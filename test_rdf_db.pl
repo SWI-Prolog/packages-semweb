@@ -29,10 +29,16 @@
     the GNU General Public License.
 */
 
-:- asserta(file_search_path(foreign, '../sgml')).
-:- asserta(file_search_path(library, '../sgml')).
-:- asserta(file_search_path(library, '../sgml/RDF')).
-:- asserta(file_search_path(foreign, '.')).
+:- module(test_rdf_db,
+	  [ test_rdf_db/0
+	  ]).
+
+:- asserta(user:file_search_path(foreign, '../sgml')).
+:- asserta(user:file_search_path(library, '../sgml')).
+:- asserta(user:file_search_path(foreign, '../clib')).
+:- asserta(user:file_search_path(library, '../clib')).
+:- asserta(user:file_search_path(library, '../sgml/RDF')).
+:- asserta(user:file_search_path(foreign, '.')).
 :- use_module(rdf_db).
 :- use_module(rdfs).
 :- use_module(library(xsdp_types)).
@@ -51,7 +57,9 @@ available test sets. The public goals are:
 	?- test.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-:- format('RDF-DB test suite.  To run all tests run ?- test.~n~n', []).
+test_rdf_db :-
+	test.
+
 
 		 /*******************************
 		 *	     TEST DATA		*
@@ -105,7 +113,7 @@ save_reload(Encoding) :-
 	delete_file(File).
 
 %	convert_typed(+Type, +Content, -Object)
-%	
+%
 %	Convert to type(Type, PrologValue), providing the inverse of
 %	the default RDF as produced by rdf_db.pl
 
@@ -219,7 +227,7 @@ lang(1) :-
 		lang(en, 'John'),
 		lang(en, ''),
 		'Johannes'
-	      ]. 
+	      ].
 lang(2) :-
 	lang_data,
 	findall(X, rdf(x, a, literal(lang(nl, X))), Xs),
@@ -242,10 +250,10 @@ lang(save_db) :-
 	save_reload_db,
 	X = lang(_,_),
 	findall(X, rdf(x, a, literal(X)), Xs),
-	(   Xs =@= [ lang(nl, 'Jan'), 
+	(   Xs =@= [ lang(nl, 'Jan'),
 		     lang(en, 'John'),
 		     lang(en, ''),
-		     lang(_, 'Johannes') 
+		     lang(_, 'Johannes')
 		   ]
 	->  true
 	;   format(user_error, 'Xs = ~w~n', [Xs]),
@@ -259,7 +267,7 @@ lang(save) :-
 		     [ lang(nl, 'Jan'),
 		       lang(en, 'John'),
 		       lang(en, ''),
-		       'Johannes' 
+		       'Johannes'
 		     ])
 	->  true
 	;   format(user_error, 'Xs = ~q~n', [Xs]),
@@ -585,7 +593,7 @@ prefix(7) :- tprefix(p2, bbbb).
 prefix(8) :- tprefix(p2, bbbbb).
 prefix(9) :- tprefix(p2, 'Bbbbb').
 prefix(10) :- tprefix(p2, 'BBBBB').
-				
+
 prefix(like-1) :-
 	mkprefix_db(_),
 	findall(L, rdf(_,_,literal(like('a*b'), L)), Ls),
@@ -746,7 +754,19 @@ source(1) :-
 	rdf_source(test, X),
 	X == 'test.rdf'.
 
+		 /*******************************
+		 *	        UNLOAD		*
+		 *******************************/
 
+unload(1) :-
+	rdf_load(dc),
+	rdf_statistics(triples(T0)),
+	rdf_unload(dc),
+	rdf_statistics(triples(T1)),
+	rdf_load(dc),
+	rdf_statistics(triples(T2)),
+	T0 == T2,
+	T1 == 0.
 
 		 /*******************************
 		 *	      SCRIPTS		*
@@ -781,7 +801,7 @@ run_test_script(Script) :-
 
 run_test_scripts(Directory) :-
 	(   script_dir(ScriptDir),
-	    concat_atom([ScriptDir, /, Directory], Dir),
+	    atomic_list_concat([ScriptDir, /, Directory], Dir),
 	    exists_directory(Dir)
 	->  true
 	;   Dir = Directory
@@ -840,9 +860,10 @@ testset(ptree).
 testset(reachable).
 testset(duplicates).
 testset(source).
+testset(unload).
 
 %	testdir(Dir)
-%	
+%
 %	Enumerate directories holding tests.
 
 testdir('Tests').
@@ -907,7 +928,7 @@ runtest(Name) :-
 	fail.
 runtest(_) :-
 	format(' done.~n').
-	
+
 test_failed(R, Except) :-
 	clause(Head, _, R),
 	functor(Head, Name, 1),
