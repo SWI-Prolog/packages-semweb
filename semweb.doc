@@ -466,16 +466,15 @@ Changes the second field of the triple.
     \termitem{object}{Object}
 Changes the last field of the triple to the given resource or
 \term{literal}{Value}.
-    \termitem{source}{Source}
-Changes the source location (\jargon{payload}).  Note that updating the
-source has no consequences for the semantics and therefore the
-\jargon{generation} (see rdf_generation/1) is \emph{not} updated.
+    \termitem{graph}{Graph}
+Moves the triple from its current named graph to \arg{Graph}. Note that
+updating the source has no consequences for the semantics and therefore
+the \jargon{generation} (see rdf_generation/1) is \emph{not} updated.
 \end{description}
 
     \predicate{rdf_update}{5}{+Subject, +Predicate, +Object,
-			      +Source,+Action}
-As rdf_update/4 but allows for specifying the source.
-
+			      +Graph, +Action}
+As rdf_update/4 but allows for specifying the graph.
 \end{description}
 
 
