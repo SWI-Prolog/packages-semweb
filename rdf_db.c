@@ -5498,18 +5498,9 @@ update_triple(rdf_db *db, term_t action, triple *t)
       return FALSE;
     if ( t2.graph == t->graph && t2.line == t->line )
       return TRUE;
-    if ( db->tr_first )
-    { record_update_src_transaction(db, t, t2.graph, t2.line);
-    } else
-    { if ( t->graph )
-	unregister_graph(db, t);
-      t->graph = t2.graph;
-      t->line = t2.line;
-      if ( t->graph )
-	register_graph(db, t);
-    }
 
-    return TRUE;			/* considered no change */
+    tmp.graph = t2.graph;
+    tmp.line = t2.line;
   } else
     return domain_error(action, "rdf_action");
 
