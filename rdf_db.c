@@ -4522,21 +4522,6 @@ record_update_transaction(rdf_db *db, triple *t, triple *new)
 
 
 static void
-record_update_src_transaction(rdf_db *db, triple *t,
-			      atom_t src, unsigned long line)
-{ transaction_record *tr = rdf_malloc(db, sizeof(*tr));
-
-  memset(tr, 0, sizeof(*tr));
-  tr->type = TR_UPDATE_SRC,
-  tr->triple = t;
-  tr->update.src.atom = src;
-  tr->update.src.line = line;
-
-  append_transaction(db, tr);
-}
-
-
-static void
 void_transaction(rdf_db *db, transaction_record *tr)
 { switch(tr->type)
   { case TR_ASSERT:
@@ -4587,7 +4572,6 @@ clean_transaction(rdf_db *db, transaction_record *tr0)
 	{ switch(tr2->type)
 	  { case TR_RETRACT:
 	    case TR_UPDATE:
-	    case TR_UPDATE_SRC:
 	      void_transaction(db, tr2);
 	    default:
 	      ;
@@ -4751,19 +4735,6 @@ commit_transaction(rdf_db *db, term_t id)
 	      link_triple_silent(db, tr->update.triple);
 	      db->generation++;
 	    }
-	  }
-	  break;
-	case TR_UPDATE_SRC:
-	  if ( !tr->triple->erased )
-	  { if ( tr->triple->graph != tr->update.src.atom )
-	    { if ( tr->triple->graph )
-		unregister_graph(db, tr->triple);
-	      tr->triple->graph = tr->update.src.atom;
-	      if ( tr->triple->graph )
-		register_graph(db, tr->triple);
-	    }
-	    tr->triple->line = tr->update.src.line;
-	    db->generation++;
 	  }
 	  break;
 	case TR_UPDATE_MD5:
@@ -5538,14 +5509,19 @@ update_triple(rdf_db *db, term_t action, triple *t)
 }
 
 
+#define UPDATE_BUFSIZE 64
 
 static foreign_t
 rdf_update5(term_t subject, term_t predicate, term_t object, term_t src,
 	    term_t action)
 { triple t, *p;
   int indexed = BY_SPO;
-  int done = 0;
   rdf_db *db = DB;
+  size_t count = 0;
+  size_t allocated = UPDATE_BUFSIZE;
+  triple *tmp[UPDATE_BUFSIZE];
+  triple **buf = tmp;
+  int rc = TRUE;
 
   memset(&t, 0, sizeof(t));
 
@@ -5553,7 +5529,7 @@ rdf_update5(term_t subject, term_t predicate, term_t object, term_t src,
        !get_triple(db, subject, predicate, object, &t) )
     return FALSE;
 
-  if ( !WRLOCK(db, FALSE) )
+  if ( !WRLOCK(db, TRUE) )
   { free_triple(db, &t);
     return FALSE;
   }
@@ -5565,18 +5541,42 @@ rdf_update5(term_t subject, term_t predicate, term_t object, term_t src,
   p = db->table[ICOL(indexed)][triple_hash(db, &t, indexed)];
   for( ; p; p = p->tp.next[ICOL(indexed)])
   { if ( match_triples(p, &t, MATCH_EXACT) )
-    { if ( !update_triple(db, action, p) )
-      { WRUNLOCK(db);
-	free_triple(db, &t);
-	return FALSE;			/* type errors */
+    { if ( count == allocated )
+      {	size_t osize = allocated*sizeof(triple*);
+
+	if ( buf == tmp	)
+	{ buf = rdf_malloc(db, osize*2);
+	  memcpy(buf, tmp, osize);
+	} else
+	{ buf = rdf_realloc(db, buf, osize, osize*2);
+	}
+
+	allocated *= 2;
       }
-      done++;
+      buf[count++] = p;
     }
   }
+
+  if ( LOCKOUT_READERS(db) )
+  { size_t n;
+
+    for(n=0; n<count; n++)
+    { if ( !update_triple(db, action, buf[n]) )
+      { rc = FALSE;
+	goto out;
+      }
+    }
+
+    REALLOW_READERS(db);
+  }
+
+out:
+  if ( buf != tmp )
+    rdf_free(db, buf, allocated*sizeof(triple*));
   free_triple(db, &t);
   WRUNLOCK(db);
 
-  return done ? TRUE : FALSE;
+  return (rc && count > 0) ? TRUE : FALSE;
 }
 
 

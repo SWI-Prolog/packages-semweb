@@ -209,7 +209,6 @@ typedef enum
   TR_ASSERT,				/* rdf_assert */
   TR_RETRACT,				/* rdf_retractall */
   TR_UPDATE,				/* rdf_update */
-  TR_UPDATE_SRC,			/* rdf_update */
   TR_UPDATE_MD5,			/* update md5 src */
   TR_RESET,				/* rdf_reset_db */
   TR_VOID				/* no-op */
