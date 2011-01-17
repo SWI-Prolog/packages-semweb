@@ -1,0 +1,25 @@
+---+ Concurrent version of RDF-DB.
+
+---++ Objectives
+
+  * Provide concurrency similar to Prolog's dynamic DB, using the Prolog update
+  semantics.  Steps:
+
+    1. Avoid the _need_ for reindexing
+    2. Introduce generations for RDF triples
+    3. Change locking.  Options:
+
+      1. As Prolog does it now:
+	- Lock on entry, updating active_queries
+	- Lock on exit, updating active_queries
+	- GC if desirable and no active queries
+
+      2. Lock-free version of (1):
+	- Update active queries lock-free.  Atomic test to see
+	  whether GC is in progress.
+
+	  	--> Anyway, mostly same code as (1).
+
+      3. Alternatively
+	- Use lock-free algorithms to update chains
+	- Use atom-GC style silence-all-threads-and-gc
