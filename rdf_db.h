@@ -180,13 +180,13 @@ typedef struct triple
     atom_t	resource;
   } object;
   atom_t	graph;			/* where it comes from */
-  unsigned long line;			/* graph-line number */
 					/* indexing */
   union
   { struct triple*next[INDEX_TABLES];	/* hash-table next links */
     literal 	end;			/* end for between(X,Y) patterns */
   } tp;					/* triple or pattern */
-					/* flags */
+					/* smaller objects (e.g., flags) */
+  uint32_t      line;			/* graph-line number */
   unsigned	object_is_literal : 1;	/* Object is a literal */
   unsigned	resolve_pred : 1;	/* predicates needs to be resolved */
   unsigned	indexed : 4;		/* Partials: BY_* */
