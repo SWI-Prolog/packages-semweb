@@ -23,3 +23,22 @@
       3. Alternatively
 	- Use lock-free algorithms to update chains
 	- Use atom-GC style silence-all-threads-and-gc
+
+---+++ Update semantics
+
+  * Add born/died generation to a triple
+  * Dealing with predicate clouds:
+    - A cloud has multiple reachability matrices, organised in an AVL tree.
+    - If an rdf:subPropertyOf is added/deleted, we make a new (lazy)
+    matrix.
+  * If two non-empty predicate clouds must be merged:
+    1. Move triples to new hash
+	- Delete triple (generation)
+	- Create new triple with new hash at this generation.
+    2. Create new cloud with all merged predicates.
+	- Link this cloud to original ones
+	- Perform multiple queries
+
+---+ References
+
+Lock-free library: http://www.liblfds.org/
