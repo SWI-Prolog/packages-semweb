@@ -24,7 +24,7 @@
 	- Use lock-free algorithms to update chains
 	- Use atom-GC style silence-all-threads-and-gc
 
----+++ Update semantics
+---+++ Logical update semantics
 
   * Add born/died generation to a triple
   * Dealing with predicate clouds:
@@ -35,9 +35,20 @@
     1. Move triples to new hash
 	- Delete triple (generation)
 	- Create new triple with new hash at this generation.
-    2. Create new cloud with all merged predicates.
+	! predicate->cloud no longer works
+	    + predicate --> AVL-tree of clouds
+    2. *OR* Create new cloud with all merged predicates.
 	- Link this cloud to original ones
 	- Perform multiple queries
+
+---++ GC issues
+
+  * If there are no active queries and GC is desirable
+    1. Remove erased triples
+    2. Restart generation-counter (keep offset for the `real' generation)
+    3. Reset generation-AVL trees
+	- Do we need AVL trees then?  Alternative is array, possibly with
+	binary search.
 
 ---+ References
 
