@@ -27,33 +27,8 @@
 ---+++ Logical update semantics
 
   * Add born/died generation to a triple
-  * Dealing with predicate clouds:
-    - A cloud has multiple reachability matrices, organised in an AVL tree.
-    - If an rdf:subPropertyOf is added/deleted, we make a new (lazy)
-    matrix.
-  * If two non-empty predicate clouds must be merged:
-    1. Move triples of smallest (#triples) to hash of larger ones
-	- Delete triple (generation)
-	- Create new triple with new hash at this generation.
-    2. Add predicates of smallest (#triples) to largest
-        - Add matrices for generations known in both clouds
-	- Re-point predicate->cloud of moved predicates to new cloud
-	- Keep old cloud until queries died (see GC).
-  * If a non-empty predicates could is split (can be left to GC)
-    1. Create a new cloud (with new hash) for the smallest group
-    2. Copy triples to new cloud (as above)
-    3. We MUST use the old (merged) cloud as long as there are queries
-    4. If all queries died
-	- Move predicates to new cloud.
-	- Shrink old cloud
-    ===OR===
-    1. Wait until all old queries have died, then
-       2. Create a new cloud for the smaller group
-       3. Copy triples to new cloud (as above)
-       4. Move predicate-->group link for new cloud (set dirty)
-       5.
 
----++++ Plan B for clouds:
+---++++ Dealing with predicate clouds:
 
   * Have the link on predicates + generation and have immutable clouds
     - Array of generation-ranges to clouds
