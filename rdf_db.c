@@ -1097,8 +1097,11 @@ split_cloud(rdf_db *db, predicate_cloud *cloud,
 
       pred_reachable(start, done, graph, &gsize);
       new_cloud = new_predicate_cloud(db, graph, gsize);
+      DEBUG(1, Sdprintf("Split cloud %d from %s --> %p with %d members\n",
+			found, pname(start), new_cloud, gsize));
       if ( found == 0 )
       { new_cloud->hash = cloud->hash;
+	new_cloud->dirty = cloud->dirty;
       } else
       { new_cloud->dirty = TRUE;	/* preds come from another cloud */
 	db->need_update++;
