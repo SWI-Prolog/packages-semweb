@@ -32,14 +32,73 @@
     - If an rdf:subPropertyOf is added/deleted, we make a new (lazy)
     matrix.
   * If two non-empty predicate clouds must be merged:
-    1. Move triples to new hash
+    1. Move triples of smallest (#triples) to hash of larger ones
 	- Delete triple (generation)
 	- Create new triple with new hash at this generation.
-	! predicate->cloud no longer works
-	    + predicate --> AVL-tree of clouds
-    2. *OR* Create new cloud with all merged predicates.
-	- Link this cloud to original ones
-	- Perform multiple queries
+    2. Add predicates of smallest (#triples) to largest
+        - Add matrices for generations known in both clouds
+	- Re-point predicate->cloud of moved predicates to new cloud
+	- Keep old cloud until queries died (see GC).
+  * If a non-empty predicates could is split (can be left to GC)
+    1. Create a new cloud (with new hash) for the smallest group
+    2. Copy triples to new cloud (as above)
+    3. We MUST use the old (merged) cloud as long as there are queries
+    4. If all queries died
+	- Move predicates to new cloud.
+	- Shrink old cloud
+    ===OR===
+    1. Wait until all old queries have died, then
+       2. Create a new cloud for the smaller group
+       3. Copy triples to new cloud (as above)
+       4. Move predicate-->group link for new cloud (set dirty)
+       5.
+
+---++++ Plan B for clouds:
+
+  * Have the link on predicates + generation and have immutable clouds
+    - Array of generation-ranges to clouds
+      - Start searching this from the latest
+      - Remove on GC
+      - If predicate-hash must change at generation X, copy triples
+    - Adding/deleting a triple inside a cloud:
+      1. Create a copy
+      2. Set new one from current generation on all predicates
+    - Adding a triples that joins two clouds
+      2. Create new cloud with all triples and hash of `largest'
+      3. Copy triples to new hash
+      4. Set new one from current generation on all predicates.
+    - Delete a triples that splits a cloud
+      1. Create two new clouds.  Largest takes hash of old.
+      2. Copy triples of smaller to hash of new cloud.
+      3. Set new clouds on current generation on all predicates.
+
+---+++ Transaction semantics
+
+  * All goals in a transaction see the database at the generation of the
+  transaction start.
+  * All goals in a _nested_ transaction see changes done by the parent
+  transaction upto the start of the nested transaction.
+  * Update semantics
+    - A transaction maintains a list of affected triples.
+    - A transaction is assigned a transaction generation, which count
+      from near the maximum generation.
+      - Each added triple is born at the transaction-generation
+      - Each triples deleted died at the transaction-generation
+    - If a transaction is _committed_ we scan the affected triples and
+      - Each added triple is born at the current generation
+      - Each deleted triple died at the current generation
+    - If a transaction is _rolled_back_
+      - Each added triple is born at the max generation
+	- GC will take care of them
+      - Each deleted triple died at the max generation (as initial)
+
+  * Transaction generation
+    - Must be far enough away from `now'; allocated near the end.
+    - All triples in a transaction are from the same generation.
+    - Nested transactions need a generation > parent
+    - Multiple threads may run multiple transactions concurrently.
+      - Groups: max-threads, max-nested?  Ok: 1000*1000 = 1m is still
+      nothing.
 
 ---++ GC issues
 
@@ -49,6 +108,19 @@
     3. Reset generation-AVL trees
 	- Do we need AVL trees then?  Alternative is array, possibly with
 	binary search.
+
+---+++ Non-blocking GC (yes!)
+
+  * We can do it much more often :-)
+  * Possible `non-blocking' GC (can run in a separate thread!):
+    - Keep track of `oldest' generation (incrementally)
+    - Remove older triples from links without locking.  Means we need to
+      keep the removed triples for a while.  A safe time is when all queries
+      running at GC ended --> semaphore?  Explicit query structure with flag
+      that we ran during GC.
+    - Wrap-around generation?  Keeping transaction generations in a seperate
+      pool.  Not possible: triples come in all the time --> 64-bit generation
+      pointers :-(
 
 ---+ References
 
