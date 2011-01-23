@@ -88,8 +88,9 @@ typedef enum q_type
 
 typedef struct query
 { gen_t		generation;		/* Generation that started the Q */
-  DB	       *db;			/* Database on which we run */
+  rdf_db       *db;			/* Database on which we run */
   int		thread;			/* Prolog thread-id running the Q */
+  thread_info  *thread_info;		/* Per-thread administration */
   q_type	type;			/* Q_* */
   wait_list    *waiters;		/* things waiting for me to die */
   struct
@@ -103,6 +104,9 @@ typedef struct query_admin
 { gen_t		generation;		/* Global heart-beat */
   per_thread	per_thread;		/* per-thread data (transactions) */
   query	       *queries;		/* Open queries */
+  struct
+  { mutex_t	add;			/* For adding triples */
+  } locks;
 } query_admin.
 
 
@@ -110,12 +114,12 @@ typedef struct query_admin
 		 *	    	API		*
 		 *******************************/
 
-COMMON(query *)		alloc_query(DB *db);
-COMMON(query *)		alloc_transaction(DB *db);
+COMMON(query *)		alloc_query(rdf_db *db);
+COMMON(query *)		alloc_transaction(rdf_db *db);
 COMMON(query *)		free_query(query *q);
 
-COMMON(gen_t)		oldest_query(DB *db,
-				     void (*ondied)(DB *db, void *closure));
+COMMON(gen_t)		oldest_query(rdf_db *db,
+				     void (*ondied)(rdf_db *db, void *closure));
 
 					/* Inline? */
 COMMON(int)		alive(query *q, lifespan *span);

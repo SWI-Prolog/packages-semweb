@@ -102,9 +102,44 @@
       pool.  Not possible: triples come in all the time --> 64-bit generation
       pointers :-(
 
+---+ Adding triples
+
+  - LOCKED
+    1. Obtain a generation.
+    2. Add the triples.
+    3. Step the generation to the newly obtained generation.
+
+  The lock must be held as short as possible.  What about this:
+
+  - add_triples(triple *triples, size_t count)
+    1. Adds triples to the chains, setting generation to the future.
+    2. Do the above, where (2) sets the proper generation.
+		  -- also requires a lock :-(
+
+
 ---+ Problems
 
   * Locking in literal-DB.  Is there a B-tree with good concurrency?
+
+---++ Alternative:
+
+  * Use a sorted array of literals with holes (like a closed hash table).
+
+    - If new hits a hole --> fill.
+    - Otherwise
+	- Plan A
+	  - Place out of order.  Search must seek for a hole before
+	    deciding.  Probably doable, but results are out of order.
+	- Plan B
+	  - Shuffle.  Means enumeration can hit twice.  Maybe acceptable?
+    - Too small: create new array.  Wait for active queries to finish
+      before deleting the old.
+
+    A bit similar to a B+-tree with unbounded node-size?
+
+	- Closed hash: distribution guaranteed.
+	- Sorted array: things may build up in certain areas, causing
+	  frequent re-sizes.
 
 ---+ References
 
