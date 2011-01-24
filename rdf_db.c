@@ -2268,6 +2268,9 @@ triple_hash(rdf_db *db, triple *t, int which)
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 by_inverse[] returns the index key to use   for inverse search as needed
 to realise symmetric and inverse predicates.
+
+Note that this only deals with the   non-G(graph)  indices because it is
+only used by rdf_has/3 and rdf_reachable/3.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static int by_inverse[8] =
