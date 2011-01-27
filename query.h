@@ -105,8 +105,8 @@ typedef struct query_admin
   per_thread	per_thread;		/* per-thread data (transactions) */
   query	       *queries;		/* Open queries */
   struct
-  { mutex_t	add;			/* For adding triples */
-  } locks;
+  { mutex_t	lock;			/* For adding triples */
+  } write;
 } query_admin.
 
 

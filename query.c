@@ -132,7 +132,48 @@ Or, hand them to a separate thread?
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 int
-add_triples(rdf_db *db, triple *triples, size_t count)
-{
+add_triples(rdf_db *db, triple **triples, size_t count)
+{ gen_t gen = db->queries.generation + 1;
+  triple **ep = triples+count;
+  triple **tp;
+
+  LOCK(db->queries.write.lock);
+  for(tp=triples; tp < ep; tp++)
+  { (*tp)->born = gen;
+    (*tp)->died = GEN_MAX;
+    link_triple(db, *tp);
+  }
+  db->queries.generation++;
+  UNLOCK(db->queries.write.lock);
+
+  return TRUE;
 }
 
+
+int
+del_triples(rdf_db *db, triple **triples, size_t count)
+{ gen_t gen = db->queries.generation + 1;
+  triple **ep = triples+count;
+  triple **tp;
+
+  LOCK(db->queries.write.lock);
+  for(tp=triples; tp < ep; tp++)
+  { (*tp)->died = gen;
+    link_triple(db, *tp);
+  }
+  db->queries.generation++;
+  UNLOCK(db->queries.write.lock);
+
+  return TRUE;
+}
+
+
+/* copy_triples() copies triples whose indexing is out-of-date to the
+   new index.  This must happen after an rdfs:subPropertyOf addition
+   has joined two non-empty predicate clouds.
+*/
+
+int
+copy_triples(rdf_db *db, predicate **p, size_t count)
+{
+}

@@ -141,6 +141,19 @@
 	- Sorted array: things may build up in certain areas, causing
 	  frequent re-sizes.
 
+---+ Hash-table design
+
+---++ Connected/disconnected?
+
+10 tables, 5 include P.
+
+  * Why connected:
+      - After finding a triple we must match it anyway
+  * Why not connected:
+      - Larger blocks.  I.e. search SP (very common), we basically want SP
+        blocks.
+
+
 ---+ References
 
 Lock-free library:	http://www.liblfds.org/
