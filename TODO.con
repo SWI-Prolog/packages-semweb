@@ -153,6 +153,35 @@
       - Larger blocks.  I.e. search SP (very common), we basically want SP
         blocks.
 
+The math:
+
+  * Now (connected model)
+    - A triple holds 5 cells for the data + 10 for indexing.
+    - 10 bucket-arrays + 10 bucket-tail arrays.
+    - Current sizes:
+	- S,SG: 2
+	- P: 0.5
+	- PG: #P*#G/5
+	- O,SP,SO,PO,SPO: 4	2.5 cell/t
+	- G: 0.5
+
+  * Disconnected model:
+    - Now we use only one cell per entry: no way to win space.
+    - Win on reindex: only have to copy the index.
+
+    - Loose?
+
+  * Resize (YES)
+    - Double buckets.
+	- Use lock-free dynamic arrays!
+    - Lookup using K%N, K%(2N), ... (is like Cuckoo hashing)
+	- Needs to know N0.  Do not make N0 too small.
+    - Unbalance < 2L.
+    - Move things from K%N --> K%(2N)?
+	- Can only be done with copying the triple or full GC.  Most likely
+	not worth the trouble.
+    - How to estimate complexity based on hash?
+	- Get sizes of different candidates and do the math.
 
 ---+ References
 
