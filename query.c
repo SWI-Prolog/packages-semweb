@@ -82,7 +82,7 @@ rdf_thread_info(rdf_db *db, int tid)
   { LOCK_DB(db);
     if ( !td->blocks[idx] )
     { size_t bs = (size_t)1<<idx;
-      thread_info *newblock = allocHeap(bs*sizeof(thread_info));
+      thread_info *newblock = sgml_malloc(db, bs*sizeof(thread_info));
 
       memset(newblock, 0, bs*sizeof(thread_info));
 
