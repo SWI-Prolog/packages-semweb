@@ -2102,24 +2102,32 @@ dump_literals()
 		 *	      TRIPLES		*
 		 *******************************/
 
-static void
+static int
+init_table(rdf_db *db, int index, size_t count)
+{ triple_hash *h = &db->hash[index];
+  size_t bytes = sizeof(triple*)*count;
+  triple *t = rdf_malloc(db, bytes);
+
+  memset(t, 0, bytes);
+  memset(h, 0, sizeof(*h));
+  for(i=0; i<MSB(count-1); i++)
+    h->blocks[i] = t;
+
+  h->bucket_count_epoch = h->bucket_count = count;
+
+  return TRUE;
+}
+
+
+static int
 init_tables(rdf_db *db)
 { int ic;
-  int bytes = sizeof(triple*)*INITIAL_TABLE_SIZE;
-  int cbytes = sizeof(int)*INITIAL_TABLE_SIZE;
 
-  db->table[0] = &db->by_none;
-  db->tail[0]  = &db->by_none_tail;
+  db->hash[0].blocks[0].triples = &db->by_none;
+  db->tail[0].blocks[0].tail    = &db->by_none_tail;
 
   for(ic=BY_S; ic<INDEX_TABLES; ic++)
-  { db->table[ic] = rdf_malloc(db, bytes);
-    memset(db->table[ic], 0, bytes);
-    db->tail[ic] = rdf_malloc(db, bytes);
-    memset(db->tail[ic], 0, bytes);
-    db->counts[ic] = rdf_malloc(db, cbytes);
-    memset(db->counts[ic], 0, cbytes);
-    db->table_size[ic] = INITIAL_TABLE_SIZE;
-  }
+    init_table(db, ic, INITIAL_TABLE_SIZE);
 
   init_pred_table(db);
   init_graph_table(db);

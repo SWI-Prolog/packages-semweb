@@ -241,12 +241,24 @@ typedef struct active_transaction
 } active_transaction;
 
 
+typedef struct triple_bucket
+{ triple       *triples;		/* Head of triple-list */
+  triple       *tail;			/* Tail of triple-list */
+  unsigned int	count;			/* #Triples in bucket */
+} triple_bucket;
+
+#define MAX_TBLOCKS 32
+
+typedef struct triple_hash
+{ triple_bucket	*blocks[MAX_TBLOCKS];	/* Dynamic array starts */
+  size_t	bucket_count;		/* Allocated #buckets */
+  size_t	bucket_count_epoch;	/* Initial bucket count */
+} triple_hash;
+
+
 typedef struct rdf_db
-{ triple       *by_none, *by_none_tail;
-  triple      **table[INDEX_TABLES];
-  triple      **tail[INDEX_TABLES];
-  int	       *counts[INDEX_TABLES];
-  size_t	table_size[INDEX_TABLES];
+{ triple       *by_none, *by_none_tail;	/* Plain linked list of triples */
+  triple_hash   hash[INDEX_TABLES];	/* Hash-tables */
   size_t	created;		/* #triples created */
   size_t	erased;			/* #triples erased */
   size_t	freed;			/* #triples actually erased */
