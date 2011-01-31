@@ -6489,10 +6489,12 @@ rdf_reachable(term_t subj, term_t pred, term_t obj,
 	atom_t inf;
 
 	if ( PL_get_atom(max_d, &inf) && inf == ATOM_infinite )
-	  a.max_d = (uintptr_t)-1;
-	if ( !get_long_ex(max_d, &md) || md < 0 )
-	  return FALSE;
-	a.max_d = md;
+	{ a.max_d = (uintptr_t)-1;
+	} else
+	{ if ( !get_long_ex(max_d, &md) || md < 0 )
+	    return FALSE;
+	  a.max_d = md;
+	}
       } else
       { a.max_d = (uintptr_t)-1;
       }
