@@ -72,7 +72,7 @@
 /* (*) INDEX_TABLES must be consistent with index_col[] in rdf_db.c */
 #define INDEX_TABLES 		        10 	/* (*)  */
 #define INITIAL_TABLE_SIZE   		1024
-#define INITIAL_PREDICATE_TABLE_SIZE	1024
+#define INITIAL_PREDICATE_TABLE_SIZE	64
 #define INITIAL_GRAPH_TABLE_SIZE	64
 
 #define MAX_HASH_FACTOR 8		/* factor to trigger re-hash */

@@ -832,17 +832,33 @@ TBD: We can do a partial re-hash in that case!
 
 static int
 init_pred_table(rdf_db *db)
-{ int bytes = sizeof(predicate**)*INITIAL_PREDICATE_TABLE_SIZE;
+{ size_t bytes = sizeof(predicate**)*INITIAL_PREDICATE_TABLE_SIZE;
   predicate **p = rdf_malloc(db, bytes);
-  memset(p, 0, bytes);
   int i, count = INITIAL_PREDICATE_TABLE_SIZE;
 
+  memset(p, 0, bytes);
   for(i=0; i<MSB(count); i++)
     db->predicates.blocks[i] = p;
 
   db->predicates.bucket_count       = count;
   db->predicates.bucket_count_epoch = count;
   db->predicates.count              = 0;
+
+  return TRUE;
+}
+
+
+static int
+resize_pred_table(rdf_db *db)
+{ int i = MSB(db->predicates.bucket_count);
+  size_t bytes  = sizeof(predicate**)*db->predicates.bucket_count;
+  predicate **p = rdf_malloc(db, bytes);
+
+  memset(p, 0, bytes);
+  db->predicates.blocks[i] = p-db->predicates.bucket_count;
+  db->predicates.bucket_count *= 2;
+  DEBUG(0, Sdprintf("Resized predicate table to %ld\n",
+		    (long)db->predicates.bucket_count));
 
   return TRUE;
 }
@@ -925,6 +941,8 @@ lookup_predicate(rdf_db *db, atom_t name)
   cp = new_predicate_cloud(db, &p, 1);
   p->hash = cp->hash;
   PL_register_atom(name);
+  if ( db->predicates.count > db->predicates.bucket_count )
+    resize_pred_table(db);
   entry = atom_hash(name) % db->predicates.bucket_count;
   pp = &db->predicates.blocks[MSB(entry)][entry];
   p->next = *pp;
