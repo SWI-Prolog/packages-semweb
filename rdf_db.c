@@ -6177,26 +6177,65 @@ unify_predicate_property(rdf_db *db, predicate *p, term_t option, functor_t f)
 }
 
 
-static foreign_t
-rdf_current_predicates(term_t preds)
-{ rdf_db *db = DB;
+typedef struct enum_pred
+{ predicate *p;
   int i;
-  term_t head = PL_new_term_ref();
-  term_t tail = PL_copy_term_ref(preds);
+} enum_pred;
 
-  for(i=0; i<db->predicates.bucket_count; i++)
-  { predicate *p = db->predicates.blocks[MSB(i)][i];
 
-    for(; p; p = p->next)
-    { if ( !PL_unify_list(tail, head, tail) ||
-	   !PL_unify_atom(head, p->name) )
-      { UNLOCK_MISC(db);
-	return FALSE;
+static foreign_t
+rdf_current_predicate(term_t name, control_t h)
+{ rdf_db *db = DB;
+  predicate *p;
+  enum_pred *ep;
+  atom_t a;
+
+  switch( PL_foreign_control(h) )
+  { case PL_FIRST_CALL:
+      if ( PL_is_variable(name) )
+      { ep = rdf_malloc(db, sizeof(*ep));
+	ep->i  = 0;
+	ep->p  = NULL;
+	goto next;
+      } else if ( get_atom_ex(name, &a) )
+      { predicate *p;
+
+	if ( (p=existing_predicate(db, a)) &&
+	     p->triple_count > 0 )
+	  return TRUE;
       }
+      return FALSE;
+    case PL_REDO:
+      ep = PL_foreign_context_address(h);
+      goto next;
+    case PL_PRUNED:
+      ep = PL_foreign_context_address(h);
+      rdf_free(db, ep, sizeof(*ep));
+      return TRUE;
+    default:
+      assert(0);
+      return FALSE;
+  }
+
+next:
+  if ( !(p=ep->p) )
+  { while (!(p = db->predicates.blocks[MSB(ep->i)][ep->i]) )
+    { if ( ++ep->i >= db->predicates.bucket_count )
+	goto fail;
     }
   }
 
-  return PL_unify_nil(tail);
+  if ( !PL_unify_atom(name, p->name) )
+  { fail:
+    rdf_free(db, ep, sizeof(*ep));
+    return FALSE;
+  }
+
+  if ( !(ep->p = p->next) )
+  { if ( ++ep->i >= db->predicates.bucket_count )
+      goto fail;
+  }
+  PL_retry_address(ep);
 }
 
 
@@ -7146,8 +7185,8 @@ install_rdf_db()
 					2, rdf_set_predicate, 0);
   PL_register_foreign("rdf_predicate_property_",
 					2, rdf_predicate_property, NDET);
-  PL_register_foreign("rdf_current_predicates",
-					1, rdf_current_predicates, 0);
+  PL_register_foreign("rdf_current_predicate",
+					1, rdf_current_predicate, NDET);
   PL_register_foreign("rdf_current_literal",
 					1, rdf_current_literal, NDET);
   PL_register_foreign("rdf_graphs_",    1, rdf_graphs,      0);
