@@ -663,24 +663,11 @@ index(rdf(+,+,+,+), 15).
 		 *	     PREDICATES		*
 		 *******************************/
 
-%%	rdf_current_predicate(?Predicate)
-%
-%	True if Predicate is a currently defined predicate.
-
-rdf_current_predicate(P) :-
-	var(P), !,
-	rdf_current_predicates(All),
-	member(P, All),
-	rdf_predicate_property_(P, triples(N)),
-	N > 0.
-rdf_current_predicate(P) :-
-	rdf_predicate_property_(P, triples(N)),
-	N > 0.
-
 rdf_current_predicate(P, DB) :-
-	rdf_current_predicates(All),
-	member(P, All),
-	once(rdf(_,P,_,DB:_)).
+	rdf_current_predicate(P),
+	(   rdf(_,P,_,DB)
+	->  true
+	).
 
 %%	rdf_predicate_property(?Predicate, ?Property)
 %
@@ -1274,21 +1261,6 @@ do_unload(DB) :-
 	retractall(rdf_source(DB, _, _, _, _)),
 	rdf_unset_graph_source(DB).
 
-
-%%	rdf_graph(+DB) is semidet.
-%%	rdf_graph(-DB) is nondet.
-%
-%	True if DB is a current named graph with at least one triple.
-
-rdf_graph(DB) :-
-	atom(DB), !,
-	rdf_statistics_(triples(DB, Triples)),
-	Triples > 0.
-rdf_graph(DB) :-
-	rdf_graphs_(Sources),
-	member(DB, Sources),
-	rdf_statistics_(triples(DB, Triples)),
-	Triples > 0.
 
 %%	rdf_source(?Graph, ?SourceURL) is nondet.
 %

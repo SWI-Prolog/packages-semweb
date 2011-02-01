@@ -1545,68 +1545,146 @@ object_branch_factor(rdf_db *db, predicate *p, int which)
 
 static int
 init_graph_table(rdf_db *db)
-{ int bytes = sizeof(predicate*)*INITIAL_GRAPH_TABLE_SIZE;
+{ size_t bytes = sizeof(graph**)*INITIAL_PREDICATE_TABLE_SIZE;
+  graph **p = rdf_malloc(db, bytes);
+  int i, count = INITIAL_PREDICATE_TABLE_SIZE;
 
-  db->graph_table = rdf_malloc(db, bytes);
-  memset(db->graph_table, 0, bytes);
-  db->graph_table_size = INITIAL_GRAPH_TABLE_SIZE;
+  memset(p, 0, bytes);
+  for(i=0; i<MSB(count); i++)
+    db->graphs.blocks[i] = p;
+
+  db->graphs.bucket_count       = count;
+  db->graphs.bucket_count_epoch = count;
+  db->graphs.count              = 0;
 
   return TRUE;
 }
 
 
+static int
+resize_graph_table(rdf_db *db)
+{ int i = MSB(db->graphs.bucket_count);
+  size_t bytes  = sizeof(graph**)*db->graphs.bucket_count;
+  graph **p = rdf_malloc(db, bytes);
+
+  memset(p, 0, bytes);
+  db->graphs.blocks[i] = p-db->graphs.bucket_count;
+  db->graphs.bucket_count *= 2;
+  DEBUG(0, Sdprintf("Resized graph table to %ld\n",
+		    (long)db->graphs.bucket_count));
+
+  return TRUE;
+}
+
+
+typedef struct graph_walker
+{ rdf_db       *db;			/* RDF DB */
+  atom_t	name;			/* Name of the graph */
+  size_t	unbounded_hash;		/* Atom's hash */
+  size_t	bcount;			/* current bucket count */
+  graph	       *current;		/* current location */
+} graph_walker;
+
+
+static void
+init_graph_walker(graph_walker *gw, rdf_db *db, atom_t name)
+{ gw->db	     = db;
+  gw->name	     = name;
+  gw->unbounded_hash = atom_hash(name);
+  gw->bcount	     = db->graphs.bucket_count_epoch;
+  gw->current	     = NULL;
+}
+
+static graph*
+next_graph(graph_walker *gw)
+{ graph *g;
+
+  if ( gw->current )
+  { g = gw->current;
+    gw->current = g->next;
+  } else if ( gw->bcount <= gw->db->graphs.bucket_count )
+  { do
+    { int entry = gw->unbounded_hash % gw->bcount;
+      g = gw->db->graphs.blocks[MSB(entry)][entry];
+      gw->bcount *= 2;
+    } while(!g && gw->bcount <= gw->db->graphs.bucket_count );
+
+    if ( g )
+      gw->current = g->next;
+  } else
+    return NULL;
+
+  return g;
+}
+
+
 static graph *
-lookup_graph(rdf_db *db, atom_t name, int create)
-{ int hash = atom_hash(name) % db->graph_table_size;
-  graph *src;
+existing_graph(rdf_db *db, atom_t name)
+{ graph_walker gw;
+  graph *g;
+
+  init_graph_walker(&gw, db, name);
+  while((g=next_graph(&gw)))
+  { if ( g->name == name )
+      return g;
+  }
+
+  return g;
+}
+
+
+static graph *
+lookup_graph(rdf_db *db, atom_t name)
+{ graph *g, **gp;
+  int entry;
+
+  if ( (g=existing_graph(db, name)) )
+    return g;
 
   LOCK_MISC(db);
-  for(src=db->graph_table[hash]; src; src = src->next)
-  { if ( src->name == name )
-    { UNLOCK_MISC(db);
-      return src;
-    }
-  }
-
-  if ( !create )
+  if ( (g=existing_graph(db, name)) )
   { UNLOCK_MISC(db);
-    return NULL;
+    return g;
   }
 
-  src = rdf_malloc(db, sizeof(*src));
-  memset(src, 0, sizeof(*src));
-  src->name = name;
-  src->md5 = TRUE;
+  g = rdf_malloc(db, sizeof(*g));
+  memset(g, 0, sizeof(*g));
+  g->name = name;
+  g->md5 = TRUE;
   PL_register_atom(name);
-  src->next = db->graph_table[hash];
-  db->graph_table[hash] = src;
-  db->graph_count++;
+  if ( db->graphs.count > db->graphs.bucket_count )
+    resize_graph_table(db);
+  entry = atom_hash(name) % db->graphs.bucket_count;
+  gp = &db->graphs.blocks[MSB(entry)][entry];
+  g->next = *gp;
+  *gp = g;
+  db->graphs.count++;
   UNLOCK_MISC(db);
 
-  return src;
+  return g;
 }
 
 
 static void
 erase_graphs(rdf_db *db)
-{ graph **ht;
-  int i;
+{ int i;
 
-  for(i=0,ht = db->graph_table; i<db->graph_table_size; i++, ht++)
-  { graph *src, *n;
+  for(i=0; i<db->graphs.bucket_count; i++)
+  { graph *n, *g = db->graphs.blocks[MSB(i)][i];
 
-    for( src = *ht; src; src = n )
-    { n = src->next;
+    db->graphs.blocks[MSB(i)][i] = NULL;
 
-      PL_unregister_atom(src->name);
-      if ( src->source )
-	PL_unregister_atom(src->source);
-      rdf_free(db, src, sizeof(*src));
+    for( ; g; g = n )
+    { n = g->next;
+
+      PL_unregister_atom(g->name);
+      if ( g->source )
+	PL_unregister_atom(g->source);
+      rdf_free(db, g, sizeof(*g));
     }
-
-    *ht = NULL;
   }
 
+  db->graphs.count = 0;
   db->last_graph = NULL;
 }
 
@@ -1621,7 +1699,7 @@ register_graph(rdf_db *db, triple *t)
   if ( db->last_graph && db->last_graph->name == t->graph )
   { src = db->last_graph;
   } else
-  { src = lookup_graph(db, t->graph, TRUE);
+  { src = lookup_graph(db, t->graph);
     db->last_graph = src;
   }
 
@@ -1646,7 +1724,7 @@ unregister_graph(rdf_db *db, triple *t)
   if ( db->last_graph && db->last_graph->name == t->graph )
   { src = db->last_graph;
   } else
-  { src = lookup_graph(db, t->graph, TRUE);
+  { src = lookup_graph(db, t->graph);
     db->last_graph = src;
   }
 
@@ -1662,35 +1740,70 @@ unregister_graph(rdf_db *db, triple *t)
 
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-rdf_graphs_(-ListOfGraphs)
+rdf_graph(-Graph) is nondet.
 
 Return a list holding the names  of   all  currently defined graphs. We
 return a list to avoid the need for complicated long locks.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+typedef struct enum_graph
+{ graph *g;
+  int i;
+} enum_graph;
+
 static foreign_t
-rdf_graphs(term_t list)
-{ int i;
-  term_t tail = PL_copy_term_ref(list);
-  term_t head = PL_new_term_ref();
-  rdf_db *db = DB;
+rdf_graph(term_t name, control_t h)
+{ rdf_db *db = DB;
+  graph *g;
+  enum_graph *eg;
+  atom_t a;
 
-  if ( !RDLOCK(db) )
-    return FALSE;
-  for(i=0; i<db->graph_table_size; i++)
-  { graph *src;
+  switch( PL_foreign_control(h) )
+  { case PL_FIRST_CALL:
+      if ( PL_is_variable(name) )
+      { eg = rdf_malloc(db, sizeof(*eg));
+	eg->i  = 0;
+	eg->g  = NULL;
+	goto next;
+      } else if ( get_atom_ex(name, &a) )
+      { graph *g;
 
-    for(src=db->graph_table[i]; src; src = src->next)
-    { if ( !PL_unify_list(tail, head, tail) ||
-	   !PL_unify_atom(head, src->name) )
-      { RDUNLOCK(db);
-	return FALSE;
+	if ( (g=existing_graph(db, a)) &&
+	     g->triple_count > 0 )
+	  return TRUE;
       }
+      return FALSE;
+    case PL_REDO:
+      eg = PL_foreign_context_address(h);
+      goto next;
+    case PL_PRUNED:
+      eg = PL_foreign_context_address(h);
+      rdf_free(db, eg, sizeof(*eg));
+      return TRUE;
+    default:
+      assert(0);
+      return FALSE;
+  }
+
+next:
+  if ( !(g=eg->g) )
+  { while (!(g = db->graphs.blocks[MSB(eg->i)][eg->i]) )
+    { if ( ++eg->i >= db->graphs.bucket_count )
+	goto fail;
     }
   }
-  RDUNLOCK(db);
 
-  return PL_unify_nil(tail);
+  if ( !PL_unify_atom(name, g->name) )
+  { fail:
+    rdf_free(db, eg, sizeof(*eg));
+    return FALSE;
+  }
+
+  if ( !(eg->g = g->next) )
+  { if ( ++eg->i >= db->graphs.bucket_count )
+      goto fail;
+  }
+  PL_retry_address(eg);
 }
 
 
@@ -1708,7 +1821,7 @@ rdf_graph_source(term_t graph_name, term_t source, term_t modified)
 
     if ( !RDLOCK(db) )
       return FALSE;
-    if ( (s = lookup_graph(db, gn, FALSE)) && s->source)
+    if ( (s = existing_graph(db, gn)) && s->source)
     { rc = ( PL_unify_atom(source, s->source) &&
 	     PL_unify_float(modified, s->modified) );
     }
@@ -1718,23 +1831,17 @@ rdf_graph_source(term_t graph_name, term_t source, term_t modified)
 
     if ( get_atom_ex(source, &src) )
     { int i;
-      graph **ht;
 
-      if ( !RDLOCK(db) )
-	return FALSE;
+      for(i=0; i<db->graphs.bucket_count; i++)
+      { graph *g = db->graphs.blocks[MSB(i)][i];
 
-      for(i=0,ht = db->graph_table; i<db->graph_table_size; i++, ht++)
-      { graph *s;
-
-	for( s = *ht; s; s = s->next )
-	{ if ( s->source == src )
-	  { rc = ( PL_unify_atom(graph_name, s->name) &&
-		   PL_unify_float(modified, s->modified) );
+	for(; g; g=g->next)
+	{ if ( g->source == src )
+	  { return ( PL_unify_atom(graph_name, g->name) &&
+		     PL_unify_float(modified, g->modified) );
 	  }
 	}
       }
-
-      RDUNLOCK(db);
     }
   }
 
@@ -1757,7 +1864,7 @@ rdf_set_graph_source(term_t graph_name, term_t source, term_t modified)
 
   if ( !RDLOCK(db) )
     return FALSE;
-  if ( (s = lookup_graph(db, gn, TRUE)) )
+  if ( (s = lookup_graph(db, gn)) )
   { if ( s->source != src )
     { if ( s->source )
 	PL_unregister_atom(s->source);
@@ -1781,7 +1888,7 @@ rdf_unset_graph_source(term_t graph_name)
 
   if ( !get_atom_ex(graph_name, &gn) )
     return FALSE;
-  if ( (s = lookup_graph(db, gn, TRUE)) )
+  if ( (s = lookup_graph(db, gn)) )
   { if ( s->source )
     { PL_unregister_atom(s->source);
       s->source = 0;
@@ -3238,7 +3345,7 @@ write_triple(rdf_db *db, IOSTREAM *out, triple *t, save_context *ctx)
 
 static void
 write_source(rdf_db *db, IOSTREAM *out, atom_t src, save_context *ctx)
-{ graph *s = lookup_graph(db, src, FALSE);
+{ graph *s = existing_graph(db, src);
 
   if ( s && s->source )
   { Sputc('F', out);
@@ -3251,7 +3358,7 @@ write_source(rdf_db *db, IOSTREAM *out, atom_t src, save_context *ctx)
 
 static void
 write_md5(rdf_db *db, IOSTREAM *out, atom_t src)
-{ graph *s = lookup_graph(db, src, FALSE);
+{ graph *s = existing_graph(db, src);
 
   if ( s )
   { md5_byte_t *p = s->digest;
@@ -3635,7 +3742,7 @@ link_loaded_triples(rdf_db *db, triple *t, ld_context *ctx)
   graph *graph;
 
   if ( ctx->graph )			/* lookup named graph */
-  { graph = lookup_graph(db, ctx->graph, TRUE);
+  { graph = lookup_graph(db, ctx->graph);
     if ( ctx->graph_source && graph->source != ctx->graph_source )
     { if ( graph->source )
 	PL_unregister_atom(graph->source);
@@ -3893,7 +4000,7 @@ rdf_md5(term_t graph_name, term_t md5)
 
     if ( !RDLOCK(db) )
       return FALSE;
-    if ( (s = lookup_graph(db, src, FALSE)) )
+    if ( (s = existing_graph(db, src)) )
     { rc = md5_unify_digest(md5, s->digest);
     } else
     { md5_byte_t digest[16];
@@ -3904,23 +4011,17 @@ rdf_md5(term_t graph_name, term_t md5)
     RDUNLOCK(db);
   } else
   { md5_byte_t digest[16];
-    graph **ht;
     int i;
 
     memset(&digest, 0, sizeof(digest));
+    for(i=0; i<db->graphs.bucket_count; i++)
+    { graph *g = db->graphs.blocks[MSB(i)][i];
 
-    if ( !RDLOCK(db) )
-      return FALSE;
-
-    for(i=0,ht = db->graph_table; i<db->graph_table_size; i++, ht++)
-    { graph *s;
-
-      for( s = *ht; s; s = s->next )
-	sum_digest(digest, s->digest);
+      for( ; g; g = g->next )
+	sum_digest(digest, g->digest);
     }
 
-    rc = md5_unify_digest(md5, digest);
-    RDUNLOCK(db);
+    return md5_unify_digest(md5, digest);
   }
 
   return rc;
@@ -5768,7 +5869,7 @@ rdf_retractall4(term_t subject, term_t predicate, term_t object, term_t src)
   }
 
   if ( t.graph	)		/* speedup for rdf_retractall(_,_,_,DB) */
-  { graph *gr = lookup_graph(db, t.graph, FALSE);
+  { graph *gr = existing_graph(db, t.graph);
 
     if ( !gr || gr->triple_count == 0 )
       return TRUE;
@@ -6854,7 +6955,7 @@ unify_statistics(rdf_db *db, term_t key, functor_t f)
     _PL_get_arg(1, key, a);
     if ( !PL_get_atom(a, &name) )
       return type_error(a, "atom");
-    if ( (src = lookup_graph(db, name, FALSE)) )
+    if ( (src = existing_graph(db, name)) )
       v = src->triple_count;
     else
       v = 0;
@@ -7207,7 +7308,7 @@ install_rdf_db()
 					1, rdf_current_predicate, NDET);
   PL_register_foreign("rdf_current_literal",
 					1, rdf_current_literal, NDET);
-  PL_register_foreign("rdf_graphs_",    1, rdf_graphs,      0);
+  PL_register_foreign("rdf_graph",      1, rdf_graph,       NDET);
   PL_register_foreign("rdf_set_graph_source", 3, rdf_set_graph_source, 0);
   PL_register_foreign("rdf_unset_graph_source", 1, rdf_unset_graph_source, 0);
   PL_register_foreign("rdf_graph_source_", 3, rdf_graph_source, 0);

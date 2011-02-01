@@ -154,6 +154,14 @@ typedef struct graph
 #endif
 } graph;
 
+#define MAX_GBLOCKS 32
+
+typedef struct graph_hash
+{ graph	      **blocks[MAX_GBLOCKS];	/* Dynamic array starts */
+  size_t	bucket_count;		/* Allocated #buckets */
+  size_t	bucket_count_epoch;	/* Initial bucket count */
+  size_t	count;			/* Total #predicates */
+} graph_hash;
 
 typedef struct literal
 { union
@@ -291,9 +299,7 @@ typedef struct rdf_db
   size_t	agenda_created;		/* #visited nodes in agenda */
   size_t	duplicates;		/* #duplicate triples */
   size_t	generation;		/* generation-id of the database */
-  graph       **graph_table;		/* Hash table of sources */
-  int      	graph_table_size;	/* Entries in table */
-  int		graph_count;
+  graph_hash    graphs;			/* Graph table */
 
   graph	*last_graph;		/* last accessed graph */
   active_transaction *tr_active;	/* open transactions */
