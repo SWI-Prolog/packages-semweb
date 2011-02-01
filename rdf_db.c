@@ -61,6 +61,7 @@
 #include "debug.h"
 #include "hash.h"
 #include "murmur.h"
+#include "memory.h"
 
 #undef UNLOCK
 
@@ -256,9 +257,14 @@ static void update_duplicates_del(rdf_db *db, triple *t);
 static void unlock_atoms(triple *t);
 static void lock_atoms(triple *t);
 static void unlock_atoms_literal(literal *lit);
-static int  update_hash(rdf_db *db, int organise);
-static int  triple_hash(rdf_db *db, triple *t, int which);
+
+static int  	update_hash(rdf_db *db, int organise);
+static size_t	triple_hash_key(triple *t, int which);
 static size_t	object_hash(triple *t);
+static void	init_triple_walker(triple_walker *tw, rdf_db *db,
+				   triple *t, int index);
+static triple  *next_triple(triple_walker *tw);
+
 static void	reset_db(rdf_db *db);
 
 static void	record_transaction(rdf_db *db,
@@ -825,13 +831,15 @@ TBD: We can do a partial re-hash in that case!
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
-static void
+static int
 init_pred_table(rdf_db *db)
 { int bytes = sizeof(predicate*)*INITIAL_PREDICATE_TABLE_SIZE;
 
   db->pred_table = rdf_malloc(db, bytes);
   memset(db->pred_table, 0, bytes);
   db->pred_table_size = INITIAL_PREDICATE_TABLE_SIZE;
+
+  return TRUE;
 }
 
 
@@ -1376,6 +1384,7 @@ update_predicate_counts(rdf_db *db, predicate *p, int which)
     atomset object_set;
     triple t;
     triple *byp;
+    triple_walker tw;
 
     memset(&t, 0, sizeof(t));
     t.predicate.r = p;
@@ -1383,9 +1392,8 @@ update_predicate_counts(rdf_db *db, predicate *p, int which)
 
     init_atomset(&subject_set);
     init_atomset(&object_set);
-    for(byp = db->table[ICOL(t.indexed)][triple_hash(db, &t, t.indexed)];
-	byp;
-	byp = byp->tp.next[ICOL(t.indexed)])
+    init_triple_walker(&tw, db, &t, t.indexed);
+    while((byp=next_triple(&tw)))
     { if ( !byp->erased && !byp->is_duplicate )
       { if ( (which == DISTINCT_DIRECT && byp->predicate.r == p) ||
 	     (which != DISTINCT_DIRECT && isSubPropertyOf(byp->predicate.r, p)) )
@@ -1472,13 +1480,15 @@ object_branch_factor(rdf_db *db, predicate *p, int which)
 /* MT: all calls must be locked
 */
 
-static void
+static int
 init_graph_table(rdf_db *db)
 { int bytes = sizeof(predicate*)*INITIAL_GRAPH_TABLE_SIZE;
 
   db->graph_table = rdf_malloc(db, bytes);
   memset(db->graph_table, 0, bytes);
   db->graph_table_size = INITIAL_GRAPH_TABLE_SIZE;
+
+  return TRUE;
 }
 
 
@@ -1966,7 +1976,7 @@ handler  for  the  tree  as  nodes   are  either  already  destroyed  by
 free_literal() or by rdf_reset_db().
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-static void
+static int
 init_literal_table(rdf_db *db)
 { avlinit(&db->literals,
 	  db, sizeof(literal*),
@@ -1974,6 +1984,8 @@ init_literal_table(rdf_db *db)
 	  NULL,
 	  avl_malloc,
 	  avl_free);
+
+  return TRUE;
 }
 
 
@@ -2103,14 +2115,15 @@ dump_literals()
 		 *******************************/
 
 static int
-init_table(rdf_db *db, int index, size_t count)
+init_triple_hash(rdf_db *db, int index, size_t count)
 { triple_hash *h = &db->hash[index];
-  size_t bytes = sizeof(triple*)*count;
-  triple *t = rdf_malloc(db, bytes);
+  size_t bytes = sizeof(triple_bucket)*count;
+  triple_bucket *t = rdf_malloc(db, bytes);
+  int i;
 
   memset(t, 0, bytes);
   memset(h, 0, sizeof(*h));
-  for(i=0; i<MSB(count-1); i++)
+  for(i=0; i<MSB(count); i++)
     h->blocks[i] = t;
 
   h->bucket_count_epoch = h->bucket_count = count;
@@ -2119,19 +2132,40 @@ init_table(rdf_db *db, int index, size_t count)
 }
 
 
+static void
+reset_triple_hash(rdf_db *db, triple_hash *hash)
+{ size_t bytes = sizeof(triple_bucket)*hash->bucket_count_epoch;
+  int i;
+
+  memset(hash->blocks[0], 0, bytes);
+  for(i=MSB(hash->bucket_count_epoch); i<MAX_TBLOCKS; i++)
+  { if ( hash->blocks[i] )
+    { size_t size = (1<<(i-1))*sizeof(triple_bucket);
+
+      rdf_free(db, hash->blocks[i], size);
+      hash->blocks[i] = 0;
+    }
+  }
+  hash->bucket_count = hash->bucket_count_epoch;
+}
+
+
 static int
 init_tables(rdf_db *db)
 { int ic;
 
-  db->hash[0].blocks[0].triples = &db->by_none;
-  db->tail[0].blocks[0].tail    = &db->by_none_tail;
+  db->hash[ICOL(BY_NONE)].blocks[0] = &db->by_none;
+  db->hash[ICOL(BY_NONE)].bucket_count_epoch = 1;
+  db->hash[ICOL(BY_NONE)].bucket_count = 1;
 
   for(ic=BY_S; ic<INDEX_TABLES; ic++)
-    init_table(db, ic, INITIAL_TABLE_SIZE);
+  { if ( !init_triple_hash(db, ic, INITIAL_TABLE_SIZE) )
+      return FALSE;
+  }
 
-  init_pred_table(db);
-  init_graph_table(db);
-  init_literal_table(db);
+  return (init_pred_table(db) &&
+	  init_graph_table(db) &&
+	  init_literal_table(db));
 }
 
 
@@ -2218,15 +2252,17 @@ object_hash(triple *t)
 
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-triple_hash() computes the hash for a triple   on  a given index. It can
-only be called for indices defined in the col_index-array.
+triple_hash_key() computes the hash for a triple   on  a given index. It
+can only be called for indices defined in the col_index-array. Note that
+the returned value is unconstrained and  needs   to  be taken modulo the
+table-size.
 
 If   you   change   anything   here,   you    might   need   to   update
 init_cursor_from_literal().
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-static int
-triple_hash(rdf_db *db, triple *t, int which)
+static size_t
+triple_hash_key(triple *t, int which)
 { size_t v;
 
   switch(which)
@@ -2266,8 +2302,65 @@ triple_hash(rdf_db *db, triple *t, int which)
       assert(0);
   }
 
-  return (int)(v % db->table_size[ICOL(which)]);
+  return v;
 }
+
+
+/* init_triple_walker() and next_triple() are the primitives to walk indexed
+   triples.  The pattern is:
+
+	triple_walker tw;
+
+	init_triple_walker(&tw, db, pattern, index);
+	while((t=next_triple(tw)))
+	  <do your job>
+
+  TBD: Get the generation into this story.  Most likely it is better to
+  deal with this in this low-level loop then outside. We will handle
+  this in the next cycle.
+*/
+
+static void
+init_triple_walker(triple_walker *tw, rdf_db *db, triple *pattern, int which)
+{ tw->unbounded_hash = triple_hash_key(pattern, which);
+  tw->icol	     = ICOL(which);
+  tw->hash	     = &db->hash[tw->icol];
+  tw->bcount	     = tw->hash->bucket_count_epoch;
+  tw->current	     = NULL;
+}
+
+
+static triple *
+next_triple(triple_walker *tw)
+{ triple *rc;
+
+  if ( tw->current )
+  { rc = tw->current;
+    tw->current = rc->tp.next[tw->icol];
+  } else if ( tw->bcount <= tw->hash->bucket_count )
+  { do
+    { int entry = tw->unbounded_hash % tw->bcount;
+      triple_bucket *bucket = &tw->hash->blocks[MSB(entry)][entry];
+
+      rc = bucket->head;
+      tw->bcount *= 2;
+    } while(!rc && tw->bcount <= tw->hash->bucket_count );
+
+    if ( rc )
+      tw->current = rc->tp.next[tw->icol];
+  } else
+  { rc = NULL;
+  }
+
+  return rc;
+}
+
+
+static void
+set_next_triple(triple_walker *tw, triple *t)
+{ tw->current = t;
+}
+
 
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -2294,20 +2387,24 @@ Find the first triple on subject.  The   first  is  marked to generate a
 unique subjects quickly. If triple is given, start searching from there.
 This speeds up deletion of graphs,  where   we  tend  to delete multiple
 triples on the same subject.
+
+CON: The notion of first becomes   unclear when introducing generations.
+How do we deal with this?
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static triple *
 first(rdf_db *db, atom_t subject, triple *t)
-{ if ( !t )
-  { triple tmp;
-    int hash;
-
-    tmp.subject = subject;
-    hash = triple_hash(db, &tmp, BY_S);
-    t=db->table[ICOL(BY_S)][hash];
-  }
+{ triple tmp;
+  triple_walker tw;
 
   for( ; t; t = t->tp.next[ICOL(BY_S)])
+  { if ( t->subject == subject && !t->erased )
+      return t;
+  }
+
+  tmp.subject = subject;
+  init_triple_walker(&tw, db, &tmp, BY_S);
+  while((t=next_triple(&tw)))
   { if ( t->subject == subject && !t->erased )
       return t;
   }
@@ -2321,16 +2418,18 @@ link_triple_hash(rdf_db *db, triple *t)
 { int ic;
 
   for(ic=1; ic<INDEX_TABLES; ic++)
-  { int i = col_index[ic];
-    int hash = triple_hash(db, t, i);
+  { triple_hash *hash = &db->hash[ic];
+    int i = col_index[ic];
+    int key = triple_hash_key(t, i) % hash->bucket_count;
+    triple_bucket *bucket = &hash->blocks[MSB(key)][key];
 
-    if ( db->tail[ic][hash] )
-    { db->tail[ic][hash]->tp.next[ic] = t;
+    if ( bucket->tail )
+    { bucket->tail->tp.next[ic] = t;
     } else
-    { db->table[ic][hash] = t;
+    { bucket->head = t;
     }
-    db->tail[ic][hash] = t;
-    db->counts[ic][hash]++;
+    bucket->tail = t;
+    bucket->count++;
   }
 }
 
@@ -2344,7 +2443,8 @@ typedef enum
 
 static dub_state
 discard_duplicate(rdf_db *db, triple *t)
-{ triple *d;
+{ triple_walker tw;
+  triple *d;
   const int indexed = BY_SPO;
   dub_state rc = DUP_NONE;
 
@@ -2353,8 +2453,8 @@ discard_duplicate(rdf_db *db, triple *t)
 
   if ( WANT_GC(db) )			/* (*) See above */
     update_hash(db, FALSE);
-  d = db->table[ICOL(indexed)][triple_hash(db, t, indexed)];
-  for( ; d && d != t; d = d->tp.next[ICOL(indexed)] )
+  init_triple_walker(&tw, db, t, indexed);
+  while((d=next_triple(&tw)) && d != t)
   { if ( match_triples(d, t, MATCH_DUPLICATE) )
     { if ( d->graph == t->graph &&
 	   (d->line == NO_LINE || d->line == t->line) )
@@ -2386,11 +2486,11 @@ link_triple_silent(rdf_db *db, triple *t)
   if ( (dup=discard_duplicate(db, t)) == DUP_DISCARDED )
     return FALSE;
 
-  if ( db->by_none_tail )
-    db->by_none_tail->tp.next[ICOL(BY_NONE)] = t;
+  if ( db->by_none.tail )
+    db->by_none.tail->tp.next[ICOL(BY_NONE)] = t;
   else
-    db->by_none = t;
-  db->by_none_tail = t;
+    db->by_none.head = t;
+  db->by_none.tail = t;
 
   link_triple_hash(db, t);
   if ( t->object_is_literal )
@@ -2443,28 +2543,13 @@ there are no active queries and the tables are of the proper size.
 At the same time, this predicate actually removes erased triples.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-static size_t
-tbl_size(size_t triples, int factor)
-{ size_t s0 = 256;
-
-  triples *= 10;			/* Should be safe for overflow */
-  triples /= factor;
-
-  while(s0 < triples)
-    s0 *= 2;
-
-  return s0;
-}
-
-
 static int
 rehash_triples(rdf_db *db)
-{ int ic;
-  triple *t, *t2;
-
-  DEBUG(1, Sdprintf("(%ld triples ...", (long)(db->created - db->freed)));
+{ DEBUG(1, Sdprintf("(%ld triples ...", (long)(db->created - db->freed)));
   if ( !broadcast(EV_REHASH, (void*)ATOM_begin, NULL) )
     return FALSE;
+
+#if 0					/* TBD */
 
   for(ic=1; ic<INDEX_TABLES; ic++)
   { size_t ocount;
@@ -2557,6 +2642,8 @@ rehash_triples(rdf_db *db)
   if ( db->by_none == NULL )
     db->by_none_tail = NULL;
 
+#endif /*0*/
+
   return broadcast(EV_REHASH, (void*)ATOM_end, NULL);
 }
 
@@ -2579,7 +2666,7 @@ WANT_GC(rdf_db *db)
   { DEBUG(1, Sdprintf("rdf_db: dirty; want GC\n"));
     return TRUE;
   }
-  if ( count > db->table_size[ICOL(BY_SPO)]*MAX_HASH_FACTOR )
+  if ( count > db->hash[ICOL(BY_SPO)].bucket_count*MAX_HASH_FACTOR )
   { DEBUG(1, Sdprintf("rdf_db: small hashes; want GC\n"));
     return TRUE;
   }
@@ -3136,7 +3223,7 @@ save_db(rdf_db *db, IOSTREAM *out, atom_t src)
     return FALSE;
   }
 
-  for(t = db->by_none; t; t = t->tp.next[ICOL(BY_NONE)])
+  for(t = db->by_none.head; t; t = t->tp.next[ICOL(BY_NONE)])
   { if ( !t->erased &&
 	 (!src || t->graph == src) )
     { write_triple(db, out, t, &ctx);
@@ -4369,7 +4456,8 @@ be updated on the first real query.
 
 static int
 update_duplicates_add(rdf_db *db, triple *t)
-{ triple *d;
+{ triple_walker tw;
+  triple *d;
   const int indexed = BY_SPO;
 
   assert(t->is_duplicate == FALSE);
@@ -4377,8 +4465,8 @@ update_duplicates_add(rdf_db *db, triple *t)
 
   if ( WANT_GC(db) )			/* (*) See above */
     update_hash(db, FALSE);
-  d = db->table[ICOL(indexed)][triple_hash(db, t, indexed)];
-  for( ; d && d != t; d = d->tp.next[ICOL(indexed)] )
+  init_triple_walker(&tw, db, t, indexed);
+  while((d=next_triple(&tw)) && d != t)
   { if ( match_triples(d, t, MATCH_DUPLICATE) )
     { t->is_duplicate = TRUE;
       assert( !d->is_duplicate );
@@ -4407,15 +4495,16 @@ update_duplicates_del(rdf_db *db, triple *t)
 { const int indexed = BY_SPO;
 
   if ( t->duplicates )			/* I am the principal one */
-  { triple *d;
+  { triple_walker tw;
+    triple *d;
 
     DEBUG(2,
 	  print_triple(t, PRT_SRC);
 	  Sdprintf(": DEL principal %p, %d duplicates: ", t, t->duplicates));
 
     db->duplicates--;
-    d = db->table[ICOL(indexed)][triple_hash(db, t, indexed)];
-    for( ; d; d = d->tp.next[ICOL(indexed)] )
+    init_triple_walker(&tw, db, t, indexed);
+    while( (d=next_triple(&tw)) )
     { if ( d != t && match_triples(d, t, MATCH_DUPLICATE) )
       { assert(d->is_duplicate);
 	d->is_duplicate = FALSE;
@@ -4430,15 +4519,16 @@ update_duplicates_del(rdf_db *db, triple *t)
     }
     assert(0);
   } else if ( t->is_duplicate )		/* I am a duplicate */
-  { triple *d;
+  { triple_walker tw;
+    triple *d;
 
     DEBUG(2,
 	  print_triple(t, PRT_SRC);
 	  Sdprintf(": DEL: is a duplicate: "));
 
     db->duplicates--;
-    d = db->table[ICOL(indexed)][triple_hash(db, t, indexed)];
-    for( ; d; d = d->tp.next[ICOL(indexed)] )
+    init_triple_walker(&tw, db, t, indexed);
+    while( (d=next_triple(&tw)) )
     { if ( d != t && match_triples(d, t, MATCH_DUPLICATE) )
       { if ( d->duplicates )
 	{ d->duplicates--;
@@ -4928,7 +5018,7 @@ typedef struct search_state
   avl_enum     *literal_state;		/* Literal search state */
   literal      *literal_cursor;		/* pointer in current literal */
   literal_ex    lit_ex;			/* extended literal for fast compare */
-  triple       *cursor;			/* Pointer in triple DB */
+  triple_walker cursor;			/* Pointer in triple DB */
   triple	pattern;		/* Pattern triple */
 } search_state;
 
@@ -4939,7 +5029,6 @@ static void
 init_cursor_from_literal(search_state *state, literal *cursor)
 { triple *p = &state->pattern;
   size_t iv;
-  int i;
 
   DEBUG(3,
 	Sdprintf("Trying literal search for ");
@@ -4951,7 +5040,7 @@ init_cursor_from_literal(search_state *state, literal *cursor)
   if ( p->indexed == BY_SO )
     p->indexed = BY_S;			/* we do not have index BY_SO */
 
-  switch(p->indexed)			/* keep in sync with triple_hash() */
+  switch(p->indexed)			/* keep in sync with triple_hash_key() */
   { case BY_O:
       iv = literal_hash(cursor);
       break;
@@ -4968,8 +5057,7 @@ init_cursor_from_literal(search_state *state, literal *cursor)
       assert(0);
   }
 
-  i = (int)(iv % state->db->table_size[ICOL(p->indexed)]);
-  state->cursor = state->db->table[ICOL(p->indexed)][i];
+  init_triple_walker(&state->cursor, state->db, p, p->indexed);
   state->literal_cursor = cursor;
 }
 
@@ -5053,8 +5141,7 @@ init_search_state(search_state *state)
       return FALSE;
     }
   } else
-  { state->cursor = state->db->table[ICOL(p->indexed)]
-    				    [triple_hash(state->db, p, p->indexed)];
+  { init_triple_walker(&state->cursor, state->db, p, p->indexed);
   }
 
   return TRUE;
@@ -5102,11 +5189,12 @@ allow_retry_state(search_state *state)
 
 static int
 next_search_state(search_state *state)
-{ triple *t = state->cursor;
+{ triple *t;
+  triple_walker *tw = &state->cursor;
   triple *p = &state->pattern;
 
 retry:
-  for( ; t; t = t->tp.next[ICOL(p->indexed)])
+  while( (t = next_triple(tw)) )
   { if ( t->is_duplicate && !state->src )
       continue;
 
@@ -5127,9 +5215,8 @@ retry:
 	  return FALSE;
       }
 
-      t=t->tp.next[ICOL(p->indexed)];
     inv_alt:
-      for(; t; t = t->tp.next[ICOL(p->indexed)])
+      while( (t = next_triple(tw)) )
       { if ( state->literal_state )
 	{ if ( !(t->object_is_literal &&
 		 t->object.literal == state->literal_cursor) )
@@ -5137,25 +5224,23 @@ retry:
 	}
 
 	if ( match_triples(t, p, state->flags) )
-	{ state->cursor = t;
+	{ set_next_triple(tw, t);
 
 	  return TRUE;			/* non-deterministic */
 	}
       }
 
       if ( (state->flags & MATCH_INVERSE) && inverse_partial_triple(p) )
-      { t = state->db->table[ICOL(p->indexed)]
-			    [triple_hash(state->db, p, p->indexed)];
+      { init_triple_walker(tw, state->db, p, p->indexed);
 	goto inv_alt;
       }
 
-      state->cursor = NULL;		/* deterministic */
-      return TRUE;
+      return TRUE;			/* deterministic */
     }
   }
 
   if ( (state->flags & MATCH_INVERSE) && inverse_partial_triple(p) )
-  { t = state->db->table[ICOL(p->indexed)][triple_hash(state->db, p, p->indexed)];
+  { init_triple_walker(tw, state->db, p, p->indexed);
     goto retry;
   }
 
@@ -5198,7 +5283,6 @@ retry:
       }
 
       init_cursor_from_literal(state, lit);
-      t = state->cursor;
 
       goto retry;
     }
@@ -5242,7 +5326,7 @@ rdf(term_t subject, term_t predicate, term_t object,
 
     search:
       if ( (rc=next_search_state(state)) )
-      { if ( state->cursor || state->literal_state )
+      { if ( state->cursor.current || state->literal_state )
 	  return allow_retry_state(state);
       }
 
@@ -5340,7 +5424,17 @@ rdf_estimate_complexity(term_t subject, term_t predicate, term_t object,
   { c = t.predicate.r->triple_count;		/* must sum over children */
 #endif
   } else
-  { c = db->counts[ICOL(t.indexed)][triple_hash(db, &t, t.indexed)];
+  { size_t key = triple_hash_key(&t, t.indexed);
+    triple_hash *hash = &db->hash[ICOL(t.indexed)];
+    size_t count;
+
+    c = 0;
+    for(count=hash->bucket_count_epoch; count <= hash->bucket_count; count *= 2)
+    { int entry = key%count;
+      triple_bucket *bucket = &hash->blocks[MSB(entry)][entry];
+
+      c += bucket->count;		/* TBD: compensate for resize */
+    }
   }
 
   rc = PL_unify_int64(complexity, c);
@@ -5530,6 +5624,7 @@ rdf_update5(term_t subject, term_t predicate, term_t object, term_t src,
   triple *tmp[UPDATE_BUFSIZE];
   triple **buf = tmp;
   int rc = TRUE;
+  triple_walker tw;
 
   memset(&t, 0, sizeof(t));
 
@@ -5546,8 +5641,9 @@ rdf_update5(term_t subject, term_t predicate, term_t object, term_t src,
     free_triple(db, &t);
     return FALSE;
   }
-  p = db->table[ICOL(indexed)][triple_hash(db, &t, indexed)];
-  for( ; p; p = p->tp.next[ICOL(indexed)])
+
+  init_triple_walker(&tw, db, &t, indexed);
+  while((p=next_triple(&tw)));
   { if ( match_triples(p, &t, MATCH_EXACT) )
     { if ( count == allocated )
       {	size_t osize = allocated*sizeof(triple*);
@@ -5598,6 +5694,7 @@ static foreign_t
 rdf_retractall4(term_t subject, term_t predicate, term_t object, term_t src)
 { triple t, *p;
   rdf_db *db = DB;
+  triple_walker tw;
 
   memset(&t, 0, sizeof(t));
   switch( get_partial_triple(db, subject, predicate, object, src, &t) )
@@ -5616,14 +5713,9 @@ rdf_retractall4(term_t subject, term_t predicate, term_t object, term_t src)
 
   if ( !WRLOCK(db, FALSE) )
     return FALSE;
-/*			No need, as we do not search with subPropertyOf
-  if ( !update_hash(db, TRUE) )
-  { WRUNLOCK(db);
-    return FALSE;
-  }
-*/
-  p = db->table[ICOL(t.indexed)][triple_hash(db, &t, t.indexed)];
-  for( ; p; p = p->tp.next[ICOL(t.indexed)])
+
+  init_triple_walker(&tw, db, &t, t.indexed);
+  while((p=next_triple(&tw)))
   { if ( match_triples(p, &t, MATCH_EXACT|MATCH_SRC) )
     { if ( t.object_is_literal && t.object.literal->objtype == OBJ_TERM )
       { fid_t fid = PL_open_foreign_frame();
@@ -5912,7 +6004,7 @@ rdf_subject(term_t subject, control_t h)
   switch(PL_foreign_control(h))
   { case PL_FIRST_CALL:
     { if ( PL_is_variable(subject) )
-      { t = db->table[ICOL(BY_NONE)][0];
+      { t = db->by_none.head;
 	goto next;
       } else
       { atom_t a;
@@ -6318,7 +6410,8 @@ append_agenda(rdf_db *db, agenda *a, atom_t res, uintptr_t d)
 
 static int
 can_reach_target(rdf_db *db, agenda *a)
-{ int indexed = a->pattern.indexed;
+{ triple_walker tw;
+  int indexed = a->pattern.indexed;
   int rc = FALSE;
   triple *p;
 
@@ -6330,8 +6423,8 @@ can_reach_target(rdf_db *db, agenda *a)
     indexed |= BY_S;
   }
 
-  p = db->table[ICOL(indexed)][triple_hash(db, &a->pattern, indexed)];
-  for( ; p; p = p->tp.next[ICOL(indexed)])
+  init_triple_walker(&tw, db, &a->pattern, indexed);
+  while((p=next_triple(&tw)))
   { if ( match_triples(p, &a->pattern, MATCH_SUBPROPERTY) )
     { rc = TRUE;
       break;
@@ -6365,10 +6458,11 @@ bf_expand(rdf_db *db, agenda *a, atom_t resource, uintptr_t d)
 
   for(;;)
   { int indexed = pattern.indexed;
+    triple_walker tw;
     triple *p;
 
-    p = db->table[ICOL(indexed)][triple_hash(db, &pattern, indexed)];
-    for( ; p; p = p->tp.next[ICOL(indexed)])
+    init_triple_walker(&tw, db, &pattern, indexed);
+    while((p=next_triple(&tw)))
     { if ( match_triples(p, &pattern, MATCH_SUBPROPERTY) )
       { atom_t found;
 	visited *v;
@@ -6737,21 +6831,18 @@ erase_triples(rdf_db *db)
 { triple *t, *n;
   int i;
 
-  for(t=db->by_none; t; t=n)
+  for(t=db->by_none.head; t; t=n)
   { n = t->tp.next[ICOL(BY_NONE)];
 
     free_triple(db, t);
     db->freed++;
   }
-  db->by_none = db->by_none_tail = NULL;
+  db->by_none.head = db->by_none.tail = NULL;
 
   for(i=BY_S; i<INDEX_TABLES; i++)
-  { if ( db->table[i] )
-    { size_t bytes = sizeof(triple*) * db->table_size[i];
+  { triple_hash *hash = &db->hash[i];
 
-      memset(db->table[i], 0, bytes);
-      memset(db->tail[i], 0, bytes);
-    }
+    reset_triple_hash(db, hash);
   }
 
   db->created = 0;

@@ -30,7 +30,7 @@
 #endif
 #include "lock.h"
 
-#define RDF_VERSION 20900		/* 2.8.0 */
+#define RDF_VERSION 30000		/* 3.0.0 */
 
 #define URL_subPropertyOf \
 	"http://www.w3.org/2000/01/rdf-schema#subPropertyOf"
@@ -242,7 +242,7 @@ typedef struct active_transaction
 
 
 typedef struct triple_bucket
-{ triple       *triples;		/* Head of triple-list */
+{ triple       *head;			/* head of triple-list */
   triple       *tail;			/* Tail of triple-list */
   unsigned int	count;			/* #Triples in bucket */
 } triple_bucket;
@@ -255,9 +255,16 @@ typedef struct triple_hash
   size_t	bucket_count_epoch;	/* Initial bucket count */
 } triple_hash;
 
+typedef struct triple_walker
+{ size_t	unbounded_hash;		/* The unbounded hash-key */
+  int		icol;			/* index column */
+  size_t	bcount;			/* Current bucket count */
+  triple_hash  *hash;			/* The hash */
+  triple       *current;		/* Our current location */
+} triple_walker;
 
 typedef struct rdf_db
-{ triple       *by_none, *by_none_tail;	/* Plain linked list of triples */
+{ triple_bucket by_none;		/* Plain linked list of triples */
   triple_hash   hash[INDEX_TABLES];	/* Hash-tables */
   size_t	created;		/* #triples created */
   size_t	erased;			/* #triples erased */

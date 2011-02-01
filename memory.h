@@ -28,7 +28,7 @@ Stuff for lock-free primitives
 
   * MSB(unsigned int i)
   Computes the most-significant bit, which often translates to
-  a single machine operation.
+  a single machine operation.  Returns 0 if i=0;
 
   * MemoryBarrier()
   Realises a (full) memory barrier.  This means that memory operations
@@ -42,7 +42,7 @@ MSB(unsigned int i)
 { unsigned long mask = i;
   unsigned long index;
 
-  _BitScanReverse(&index, mask);
+  _BitScanReverse(&index, mask);	/* 0 if mask is 0 */
   return index;
 }
 
@@ -52,7 +52,8 @@ MSB(unsigned int i)
 
 #elif defined(__GNUC__)			/* GCC version */
 
-#define MSB(i) (31 - __builtin_clz(i))
+/*__builtin_clz() is undefined for i=0*/
+#define MSB(i) ((i) ? (31 - __builtin_clz(i)) : 0)
 #define MemoryBarrier() __sync_synchronize()
 
 #else					/* Other */
