@@ -122,6 +122,14 @@ typedef struct predicate
   size_t	    distinct_objects[2];/* # distinct object values */
 } predicate;
 
+#define MAX_PBLOCKS 32
+
+typedef struct pred_hash
+{ predicate   **blocks[MAX_PBLOCKS];	/* Dynamic array starts */
+  size_t	bucket_count;		/* Allocated #buckets */
+  size_t	bucket_count_epoch;	/* Initial bucket count */
+  size_t	count;			/* Total #predicates */
+} pred_hash;
 
 typedef struct predicate_cloud
 { predicate   **members;		/* member predicates */
@@ -276,9 +284,7 @@ typedef struct rdf_db
   double	rehash_time;		/* time spent in rehash */
   double	gc_time;		/* time spent in GC */
   size_t	core;			/* core in use */
-  predicate   **pred_table;		/* Hash-table of predicates */
-  int		pred_table_size;	/* #entries in the table */
-  int		pred_count;		/* #predicates */
+  pred_hash	predicates;		/* Predicate table */
   int		active_queries;		/* Calls with choicepoints */
   int		need_update;		/* We need to update */
   size_t	agenda_created;		/* #visited nodes in agenda */

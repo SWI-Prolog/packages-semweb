@@ -830,61 +830,108 @@ cloud they have become part of.
 TBD: We can do a partial re-hash in that case!
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-
 static int
 init_pred_table(rdf_db *db)
-{ int bytes = sizeof(predicate*)*INITIAL_PREDICATE_TABLE_SIZE;
+{ int bytes = sizeof(predicate**)*INITIAL_PREDICATE_TABLE_SIZE;
+  predicate **p = rdf_malloc(db, bytes);
+  memset(p, 0, bytes);
+  int i, count = INITIAL_PREDICATE_TABLE_SIZE;
 
-  db->pred_table = rdf_malloc(db, bytes);
-  memset(db->pred_table, 0, bytes);
-  db->pred_table_size = INITIAL_PREDICATE_TABLE_SIZE;
+  for(i=0; i<MSB(count); i++)
+    db->predicates.blocks[i] = p;
+
+  db->predicates.bucket_count       = count;
+  db->predicates.bucket_count_epoch = count;
+  db->predicates.count              = 0;
 
   return TRUE;
 }
 
 
+typedef struct pred_walker
+{ rdf_db       *db;			/* RDF DB */
+  atom_t	name;			/* Name of the predicate */
+  size_t	unbounded_hash;		/* Atom's hash */
+  size_t	bcount;			/* current bucket count */
+  predicate    *current;		/* current location */
+} pred_walker;
+
+
+static void
+init_predicate_walker(pred_walker *pw, rdf_db *db, atom_t name)
+{ pw->db	     = db;
+  pw->name	     = name;
+  pw->unbounded_hash = atom_hash(name);
+  pw->bcount	     = db->predicates.bucket_count_epoch;
+  pw->current	     = NULL;
+}
+
+static predicate*
+next_predicate(pred_walker *pw)
+{ predicate *p;
+
+  if ( pw->current )
+  { p = pw->current;
+    pw->current = p->next;
+  } else if ( pw->bcount <= pw->db->predicates.bucket_count )
+  { do
+    { int entry = pw->unbounded_hash % pw->bcount;
+      p = pw->db->predicates.blocks[MSB(entry)][entry];
+      pw->bcount *= 2;
+    } while(!p && pw->bcount <= pw->db->predicates.bucket_count );
+
+    if ( p )
+      pw->current = p->next;
+  } else
+    return NULL;
+
+  return p;
+}
+
+
 static predicate *
 existing_predicate(rdf_db *db, atom_t name)
-{ int hash = atom_hash(name) % db->pred_table_size;
+{ pred_walker pw;
   predicate *p;
 
-  LOCK_MISC(db);
-  for(p=db->pred_table[hash]; p; p = p->next)
+  init_predicate_walker(&pw, db, name);
+  while((p=next_predicate(&pw)))
   { if ( p->name == name )
-    { UNLOCK_MISC(db);
       return p;
-    }
   }
 
-  UNLOCK_MISC(db);
   return NULL;
 }
 
 
 static predicate *
 lookup_predicate(rdf_db *db, atom_t name)
-{ int hash = atom_hash(name) % db->pred_table_size;
-  predicate *p;
+{ predicate *p, **pp;
   predicate_cloud *cp;
+  int entry;
+
+  if ( (p=existing_predicate(db, name)) )
+    return p;
 
   LOCK_MISC(db);
-  for(p=db->pred_table[hash]; p; p = p->next)
-  { if ( p->name == name )
-    { UNLOCK_MISC(db);
-      return p;
-    }
+  if ( (p=existing_predicate(db, name)) )
+  { UNLOCK_MISC(db);
+    return p;
   }
+
   p = rdf_malloc(db, sizeof(*p));
   memset(p, 0, sizeof(*p));
   p->name = name;
   cp = new_predicate_cloud(db, &p, 1);
   p->hash = cp->hash;
   PL_register_atom(name);
-  p->next = db->pred_table[hash];
-  db->pred_table[hash] = p;
-  db->pred_count++;
+  entry = atom_hash(name) % db->predicates.bucket_count;
+  pp = &db->predicates.blocks[MSB(entry)][entry];
+  p->next = *pp;
+  *pp = p;
+  db->predicates.count++;
   DEBUG(5, Sdprintf("Pred %s (count = %d)\n",
-		    PL_atom_chars(name), db->pred_count));
+		    PL_atom_chars(name), db->predicates.count));
   UNLOCK_MISC(db);
 
   return p;
@@ -915,16 +962,15 @@ pname(predicate *p)
 
 static int
 organise_predicates(rdf_db *db)		/* TBD: rename&move */
-{ predicate **ht;
-  int i;
+{ int i;
   int changed = 0;
 
   DEBUG(2, Sdprintf("rdf_db: fixing predicate clouds\n"));
 
-  for(i=0,ht = db->pred_table; i<db->pred_table_size; i++, ht++)
-  { predicate *p;
+  for(i=0; i<db->predicates.bucket_count; i++)
+  { predicate *p = db->predicates.blocks[MSB(i)][i];
 
-    for( p = *ht; p; p = p->next )
+    for( ; p; p = p->next )
     { predicate_cloud *cloud = p->cloud;
 
       if ( cloud->dirty )
@@ -1429,13 +1475,12 @@ update_predicate_counts(rdf_db *db, predicate *p, int which)
 
 static void
 invalidate_distinct_counts(rdf_db *db)
-{ predicate **ht;
-  int i;
+{ int i;
 
-  for(i=0,ht = db->pred_table; i<db->pred_table_size; i++, ht++)
-  { predicate *p;
+  for(i=0; i<db->predicates.bucket_count; i++)
+  { predicate *p = db->predicates.blocks[MSB(i)][i];
 
-    for( p = *ht; p; p = p->next )
+    for( ; p; p = p->next )
     { p->distinct_updated[DISTINCT_SUB] = 0;
       p->distinct_count[DISTINCT_SUB] = 0;
       p->distinct_subjects[DISTINCT_SUB] = 0;
@@ -6139,11 +6184,10 @@ rdf_current_predicates(term_t preds)
   term_t head = PL_new_term_ref();
   term_t tail = PL_copy_term_ref(preds);
 
-  LOCK_MISC(db);
-  for(i=0; i<db->pred_table_size; i++)
-  { predicate *p;
+  for(i=0; i<db->predicates.bucket_count; i++)
+  { predicate *p = db->predicates.blocks[MSB(i)][i];
 
-    for(p=db->pred_table[i]; p; p = p->next)
+    for(; p; p = p->next)
     { if ( !PL_unify_list(tail, head, tail) ||
 	   !PL_unify_atom(head, p->name) )
       { UNLOCK_MISC(db);
@@ -6151,7 +6195,6 @@ rdf_current_predicates(term_t preds)
       }
     }
   }
-  UNLOCK_MISC(db);
 
   return PL_unify_nil(tail);
 }
@@ -6724,7 +6767,7 @@ unify_statistics(rdf_db *db, term_t key, functor_t f)
   } else if ( f == FUNCTOR_subjects1 )
   { v = db->subjects;
   } else if ( f == FUNCTOR_predicates1 )
-  { v = db->pred_count;
+  { v = db->predicates.count;
   } else if ( f == FUNCTOR_core1 )
   { v = db->core;
   } else if ( f == FUNCTOR_indexed16 )
@@ -6859,13 +6902,14 @@ erase_triples(rdf_db *db)
 
 static void
 erase_predicates(rdf_db *db)
-{ predicate **ht;
-  int i;
+{ int i;
 
-  for(i=0,ht = db->pred_table; i<db->pred_table_size; i++, ht++)
-  { predicate *p, *n;
+  for(i=0; i<db->predicates.bucket_count; i++)
+  { predicate *n, *p = db->predicates.blocks[MSB(i)][i];
 
-    for( p = *ht; p; p = n )
+    db->predicates.blocks[MSB(i)][i] = NULL;
+
+    for( ; p; p = n )
     { n = p->next;
 
       free_list(db, &p->subPropertyOf);
@@ -6875,11 +6919,9 @@ erase_predicates(rdf_db *db)
 
       rdf_free(db, p, sizeof(*p));
     }
-
-    *ht = NULL;
   }
 
-  db->pred_count = 0;
+  db->predicates.count = 0;
 }
 
 
