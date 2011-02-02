@@ -268,6 +268,25 @@ init_query_admin(rdf_db *db)
 
 
 		 /*******************************
+		 *	    GENERATIONS		*
+		 *******************************/
+
+/* alive_triple() is true if a triple is visible inside a query.
+
+TBD: Transactions.
+*/
+
+int
+alive_triple(query *q, triple *t)
+{ if ( q->rd_gen >= t->lifespan.born &&
+       q->rd_gen <  t->lifespan.died )
+    return TRUE;
+
+  return FALSE;
+}
+
+
+		 /*******************************
 		 *     TRIPLE MANIPULATION	*
 		 *******************************/
 

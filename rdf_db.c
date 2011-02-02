@@ -3049,8 +3049,6 @@ match_triples(triple *t, triple *p, unsigned flags)
 	   Sdprintf(")\n"));
   */
 
-  if ( t->erased )
-    return FALSE;
   if ( p->subject && t->subject != p->subject )
     return FALSE;
   if ( !match_object(t, p, flags) )
@@ -5167,14 +5165,14 @@ typedef struct search_state
   term_t 	predicate;
   term_t 	src;
   term_t 	realpred;
-  unsigned 	locked : 1;		/* State has been locked */
-  unsigned	allocated : 1;		/* State has been allocated */
+  unsigned	allocated;		/* State has been allocated */
   unsigned	flags;			/* Misc flags controlling search */
   atom_t	prefix;			/* prefix and like search */
   avl_enum     *literal_state;		/* Literal search state */
   literal      *literal_cursor;		/* pointer in current literal */
   literal_ex    lit_ex;			/* extended literal for fast compare */
   triple_walker cursor;			/* Pointer in triple DB */
+  query	       *query;			/* Associated query */
   triple	pattern;		/* Pattern triple */
 } search_state;
 
@@ -5235,17 +5233,7 @@ init_search_state(search_state *state)
     return FALSE;
   }
 
-  if ( !RDLOCK(state->db) )
-  { free_triple(state->db, p);
-    return FALSE;
-  }
-  state->locked = TRUE;
-  if ( p->predicate.r && (state->flags & MATCH_SUBPROPERTY) ) /* See (*) */
-  { if ( !update_hash(state->db, TRUE) )
-    { free_search_state(state);
-      return FALSE;
-    }
-  }
+  state->query = open_query(state->db);
 
   if ( (p->match == STR_MATCH_PREFIX ||	p->match == STR_MATCH_LIKE) &&
        p->indexed != BY_SP &&
@@ -5306,9 +5294,8 @@ init_search_state(search_state *state)
 
 static void
 free_search_state(search_state *state)
-{ if ( state->locked )
-  { RDUNLOCK(state->db);
-  }
+{ if ( state->query )
+    close_query(state->query);
 
   free_triple(state->db, &state->pattern);
   if ( state->prefix )
@@ -5352,6 +5339,8 @@ next_search_state(search_state *state)
 retry:
   while( (t = next_triple(tw)) )
   { if ( t->is_duplicate && !state->src )
+      continue;
+    if ( !alive_triple(state->query, t) )
       continue;
 
 					/* hash-collision, skip */
