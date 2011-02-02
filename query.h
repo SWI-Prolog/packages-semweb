@@ -134,6 +134,7 @@ typedef struct query_admin
 
 COMMON(void)	init_query_admin(rdf_dbp db);
 COMMON(query *)	open_query(rdf_dbp db);
+COMMON(query *)	open_transaction(rdf_dbp db);
 COMMON(void)	close_query(query *q);
 
 typedef struct triple *triplep;

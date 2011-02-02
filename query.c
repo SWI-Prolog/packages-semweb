@@ -211,7 +211,6 @@ pop_query(query *q)
 }
 
 
-
 query *
 open_query(rdf_db *db)
 { int tid = PL_thread_self();
@@ -227,6 +226,21 @@ open_query(rdf_db *db)
     q->wr_gen = ti->queries.wr_gen;
   }
 
+  push_query(q);
+
+  return q;
+}
+
+
+query *
+open_transaction(rdf_db *db)
+{ int tid = PL_thread_self();
+  thread_info *ti = rdf_thread_info(db, tid);
+  query *q = alloc_query(&ti->queries);
+  gen_t g;
+
+  q->type = Q_TRANSACTION;
+  /*TBD: Get clear about generations and transactions.*/
   push_query(q);
 
   return q;

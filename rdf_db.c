@@ -268,10 +268,6 @@ static triple  *next_triple(triple_walker *tw);
 
 static void	reset_db(rdf_db *db);
 
-static void	record_transaction(rdf_db *db,
-				   tr_type type, triple *t);
-static void	record_md5_transaction(rdf_db *db,
-				       graph *src, md5_byte_t *digest);
 static void	create_reachability_matrix(rdf_db *db, predicate_cloud *cloud);
 static int	get_predicate(rdf_db *db, term_t t, predicate **p);
 static predicate_cloud *new_predicate_cloud(rdf_db *db, predicate **p, size_t count);
@@ -3737,18 +3733,6 @@ link_loaded_triples(rdf_db *db, triple *t, ld_context *ctx)
   { graph = NULL;
   }
 
-
-  if ( db->tr_first )			/* loading in a transaction */
-  { triple *next;
-
-    for( ; t; t = next )
-    { next = t->tp.next[ICOL(BY_NONE)];
-
-      t->tp.next[ICOL(BY_NONE)] = NULL;
-      lock_atoms(t);
-      record_transaction(db, TR_ASSERT, t);
-    }
-  } else
   { triple *next;
 
     for( ; t; t = next )
@@ -4686,176 +4670,6 @@ update_duplicates_del(rdf_db *db, triple *t)
 		 *	    TRANSACTIONS	*
 		 *******************************/
 
-static void
-append_transaction(rdf_db *db, transaction_record *tr)
-{ if ( db->tr_last )
-  { tr->next = NULL;
-    tr->previous = db->tr_last;
-    db->tr_last->next = tr;
-    db->tr_last = tr;
-  } else
-  { tr->next = tr->previous = NULL;
-    db->tr_first = db->tr_last = tr;
-  }
-}
-
-
-static void
-open_transaction(rdf_db *db)
-{ transaction_record *tr = rdf_malloc(db, sizeof(*tr));
-
-  memset(tr, 0, sizeof(*tr));
-  tr->type = TR_MARK;
-
-  if ( db->tr_first )
-    db->tr_nesting++;
-  else
-    db->tr_nesting = 0;
-
-  append_transaction(db, tr);
-}
-
-
-static void
-record_transaction(rdf_db *db, tr_type type, triple *t)
-{ transaction_record *tr = rdf_malloc(db, sizeof(*tr));
-
-  memset(tr, 0, sizeof(*tr));
-  tr->type = type;
-  tr->triple = t;
-
-  append_transaction(db, tr);
-}
-
-
-static void
-record_md5_transaction(rdf_db *db, graph *src, md5_byte_t *digest)
-{ transaction_record *tr = rdf_malloc(db, sizeof(*tr));
-
-  memset(tr, 0, sizeof(*tr));
-  tr->type = TR_UPDATE_MD5,
-  tr->update.md5.graph = src;
-  tr->update.md5.digest = digest;
-
-  append_transaction(db, tr);
-}
-
-
-static void
-record_update_transaction(rdf_db *db, triple *t, triple *new)
-{ transaction_record *tr = rdf_malloc(db, sizeof(*tr));
-
-  memset(tr, 0, sizeof(*tr));
-  tr->type = TR_UPDATE,
-  tr->triple = t;
-  tr->update.triple = new;
-
-  append_transaction(db, tr);
-}
-
-
-static void
-void_transaction(rdf_db *db, transaction_record *tr)
-{ switch(tr->type)
-  { case TR_ASSERT:
-      free_triple(db, tr->triple);
-      break;
-    case TR_UPDATE:
-      free_triple(db, tr->update.triple);
-      break;
-    case TR_UPDATE_MD5:
-      if ( tr->update.md5.digest )
-	rdf_free(db, tr->update.md5.digest, sizeof(*tr->update.md5.digest));
-      break;
-    default:
-      break;
-  }
-
-  tr->type = TR_VOID;
-}
-
-
-static void
-free_transaction(rdf_db *db, transaction_record *tr)
-{ void_transaction(db, tr);
-
-  rdf_free(db, tr, sizeof(*tr));
-}
-
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-This must deal  with  multiple  operations   on  the  same  triple. Most
-probably the most important thing is to   merge  update records. We must
-also make-up our mind with regard to  updated records that are erased or
-records that are erased after updating, etc.
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-static void
-clean_transaction(rdf_db *db, transaction_record *tr0)
-{
-#if 0
-  transaction_record *tr;
-
-  for(tr=tr0; tr; tr=tr->next)
-  { if ( TR_RETRACT )
-    { transaction_record *tr2;
-
-      for(tr2=tr->next; tr2; tr2=tr2->next)
-      { if ( tr2->triple == tr->triple )
-	{ switch(tr2->type)
-	  { case TR_RETRACT:
-	    case TR_UPDATE:
-	      void_transaction(db, tr2);
-	    default:
-	      ;
-	  }
-	}
-      }
-    }
-  }
-#endif
-}
-
-
-static void
-truncate_transaction(rdf_db *db, transaction_record *last)
-{ db->tr_last = last;
-  if ( last )
-  { db->tr_last->next = NULL;
-  } else
-  { db->tr_first = NULL;
-  }
-}
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-discard_transaction()  simply  destroys  all   actions    in   the  last
-transaction.
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-static void
-discard_transaction(rdf_db *db)
-{ transaction_record *tr, *prev;
-
-  for(tr=db->tr_last; tr; tr = prev)
-  { prev = tr->previous;
-
-    if ( tr->type == TR_SUB_END )
-    { if ( tr->update.transaction_id )
-	PL_erase(tr->update.transaction_id);
-    }
-
-    if ( tr->type == TR_MARK )
-    { rdf_free(db, tr, sizeof(*tr));
-      truncate_transaction(db, prev);
-      db->tr_nesting--;
-      return;
-    }
-
-    free_transaction(db, tr);
-  }
-}
-
-
 int
 put_begin_end(term_t t, functor_t be, int level)
 { term_t av;
@@ -4866,162 +4680,17 @@ put_begin_end(term_t t, functor_t be, int level)
 }
 
 
-
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Note  (*)  rdf-monitors  can  modify  the    database   by  opening  new
-transactions. Therefore we first close the  transaction to allow opening
-new ones. TBD: get  this  clear.   Monitors  have  only  restricted read
-access?
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-static int
-commit_transaction(rdf_db *db, term_t id)
-{ transaction_record *tr, *next;
-  int tr_level = 0;			/* nesting level */
-
-  if ( db->tr_nesting > 0 )		/* commit nested transaction */
-  { tr=db->tr_last;
-
-    if ( tr->type == TR_MARK )		/* empty nested transaction */
-    { truncate_transaction(db, tr->previous);
-      rdf_free(db, tr, sizeof(*tr));
-      db->tr_nesting--;
-
-      return TRUE;
-    }
-
-    for(; tr; tr = tr->previous)	/* not the last (tested above) */
-    {					/* not the first (we are nested) */
-      if ( tr->type == TR_MARK )
-      { transaction_record *end = rdf_malloc(db, sizeof(*end));
-
-	memset(end, 0, sizeof(*end));
-	end->type = TR_SUB_END;
-	end->update.transaction_id = PL_record(id);
-	append_transaction(db, end);
-
-	tr->type = TR_SUB_START;
-	tr->update.transaction_id = end->update.transaction_id;
-	db->tr_nesting--;
-
-	return TRUE;
-      }
-    }
-
-    assert(0);
-    return FALSE;
-  }
-
-  while( (tr=db->tr_first) )		/* See above (*) */
-  { size_t done;
-
-    db->tr_first = db->tr_last = NULL;
-
-    clean_transaction(db, tr);
-					/* real commit */
-    for(done=0; tr; tr = next,done++)
-    { next = tr->next;
-
-      if ( done % 1000 == 0 && WANT_GC(db) )
-	update_hash(db, FALSE);
-
-      switch(tr->type)
-      { case TR_MARK:
-	  break;
-	case TR_SUB_START:
-	{ term_t id = PL_new_term_ref();
-	  term_t be = PL_new_term_ref();
-	  if ( !PL_recorded(tr->update.transaction_id, id) ||
-	       !put_begin_end(be, FUNCTOR_begin1, ++tr_level) ||
-	       !broadcast(EV_TRANSACTION, (void*)id, (void*)be) )
-	    return FALSE;
-	  break;
-	}
-	case TR_SUB_END:
-	{ term_t id = PL_new_term_ref();
-	  term_t be = PL_new_term_ref();
-	  if ( !PL_recorded(tr->update.transaction_id, id) )
-	    return FALSE;
-	  PL_erase(tr->update.transaction_id);
-	  if ( !put_begin_end(be, FUNCTOR_end1, tr_level--) ||
-	       !broadcast(EV_TRANSACTION, (void*)id, (void*)be)	)
-	    return FALSE;
-	  break;
-	}
-	case TR_ASSERT:
-	  link_triple(db, tr->triple);
-	  db->generation++;
-	  break;
-	case TR_RETRACT:
-	  if ( !tr->triple->erased )	/* already erased */
-	  { erase_triple(db, tr->triple);
-	    db->generation++;
-	  }
-	  break;
-	case TR_UPDATE:
-	  if ( !tr->triple->erased )
-	  { if ( !broadcast(EV_UPDATE, tr->triple, tr->update.triple) )
-	      return FALSE;		/* TBD: how to handle? */
-	    if ( !tr->triple->erased )
-	    { erase_triple_silent(db, tr->triple);
-	      link_triple_silent(db, tr->update.triple);
-	      db->generation++;
-	    }
-	  }
-	  break;
-	case TR_UPDATE_MD5:
-	{ graph *src = tr->update.md5.graph;
-	  md5_byte_t *digest = tr->update.md5.digest;
-	  if ( digest )
-	  { sum_digest(digest, src->digest);
-	    src->md5 = TRUE;
-	    rdf_free(db, digest, sizeof(md5_byte_t)*16);
-	  } else
-	  { src->md5 = FALSE;
-	  }
-	  break;
-	}
-	case TR_RESET:
-	  db->tr_reset = FALSE;
-	  reset_db(db);
-	  break;
-	case TR_VOID:
-	  break;
-	default:
-	  assert(0);
-      }
-
-      rdf_free(db, tr, sizeof(*tr));
-    }
-  }
-
-  return TRUE;
-}
-
-
 static foreign_t
 rdf_transaction(term_t goal, term_t id)
 { int rc;
   rdf_db *db = DB;
-  active_transaction me;
+  query *q;
 
-  if ( !WRLOCK(db, TRUE) )
-    return FALSE;
-
-  open_transaction(db);
-  me.parent = db->tr_active;
-  me.id = id;
-  db->tr_active = &me;
-
+  q = open_transaction(db);
   rc = PL_call_predicate(NULL, PL_Q_PASS_EXCEPTION, PRED_call1, goal);
 
   if ( rc )
-  { int empty = (db->tr_last == NULL || db->tr_last->type == TR_MARK);
-
-    if ( empty || db->tr_nesting > 0 )
-    { commit_transaction(db, id);
-    } else
+  { if ( !empty_transaction(q) )
     { term_t be;
 
       if ( !(be=PL_new_term_ref()) ||
@@ -5030,41 +4699,16 @@ rdf_transaction(term_t goal, term_t id)
 	   !put_begin_end(be, FUNCTOR_end1, 0) )
 	return FALSE;
 
-      if ( !LOCKOUT_READERS(db) )	/* interrupt, timeout */
-      { broadcast(EV_TRANSACTION, (void*)id, (void*)be);
-	rc = FALSE;
-	goto discard;
-      }
-      commit_transaction(db, id);
-      REALLOW_READERS(db);
+      commit_transaction(q);
+
       if ( !broadcast(EV_TRANSACTION, (void*)id, (void*)be) )
 	return FALSE;
     }
   } else
-  { discard:
-    discard_transaction(db);
+  { discard_transaction(q);
   }
-  db->tr_active = me.parent;
-  WRUNLOCK(db);
 
   return rc;
-}
-
-
-static foreign_t
-rdf_active_transactions(term_t list)
-{ rdf_db *db = DB;
-  term_t tail = PL_copy_term_ref(list);
-  term_t head = PL_new_term_ref();
-  active_transaction *ot;
-
-  for(ot = db->tr_active; ot; ot=ot->parent)
-  { if ( !PL_unify_list(tail, head, tail) ||
-	 !PL_unify(head, ot->id) )
-      return FALSE;
-  }
-
-  return PL_unify_nil(tail);
 }
 
 
@@ -5712,17 +5356,13 @@ update_triple(rdf_db *db, term_t action, triple *t)
   free_triple(db, &tmp);
   lock_atoms(new);
 
-  if ( db->tr_first )
-  { record_update_transaction(db, t, new);
+  if ( broadcast(EV_UPDATE, t, new) )
+  { erase_triple_silent(db, t);
+    link_triple_silent(db, new);
+    db->generation++;
   } else
-  { if ( broadcast(EV_UPDATE, t, new) )
-    { erase_triple_silent(db, t);
-      link_triple_silent(db, new);
-      db->generation++;
-    } else
-    { free_triple(db, new);
-      rc = FALSE;
-    }
+  { free_triple(db, new);
+    rc = FALSE;
   }
 
   return rc;
@@ -7262,8 +6902,6 @@ install_rdf_db()
   PL_register_foreign("rdf_estimate_complexity",
 					4, rdf_estimate_complexity, 0);
   PL_register_foreign("rdf_transaction_",2, rdf_transaction, META);
-  PL_register_foreign("rdf_active_transactions_",
-					1, rdf_active_transactions, 0);
   PL_register_foreign("rdf_monitor_",   2, rdf_monitor,     META);
 /*PL_register_foreign("rdf_broadcast_", 2, rdf_broadcast,   0);*/
 #ifdef WITH_MD5
