@@ -348,34 +348,6 @@ domain_error(term_t actual, const char *expected)
 
 
 static int
-permission_error(const char *op, const char *type, const char *obj,
-		 const char *msg)
-{ term_t ex, ctx;
-
-  if ( !(ex = PL_new_term_ref()) ||
-       !(ctx = PL_new_term_ref()) )
-    return FALSE;
-
-  if ( msg )
-  { if ( !PL_unify_term(ctx, PL_FUNCTOR_CHARS, "context", 2,
-			       PL_VARIABLE,
-			       PL_CHARS, msg) )
-      return FALSE;
-  }
-
-  if ( !PL_unify_term(ex, PL_FUNCTOR_CHARS, "error", 2,
-		      PL_FUNCTOR_CHARS, "permission_error", 3,
-		        PL_CHARS, op,
-		        PL_CHARS, type,
-		        PL_CHARS, obj,
-		      PL_TERM, ctx) )
-    return FALSE;
-
-  return PL_raise_exception(ex);
-}
-
-
-static int
 get_atom_ex(term_t t, atom_t *a)
 { if ( PL_get_atom(t, a) )
     return TRUE;
@@ -5841,6 +5813,8 @@ rdf_retractall4(term_t subject, term_t predicate, term_t object, term_t src)
 { triple t, *p;
   rdf_db *db = DB;
   triple_walker tw;
+  triple_buffer buf;
+  query *q;
 
   memset(&t, 0, sizeof(t));
   switch( get_partial_triple(db, subject, predicate, object, src, &t) )
@@ -5857,9 +5831,8 @@ rdf_retractall4(term_t subject, term_t predicate, term_t object, term_t src)
       return TRUE;
   }
 
-  if ( !WRLOCK(db, FALSE) )
-    return FALSE;
-
+  init_triple_buffer(&buf);
+  q = open_query(db);
   init_triple_walker(&tw, db, &t, t.indexed);
   while((p=next_triple(&tw)))
   { if ( match_triples(p, &t, MATCH_EXACT|MATCH_SRC) )
@@ -5871,23 +5844,14 @@ rdf_retractall4(term_t subject, term_t predicate, term_t object, term_t src)
 	  continue;
       }
 
-      if ( db->tr_first )
-      { if ( db->tr_reset )
-	{ WRUNLOCK(db);
-	  return permission_error("retract", "triple", "",
-				  "rdf_retractall cannot follow "
-				  "rdf_reset_db in one transaction");
-	}
-	record_transaction(db, TR_RETRACT, p);
-      } else
-      { erase_triple(db, p);
-	db->generation++;
-      }
+      buffer_triple(&buf, p);
     }
   }
-
-  WRUNLOCK(db);
   free_triple(db, &t);
+  del_triples(q, buf.base, buf.top-buf.base);
+  close_query(q);
+  free_triple_buffer(&buf);
+
 
   return TRUE;
 }
