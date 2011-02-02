@@ -6382,7 +6382,8 @@ typedef struct visited
 #define AGENDA_SAVED_MAGIC 742736362
 
 typedef struct agenda
-{ visited *head;			/* visited list */
+{ query   *query;			/* associated query */
+  visited *head;			/* visited list */
   visited *tail;			/* tail of visited list */
   visited *to_expand;			/* next to expand */
   visited *to_return;			/* next to return */
@@ -6437,6 +6438,9 @@ static void
 empty_agenda(rdf_db *db, agenda *a)
 { chunk *c, *n;
 
+  if ( a->query )
+    close_query(a->query);
+
   for(c=a->chunk; c; c = n)
   { n = c->next;
     rdf_free(db, c, CHUNK_SIZE(c->size));
@@ -6450,13 +6454,6 @@ empty_agenda(rdf_db *db, agenda *a)
   } else
   { a->magic = 0;
   }
-}
-
-
-static void
-unlock_and_empty_agenda(rdf_db *db, agenda *a)
-{ RDUNLOCK(db);
-  empty_agenda(db, a);
 }
 
 
@@ -6610,7 +6607,10 @@ bf_expand(rdf_db *db, agenda *a, atom_t resource, uintptr_t d)
 
     init_triple_walker(&tw, db, &pattern, indexed);
     while((p=next_triple(&tw)))
-    { if ( match_triples(p, &pattern, MATCH_SUBPROPERTY) )
+    { if ( !alive_triple(a->query, p) )
+	continue;
+
+      if ( match_triples(p, &pattern, MATCH_SUBPROPERTY) )
       { atom_t found;
 	visited *v;
 
@@ -6763,10 +6763,7 @@ rdf_reachable(term_t subj, term_t pred, term_t obj,
       } else
 	return instantiation_error(subj);
 
-      if ( !RDLOCK(db) )
-	return FALSE;
-      if ( !update_hash(db, TRUE) )
-	return FALSE;
+      a.query = open_query(db);
       if ( (a.pattern.indexed & BY_S) ) 	/* subj ... */
 	append_agenda(db, &a, a.pattern.subject, 0);
       else
@@ -6778,23 +6775,22 @@ rdf_reachable(term_t subj, term_t pred, term_t obj,
       { if ( PL_unify_atom(target_term, v->resource) )
 	{ if ( is_det )		/* mode(+, +, +) */
 	  { int rc = unify_distance(d, v->distance);
-	    unlock_and_empty_agenda(db, &a);
+	    empty_agenda(db, &a);
 	    return rc;
 	  } else if ( unify_distance(d, v->distance) )
 	  {				/* mode(+, +, -) or mode(-, +, +) */
 	    if ( peek_agenda(db, &a) )
-	    { agenda *ra =  save_agenda(db, &a);
-	      inc_active_queries(db);
+	    { agenda *ra = save_agenda(db, &a);
 	      DEBUG(9, Sdprintf("Saved agenta to %p\n", ra));
 	      PL_retry_address(ra);
 	    }
 
-	    unlock_and_empty_agenda(db, &a);
+	    empty_agenda(db, &a);
 	    return TRUE;
 	  }
 	}
       }
-      unlock_and_empty_agenda(db, &a);
+      empty_agenda(db, &a);
       return FALSE;
     }
     case PL_REDO:
@@ -6816,15 +6812,13 @@ rdf_reachable(term_t subj, term_t pred, term_t obj,
 	  if ( peek_agenda(db, a) )
 	  { PL_retry_address(a);
 	  } else
-	  { dec_active_queries(db);
-	    unlock_and_empty_agenda(db, a);
+	  { empty_agenda(db, a);
 	    return TRUE;
 	  }
 	}
       }
 
-      dec_active_queries(db);
-      unlock_and_empty_agenda(db, a);
+      empty_agenda(db, a);
       return FALSE;
     }
     case PL_PRUNED:
@@ -6834,8 +6828,7 @@ rdf_reachable(term_t subj, term_t pred, term_t obj,
 
       assert(a->magic == AGENDA_SAVED_MAGIC);
 
-      dec_active_queries(db);
-      unlock_and_empty_agenda(db, a);
+      empty_agenda(db, a);
       return TRUE;
     }
     default:
