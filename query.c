@@ -36,9 +36,15 @@ generations:
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
+#include <SWI-Stream.h>
+#include <SWI-Prolog.h>
+#include <string.h>
+#include "rdf_db.h"
 #include "query.h"
 #include "memory.h"
 #include "mutex.h"
+
+static void	init_query_stack(rdf_db *db, query_stack *qs);
 
 
 		 /*******************************
@@ -53,38 +59,38 @@ generations:
 thread_info *
 rdf_thread_info(rdf_db *db, int tid)
 { query_admin *qa = &db->queries;
-  per_thread *td = qa->per_thread;
+  per_thread *td = &qa->query.per_thread;
   thread_info *ti;
   size_t idx = MSB(tid);
 
   if ( !td->blocks[idx] )
-  { simpleMutexLock(qa->query.lock);
+  { simpleMutexLock(&qa->query.lock);
     if ( !td->blocks[idx] )
     { size_t bs = (size_t)1<<idx;
-      thread_info **newblock = rdf_malloc(db, bs*sizeof(thread_info));
+      thread_info **newblock = rdf_malloc(db, bs*sizeof(thread_info*));
 
       memset(newblock, 0, bs*sizeof(thread_info));
 
       td->blocks[idx] = newblock-bs;
     }
-    simpleMutexUnlock(qa->query.lock);
+    simpleMutexUnlock(&qa->query.lock);
   }
 
   if ( !(ti=td->blocks[idx][tid]) )
-  { simpleMutexLock(qa->query.lock);
+  { simpleMutexLock(&qa->query.lock);
     if ( !(ti=td->blocks[idx][tid]) )
     { ti = rdf_malloc(db, sizeof(*ti));
       memset(ti, 0, sizeof(*ti));
-      simpleMutexInit(&ti->lock);
-      ti->generation = GEN_UNDEF;
+      init_query_stack(db, &ti->queries);
       MemoryBarrier();
       td->blocks[idx][tid] = ti;
     }
-    simpleMutexUnlock(qa->query.lock);
+    simpleMutexUnlock(&qa->query.lock);
   }
 
   return ti;
 }
+
 
 		 /*******************************
 		 *	       WAITER		*
@@ -141,6 +147,11 @@ init_query_stack(rdf_db *db, query_stack *qs)
   query *parent = NULL;
 
   memset(qs, 0, sizeof(*qs));
+
+  simpleMutexInit(&qs->lock);
+  qs->db = db;
+  qs->rd_gen = qs->wr_gen = GEN_UNDEF;
+
   for(i=0; i<MSB(prealloc); i++)
     qs->blocks[i] = qs->preallocated;
   for(i=0; i<prealloc; i++)
@@ -158,44 +169,45 @@ alloc_query(query_stack *qs)
   int b = MSB(depth);
 
   if ( qs->blocks[b] )
-    return qs->blocks[b][depth];
+    return &qs->blocks[b][depth];
 
-  simpleMutexLock(qs->lock);
+  simpleMutexLock(&qs->lock);
   if ( !qs->blocks[b] )
   { size_t bytes = (1<<b) * sizeof(query);
     query *ql = rdf_malloc(qs->db, bytes);
     query *parent;
+    int i;
 
     memset(ql, 0, bytes);
     ql -= depth;			/* rebase */
     parent = &qs->blocks[b-1][depth-1];
     for(i=depth; i<depth*2; i++)
     { query *q = &ql[depth];
-      preinit_query(db, qs, q, parent, i);
+      preinit_query(qs->db, qs, q, parent, i);
       parent = q;
     }
     MemoryBarrier();
     qs->blocks[b] = ql;
   }
-  simpleMutexUnlock(qs->lock);
+  simpleMutexUnlock(&qs->lock);
 
-  return qs->blocks[b][depth];
+  return &qs->blocks[b][depth];
 }
 
 
 static void
 push_query(query *q)
-{ simpleMutexLock(q->stack->lock);
+{ simpleMutexLock(&q->stack->lock);
   q->stack->top++;
-  simpleMutexUnlock(q->stack->lock);
+  simpleMutexUnlock(&q->stack->lock);
 }
 
 
 static void
 pop_query(query *q)
-{ simpleMutexLock(q->stack->lock);
+{ simpleMutexLock(&q->stack->lock);
   q->stack->top--;
-  simpleMutexUnlock(q->stack->lock);
+  simpleMutexUnlock(&q->stack->lock);
 }
 
 
@@ -216,6 +228,8 @@ open_query(rdf_db *db)
   }
 
   push_query(q);
+
+  return q;
 }
 
 
@@ -235,6 +249,21 @@ close_query(query *q)
   }
 
   pop_query(q);
+}
+
+
+		 /*******************************
+		 *	     ADMIN		*
+		 *******************************/
+
+void
+init_query_admin(rdf_db *db)
+{ query_admin *qa = &db->queries;
+
+  memset(qa, 0, sizeof(*qa));
+  qa->generation = 0;
+  simpleMutexInit(&qa->query.lock);
+  simpleMutexInit(&qa->write.lock);
 }
 
 
@@ -280,14 +309,14 @@ add_triples(rdf_db *db, triple **triples, size_t count)
   triple **ep = triples+count;
   triple **tp;
 
-  simpleMutexLock(db->queries.write.lock);
+  simpleMutexLock(&db->queries.write.lock);
   for(tp=triples; tp < ep; tp++)
-  { (*tp)->born = gen;
-    (*tp)->died = GEN_MAX;
+  { (*tp)->lifespan.born = gen;
+    (*tp)->lifespan.died = GEN_MAX;
     link_triple(db, *tp);
   }
   db->queries.generation++;
-  simpleMutexUnlock(db->queries.write.lock);
+  simpleMutexUnlock(&db->queries.write.lock);
 
   return TRUE;
 }
@@ -299,13 +328,13 @@ del_triples(rdf_db *db, triple **triples, size_t count)
   triple **ep = triples+count;
   triple **tp;
 
-  simpleMutexLock(db->queries.write.lock);
+  simpleMutexLock(&db->queries.write.lock);
   for(tp=triples; tp < ep; tp++)
-  { (*tp)->died = gen;
+  { (*tp)->lifespan.died = gen;
     link_triple(db, *tp);
   }
   db->queries.generation++;
-  simpleMutexUnlock(db->queries.write.lock);
+  simpleMutexUnlock(&db->queries.write.lock);
 
   return TRUE;
 }
@@ -318,5 +347,5 @@ del_triples(rdf_db *db, triple **triples, size_t count)
 
 int
 copy_triples(rdf_db *db, predicate **p, size_t count)
-{
+{ return TRUE;
 }

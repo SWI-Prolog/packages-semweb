@@ -107,7 +107,7 @@ library uses plain malloc to facilitate malloc debuggers.
 #else /*DIRECT_MALLOC*/
 
 #if CHECK_MALLOC_SIZES
-static void *
+void *
 rdf_malloc(rdf_db *db, size_t size)
 { size_t bytes = size + sizeof(size_t);
   size_t *ptr = PL_malloc(bytes);
@@ -119,7 +119,7 @@ rdf_malloc(rdf_db *db, size_t size)
   return ptr;
 }
 
-static void
+void
 rdf_free(rdf_db *db, void *ptr, size_t size)
 { size_t *p = ptr;
 
@@ -130,7 +130,7 @@ rdf_free(rdf_db *db, void *ptr, size_t size)
 }
 
 
-static void *
+void *
 rdf_realloc(rdf_db *db, void *ptr, size_t old, size_t new)
 { size_t *p = ptr;
   size_t bytes = new + sizeof(size_t);
@@ -145,7 +145,7 @@ rdf_realloc(rdf_db *db, void *ptr, size_t old, size_t new)
 
 #else /*CHECK_MALLOC_SIZES*/
 
-static void *
+void *
 rdf_malloc(rdf_db *db, size_t size)
 { if ( db )
     db->core += size;
@@ -153,7 +153,7 @@ rdf_malloc(rdf_db *db, size_t size)
   return PL_malloc(size);
 }
 
-static void
+void
 rdf_free(rdf_db *db, void *ptr, size_t size)
 { db->core -= size;
 
@@ -161,7 +161,7 @@ rdf_free(rdf_db *db, void *ptr, size_t size)
 }
 
 
-static void *
+void *
 rdf_realloc(rdf_db *db, void *ptr, size_t old, size_t new)
 { db->core += new-old;
 
@@ -2694,7 +2694,7 @@ ok:
 }
 
 
-static inline int
+int
 link_triple(rdf_db *db, triple *t)
 { if ( link_triple_silent(db, t) )
     return broadcast(EV_ASSERT, t, NULL);

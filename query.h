@@ -22,6 +22,7 @@
 
 #ifndef RDF_QUERY_H_INCLUDED
 #define RDF_QUERY_H_INCLUDED
+#include <stdint.h>
 #include "mutex.h"
 
 
@@ -32,8 +33,8 @@
 typedef uint64_t gen_t;			/* Basic type for generations */
 
 typedef struct lifespan
-{ gen_t		birth;			/* Generation we were born */
-  gen_t		death;			/* Generation we died */
+{ gen_t		born;			/* Generation we were born */
+  gen_t		died;			/* Generation we died */
 } lifespan;
 
 #define GEN_UNDEF	0xffffffffffffffff /* no defined generation */
@@ -45,23 +46,25 @@ typedef struct lifespan
 #define T_GEN(tid,d)	(GEN_TBASE + (tid)*GEN_TNEST + (d))
 
 
+typedef struct rdf_db *rdf_dbp;
+
 		 /*******************************
 		 *	      WAITERS		*
 		 *******************************/
 
-typedef void (*)(DB *db, void *closure) onready;
+typedef void (*onready)(rdf_dbp db, void *closure);
 
 typedef struct wait_on_queries
 { simpleMutex	lock;			/* Protect active count */
   int		active_count;		/* #Running queries */
-  rdf_db       *db;			/* Database I'm associated to */
+  rdf_dbp	db;			/* Database I'm associated to */
   void	       *data;			/* Closure data */
   onready      *onready;		/* Call-back */
 } wait_on_queries;
 
 
 typedef struct wait_list
-{ wait_on_queries   waiter;		/* Waiting structure */
+{ wait_on_queries  *waiter;		/* Waiting structure */
   struct wait_list *next;		/* Next waiting */
 } wait_list;
 
@@ -78,7 +81,7 @@ typedef enum q_type
 typedef struct query
 { gen_t		rd_gen;			/* generation for reading */
   gen_t		wr_gen;			/* generation for writing */
-  rdf_db       *db;			/* Database on which we run */
+  rdf_dbp	db;			/* Database on which we run */
   wait_list    *waiters;		/* things waiting for me to die */
   struct query *parent;			/* Parent query */
   struct query_stack  *stack;		/* Query-stack I am part of */
@@ -89,11 +92,12 @@ typedef struct query
 #define MAX_QBLOCKS 20			/* allows for 2M concurrent queries */
 
 typedef struct query_stack
-{ query		blocks[MAX_QBLOCKS];
+{ query	       *blocks[MAX_QBLOCKS];
   query		preallocated[4];
   simpleMutex	lock;
   gen_t		rd_gen;			/* generation for reading */
   gen_t		wr_gen;			/* generation for writing */
+  rdf_dbp	db;			/* DB we are associated to */
   int		top;			/* Top of query stack */
 } query_stack;
 
@@ -109,8 +113,7 @@ typedef struct thread_info
 #define MAX_BLOCKS 20			/* allows for 2M threads */
 
 typedef struct per_thread
-{ thread_info *blocks[MAX_BLOCKS];
-  thread_info *preallocated[4];
+{ thread_info **blocks[MAX_BLOCKS];
 } per_thread;
 
 typedef struct query_admin
@@ -122,14 +125,15 @@ typedef struct query_admin
   struct
   { simpleMutex	lock;
   } write;				/* write administration */
-} query_admin.
+} query_admin;
 
 
 		 /*******************************
 		 *	    	API		*
 		 *******************************/
 
-COMMON(query *)		open_query(rdf_db *db);
+COMMON(void)		init_query_admin(rdf_dbp db);
+COMMON(query *)		open_query(rdf_dbp db);
 COMMON(void)		close_query(query *q);
 
 #endif /*RDF_QUERY_H_INCLUDED*/

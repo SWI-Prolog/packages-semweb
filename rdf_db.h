@@ -25,11 +25,40 @@
 
 #ifndef RDFDB_H_INCLUDED
 #define RDFDB_H_INCLUDED
+
+		 /*******************************
+		 *	     OPTIONS		*
+		 *******************************/
+
+#define WITH_MD5 1
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Symbols are local to shared objects  by   default  in  COFF based binary
+formats, and public in ELF based formats.   In some ELF based systems it
+is possible to make them local   anyway. This enhances encapsulation and
+avoids an indirection for calling these   functions.  Functions that are
+supposed to be local to the SWI-Prolog kernel are declared using
+
+    COMMON(<type) <function>(<args>);
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+#ifdef HAVE_VISIBILITY_ATTRIBUTE
+#define SO_LOCAL __attribute__((visibility("hidden")))
+#else
+#define SO_LOCAL
+#endif
+#define COMMON(type) SO_LOCAL type
+
+		 /*******************************
+		 *	   OTHER MODULES	*
+		 *******************************/
+
 #include "avl.h"
 #ifdef WITH_MD5
 #include "md5.h"
 #endif
 #include "lock.h"
+#include "query.h"
 
 #define RDF_VERSION 30000		/* 3.0.0 */
 
@@ -197,6 +226,7 @@ typedef struct triple
     atom_t	resource;
   } object;
   atom_t	graph;			/* where it comes from */
+  lifespan	lifespan;		/* Start and end generation */
 					/* indexing */
   union
   { struct triple*next[INDEX_TABLES];	/* hash-table next links */
@@ -300,8 +330,9 @@ typedef struct rdf_db
   size_t	duplicates;		/* #duplicate triples */
   size_t	generation;		/* generation-id of the database */
   graph_hash    graphs;			/* Graph table */
+  graph	       *last_graph;		/* last accessed graph */
+  query_admin	queries;		/* Active query administration */
 
-  graph	*last_graph;		/* last accessed graph */
   active_transaction *tr_active;	/* open transactions */
   transaction_record *tr_first;		/* first transaction record */
   transaction_record *tr_last;		/* last transaction record */
@@ -313,5 +344,15 @@ typedef struct rdf_db
 
   avl_tree      literals;
 } rdf_db;
+
+
+		 /*******************************
+		 *	      FUNCTIONS		*
+		 *******************************/
+
+COMMON(void *)	rdf_malloc(rdf_db *db, size_t size);
+COMMON(void)	rdf_free(rdf_db *db, void *ptr, size_t size);
+COMMON(void *)	rdf_realloc(rdf_db *db, void *ptr, size_t old, size_t new);
+COMMON(int)	link_triple(rdf_db *db, triple *t);
 
 #endif /*RDFDB_H_INCLUDED*/
