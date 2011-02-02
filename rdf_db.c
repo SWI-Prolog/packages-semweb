@@ -62,6 +62,7 @@
 #include "hash.h"
 #include "murmur.h"
 #include "memory.h"
+#include "buffer.h"
 
 #undef UNLOCK
 
