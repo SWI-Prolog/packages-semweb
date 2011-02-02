@@ -10,7 +10,7 @@
 #
 #	ln-install		Install with symbolic links
 #
-# Author: Jan Wielemaker (wielemak@science.uva.nl)
+# Author: Jan Wielemaker (J.Wielemaker@vu.nl)
 ################################################################
 
 .SUFFIXES: .tex .dvi .doc .pl
