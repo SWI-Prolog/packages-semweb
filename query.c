@@ -301,40 +301,47 @@ Or, hand them to a separate thread?
   + Only this thread manages the chains: no need for locking.
   - If a thread adds triples, it has to wait.  This means two-way
     communication.  --> probably too high overhead.
+
+TBD: Generation management is different if we are in a transaction.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 int
-add_triples(rdf_db *db, triple **triples, size_t count)
-{ gen_t gen = db->queries.generation + 1;
+add_triples(query *q, triple **triples, size_t count)
+{ rdf_db *db = q->db;
+  gen_t gen;
   triple **ep = triples+count;
   triple **tp;
 
   simpleMutexLock(&db->queries.write.lock);
+  gen = db->queries.generation + 1;
   for(tp=triples; tp < ep; tp++)
   { (*tp)->lifespan.born = gen;
     (*tp)->lifespan.died = GEN_MAX;
     link_triple(db, *tp);
   }
-  db->queries.generation++;
+  db->queries.generation = gen;
   simpleMutexUnlock(&db->queries.write.lock);
+					/* TBD: broadcast */
 
   return TRUE;
 }
 
 
 int
-del_triples(rdf_db *db, triple **triples, size_t count)
-{ gen_t gen = db->queries.generation + 1;
+del_triples(query *q, triple **triples, size_t count)
+{ rdf_db *db = q->db;
+  gen_t gen;
   triple **ep = triples+count;
   triple **tp;
 
   simpleMutexLock(&db->queries.write.lock);
+  gen = db->queries.generation + 1;
   for(tp=triples; tp < ep; tp++)
   { (*tp)->lifespan.died = gen;
-    link_triple(db, *tp);
   }
-  db->queries.generation++;
+  db->queries.generation = gen;
   simpleMutexUnlock(&db->queries.write.lock);
+					/* TBD: broadcast */
 
   return TRUE;
 }
@@ -346,6 +353,6 @@ del_triples(rdf_db *db, triple **triples, size_t count)
 */
 
 int
-copy_triples(rdf_db *db, predicate **p, size_t count)
+copy_triples(query *q, predicate **p, size_t count)
 { return TRUE;
 }

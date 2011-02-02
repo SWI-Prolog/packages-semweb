@@ -132,8 +132,13 @@ typedef struct query_admin
 		 *	    	API		*
 		 *******************************/
 
-COMMON(void)		init_query_admin(rdf_dbp db);
-COMMON(query *)		open_query(rdf_dbp db);
-COMMON(void)		close_query(query *q);
+COMMON(void)	init_query_admin(rdf_dbp db);
+COMMON(query *)	open_query(rdf_dbp db);
+COMMON(void)	close_query(query *q);
+
+typedef struct triple *triplep;
+
+COMMON(int)	add_triples(query *q, triplep *triples, size_t count);
+COMMON(int)	del_triples(query *q, triplep *triples, size_t count);
 
 #endif /*RDF_QUERY_H_INCLUDED*/

@@ -5105,6 +5105,7 @@ static foreign_t
 rdf_assert4(term_t subject, term_t predicate, term_t object, term_t src)
 { rdf_db *db = DB;
   triple *t = new_triple(db);
+  query *q;
 
   if ( !get_triple(db, subject, predicate, object, t) )
   { free_triple(db, t);
@@ -5119,20 +5120,11 @@ rdf_assert4(term_t subject, term_t predicate, term_t object, term_t src)
   { t->graph = ATOM_user;
     t->line = NO_LINE;
   }
-
   lock_atoms(t);
-  if ( !WRLOCK(db, FALSE) )
-  { free_triple(db, t);
-    return FALSE;
-  }
 
-  if ( db->tr_first )
-  { record_transaction(db, TR_ASSERT, t);
-  } else
-  { link_triple(db, t);
-    db->generation++;
-  }
-  WRUNLOCK(db);
+  q = open_query(db);
+  add_triples(q, &t, 1);
+  close_query(q);
 
   return TRUE;
 }
