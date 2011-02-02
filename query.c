@@ -69,7 +69,7 @@ rdf_thread_info(rdf_db *db, int tid)
     { size_t bs = (size_t)1<<idx;
       thread_info **newblock = rdf_malloc(db, bs*sizeof(thread_info*));
 
-      memset(newblock, 0, bs*sizeof(thread_info));
+      memset(newblock, 0, bs*sizeof(thread_info*));
 
       td->blocks[idx] = newblock-bs;
     }
