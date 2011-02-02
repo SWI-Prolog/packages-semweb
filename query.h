@@ -22,6 +22,7 @@
 
 #ifndef RDF_QUERY_H_INCLUDED
 #define RDF_QUERY_H_INCLUDED
+#include "mutex.h"
 
 
 		 /*******************************
@@ -35,6 +36,7 @@ typedef struct lifespan
   gen_t		death;			/* Generation we died */
 } lifespan;
 
+#define GEN_UNDEF	0xffffffffffffffff /* no defined generation */
 #define GEN_MAX		0x7fffffffffffffff /* Max `normal' generation */
 #define GEN_TBASE	0x8000000000000000 /* Transaction generation base */
 #define GEN_TNEST	0x0000000100000000 /* Max transaction nesting */
@@ -47,11 +49,14 @@ typedef struct lifespan
 		 *	      WAITERS		*
 		 *******************************/
 
-#include <semaphore.h>
+typedef void (*)(DB *db, void *closure) onready;
 
 typedef struct wait_on_queries
-{ int	active_count;			/* #Running queries */
-  void (*ondied)(DB *db, void *closure); /* Call-back */
+{ simpleMutex	lock;			/* Protect active count */
+  int		active_count;		/* #Running queries */
+  rdf_db       *db;			/* Database I'm associated to */
+  void	       *data;			/* Closure data */
+  onready      *onready;		/* Call-back */
 } wait_on_queries;
 
 
@@ -62,21 +67,6 @@ typedef struct wait_list
 
 
 		 /*******************************
-		 *	      THREADS		*
-		 *******************************/
-
-typedef struct thread_info
-{ struct query *transaction;		/* Current transaction */
-} thread_info;
-
-#define MAX_BLOCKS 20			/* allows for 2M threads */
-
-typedef struct per_thread
-{ thread_info blocks[MAX_BLOCKS];
-  thread_info preallocated[7];
-} per_thread;
-
-		 /*******************************
 		 *	      QUERIES		*
 		 *******************************/
 
@@ -85,28 +75,53 @@ typedef enum q_type
   Q_TRANSACTION				/* A transaction */
 } q_type;
 
-
 typedef struct query
-{ gen_t		generation;		/* Generation that started the Q */
+{ gen_t		rd_gen;			/* generation for reading */
+  gen_t		wr_gen;			/* generation for writing */
   rdf_db       *db;			/* Database on which we run */
-  int		thread;			/* Prolog thread-id running the Q */
-  thread_info  *thread_info;		/* Per-thread administration */
-  q_type	type;			/* Q_* */
   wait_list    *waiters;		/* things waiting for me to die */
-  struct
-  { gen_t	generation;		/* generation of the transaction */
-    struct query *parent;		/* Parent transaction */
-  } trans;
+  struct query *parent;			/* Parent query */
+  struct query_stack  *stack;		/* Query-stack I am part of */
+  q_type	type;			/* Q_* */
+  int		depth;			/* recursion depth */
 } query;
 
+#define MAX_QBLOCKS 20			/* allows for 2M concurrent queries */
+
+typedef struct query_stack
+{ query		blocks[MAX_QBLOCKS];
+  query		preallocated[4];
+  simpleMutex	lock;
+  gen_t		rd_gen;			/* generation for reading */
+  gen_t		wr_gen;			/* generation for writing */
+  int		top;			/* Top of query stack */
+} query_stack;
+
+
+		 /*******************************
+		 *	      THREADS		*
+		 *******************************/
+
+typedef struct thread_info
+{ query_stack   queries;		/* Open queries */
+} thread_info;
+
+#define MAX_BLOCKS 20			/* allows for 2M threads */
+
+typedef struct per_thread
+{ thread_info *blocks[MAX_BLOCKS];
+  thread_info *preallocated[4];
+} per_thread;
 
 typedef struct query_admin
 { gen_t		generation;		/* Global heart-beat */
-  per_thread	per_thread;		/* per-thread data (transactions) */
-  query	       *queries;		/* Open queries */
   struct
-  { mutex_t	lock;			/* For adding triples */
-  } write;
+  { simpleMutex	lock;
+    per_thread	per_thread;
+  } query;				/* active query administration */
+  struct
+  { simpleMutex	lock;
+  } write;				/* write administration */
 } query_admin.
 
 
@@ -114,17 +129,7 @@ typedef struct query_admin
 		 *	    	API		*
 		 *******************************/
 
-COMMON(query *)		alloc_query(rdf_db *db);
-COMMON(query *)		alloc_transaction(rdf_db *db);
-COMMON(query *)		free_query(query *q);
-
-COMMON(gen_t)		oldest_query(rdf_db *db,
-				     void (*ondied)(rdf_db *db, void *closure));
-
-					/* Inline? */
-COMMON(int)		alive(query *q, lifespan *span);
-
-
-
+COMMON(query *)		open_query(rdf_db *db);
+COMMON(void)		close_query(query *q);
 
 #endif /*RDF_QUERY_H_INCLUDED*/
