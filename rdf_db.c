@@ -7045,6 +7045,14 @@ reset_db(rdf_db *db)
 }
 
 
+/** rdf_reset_db
+
+    Reset the RDF database to its initial state.  Only allowed if there
+    are no active queries. This means that if the calling thread has
+    open queries this must be considered a permission error.  Otherwise
+    we wait until all queries have died.
+*/
+
 static foreign_t
 rdf_reset_db()
 { rdf_db *db = DB;
