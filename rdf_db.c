@@ -1453,7 +1453,7 @@ update_predicate_counts(rdf_db *db, predicate *p, int which)
     init_atomset(&object_set);
     init_triple_walker(&tw, db, &t, t.indexed);
     while((byp=next_triple(&tw)))
-    { if ( !byp->lifespan.died != GEN_MAX && !byp->is_duplicate )
+    { if ( byp->lifespan.died == GEN_MAX && !byp->is_duplicate )
       { if ( (which == DISTINCT_DIRECT && byp->predicate.r == p) ||
 	     (which != DISTINCT_DIRECT && isSubPropertyOf(byp->predicate.r, p)) )
 	{ total++;
@@ -2563,14 +2563,14 @@ first(rdf_db *db, atom_t subject, triple *t)
   triple_walker tw;
 
   for( ; t; t = t->tp.next[ICOL(BY_S)])
-  { if ( t->subject == subject && t->lifespan.died != GEN_MAX )
+  { if ( t->subject == subject && t->lifespan.died == GEN_MAX )
       return t;
   }
 
   tmp.subject = subject;
   init_triple_walker(&tw, db, &tmp, BY_S);
   while((t=next_triple(&tw)))
-  { if ( t->subject == subject && t->lifespan.died != GEN_MAX )
+  { if ( t->subject == subject && t->lifespan.died == GEN_MAX )
       return t;
   }
 
@@ -5779,7 +5779,7 @@ rdf_subject(term_t subject, control_t h)
       t = PL_foreign_context_address(h);
     next:
       for(; t; t = t->tp.next[ICOL(BY_NONE)])
-      { if ( t->first && t->lifespan.died != GEN_MAX )
+      { if ( t->first && t->lifespan.died == GEN_MAX )
 	{ if ( !PL_unify_atom(subject, t->subject) )
 	    return FALSE;
 
