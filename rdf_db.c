@@ -266,8 +266,6 @@ static void	init_triple_walker(triple_walker *tw, rdf_db *db,
 				   triple *t, int index);
 static triple  *next_triple(triple_walker *tw);
 
-static void	reset_db(rdf_db *db);
-
 static void	create_reachability_matrix(rdf_db *db, predicate_cloud *cloud);
 static int	get_predicate(rdf_db *db, term_t t, predicate **p);
 static predicate_cloud *new_predicate_cloud(rdf_db *db, predicate **p, size_t count);
@@ -340,6 +338,34 @@ domain_error(term_t actual, const char *expected)
     return PL_raise_exception(ex);
 
   return FALSE;
+}
+
+
+static int
+permission_error(const char *op, const char *type, const char *obj,
+		 const char *msg)
+{ term_t ex, ctx;
+
+  if ( !(ex = PL_new_term_ref()) ||
+       !(ctx = PL_new_term_ref()) )
+    return FALSE;
+
+  if ( msg )
+  { if ( !PL_unify_term(ctx, PL_FUNCTOR_CHARS, "context", 2,
+			       PL_VARIABLE,
+			       PL_CHARS, msg) )
+      return FALSE;
+  }
+
+  if ( !PL_unify_term(ex, PL_FUNCTOR_CHARS, "error", 2,
+		      PL_FUNCTOR_CHARS, "permission_error", 3,
+		        PL_CHARS, op,
+		        PL_CHARS, type,
+		        PL_CHARS, obj,
+		      PL_TERM, ctx) )
+    return FALSE;
+
+  return PL_raise_exception(ex);
 }
 
 
@@ -6637,7 +6663,7 @@ erase_predicates(rdf_db *db)
 }
 
 
-static void
+static int
 reset_db(rdf_db *db)
 { db->resetting = TRUE;
 
@@ -6650,6 +6676,8 @@ reset_db(rdf_db *db)
   init_literal_table(db);
 
   db->resetting = FALSE;
+
+  return TRUE;
 }
 
 
@@ -6659,24 +6687,26 @@ reset_db(rdf_db *db)
     are no active queries. This means that if the calling thread has
     open queries this must be considered a permission error.  Otherwise
     we wait until all queries have died.
+
+    TBD: Check queries in other threads!
 */
 
 static foreign_t
 rdf_reset_db()
 { rdf_db *db = DB;
+  query *q = open_query(db);
+  int rc;
 
-  if ( !WRLOCK(db, FALSE) )
-    return FALSE;
+  if ( q->depth > 0 )
+  { close_query(q);
+    return permission_error("reset", "rdf_db", "default",
+			    "Active queries");
+  }
 
-  if ( db->tr_first )
-  { record_transaction(db, TR_RESET, NULL);
-    db->tr_reset = TRUE;
-  } else
-    reset_db(db);
+  rc = reset_db(db);
+  close_query(q);
 
-  WRUNLOCK(db);
-
-  return TRUE;
+  return rc;
 }
 
 
