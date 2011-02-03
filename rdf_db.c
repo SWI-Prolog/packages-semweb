@@ -4686,8 +4686,10 @@ rdf_transaction(term_t goal, term_t id)
 { int rc;
   rdf_db *db = DB;
   query *q;
+  triple_buffer added;
+  triple_buffer deleted;
 
-  q = open_transaction(db);
+  q = open_transaction(db, &added, &deleted);
   rc = PL_call_predicate(NULL, PL_Q_PASS_EXCEPTION, PRED_call1, goal);
 
   if ( rc )

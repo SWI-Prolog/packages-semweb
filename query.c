@@ -235,7 +235,7 @@ open_query(rdf_db *db)
 
 
 query *
-open_transaction(rdf_db *db)
+open_transaction(rdf_db *db, triple_buffer *added, triple_buffer *deleted)
 { int tid = PL_thread_self();
   thread_info *ti = rdf_thread_info(db, tid);
   query *q = alloc_query(&ti->queries);
@@ -256,6 +256,12 @@ open_transaction(rdf_db *db)
   ti->queries.rd_gen = q->rd_gen;
   ti->queries.wr_gen = q->wr_gen;
   ti->queries.transaction = q;
+
+  init_triple_buffer(added);
+  init_triple_buffer(deleted);
+  q->transaction_data.added = added;
+  q->transaction_data.deleted = deleted;
+
 
   push_query(q);
 

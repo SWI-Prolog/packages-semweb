@@ -142,9 +142,11 @@ typedef struct query_admin
 
 COMMON(void)	init_query_admin(rdf_dbp db);
 COMMON(query *)	open_query(rdf_dbp db);
-COMMON(query *)	open_transaction(rdf_dbp db);
 COMMON(void)	close_query(query *q);
 
+COMMON(query *)	open_transaction(rdf_dbp db,
+				 struct triple_buffer *added,
+				 struct triple_buffer *deleted);
 COMMON(int)	empty_transaction(query *q);
 COMMON(int)	commit_transaction(query *q);
 COMMON(int)	discard_transaction(query *q);

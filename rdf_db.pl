@@ -1361,8 +1361,8 @@ assert_triples([H|_], _) :-
 %	statistics.
 
 rdf_reset_db :-
-	retractall(rdf_source(_,_,_,_,_)),
-	rdf_transaction(rdf_reset_db_, reset).
+	rdf_reset_db_,
+	retractall(rdf_source(_,_,_,_,_)).
 
 
 		 /*******************************
