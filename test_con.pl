@@ -2,30 +2,35 @@
 	  [ (+)/1,			% Assert
 	    (-)/1,			% Retract
 	    v/1,			% Visible
+	    s/2,			% +Id, ?Subject
+	    p/2,			% +Id, ?Predicate
+	    o/2,			% +Id, ?Object
 	    u/1,			% InVisible
 	    l/0,			% List
 	    r/0,			% reset
 	    {}/1,			% transaction
-	    a/0				% Run all tests
+	    (@)/2,			% Action @ Thread (Synchronous)
+	    k/0,			% Kill helper threads
+	    a/0,			% Run all tests
+	    op(200, xfx, @)
 	  ]).
 :- use_module(rdf_db).
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Create a test-language.  Actions:
-
-    + A:{S,P,O},		Add named triple
-    - A:{S,P,O},		Remove named triple
-    v A,
-    {...}
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/** <module> RDF test language
+*/
 
 :- meta_predicate
 	true(0),
 	false(0),
-	{}(0).
+	{}(0),
+	@(:,?).
 
 :- thread_local
 	triple/2.
+
+%%	+ Pattern
+%
+%	Assert a triple, optionally giving it a name.
 
 + Name^{S,P,O} :- !,
 	mk_spo(S,P,O),
@@ -47,6 +52,10 @@ mk(_, R) :- atom(R), !.
 mk(Prefix, R) :-
 	gensym(Prefix, R).
 
+%%	- Pattern
+%
+%	Retract a triple, normally referenced by name.
+
 - Name^{S,P,O} :- !,
 	rdf_retractall(S,P,O),
 	(   var(Name)
@@ -62,6 +71,10 @@ mk(Prefix, R) :-
 	triple(Name, Triple),
 	v(Triple).
 
+%%	v(+Id)
+%
+%	True if triple Id is visible.
+
 v(rdf(S,P,O)) :- !,
 	true((rdf(S,P,O))),
 	true((rdf(S,P,O2), O == O2)),
@@ -76,12 +89,40 @@ v(Name) :-
 	triple(Name, Triple),
 	v(Triple).
 
+%%	u(+Id)
+%
+%	True if triple Id is not visible.
+
 u(rdf(S,P,O)) :- !,
 	false((rdf(S,P,O))).
 u(Name) :-
 	ground(Name),
 	triple(Name, Triple),
 	u(Triple).
+
+%%	s(Id, Subject) is semidet.
+%%	p(Id, Predicate) is semidet.
+%%	o(Id, Object) is semidet.
+
+s(rdf(S,_,_), T) :- !,
+	S = T.
+s(Name, T) :-
+	ground(Name),
+	triple(Name, Triple),
+	s(Triple, T).
+p(rdf(_,P,_), T) :- !,
+	P = T.
+p(Name, T) :-
+	ground(Name),
+	triple(Name, Triple),
+	p(Triple, T).
+o(rdf(_,_,O), T) :- !,
+	O = T.
+o(Name, T) :-
+	ground(Name),
+	triple(Name, Triple),
+	o(Triple, T).
+
 
 
 true(G) :-
@@ -98,13 +139,76 @@ false(G) :-
 	throw(test_failed).
 false(_).
 
+%%	{G}
+%
+%	Run G in an RDF transaction.
+
 {}(G) :-
 	rdf_transaction(G).
 
+%%	{G}@T
+%
+%	Run G (as once/1)  in  a  seperate   thread  and  wait  for  its
+%	completion (synchronous execution).
+
+:- dynamic
+	helper/1.
+
+(M:{}(G)) @ T :-
+	(   var(T)
+	->  thread_create(helper, T, []),
+	    assert(helper(T))
+	;   true
+	),
+	thread_self(Me),
+	thread_send_message(T, run(M:G, Me)),
+	thread_get_message(Reply),
+	(   Reply = true(X)
+	->  X = M:G
+	;   Reply = exception(E)
+	->  throw(E)
+	).
+
+%%	k
+%
+%	Kill all helper threads.
+
+k :-
+	forall(retract(helper(Id)),
+	       (   thread_send_message(Id, done),
+		   thread_join(Id, true)
+	       )).
+
+helper :-
+	thread_get_message(M),
+	(   M = run(G, Sender)
+	->  run(G,Result),
+	    thread_send_message(Sender, Result),
+	    helper
+	;   true
+	).
+
+run(G, Result) :-
+	catch(G, E, true), !,
+	(   var(E)
+	->  Result = true(G)
+	;   Result = exception(E)
+	).
+run(_, false).
+
+
+%%	r
+%
+%	Reset the RDF database, helper threads, etc.
 
 r :-
+	k,
 	retractall(triple(_,_)),
 	rdf_reset_db.
+
+%%	l
+%
+%	List content of RDF database.
 
 l :-
 	forall(rdf(S,P,O),
@@ -187,24 +291,50 @@ test t7 :-
 	;   true
 	),
 	v(a).
-
+test p1 :-
+	r,
+	+ {s,p,_},
+	+ B^{s,p,_},
+	rdf(s,p,O),
+	- B,
+	o(B, O).
+test p2 :-
+	r,
+	+ {s,p,_},
+	+ B^{s,p,_},
+	rdf(s,p,O),
+	{- B} @ H,
+	{u(B)} @ H,
+	o(B, O).
+test p3 :-
+	r,
+	+ B^{s,p,_},
+	{-B}@_,
+	u(B).
 
 :- dynamic
 	passed/1.
+
+%%	a
+%
+%	Run all tests
 
 a :-
 	retractall(passed(_)),
 	forall(test(Head),
 	       run(Head)),
 	aggregate_all(count, passed(_), Count),
-	format('~D tests passed~n', [Count]).
+	format('~N~D tests passed~n', [Count]).
 
 
 run(Head) :-
 	catch(Head, E, true), !,
+	k,
 	(   var(E)
-	->  assert(passed(Head))
-	;   format(user_error, 'TEST FAILED: ~q~n', [Head])
+	->  assert(passed(Head)),
+	    write(user_error, '.')
+	;   format(user_error, '~NTEST FAILED: ~q~n', [Head])
 	).
 run(Head) :-
-	format(user_error, 'TEST FAILED: ~q~n', [Head]).
+	k,
+	format(user_error, '~NTEST FAILED: ~q~n', [Head]).
