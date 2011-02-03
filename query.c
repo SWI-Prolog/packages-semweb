@@ -43,6 +43,7 @@ generations:
 #include "query.h"
 #include "memory.h"
 #include "mutex.h"
+#include "buffer.h"
 
 static void	init_query_stack(rdf_db *db, query_stack *qs);
 
@@ -219,6 +220,7 @@ open_query(rdf_db *db)
   gen_t g;
 
   q->type = Q_NORMAL;
+  q->transaction = ti->queries.transaction;
   if ( (g=ti->queries.rd_gen) == GEN_UNDEF )
   { q->rd_gen = q->wr_gen = db->queries.generation;
   } else
@@ -240,7 +242,21 @@ open_transaction(rdf_db *db)
   gen_t g;
 
   q->type = Q_TRANSACTION;
-  /*TBD: Get clear about generations and transactions.*/
+  q->transaction = ti->queries.transaction;
+
+  if ( (g=ti->queries.rd_gen) == GEN_UNDEF )
+    q->rd_gen = db->queries.generation;
+  else
+    q->rd_gen = ti->queries.wr_gen;	/* nested transaction */
+
+  q->wr_gen = GEN_TBASE + tid*GEN_TNEST + q->depth;
+
+  q->transaction_data.rd_gen_saved = ti->queries.rd_gen;
+  q->transaction_data.wr_gen_saved = ti->queries.wr_gen;
+  ti->queries.rd_gen = q->rd_gen;
+  ti->queries.wr_gen = q->wr_gen;
+  ti->queries.transaction = q;
+
   push_query(q);
 
   return q;
@@ -250,6 +266,12 @@ open_transaction(rdf_db *db)
 void
 close_query(query *q)
 { wait_list *wl;
+
+  if ( q->type == Q_TRANSACTION )
+  { q->stack->rd_gen = q->transaction_data.rd_gen_saved;
+    q->stack->wr_gen = q->transaction_data.wr_gen_saved;
+    q->stack->transaction = q->transaction;
+  }
 
   if ( (wl=q->waiters) )
   { wait_list *n;
@@ -263,6 +285,13 @@ close_query(query *q)
   }
 
   pop_query(q);
+}
+
+
+int
+empty_transaction(query *q)
+{ return ( is_empty_buffer(q->transaction_data.added) &&
+	   is_empty_buffer(q->transaction_data.deleted) );
 }
 
 
@@ -287,14 +316,35 @@ init_query_admin(rdf_db *db)
 
 /* alive_triple() is true if a triple is visible inside a query.
 
-TBD: Transactions.
+   A triple is alive if the query generation is inside the lifespan,
+   but with transactions there are two problems:
+	- If the triple is deleted by a parent transaction it is dead
+	- If the triple is created by a parent transaction it is alive
 */
 
 int
 alive_triple(query *q, triple *t)
-{ if ( q->rd_gen >= t->lifespan.born &&
+{ query *tr;
+
+  if ( q->rd_gen >= t->lifespan.born &&
        q->rd_gen <  t->lifespan.died )
+  { if ( t->lifespan.died != GEN_MAX &&
+	 (tr=q->transaction) )
+    { for(tr=tr->transaction; tr; tr = tr->transaction)
+      { if ( t->lifespan.died == tr->wr_gen )
+	  return FALSE;
+      }
+    }
     return TRUE;
+  }
+
+  if ( t->lifespan.born >= GEN_TBASE &&
+       (tr=q->transaction) )
+  { for(tr=tr->transaction; tr; tr = tr->transaction)
+    { if ( t->lifespan.born == tr->wr_gen )
+	return TRUE;
+    }
+  }
 
   return FALSE;
 }
@@ -346,13 +396,17 @@ add_triples(query *q, triple **triples, size_t count)
   triple **tp;
 
   simpleMutexLock(&db->queries.write.lock);
-  gen = db->queries.generation + 1;
+  if ( q->transaction )
+    gen = q->transaction->wr_gen;
+  else
+    gen = db->queries.generation + 1;
   for(tp=triples; tp < ep; tp++)
   { (*tp)->lifespan.born = gen;
     (*tp)->lifespan.died = GEN_MAX;
     link_triple(db, *tp);
   }
-  db->queries.generation = gen;
+  if ( !q->transaction )
+    db->queries.generation = gen;
   simpleMutexUnlock(&db->queries.write.lock);
 					/* TBD: broadcast */
 
@@ -368,13 +422,75 @@ del_triples(query *q, triple **triples, size_t count)
   triple **tp;
 
   simpleMutexLock(&db->queries.write.lock);
-  gen = db->queries.generation + 1;
+  if ( q->transaction )
+    gen = q->transaction->wr_gen;
+  else
+    gen = db->queries.generation + 1;
   for(tp=triples; tp < ep; tp++)
   { (*tp)->lifespan.died = gen;
   }
-  db->queries.generation = gen;
+  if ( !q->transaction )
+    db->queries.generation = gen;
   simpleMutexUnlock(&db->queries.write.lock);
 					/* TBD: broadcast */
+
+  return TRUE;
+}
+
+
+int
+commit_transaction(query *q)
+{ rdf_db *db = q->db;
+  triple **tp;
+  gen_t gen;
+
+  simpleMutexLock(&db->queries.write.lock);
+  if ( q->transaction )
+    gen = q->transaction->wr_gen;
+  else
+    gen = db->queries.generation + 1;
+  for(tp=q->transaction_data.added->base;
+      tp<q->transaction_data.added->top;
+      tp++)
+  { (*tp)->lifespan.born = gen;
+  }
+  for(tp=q->transaction_data.deleted->base;
+      tp<q->transaction_data.deleted->top;
+      tp++)
+  { (*tp)->lifespan.died = gen;
+  }
+  if ( !q->transaction )
+    db->queries.generation = gen;
+  simpleMutexUnlock(&db->queries.write.lock);
+
+  free_triple_buffer(q->transaction_data.added);
+  free_triple_buffer(q->transaction_data.deleted);
+
+  return TRUE;
+}
+
+
+/* TBD: What if someone else deleted this triple too?  We can check
+   that by discovering multiple changes to the died generation.
+*/
+
+int
+discard_transaction(query *q)
+{ triple **tp;
+
+  for(tp=q->transaction_data.added->base;
+      tp<q->transaction_data.added->top;
+      tp++)
+  { (*tp)->lifespan.born = GEN_MAX;
+  }
+  for(tp=q->transaction_data.deleted->base;
+      tp<q->transaction_data.deleted->top;
+      tp++)
+  { (*tp)->lifespan.died = GEN_MAX;
+  }
+
+  free_triple_buffer(q->transaction_data.added);
+  free_triple_buffer(q->transaction_data.deleted);
 
   return TRUE;
 }

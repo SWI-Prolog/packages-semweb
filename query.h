@@ -87,6 +87,13 @@ typedef struct query
   struct query_stack  *stack;		/* Query-stack I am part of */
   q_type	type;			/* Q_* */
   int		depth;			/* recursion depth */
+  struct query *transaction;		/* Transaction of the query */
+  struct
+  { gen_t	rd_gen_saved;
+    gen_t	wr_gen_saved;
+    struct triple_buffer *added;
+    struct triple_buffer *deleted;
+  } transaction_data;
 } query;
 
 #define MAX_QBLOCKS 20			/* allows for 2M concurrent queries */
@@ -95,6 +102,7 @@ typedef struct query_stack
 { query	       *blocks[MAX_QBLOCKS];
   query		preallocated[4];
   simpleMutex	lock;
+  query	       *transaction;		/* Current transaction */
   gen_t		rd_gen;			/* generation for reading */
   gen_t		wr_gen;			/* generation for writing */
   rdf_dbp	db;			/* DB we are associated to */
@@ -136,6 +144,10 @@ COMMON(void)	init_query_admin(rdf_dbp db);
 COMMON(query *)	open_query(rdf_dbp db);
 COMMON(query *)	open_transaction(rdf_dbp db);
 COMMON(void)	close_query(query *q);
+
+COMMON(int)	empty_transaction(query *q);
+COMMON(int)	commit_transaction(query *q);
+COMMON(int)	discard_transaction(query *q);
 
 typedef struct triple *triplep;
 

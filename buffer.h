@@ -44,6 +44,12 @@ init_triple_buffer(triple_buffer *b)
 
 
 static inline int
+is_empty_buffer(triple_buffer *b)
+{ return b->top == b->base;
+}
+
+
+static inline int
 buffer_triple(triple_buffer *b, triple *t)
 { if ( b->top < b->max )
   { *b->top++ = t;
