@@ -676,8 +676,7 @@ rdf_current_predicate(P, DB) :-
 
 rdf_predicate_property(P, Prop) :-
 	var(P), !,
-	rdf_current_predicates(All),
-	member(P, All),
+	rdf_current_predicate(P),
 	rdf_predicate_property_(P, Prop).
 rdf_predicate_property(P, Prop) :-
 	rdf_predicate_property_(P, Prop).
