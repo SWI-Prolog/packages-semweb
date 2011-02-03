@@ -411,7 +411,7 @@ add_triples(query *q, triple **triples, size_t count)
   if ( !q->transaction )
     db->queries.generation = gen;
   simpleMutexUnlock(&db->queries.write.lock);
-					/* TBD: broadcast */
+					/* TBD: broadcast(EV_ASSERT, t, NULL) */
 
   return TRUE;
 }
