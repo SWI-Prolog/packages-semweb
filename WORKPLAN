@@ -10,6 +10,13 @@
 
   * Check dubious dynamic arrays starting at 0 (MSB(0) == MSB(1) == 0)
 
+  * Reconsider implementation of rdf_subject/1 (`first')?
+    - Seperate table?
+      - Resource-table?
+    - Seperate table per graph?
+
+  * Reconsider handling of duplicate triples.
+
   * Deal with subPropertyOf predicate clouds
 
   * Test framework

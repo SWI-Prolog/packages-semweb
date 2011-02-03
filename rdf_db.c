@@ -1453,7 +1453,7 @@ update_predicate_counts(rdf_db *db, predicate *p, int which)
     init_atomset(&object_set);
     init_triple_walker(&tw, db, &t, t.indexed);
     while((byp=next_triple(&tw)))
-    { if ( !byp->erased && !byp->is_duplicate )
+    { if ( !byp->lifespan.died != GEN_MAX && !byp->is_duplicate )
       { if ( (which == DISTINCT_DIRECT && byp->predicate.r == p) ||
 	     (which != DISTINCT_DIRECT && isSubPropertyOf(byp->predicate.r, p)) )
 	{ total++;
@@ -2563,14 +2563,14 @@ first(rdf_db *db, atom_t subject, triple *t)
   triple_walker tw;
 
   for( ; t; t = t->tp.next[ICOL(BY_S)])
-  { if ( t->subject == subject && !t->erased )
+  { if ( t->subject == subject && t->lifespan.died != GEN_MAX )
       return t;
   }
 
   tmp.subject = subject;
   init_triple_walker(&tw, db, &tmp, BY_S);
   while((t=next_triple(&tw)))
-  { if ( t->subject == subject && !t->erased )
+  { if ( t->subject == subject && t->lifespan.died != GEN_MAX )
       return t;
   }
 
@@ -2875,52 +2875,37 @@ update_hash(rdf_db *db, int organise)
 }
 
 
-/* MT: Must be locked */
+/* TBD: this becomes mostly part of GC
+*/
 
-static void
+void
 erase_triple_silent(rdf_db *db, triple *t)
-{ if ( !t->erased )
-  { t->erased = TRUE;
+{ update_duplicates_del(db, t);
 
-    update_duplicates_del(db, t);
+  if ( t->predicate.r->name == ATOM_subPropertyOf &&
+       t->object_is_literal == FALSE )
+  { predicate *me    = lookup_predicate(db, t->subject);
+    predicate *super = lookup_predicate(db, t->object.resource);
 
-    if ( t->predicate.r->name == ATOM_subPropertyOf &&
-	 t->object_is_literal == FALSE )
-    { predicate *me    = lookup_predicate(db, t->subject);
-      predicate *super = lookup_predicate(db, t->object.resource);
-
-      delSubPropertyOf(db, me, super);
-    }
-
-    if ( t->first )
-    { triple *one = first(db, t->subject, t);
-
-      if ( one )
-	one->first = TRUE;
-      else
-	db->subjects--;
-    }
-    db->erased++;
-    t->predicate.r->triple_count--;
-    unregister_graph(db, t);
-
-    if ( t->object_is_literal )
-    { literal *lit = t->object.literal;
-
-      t->object.literal = NULL;
-      free_literal(db, lit);		/* TBD: thread-safe? */
-    }
+    delSubPropertyOf(db, me, super);
   }
-}
 
+  if ( t->first )
+  { triple *one = first(db, t->subject, t);
 
-static inline int
-erase_triple(rdf_db *db, triple *t)
-{ int rc;
+    if ( one )
+      one->first = TRUE;
+    else
+      db->subjects--;
+  }
+  unregister_graph(db, t);
 
-  rc = broadcast(EV_RETRACT, t, NULL);
-  erase_triple_silent(db, t);
-  return rc;
+  if ( t->object_is_literal )
+  { literal *lit = t->object.literal;
+
+    t->object.literal = NULL;
+    free_literal(db, lit);		/* TBD: thread-safe? */
+  }
 }
 
 
@@ -3365,12 +3350,11 @@ write_md5(rdf_db *db, IOSTREAM *out, atom_t src)
 
 
 static int
-save_db(rdf_db *db, IOSTREAM *out, atom_t src)
-{ triple *t;
+save_db(query *q, IOSTREAM *out, atom_t src)
+{ rdf_db *db = q->db;
+  triple *t;
   save_context ctx;
 
-  if ( !RDLOCK(db) )
-    return FALSE;
   init_saved(db, &ctx);
 
   Sfprintf(out, "%s", SAVE_MAGIC);
@@ -3382,12 +3366,10 @@ save_db(rdf_db *db, IOSTREAM *out, atom_t src)
     write_md5(db, out, src);
   }
   if ( Sferror(out) )
-  { RDUNLOCK(db);
     return FALSE;
-  }
 
   for(t = db->by_none.head; t; t = t->tp.next[ICOL(BY_NONE)])
-  { if ( !t->erased &&
+  { if ( alive_triple(q, t) &&
 	 (!src || t->graph == src) )
     { write_triple(db, out, t, &ctx);
       if ( Sferror(out) )
@@ -3396,12 +3378,9 @@ save_db(rdf_db *db, IOSTREAM *out, atom_t src)
   }
   Sputc('E', out);
   if ( Sferror(out) )
-  { RDUNLOCK(db);
     return FALSE;
-  }
 
   destroy_saved(db, &ctx);
-  RDUNLOCK(db);
 
   return TRUE;
 }
@@ -3409,15 +3388,22 @@ save_db(rdf_db *db, IOSTREAM *out, atom_t src)
 
 static foreign_t
 rdf_save_db(term_t stream, term_t graph)
-{ IOSTREAM *out;
+{ rdf_db *db = DB;
+  query *q;
+  IOSTREAM *out;
   atom_t src;
+  int rc;
 
   if ( !PL_get_stream_handle(stream, &out) )
     return type_error(stream, "stream");
   if ( !get_atom_or_var_ex(graph, &src) )
     return FALSE;
 
-  return save_db(DB, out, src);
+  q = open_query(db);
+  rc = save_db(q, out, src);
+  close_query(q);
+
+  return rc;
 }
 
 
@@ -5305,11 +5291,10 @@ choicepoints.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static int
-update_triple(rdf_db *db, term_t action, triple *t)
+update_triple(rdf_db *db, term_t action, triple *t, triple **updated)
 { term_t a = PL_new_term_ref();
   triple tmp, *new;
   int i;
-  int rc = TRUE;
 					/* Create copy in local memory */
   tmp = *t;
   tmp.allocated = FALSE;
@@ -5326,7 +5311,9 @@ update_triple(rdf_db *db, term_t action, triple *t)
     if ( !get_atom_ex(a, &s) )
       return FALSE;
     if ( tmp.subject == s )
+    { *updated = NULL;
       return TRUE;			/* no change */
+    }
 
     tmp.subject = s;
   } else if ( PL_is_functor(action, FUNCTOR_predicate1) )
@@ -5335,7 +5322,9 @@ update_triple(rdf_db *db, term_t action, triple *t)
     if ( !get_predicate(db, a, &p) )
       return FALSE;
     if ( tmp.predicate.r == p )
+    { *updated = NULL;
       return TRUE;			/* no change */
+    }
 
     tmp.predicate.r = p;
   } else if ( PL_is_functor(action, FUNCTOR_object1) )
@@ -5349,6 +5338,7 @@ update_triple(rdf_db *db, term_t action, triple *t)
     }
     if ( match_object(&t2, &tmp, MATCH_QUAL) )
     { free_triple(db, &t2);
+      *updated = NULL;
       return TRUE;
     }
 
@@ -5365,7 +5355,9 @@ update_triple(rdf_db *db, term_t action, triple *t)
     if ( !get_graph(a, &t2) )
       return FALSE;
     if ( t2.graph == t->graph && t2.line == t->line )
+    { *updated = NULL;
       return TRUE;
+    }
 
     tmp.graph = t2.graph;
     tmp.line = t2.line;
@@ -5389,20 +5381,11 @@ update_triple(rdf_db *db, term_t action, triple *t)
   free_triple(db, &tmp);
   lock_atoms(new);
 
-  if ( broadcast(EV_UPDATE, t, new) )
-  { erase_triple_silent(db, t);
-    link_triple_silent(db, new);
-    db->generation++;
-  } else
-  { free_triple(db, new);
-    rc = FALSE;
-  }
+  *updated = new;
 
-  return rc;
+  return TRUE;
 }
 
-
-#define UPDATE_BUFSIZE 64
 
 static foreign_t
 rdf_update5(term_t subject, term_t predicate, term_t object, term_t src,
@@ -5410,12 +5393,11 @@ rdf_update5(term_t subject, term_t predicate, term_t object, term_t src,
 { triple t, *p;
   int indexed = BY_SPO;
   rdf_db *db = DB;
-  size_t count = 0;
-  size_t allocated = UPDATE_BUFSIZE;
-  triple *tmp[UPDATE_BUFSIZE];
-  triple **buf = tmp;
   int rc = TRUE;
+  size_t count;
   triple_walker tw;
+  triple_buffer matches;
+  query *q;
 
   memset(&t, 0, sizeof(t));
 
@@ -5423,53 +5405,44 @@ rdf_update5(term_t subject, term_t predicate, term_t object, term_t src,
        !get_triple(db, subject, predicate, object, &t) )
     return FALSE;
 
-  if ( !WRLOCK(db, TRUE) )
-  { free_triple(db, &t);
-    return FALSE;
-  }
-  if ( !update_hash(db, TRUE) )
-  { WRUNLOCK(db);
-    free_triple(db, &t);
-    return FALSE;
-  }
-
+  q = open_query(db);
+  init_triple_buffer(&matches);
   init_triple_walker(&tw, db, &t, indexed);
-  while((p=next_triple(&tw)));
-  { if ( match_triples(p, &t, MATCH_EXACT) )
-    { if ( count == allocated )
-      {	size_t osize = allocated*sizeof(triple*);
+  while((p=next_triple(&tw)))
+  { if ( !alive_triple(q, p) )
+      continue;
 
-	if ( buf == tmp	)
-	{ buf = rdf_malloc(db, osize*2);
-	  memcpy(buf, tmp, osize);
-	} else
-	{ buf = rdf_realloc(db, buf, osize, osize*2);
-	}
-
-	allocated *= 2;
-      }
-      buf[count++] = p;
-    }
+    if ( match_triples(p, &t, MATCH_EXACT) )
+      buffer_triple(&matches, p);
   }
 
-  if ( LOCKOUT_READERS(db) )
-  { size_t n;
+  if ( !is_empty_buffer(&matches) )
+  { triple_buffer replacements;
+    triple *new, **tp;
+    size_t updated = 0;
 
-    for(n=0; n<count; n++)
-    { if ( !update_triple(db, action, buf[n]) )
+    count = matches.top-matches.base;
+    init_triple_buffer(&replacements);
+    for(tp=matches.base; tp<matches.top; tp++)
+    { if ( !update_triple(db, action, *tp, &new) )
       { rc = FALSE;
+	free_triple_buffer(&replacements);
 	goto out;
+      } else
+      { updated++;
       }
+      buffer_triple(&replacements, new);
     }
 
-    REALLOW_READERS(db);
+    if ( updated )
+      update_triples(q, matches.base, replacements.base, count);
+    free_triple_buffer(&replacements);
   }
 
 out:
-  if ( buf != tmp )
-    rdf_free(db, buf, allocated*sizeof(triple*));
+  close_query(q);
+  free_triple_buffer(&matches);
   free_triple(db, &t);
-  WRUNLOCK(db);
 
   return (rc && count > 0) ? TRUE : FALSE;
 }
@@ -5805,7 +5778,7 @@ rdf_subject(term_t subject, control_t h)
       t = PL_foreign_context_address(h);
     next:
       for(; t; t = t->tp.next[ICOL(BY_NONE)])
-      { if ( t->first && !t->erased )
+      { if ( t->first && t->lifespan.died != GEN_MAX )
 	{ if ( !PL_unify_atom(subject, t->subject) )
 	    return FALSE;
 

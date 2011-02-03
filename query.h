@@ -157,7 +157,8 @@ typedef struct triple *triplep;
 
 COMMON(int)	add_triples(query *q, triplep *triples, size_t count);
 COMMON(int)	del_triples(query *q, triplep *triples, size_t count);
-
+COMMON(int)	update_triples(query *q,
+			       triplep *old, triplep *new, size_t count);
 COMMON(int)	alive_triple(query *q, triplep t);
 
 #endif /*RDF_QUERY_H_INCLUDED*/
