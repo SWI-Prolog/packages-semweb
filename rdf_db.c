@@ -4690,6 +4690,7 @@ rdf_transaction(term_t goal, term_t id)
   triple_buffer deleted;
 
   q = open_transaction(db, &added, &deleted);
+  q->transaction_data.prolog_id = id;
   rc = PL_call_predicate(NULL, PL_Q_PASS_EXCEPTION, PRED_call1, goal);
 
   if ( rc )
@@ -4720,6 +4721,33 @@ rdf_transaction(term_t goal, term_t id)
 		 /*******************************
 		 *	     PREDICATES		*
 		 *******************************/
+
+/** rdf_active_transactions_(-List)
+
+Provides list of parent transactions in the calling thread
+*/
+
+static foreign_t
+rdf_active_transactions(term_t list)
+{ rdf_db *db = DB;
+  query *q = open_query(db);
+  term_t tail = PL_copy_term_ref(list);
+  term_t head = PL_new_term_ref();
+  query *t;
+
+  for(t = q->transaction; t; t=t->transaction)
+  { if ( !PL_unify_list(tail, head, tail) ||
+         !PL_unify(head, t->transaction_data.prolog_id) )
+    { close_query(q);
+      return FALSE;
+    }
+  }
+
+  close_query(q);
+
+  return PL_unify_nil(tail);
+}
+
 
 static foreign_t
 rdf_assert4(term_t subject, term_t predicate, term_t object, term_t src)
@@ -6911,6 +6939,8 @@ install_rdf_db()
   PL_register_foreign("rdf_estimate_complexity",
 					4, rdf_estimate_complexity, 0);
   PL_register_foreign("rdf_transaction_",2, rdf_transaction, META);
+  PL_register_foreign("rdf_active_transactions_",
+		      			1, rdf_active_transactions, 0);
   PL_register_foreign("rdf_monitor_",   2, rdf_monitor,     META);
 /*PL_register_foreign("rdf_broadcast_", 2, rdf_broadcast,   0);*/
 #ifdef WITH_MD5

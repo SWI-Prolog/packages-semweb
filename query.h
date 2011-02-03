@@ -93,6 +93,7 @@ typedef struct query
     gen_t	wr_gen_saved;
     struct triple_buffer *added;
     struct triple_buffer *deleted;
+    term_t	prolog_id;		/* Prolog transaction identifier */
   } transaction_data;
 } query;
 
