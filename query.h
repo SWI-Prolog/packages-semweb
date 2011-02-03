@@ -149,6 +149,7 @@ COMMON(query *)	open_transaction(rdf_dbp db,
 				 struct triple_buffer *deleted);
 COMMON(int)	empty_transaction(query *q);
 COMMON(int)	commit_transaction(query *q);
+COMMON(void)	close_transaction(query *q);
 COMMON(int)	discard_transaction(query *q);
 
 typedef struct triple *triplep;

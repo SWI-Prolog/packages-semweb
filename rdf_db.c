@@ -4706,6 +4706,8 @@ rdf_transaction(term_t goal, term_t id)
 
       if ( !broadcast(EV_TRANSACTION, (void*)id, (void*)be) )
 	return FALSE;
+    } else
+    { close_transaction(q);
     }
   } else
   { discard_transaction(q);

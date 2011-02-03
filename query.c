@@ -39,6 +39,7 @@ generations:
 #include <SWI-Stream.h>
 #include <SWI-Prolog.h>
 #include <string.h>
+#include <assert.h>
 #include "rdf_db.h"
 #include "query.h"
 #include "memory.h"
@@ -273,12 +274,6 @@ void
 close_query(query *q)
 { wait_list *wl;
 
-  if ( q->type == Q_TRANSACTION )
-  { q->stack->rd_gen = q->transaction_data.rd_gen_saved;
-    q->stack->wr_gen = q->transaction_data.wr_gen_saved;
-    q->stack->transaction = q->transaction;
-  }
-
   if ( (wl=q->waiters) )
   { wait_list *n;
 
@@ -410,6 +405,8 @@ add_triples(query *q, triple **triples, size_t count)
   { (*tp)->lifespan.born = gen;
     (*tp)->lifespan.died = GEN_MAX;
     link_triple(db, *tp);
+    if ( q->transaction )
+      buffer_triple(q->transaction->transaction_data.added, *tp);
   }
   if ( !q->transaction )
     db->queries.generation = gen;
@@ -434,6 +431,8 @@ del_triples(query *q, triple **triples, size_t count)
     gen = db->queries.generation + 1;
   for(tp=triples; tp < ep; tp++)
   { (*tp)->lifespan.died = gen;
+    if ( q->transaction )
+      buffer_triple(q->transaction->transaction_data.deleted, *tp);
   }
   if ( !q->transaction )
     db->queries.generation = gen;
@@ -441,6 +440,21 @@ del_triples(query *q, triple **triples, size_t count)
 					/* TBD: broadcast */
 
   return TRUE;
+}
+
+
+void
+close_transaction(query *q)
+{ assert(q->type == Q_TRANSACTION);
+
+  free_triple_buffer(q->transaction_data.added);
+  free_triple_buffer(q->transaction_data.deleted);
+
+  q->stack->rd_gen = q->transaction_data.rd_gen_saved;
+  q->stack->wr_gen = q->transaction_data.wr_gen_saved;
+  q->stack->transaction = q->transaction;
+
+  close_query(q);
 }
 
 
@@ -469,8 +483,7 @@ commit_transaction(query *q)
     db->queries.generation = gen;
   simpleMutexUnlock(&db->queries.write.lock);
 
-  free_triple_buffer(q->transaction_data.added);
-  free_triple_buffer(q->transaction_data.deleted);
+  close_transaction(q);
 
   return TRUE;
 }
@@ -495,8 +508,7 @@ discard_transaction(query *q)
   { (*tp)->lifespan.died = GEN_MAX;
   }
 
-  free_triple_buffer(q->transaction_data.added);
-  free_triple_buffer(q->transaction_data.deleted);
+  close_transaction(q);
 
   return TRUE;
 }
