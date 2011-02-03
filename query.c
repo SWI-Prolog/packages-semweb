@@ -543,8 +543,7 @@ commit_transaction(query *q)
 		   q->transaction_data.deleted->base);
     db->created += (q->transaction_data.added->top -
 		    q->transaction_data.added->base);
-  } else
-  { db->queries.generation = gen;
+    db->queries.generation = gen;
   }
   simpleMutexUnlock(&db->queries.write.lock);
 

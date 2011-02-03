@@ -2651,6 +2651,9 @@ link_triple_silent(rdf_db *db, triple *t)
   if ( (dup=discard_duplicate(db, t)) == DUP_DISCARDED )
     return FALSE;
 
+  if ( t->object_is_literal )
+    t->object.literal = share_literal(db, t->object.literal);
+
   if ( db->by_none.tail )
     db->by_none.tail->tp.next[ICOL(BY_NONE)] = t;
   else
@@ -2658,15 +2661,13 @@ link_triple_silent(rdf_db *db, triple *t)
   db->by_none.tail = t;
 
   link_triple_hash(db, t);
-  if ( t->object_is_literal )
-    t->object.literal = share_literal(db, t->object.literal);
 
   if ( dup == DUP_DUPLICATE && update_duplicates_add(db, t) )
     goto ok;				/* is a duplicate */
 
 					/* keep track of subjects */
   one = first(db, t->subject, NULL);
-  if ( !one->first )
+  if ( one && !one->first )
   { one->first = TRUE;
     db->subjects++;
   }
