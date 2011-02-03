@@ -1,0 +1,19 @@
+---+ Concurrent RDF workplan
+
+  * Establish triple-GC
+
+  * Establish expansion of triple hash-tables
+
+  * Remove old locking code.
+
+  * Establish compatible broadcasting
+
+  * Check dubious dynamic arrays starting at 0 (MSB(0) == MSB(1) == 0)
+
+  * Deal with subPropertyOf predicate clouds
+
+  * Test framework
+    - Controlled concurrency
+    - Stress testing
+
+  * add_triples: link first and update generation later?
