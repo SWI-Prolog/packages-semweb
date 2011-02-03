@@ -3468,6 +3468,8 @@ typedef struct ld_context
   int		has_digest;
   md5_byte_t    digest[16];
   atom_hash    *graph_table;		/* multi-graph file */
+  query	       *query;
+  triple_buffer	triples;
 } ld_context;
 
 
@@ -3641,16 +3643,13 @@ Note that we have two types  of   saved  states.  One holding many named
 graphs and one holding the content of exactly one named graph.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-#define LOAD_ERROR ((triple*)(intptr_t)-1)
-
-static triple *
+static int
 load_db(rdf_db *db, IOSTREAM *in, ld_context *ctx)
 { int version;
   int c;
-  triple *list = NULL, *tail = NULL;
 
   if ( !load_magic(in) )
-    return LOAD_ERROR;
+    return FALSE;
   version = (int)load_int(in);
 
   while((c=Sgetc(in)) != EOF)
@@ -3660,14 +3659,7 @@ load_db(rdf_db *db, IOSTREAM *in, ld_context *ctx)
 
 	if ( !(t=load_triple(db, in, ctx)) )
 	  return FALSE;
-
-	if ( tail )
-	{ tail->tp.next[ICOL(BY_NONE)] = t;
-	  tail = t;
-	} else
-	{ list = tail = t;
-	}
-
+	buffer_triple(&ctx->triples, t);
         break;
       }
 					/* file holding exactly one graph */
@@ -3691,7 +3683,7 @@ load_db(rdf_db *db, IOSTREAM *in, ld_context *ctx)
 	load_double(in, &ctx->modified);
         break;
       case 'E':				/* end of file */
-	return list;
+	return TRUE;
       default:
 	break;
     }
@@ -3699,12 +3691,12 @@ load_db(rdf_db *db, IOSTREAM *in, ld_context *ctx)
 
   PL_warning("Illegal RDF triple file");
 
-  return LOAD_ERROR;
+  return FALSE;
 }
 
 
 static int
-link_loaded_triples(rdf_db *db, triple *t, ld_context *ctx)
+link_loaded_triples(rdf_db *db, ld_context *ctx)
 { size_t created0 = db->created;
   graph *graph;
 
@@ -3720,11 +3712,7 @@ link_loaded_triples(rdf_db *db, triple *t, ld_context *ctx)
 
     if ( ctx->has_digest )
     { if ( graph->md5 )
-      { if ( db->tr_first )
-	{ record_md5_transaction(db, graph, NULL);
-	} else
-	{ graph->md5 = FALSE;		/* kill repetitive MD5 update */
-	}
+      { graph->md5 = FALSE;		/* kill repetitive MD5 update */
       } else
       { ctx->has_digest = FALSE;
       }
@@ -3733,27 +3721,12 @@ link_loaded_triples(rdf_db *db, triple *t, ld_context *ctx)
   { graph = NULL;
   }
 
-  { triple *next;
-
-    for( ; t; t = next )
-    { next = t->tp.next[ICOL(BY_NONE)];
-
-      t->tp.next[ICOL(BY_NONE)] = NULL;
-      lock_atoms(t);
-      if ( link_triple_silent(db, t) )
-	broadcast(EV_ASSERT_LOAD, t, NULL);
-    }
-  }
+					/* TBD: broadcast(EV_ASSERT_LOAD, ...) */
+  add_triples(ctx->query, ctx->triples.base, ctx->triples.top-ctx->triples.base);
 
 					/* update the graph info */
   if ( ctx->has_digest )
-  { if ( db->tr_first )
-    { md5_byte_t *d = rdf_malloc(db, sizeof(ctx->digest));
-      memcpy(d, ctx->digest, sizeof(ctx->digest));
-      record_md5_transaction(db, graph, d);
-    } else
-    { sum_digest(graph->digest, ctx->digest);
-    }
+  { sum_digest(graph->digest, ctx->digest);
     graph->md5 = TRUE;
   }
 
@@ -3783,21 +3756,23 @@ rdf_load_db(term_t stream, term_t id, term_t graphs)
 { ld_context ctx;
   rdf_db *db = DB;
   IOSTREAM *in;
-  triple *list;
   int rc;
 
   if ( !PL_get_stream_handle(stream, &in) )
     return type_error(stream, "stream");
 
   memset(&ctx, 0, sizeof(ctx));
-  if ( (list=load_db(db, in, &ctx)) == LOAD_ERROR )
-    return FALSE;
+  init_triple_buffer(&ctx.triples);
+  rc = load_db(db, in, &ctx);
+  PL_release_stream(in);
+  if ( !rc )
+  { return FALSE;			/* TBD: Discard partial load */
+  }
 
-  if ( !WRLOCK(db, FALSE) )
-    return FALSE;
+  ctx.query = open_query(db);
   broadcast(EV_LOAD, (void*)id, (void*)ATOM_begin);
 
-  if ( (rc=link_loaded_triples(db, list, &ctx)) )
+  if ( (rc=link_loaded_triples(db, &ctx)) )
   { if ( ctx.graph_table )
     { term_t tail = PL_copy_term_ref(graphs);
 
@@ -3809,10 +3784,10 @@ rdf_load_db(term_t stream, term_t id, term_t graphs)
     { rc = PL_unify_atom(graphs, ctx.graph);
     }
   }
-  broadcast(EV_LOAD, (void*)id, (void*)ATOM_end);
-  WRUNLOCK(db);
 
-  PL_release_stream(in);
+  broadcast(EV_LOAD, (void*)id, (void*)ATOM_end);
+  close_query(ctx.query);
+
   if ( ctx.loaded_atoms )
   { atom_t *ap, *ep;
 
