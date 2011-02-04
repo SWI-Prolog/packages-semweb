@@ -386,7 +386,13 @@ Or, hand them to a separate thread?
   - If a thread adds triples, it has to wait.  This means two-way
     communication.  --> probably too high overhead.
 
-TBD: Generation management is different if we are in a transaction.
+What should we do when writing inside a transaction?
+
+	- As long as there is no nested transaction using the new
+	  triple, there is little point doing anything.
+
+
+
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 int
@@ -404,7 +410,7 @@ add_triples(query *q, triple **triples, size_t count)
   for(tp=triples; tp < ep; tp++)
   { (*tp)->lifespan.born = gen;
     (*tp)->lifespan.died = GEN_MAX;
-    link_triple(db, *tp);
+    link_triple(db, *tp);		/* Wrong? */
     if ( q->transaction )
       buffer_triple(q->transaction->transaction_data.added, *tp);
   }
