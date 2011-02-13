@@ -19,6 +19,7 @@
 *.toc
 *.bbl
 *.blg
+*.manifest
 *~
 TAGS
 configure
