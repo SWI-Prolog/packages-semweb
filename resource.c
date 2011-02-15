@@ -24,6 +24,8 @@
 
 #include "rdf_db.h"
 
+static void	erase_resource_array(resource_db *rdb);
+
 static int
 init_resource_hash(resource_db *rdb)
 { size_t bytes = sizeof(resource**)*INITIAL_RESOURCE_TABLE_SIZE;
@@ -39,6 +41,30 @@ init_resource_hash(resource_db *rdb)
   rdb->hash.count              = 0;
 
   return TRUE;
+}
+
+
+static void
+erase_resource_hash(resource_db *rdb)
+{ if ( rdb->hash.blocks[0] )
+  { int i, count = INITIAL_PREDICATE_TABLE_SIZE;
+
+    rdf_free(rdb->db, rdb->hash.blocks[0], sizeof(resource**)*count);
+
+    for(i=MSB(count); i<MAX_RBLOCKS; i++)
+    { resource **r = rdb->hash.blocks[i];
+
+      if ( r )
+      { int size = 1<<i;
+
+	r += size;
+	rdf_free(rdb->db, r, size*sizeof(resource**));
+      } else
+	break;
+    }
+  }
+
+  memset(&rdb->hash, 0, sizeof(rdb->hash));
 }
 
 
@@ -64,6 +90,13 @@ init_resource_db(rdf_db *db, resource_db *rdb)
   init_resource_hash(rdb);
 
   return TRUE;
+}
+
+
+void
+erase_resources(resource_db *rdb)
+{ erase_resource_hash(rdb);
+  erase_resource_array(rdb);
 }
 
 
@@ -106,6 +139,33 @@ set_id_resource(resource_db *rdb, resource *r)
 
       return TRUE;
     }
+  }
+}
+
+
+static void
+erase_resource_array(resource_db *rdb)
+{ int i;
+
+  for(i=0; i<MAX_RBLOCKS; i++)
+  { resource **r = rdb->hash.blocks[i];
+
+    if ( r )
+    { int size = i == 0	? 2 : 1<<i;
+      int n;
+
+      r += size;
+      for(n=0; n<size; n++)
+      { if ( r[n] )
+	{ if ( r[n]->name )
+	    PL_unregister_atom(r[n]->name);
+	  rdf_free(rdb->db, r[n], sizeof(r[n]));
+	}
+      }
+
+      rdf_free(rdb->db, r, size*sizeof(resource**));
+    } else
+      break;
   }
 }
 

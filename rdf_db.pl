@@ -39,6 +39,7 @@
 	    rdf_has/4,			% ?Subject, +Pred, ?Obj, -RealPred
 	    rdf_reachable/3,		% ?Subject, +Pred, ?Object
 	    rdf_reachable/5,		% ?Subject, +Pred, ?Object, +MaxD, ?D
+	    rdf_resource/1,		% ?Resource
 	    rdf_subject/1,		% ?Subject
 
 	    rdf_member_property/2,	% ?Property, ?Index
@@ -465,6 +466,7 @@ mk_global(NS:Local, Global) :-
 	rdf_update(r,r,o,+,t),
 	rdf_equal(r,r),
 	rdf_source_location(r,-),
+	rdf_resource(r),
 	rdf_subject(r),
 	rdf_set_predicate(r, t),
 	rdf_predicate_property(r, -),
@@ -495,6 +497,14 @@ lang_equal(Lang1, Lang2) :-
 
 rdf_has(Subject, Predicate, Object) :-
 	rdf_has(Subject, Predicate, Object, _).
+
+%%	rdf_subject(?Resource)
+%
+%	True if Resource appears as a subject
+
+rdf_subject(Resource) :-
+	rdf_resource(Resource),
+	( rdf(Resource, _, _) -> true ).
 
 
 		 /*******************************

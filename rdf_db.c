@@ -171,7 +171,7 @@ static functor_t FUNCTOR_colon2;
 
 static functor_t FUNCTOR_triples1;
 static functor_t FUNCTOR_triples2;
-static functor_t FUNCTOR_subjects1;
+static functor_t FUNCTOR_resources1;
 static functor_t FUNCTOR_predicates1;
 static functor_t FUNCTOR_duplicates1;
 static functor_t FUNCTOR_literals1;
@@ -2378,39 +2378,6 @@ static int by_inverse[8] =
 };
 
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-triple *first(rdf_db *db, atom_t subject, triple *t)
-
-Find the first triple on subject.  The   first  is  marked to generate a
-unique subjects quickly. If triple is given, start searching from there.
-This speeds up deletion of graphs,  where   we  tend  to delete multiple
-triples on the same subject.
-
-CON: The notion of first becomes   unclear when introducing generations.
-How do we deal with this?
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-static triple *
-first(rdf_db *db, atom_t subject, triple *t)
-{ triple tmp;
-  triple_walker tw;
-
-  for( ; t; t = t->tp.next[ICOL(BY_S)])
-  { if ( t->subject == subject && t->lifespan.died == GEN_MAX )
-      return t;
-  }
-
-  tmp.subject = subject;
-  init_triple_walker(&tw, db, &tmp, BY_S);
-  while((t=next_triple(&tw)))
-  { if ( t->subject == subject && t->lifespan.died == GEN_MAX )
-      return t;
-  }
-
-  return NULL;
-}
-
-
 static void
 link_triple_hash(rdf_db *db, triple *t)
 { int ic;
@@ -2473,8 +2440,7 @@ discard_duplicate(rdf_db *db, triple *t)
 
 static int
 link_triple_silent(rdf_db *db, triple *t)
-{ triple *one;
-  dub_state dup;
+{ dub_state dup;
 
   if ( t->resolve_pred )
   { t->predicate.r = lookup_predicate(db, t->predicate.u);
@@ -2497,13 +2463,6 @@ link_triple_silent(rdf_db *db, triple *t)
 
   if ( dup == DUP_DUPLICATE && update_duplicates_add(db, t) )
     goto ok;				/* is a duplicate */
-
-					/* keep track of subjects */
-  one = first(db, t->subject, NULL);
-  if ( one && !one->first )
-  { one->first = TRUE;
-    db->subjects++;
-  }
 
 					/* keep track of subPropertyOf */
   if ( t->predicate.r->name == ATOM_subPropertyOf &&
@@ -2724,14 +2683,6 @@ erase_triple_silent(rdf_db *db, triple *t)
     delSubPropertyOf(db, me, super);
   }
 
-  if ( t->first )
-  { triple *one = first(db, t->subject, t);
-
-    if ( one )
-      one->first = TRUE;
-    else
-      db->subjects--;
-  }
   unregister_graph(db, t);
 
   if ( t->object_is_literal )
@@ -5576,62 +5527,6 @@ rdf_monitor(term_t goal, term_t mask)
 
 
 
-		 /*******************************
-		 *	       QUERY		*
-		 *******************************/
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Enumerate the known subjects. This uses the   `first' flag on triples to
-avoid returning the same resource multiple   times.  As the `by_none' is
-never re-hashed, we don't mark this query in the `active_queries'.
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-static foreign_t
-rdf_subject(term_t subject, control_t h)
-{ triple *t;
-  rdf_db *db = DB;
-
-  switch(PL_foreign_control(h))
-  { case PL_FIRST_CALL:
-    { if ( PL_is_variable(subject) )
-      { t = db->by_none.head;
-	goto next;
-      } else
-      { atom_t a;
-
-	if ( get_atom_ex(subject, &a) )
-	{ if ( first(db, a, NULL) )
-	    return TRUE;
-	  return FALSE;
-	}
-
-	return FALSE;
-      }
-    }
-    case PL_REDO:
-      t = PL_foreign_context_address(h);
-    next:
-      for(; t; t = t->tp.next[ICOL(BY_NONE)])
-      { if ( t->first && t->lifespan.died == GEN_MAX )
-	{ if ( !PL_unify_atom(subject, t->subject) )
-	    return FALSE;
-
-	  t = t->tp.next[ICOL(BY_NONE)];
-	  if ( t )
-	    PL_retry_address(t);
-	  return TRUE;
-	}
-      }
-      return FALSE;
-    case PL_PRUNED:
-      return TRUE;
-    default:
-      assert(0);
-      return FALSE;
-  }
-}
-
-
 static foreign_t
 rdf_set_predicate(term_t pred, term_t option)
 { predicate *p;
@@ -6341,8 +6236,8 @@ unify_statistics(rdf_db *db, term_t key, functor_t f)
 
   if ( f == FUNCTOR_triples1 )
   { v = db->created - db->erased;
-  } else if ( f == FUNCTOR_subjects1 )
-  { v = db->subjects;
+  } else if ( f == FUNCTOR_resources1 )
+  { v = db->resources.hash.count;
   } else if ( f == FUNCTOR_predicates1 )
   { v = db->predicates.count;
   } else if ( f == FUNCTOR_core1 )
@@ -6469,7 +6364,6 @@ erase_triples(rdf_db *db)
   db->erased = 0;
   db->freed = 0;
   db->erased = 0;
-  db->subjects = 0;
   db->rehash_count = 0;
   memset(db->indexed, 0, sizeof(db->indexed));
   db->duplicates = 0;
@@ -6508,6 +6402,7 @@ reset_db(rdf_db *db)
 
   erase_triples(db);
   erase_predicates(db);
+  erase_resources(&db->resources);
   erase_graphs(db);
   db->need_update = FALSE;
   db->agenda_created = 0;
@@ -6631,7 +6526,7 @@ install_rdf_db()
   MKFUNCTOR(literal, 1);
   MKFUNCTOR(triples, 1);
   MKFUNCTOR(triples, 2);
-  MKFUNCTOR(subjects, 1);
+  MKFUNCTOR(resources, 1);
   MKFUNCTOR(predicates, 1);
   MKFUNCTOR(subject, 1);
   MKFUNCTOR(predicate, 1);
@@ -6693,7 +6588,7 @@ install_rdf_db()
 
 					/* statistics */
   keys[i++] = FUNCTOR_triples1;
-  keys[i++] = FUNCTOR_subjects1;
+  keys[i++] = FUNCTOR_resources1;
   keys[i++] = FUNCTOR_indexed16;
   keys[i++] = FUNCTOR_predicates1;
   keys[i++] = FUNCTOR_searched_nodes1;
@@ -6720,7 +6615,6 @@ install_rdf_db()
   PL_register_foreign("rdf_update",	5, rdf_update5,     0);
   PL_register_foreign("rdf_retractall",	3, rdf_retractall3, 0);
   PL_register_foreign("rdf_retractall",	4, rdf_retractall4, 0);
-  PL_register_foreign("rdf_subject",	1, rdf_subject,	    NDET);
   PL_register_foreign("rdf",		3, rdf3,	    NDET);
   PL_register_foreign("rdf",		4, rdf4,	    NDET);
   PL_register_foreign("rdf_has",	4, rdf_has,	    NDET);

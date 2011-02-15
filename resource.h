@@ -53,6 +53,7 @@ typedef struct resource_db
 } resource_db;
 
 COMMON(int)	   init_resource_db(struct rdf_db *db, resource_db *rdb);
+COMMON(void)	   erase_resources(resource_db *rdb);
 COMMON(resource *) lookup_resource(resource_db *rdb, atom_t name);
 COMMON(int)	   register_resource_predicates(void);
 

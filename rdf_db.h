@@ -255,7 +255,6 @@ typedef struct triple
   unsigned	object_is_literal : 1;	/* Object is a literal */
   unsigned	resolve_pred : 1;	/* predicates needs to be resolved */
   unsigned	indexed : 4;		/* Partials: BY_* */
-  unsigned	first   : 1;		/* I'm the first on subject */
   unsigned	match   : 4;		/* How to match literals */
   unsigned	inversed : 1;		/* Partials: using inverse match */
   unsigned	is_duplicate : 1;	/* I'm a duplicate */
@@ -333,7 +332,6 @@ typedef struct rdf_db
   size_t	created;		/* #triples created */
   size_t	erased;			/* #triples erased */
   size_t	freed;			/* #triples actually erased */
-  size_t	subjects;		/* subjects (unique first) */
   size_t	indexed[16];		/* Count calls */
   int		rehash_count;		/* # rehashes */
   int		gc_count;		/* # garbage collections */
