@@ -221,14 +221,18 @@ rdf_resource(term_t r, control_t h)
       { if ( existing_resource(&db->resources, name) )
 	  return TRUE;
 	return FALSE;
-      } else
-	return FALSE;
+      }
+
+      return FALSE;
     }
     case PL_REDO:
       id = PL_foreign_context(h);
       break;
     case PL_PRUNED:
       return TRUE;
+    default:
+      assert(0);
+      return FALSE;
   }
 
   for(; id<=db->resources.array.highest_id; id++)
