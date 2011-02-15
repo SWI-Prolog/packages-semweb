@@ -67,6 +67,15 @@ init_resource_db(rdf_db *db, resource_db *rdb)
 }
 
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+    MSB	 IDs		Offset
+     0	 0,1		0
+     1   2,3		2
+     2   4,5,6,7	4
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 static int
 set_id_resource(resource_db *rdb, resource *r)
 { size_t id;
@@ -74,29 +83,28 @@ set_id_resource(resource_db *rdb, resource *r)
   MUST_HOLD(rdb->db);
 
   for(id=rdb->array.first_free; ; id++)
-  { resource **b = rdb->array.blocks[MSB(id)];
+  { int idx = MSB(id);
+    resource **b = rdb->array.blocks[idx];
 
     if ( !b )
-    { b = rdb->array.blocks[MSB(id)];
-      if ( !b )
-      { size_t count = 1<<MSB(id);
-	size_t bytes = count*sizeof(resource*);
-	resource **rp = rdf_malloc(rdb->db, bytes);
+    { size_t count = id < 2 ? 2 : 1<<idx;
+      size_t bytes = count*sizeof(resource*);
 
-	memset(rp, 0, bytes);
-	b = rdb->array.blocks[MSB(id)] = rp-count;
-      }
+      b = rdf_malloc(rdb->db, bytes);
+      memset(b, 0, bytes);
+      if ( id >= 2 )
+	b -= count;
+      rdb->array.blocks[idx] = b;
     }
 
     if ( !b[id] )
-    { if ( !b[id] )
-      { b[id] = r;
-	r->id = id;
-	rdb->array.first_free = id+1;
-	if ( rdb->array.highest_id < id )
-	  rdb->array.highest_id = id;
-	return TRUE;
-      }
+    { b[id] = r;
+      r->id = id;
+      rdb->array.first_free = id+1;
+      if ( rdb->array.highest_id < id )
+	rdb->array.highest_id = id;
+
+      return TRUE;
     }
   }
 }
