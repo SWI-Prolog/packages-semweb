@@ -60,12 +60,14 @@ supposed to be local to the SWI-Prolog kernel are declared using
 #include "debug.h"
 #include "memory.h"
 #include "hash.h"
+#include "error.h"
 #include "avl.h"
 #ifdef WITH_MD5
 #include "md5.h"
 #endif
 #include "lock.h"
 #include "query.h"
+#include "resource.h"
 
 #define RDF_VERSION 30000		/* 3.0.0 */
 
@@ -77,6 +79,7 @@ supposed to be local to the SWI-Prolog kernel are declared using
 		 *	       LOCKING		*
 		 *******************************/
 
+#define MUST_HOLD(lock)			((void)0)
 #define LOCK_MISC(db)			lock_misc(&db->lock)
 #define UNLOCK_MISC(db)			unlock_misc(&db->lock)
 
@@ -185,32 +188,6 @@ typedef struct predicate_cloud
   unsigned	dirty : 1;		/* predicate hash not synchronised */
 } predicate_cloud;
 
-
-typedef struct resource
-{ atom_t	name;			/* identifier of the resource */
-  struct resource *next;		/* Next in hash */
-  unsigned int	id;			/* Integer id */
-} resource;
-
-#define MAX_RBLOCKS 32
-
-typedef struct resource_hash
-{ resource    **blocks[MAX_RBLOCKS];	/* Dynamic array starts */
-  size_t	bucket_count;		/* Allocated #buckets */
-  size_t	bucket_count_epoch;	/* Initial bucket count */
-  size_t	count;			/* Total #resources */
-} resource_hash;
-
-typedef struct resource_array
-{ resource    **blocks[MAX_RBLOCKS];
-  size_t	first_free;
-} resource_array;
-
-typedef struct resource_db
-{ resource_hash	hash;			/* Hash atom-->id */
-  resource_array array;			/* Array id-->resource */
-  struct rdf_db	*db;			/* RDF database I belong to */
-} resource_db;
 
 typedef struct graph
 { struct graph    *next;		/* next in table */
@@ -363,6 +340,7 @@ typedef struct rdf_db
   double	rehash_time;		/* time spent in rehash */
   double	gc_time;		/* time spent in GC */
   size_t	core;			/* core in use */
+  resource_db	resources;		/* admin of used resources */
   pred_hash	predicates;		/* Predicate table */
   int		active_queries;		/* Calls with choicepoints */
   int		need_update;		/* We need to update */
@@ -394,5 +372,12 @@ COMMON(void *)	rdf_malloc(rdf_db *db, size_t size);
 COMMON(void)	rdf_free(rdf_db *db, void *ptr, size_t size);
 COMMON(void *)	rdf_realloc(rdf_db *db, void *ptr, size_t old, size_t new);
 COMMON(int)	link_triple(rdf_db *db, triple *t);
+
+
+		 /*******************************
+		 *	    GLOBAL DATA		*
+		 *******************************/
+
+COMMON(rdf_db *) DB;			/* Our one and only database */
 
 #endif /*RDFDB_H_INCLUDED*/

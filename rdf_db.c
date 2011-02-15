@@ -167,9 +167,6 @@ rdf_realloc(rdf_db *db, void *ptr, size_t old, size_t new)
 
 static functor_t FUNCTOR_literal1;
 static functor_t FUNCTOR_literal2;
-static functor_t FUNCTOR_error2;
-static functor_t FUNCTOR_type_error2;
-static functor_t FUNCTOR_domain_error2;
 static functor_t FUNCTOR_colon2;
 
 static functor_t FUNCTOR_triples1;
@@ -279,155 +276,6 @@ static int	check_predicate_cloud(predicate_cloud *c);
 #define INIT_LOCK(db)			init_lock(&db->lock)
 
 
-		 /*******************************
-		 *	       ERRORS		*
-		 *******************************/
-
-static int
-instantiation_error(term_t actual)
-{ term_t ex;
-
-  if ( (ex = PL_new_term_ref()) &&
-       PL_unify_term(ex,
-		     PL_FUNCTOR, FUNCTOR_error2,
-		       PL_CHARS, "instantiation_error",
-		       PL_VARIABLE) )
-    return PL_raise_exception(ex);
-
-  return FALSE;
-}
-
-
-static int
-type_error(term_t actual, const char *expected)
-{ term_t ex;
-
-  if ( (ex = PL_new_term_ref()) &&
-       PL_unify_term(ex,
-		     PL_FUNCTOR, FUNCTOR_error2,
-		       PL_FUNCTOR, FUNCTOR_type_error2,
-		         PL_CHARS, expected,
-		         PL_TERM, actual,
-		       PL_VARIABLE) )
-    return PL_raise_exception(ex);
-
-  return FALSE;
-}
-
-
-static int
-domain_error(term_t actual, const char *expected)
-{ term_t ex;
-
-  if ( (ex = PL_new_term_ref()) &&
-       PL_unify_term(ex,
-		     PL_FUNCTOR, FUNCTOR_error2,
-		       PL_FUNCTOR, FUNCTOR_domain_error2,
-		         PL_CHARS, expected,
-		         PL_TERM, actual,
-		       PL_VARIABLE) )
-    return PL_raise_exception(ex);
-
-  return FALSE;
-}
-
-
-static int
-permission_error(const char *op, const char *type, const char *obj,
-		 const char *msg)
-{ term_t ex, ctx;
-
-  if ( !(ex = PL_new_term_ref()) ||
-       !(ctx = PL_new_term_ref()) )
-    return FALSE;
-
-  if ( msg )
-  { if ( !PL_unify_term(ctx, PL_FUNCTOR_CHARS, "context", 2,
-			       PL_VARIABLE,
-			       PL_CHARS, msg) )
-      return FALSE;
-  }
-
-  if ( !PL_unify_term(ex, PL_FUNCTOR_CHARS, "error", 2,
-		      PL_FUNCTOR_CHARS, "permission_error", 3,
-		        PL_CHARS, op,
-		        PL_CHARS, type,
-		        PL_CHARS, obj,
-		      PL_TERM, ctx) )
-    return FALSE;
-
-  return PL_raise_exception(ex);
-}
-
-
-static int
-get_atom_ex(term_t t, atom_t *a)
-{ if ( PL_get_atom(t, a) )
-    return TRUE;
-
-  return type_error(t, "atom");
-}
-
-
-static int
-get_long_ex(term_t t, long *v)
-{ if ( PL_get_long(t, v) )
-    return TRUE;
-
-  return type_error(t, "integer");
-}
-
-
-static int
-get_double_ex(term_t t, double *v)
-{ if ( PL_get_float(t, v) )
-    return TRUE;
-
-  return type_error(t, "float");
-}
-
-
-static int
-get_atom_or_var_ex(term_t t, atom_t *a)
-{ if ( PL_get_atom(t, a) )
-    return TRUE;
-  if ( PL_is_variable(t) )
-  { *a = 0L;
-    return TRUE;
-  }
-
-  return type_error(t, "atom");
-}
-
-
-static int
-get_resource_or_var_ex(term_t t, atom_t *a)
-{ if ( PL_get_atom(t, a) )
-    return TRUE;
-  if ( PL_is_variable(t) )
-  { *a = 0L;
-    return TRUE;
-  }
-  if ( PL_is_functor(t, FUNCTOR_literal1) )
-    return FALSE;			/* fail on rdf(literal(_), ...) */
-
-  return type_error(t, "atom");
-}
-
-
-static int
-get_bool_arg_ex(int a, term_t t, int *val)
-{ term_t arg = PL_new_term_ref();
-
-  if ( !PL_get_arg(a, t, arg) )
-    return type_error(t, "compound");
-  if ( !PL_get_bool(arg, val) )
-    return type_error(arg, "bool");
-
-  return TRUE;
-}
-
-
 
 		 /*******************************
 		 *	   DEBUG SUPPORT	*
@@ -535,12 +383,6 @@ print_triple(triple *t, int flags)
 		 /*******************************
 		 *	     STORAGE		*
 		 *******************************/
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Our one and only database (for the time being).
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-static rdf_db *DB;
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 Tables that allow finding the hash-chains   for a particular index. They
@@ -6783,10 +6625,10 @@ install_rdf_db()
 { int i=0;
   extern install_t install_atom_map(void);
 
+  init_errors();
+  register_resource_predicates();
+
   MKFUNCTOR(literal, 1);
-  MKFUNCTOR(error, 2);
-  MKFUNCTOR(type_error, 2);
-  MKFUNCTOR(domain_error, 2);
   MKFUNCTOR(triples, 1);
   MKFUNCTOR(triples, 2);
   MKFUNCTOR(subjects, 1);
@@ -6869,6 +6711,7 @@ install_rdf_db()
 
 					/* setup the database */
   DB = new_db();
+  init_resource_db(DB, &DB->resources);
 
   PL_register_foreign("rdf_version",    1, rdf_version,     0);
   PL_register_foreign("rdf_assert",	3, rdf_assert3,	    0);

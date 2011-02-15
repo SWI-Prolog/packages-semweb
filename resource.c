@@ -71,12 +71,13 @@ static int
 set_id_resource(resource_db *rdb, resource *r)
 { size_t id;
 
+  MUST_HOLD(rdb->db);
+
   for(id=rdb->array.first_free; ; id++)
   { resource **b = rdb->array.blocks[MSB(id)];
 
     if ( !b )
-    { LOCK_MISC(rdb->db);
-      b = rdb->array.blocks[MSB(id)];
+    { b = rdb->array.blocks[MSB(id)];
       if ( !b )
       { size_t count = 1<<MSB(id);
 	size_t bytes = count*sizeof(resource*);
@@ -85,19 +86,17 @@ set_id_resource(resource_db *rdb, resource *r)
 	memset(rp, 0, bytes);
 	b = rdb->array.blocks[MSB(id)] = rp-count;
       }
-      UNLOCK_MISC(rdb->db);
     }
 
     if ( !b[id] )
-    { LOCK_MISC(rdb->db);
-      if ( !b[id] )
+    { if ( !b[id] )
       { b[id] = r;
 	r->id = id;
 	rdb->array.first_free = id+1;
-	UNLOCK_MISC(rdb->db);
+	if ( rdb->array.highest_id < id )
+	  rdb->array.highest_id = id;
 	return TRUE;
       }
-      UNLOCK_MISC(rdb->db);
     }
   }
 }
@@ -145,7 +144,7 @@ next_resource(res_walker *rw)
 }
 
 
-resource *
+static resource *
 existing_resource(resource_db *rdb, atom_t name)
 { res_walker rw;
   resource *r;
@@ -160,7 +159,7 @@ existing_resource(resource_db *rdb, atom_t name)
 }
 
 
-static resource *
+resource *
 lookup_resource(resource_db *rdb, atom_t name)
 { resource *r, **rp;
   int entry;
@@ -191,4 +190,75 @@ lookup_resource(resource_db *rdb, atom_t name)
   UNLOCK_MISC(rdb->db);
 
   return r;
+}
+
+
+		 /*******************************
+		 *	       PROLOG		*
+		 *******************************/
+
+static foreign_t
+rdf_resource(term_t r, control_t h)
+{ rdf_db *db = DB;
+  size_t id;
+
+  switch( PL_foreign_control(h) )
+  { case PL_FIRST_CALL:
+    { atom_t name;
+
+      if ( PL_is_variable(r) )
+      { id = 0;
+	break;
+      } else if ( get_atom_ex(r, &name) )
+      { if ( existing_resource(&db->resources, name) )
+	  return TRUE;
+	return FALSE;
+      } else
+	return FALSE;
+    }
+    case PL_REDO:
+      id = PL_foreign_context(h);
+      break;
+    case PL_PRUNED:
+      return TRUE;
+  }
+
+  for(; id<=db->resources.array.highest_id; id++)
+  { resource **b = db->resources.array.blocks[MSB(id)];
+
+    assert(b);
+    if ( b[id] )
+    { if ( !PL_unify_atom(r, (*b)->name) )
+	return FALSE;			/* error */
+      PL_retry(id);
+    }
+  }
+
+  return FALSE;
+}
+
+
+static foreign_t
+pl_lookup_resource(term_t name, term_t id)
+{ rdf_db *db = DB;
+  resource *r;
+  atom_t a;
+
+  if ( !get_atom_ex(name, &a) )
+    return FALSE;
+
+  r = lookup_resource(&db->resources, a);
+
+  return PL_unify_int64(id, r->id);
+}
+
+
+#define NDET PL_FA_NONDETERMINISTIC
+
+int
+register_resource_predicates(void)
+{ PL_register_foreign("rdf_resource",	     1, rdf_resource,       NDET);
+  PL_register_foreign("rdf_lookup_resource", 2, pl_lookup_resource, 0);
+
+  return TRUE;
 }
