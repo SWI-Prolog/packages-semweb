@@ -46,20 +46,13 @@
 #endif
 #endif
 
-#include <SWI-Stream.h>
-#include <SWI-Prolog.h>
 #include "rdf_db.h"
-#include <assert.h>
-#include <string.h>
 #include <wchar.h>
 #include <wctype.h>
 #include <ctype.h>
-#include "avl.h"
 #ifdef WITH_MD5
 #include "md5.h"
 #include "atom.h"
-#include "debug.h"
-#include "hash.h"
 #include "murmur.h"
 #include "memory.h"
 #include "buffer.h"
@@ -283,8 +276,6 @@ static int	check_predicate_cloud(predicate_cloud *c);
 #define REALLOW_READERS(db)		reallow_readers(&db->lock)
 #define WRUNLOCK(db)			unlock(&db->lock, FALSE)
 #define RDUNLOCK(db)			unlock(&db->lock, TRUE)
-#define LOCK_MISC(db)			lock_misc(&db->lock)
-#define UNLOCK_MISC(db)			unlock_misc(&db->lock)
 #define INIT_LOCK(db)			init_lock(&db->lock)
 
 
