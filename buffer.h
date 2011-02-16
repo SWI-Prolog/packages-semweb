@@ -71,6 +71,7 @@ buffer_triple(triple_buffer *b, triple *t)
       if ( tmp )
       { b->max += tmp-b->base;
 	b->top += tmp-b->base;
+	b->base = tmp;
 	*b->top++ = t;
       } else
 	return FALSE;

@@ -618,8 +618,8 @@ rdf_source_location(Subject, Source) :-
 
 rdf_statistics(sources(Count)) :-
 	predicate_property(rdf_source(_,_,_,_,_), number_of_clauses(Count)).
-rdf_statistics(subjects(Count)) :-
-	rdf_statistics_(subjects(Count)).
+rdf_statistics(resources(Count)) :-
+	rdf_statistics_(resources(Count)).
 rdf_statistics(properties(Count)) :-
 	rdf_statistics_(predicates(Count)).
 rdf_statistics(triples(Count)) :-

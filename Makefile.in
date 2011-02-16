@@ -97,7 +97,8 @@ uninstall::
 		(cd $(PLBASE)/library && rm -f $(LIBPL))
 		$(PL) -f none -g make -t halt
 
-rdf_db.o:	quote.c unicode_map.c
+rdf_db.o:	quote.c unicode_map.c buffer.h
+query.o:	buffer.h
 
 ################################################################
 # Documentation
