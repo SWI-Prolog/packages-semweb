@@ -4519,8 +4519,7 @@ free_search_state(search_state *state)
   if ( state->literal_state )
     rdf_free(state->db, state->literal_state, sizeof(*state->literal_state));
   if ( state->allocated )		/* also means redo! */
-  { dec_active_queries(state->db);
-    rdf_free(state->db, state, sizeof(*state));
+  { rdf_free(state->db, state, sizeof(*state));
   }
 }
 
@@ -4533,7 +4532,6 @@ allow_retry_state(search_state *state)
     if ( state->lit_ex.literal == &state->pattern.tp.end )
       copy->lit_ex.literal = &copy->pattern.tp.end;
     copy->allocated = TRUE;
-    inc_active_queries(state->db);
 
     state = copy;
   }
