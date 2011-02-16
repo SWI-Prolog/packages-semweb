@@ -241,7 +241,6 @@ static predicate_t PRED_call1;
 #define MATCH_QUAL		0x10	/* Match qualifiers too */
 #define MATCH_DUPLICATE		(MATCH_EXACT|MATCH_QUAL)
 
-static int WANT_GC(rdf_db *db);
 static int match_triples(triple *t, triple *p, unsigned flags);
 static int update_duplicates_add(rdf_db *db, triple *t);
 static void update_duplicates_del(rdf_db *db, triple *t);
@@ -249,7 +248,6 @@ static void unlock_atoms(rdf_db *db, triple *t);
 static void lock_atoms(rdf_db *db, triple *t);
 static void unlock_atoms_literal(literal *lit);
 
-static int  	update_hash(rdf_db *db, int organise);
 static size_t	triple_hash_key(triple *t, int which);
 static size_t	object_hash(triple *t);
 static void	init_triple_walker(triple_walker *tw, rdf_db *db,
@@ -1269,9 +1267,6 @@ update_predicate_counts(rdf_db *db, predicate *p, int which)
       return TRUE;
   }
 
-  if ( !update_hash(db, TRUE) )
-    return FALSE;
-
   { atomset subject_set;
     atomset object_set;
     triple t;
@@ -1638,7 +1633,6 @@ next:
 static foreign_t
 rdf_graph_source(term_t graph_name, term_t source, term_t modified)
 { atom_t gn;
-  int rc = FALSE;
   rdf_db *db = DB;
 
   if ( !get_atom_or_var_ex(graph_name, &gn) )
@@ -1647,13 +1641,10 @@ rdf_graph_source(term_t graph_name, term_t source, term_t modified)
   if ( gn )
   { graph *s;
 
-    if ( !RDLOCK(db) )
-      return FALSE;
     if ( (s = existing_graph(db, gn)) && s->source)
-    { rc = ( PL_unify_atom(source, s->source) &&
-	     PL_unify_float(modified, s->modified) );
+    { return ( PL_unify_atom(source, s->source) &&
+	       PL_unify_float(modified, s->modified) );
     }
-    RDUNLOCK(db);
   } else
   { atom_t src;
 
@@ -1673,7 +1664,7 @@ rdf_graph_source(term_t graph_name, term_t source, term_t modified)
     }
   }
 
-  return rc;
+  return FALSE;
 }
 
 
@@ -1690,19 +1681,18 @@ rdf_set_graph_source(term_t graph_name, term_t source, term_t modified)
        !get_double_ex(modified, &mtime) )
     return FALSE;
 
-  if ( !RDLOCK(db) )
-    return FALSE;
   if ( (s = lookup_graph(db, gn)) )
-  { if ( s->source != src )
+  { LOCK_MISC(db);
+    if ( s->source != src )
     { if ( s->source )
 	PL_unregister_atom(s->source);
       s->source = src;
       PL_register_atom(s->source);
     }
     s->modified = mtime;
+    UNLOCK_MISC(db);
     rc = TRUE;
   }
-  RDUNLOCK(db);
 
   return rc;
 }
@@ -1717,16 +1707,14 @@ rdf_unset_graph_source(term_t graph_name)
   if ( !get_atom_ex(graph_name, &gn) )
     return FALSE;
   if ( (s = lookup_graph(db, gn)) )
-  { if ( s->source )
+  { LOCK_MISC(db);
+    if ( s->source )
     { PL_unregister_atom(s->source);
       s->source = 0;
     }
     s->modified = 0.0;
+    UNLOCK_MISC(db);
   }
-  if ( !RDLOCK(db) )
-    return FALSE;
-
-  RDUNLOCK(db);
 
   return TRUE;
 }
@@ -2416,8 +2404,6 @@ discard_duplicate(rdf_db *db, triple *t)
   assert(t->is_duplicate == FALSE);
   assert(t->duplicates == 0);
 
-  if ( WANT_GC(db) )			/* (*) See above */
-    update_hash(db, FALSE);
   init_triple_walker(&tw, db, t, indexed);
   while((d=next_triple(&tw)) && d != t)
   { if ( match_triples(d, t, MATCH_DUPLICATE) )
@@ -2486,183 +2472,6 @@ int
 link_triple(rdf_db *db, triple *t)
 { if ( link_triple_silent(db, t) )
     return broadcast(EV_ASSERT, t, NULL);
-
-  return TRUE;
-}
-
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-rehash_triples()
-
-Relink the triples in the hash-chains after the hash-keys for properties
-have changed or the tables have  been   resized.  The caller must ensure
-there are no active queries and the tables are of the proper size.
-
-At the same time, this predicate actually removes erased triples.
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-static int
-rehash_triples(rdf_db *db)
-{ DEBUG(1, Sdprintf("(%ld triples ...", (long)(db->created - db->freed)));
-  if ( !broadcast(EV_REHASH, (void*)ATOM_begin, NULL) )
-    return FALSE;
-
-#if 0					/* TBD */
-
-  for(ic=1; ic<INDEX_TABLES; ic++)
-  { size_t ocount;
-    int factor;
-    size_t tsize;
-    int i = col_index[ic];
-
-    switch(i)
-    { case BY_S:
-      case BY_SG:
-	ocount = db->subjects;
-        factor = 20;
-	break;
-      case BY_P:
-	ocount = db->pred_count;
-        factor = 5;
-	break;
-      case BY_PG:
-	ocount = db->pred_count * db->graph_count;
-        factor = 100;
-	break;
-      case BY_O:
-      case BY_SP:
-      case BY_SO:
-      case BY_PO:
-      case BY_SPO:
-	ocount = db->created - db->freed;
-        factor = MIN_HASH_FACTOR*10;
-        break;
-      case BY_G:
-	ocount = db->graph_count;
-        factor = 5;
-	break;
-      default:
-	assert(0);
-    }
-    tsize = tbl_size(ocount, factor);
-
-    if ( db->table[ic] )
-    { size_t bytes   = sizeof(triple*) * tsize;
-      size_t cbytes  = sizeof(int)     * tsize;
-      size_t obytes  = sizeof(triple*) * db->table_size[ic];
-      size_t ocbytes = sizeof(int)     * db->table_size[ic];
-
-      db->table[ic]  = rdf_realloc(db, db->table[ic],  obytes,  bytes);
-      db->tail[ic]   = rdf_realloc(db, db->tail[ic],   obytes,  bytes);
-      db->counts[ic] = rdf_realloc(db, db->counts[ic], ocbytes, cbytes);
-      db->table_size[ic] = tsize;
-
-      memset(db->table[ic],  0, bytes);
-      memset(db->tail[ic],   0, bytes);
-      memset(db->counts[ic], 0, cbytes);
-    }
-  }
-
-					/* delete leading erased triples */
-  for(t=db->by_none; t && t->erased; t=t2)
-  { t2 = t->tp.next[ICOL(BY_NONE)];
-
-    free_triple(db, t);
-    db->freed++;
-
-    db->by_none = t2;
-  }
-
-  for(t=db->by_none; t; t = t2)
-  { triple *t3;
-    int i;
-
-    t2 = t->tp.next[ICOL(BY_NONE)];
-
-    for(i=1; i<INDEX_TABLES; i++)
-      t->tp.next[i] = NULL;
-
-    assert(t->erased == FALSE);
-    link_triple_hash(db, t);
-
-    for( ; t2 && t2->erased; t2=t3 )
-    { t3 = t2->tp.next[ICOL(BY_NONE)];
-
-      free_triple(db, t2);
-      db->freed++;
-    }
-
-    t->tp.next[ICOL(BY_NONE)] = t2;
-    if ( !t2 )
-      db->by_none_tail = t;
-  }
-
-  if ( db->by_none == NULL )
-    db->by_none_tail = NULL;
-
-#endif /*0*/
-
-  return broadcast(EV_REHASH, (void*)ATOM_end, NULL);
-}
-
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-update_hash(). Note this may be called by  readers and writers, but must
-be done only onces and certainly   not concurrently by multiple readers.
-Hence we need a seperate lock.
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-static int
-WANT_GC(rdf_db *db)
-{ size_t dirty = db->erased - db->freed;
-  size_t count = db->created - db->erased;
-
-  assert(db->erased >= db->freed);
-  assert(db->created >= db->erased);
-
-  if ( dirty > 1000 && dirty > count )
-  { DEBUG(1, Sdprintf("rdf_db: dirty; want GC\n"));
-    return TRUE;
-  }
-  if ( count > db->hash[ICOL(BY_SPO)].bucket_count*MAX_HASH_FACTOR )
-  { DEBUG(1, Sdprintf("rdf_db: small hashes; want GC\n"));
-    return TRUE;
-  }
-
-  return FALSE;
-}
-
-
-static int
-update_hash(rdf_db *db, int organise)
-{ if ( (organise && db->need_update) || WANT_GC(db) )
-  { LOCK_MISC(db);
-
-    if ( organise && db->need_update )	/* check again */
-    { if ( organise_predicates(db) )
-      { long t0 = (long)PL_query(PL_QUERY_USER_CPU);
-
-	DEBUG(1, Sdprintf("Re-hash ..."));
-	invalidate_distinct_counts(db);
-	rehash_triples(db);
-	db->generation += (db->created-db->erased);
-	db->rehash_count++;
-	db->rehash_time += ((double)(PL_query(PL_QUERY_USER_CPU)-t0))/1000.0;
-	DEBUG(1, Sdprintf("ok\n"));
-      }
-      db->need_update = 0;
-    } else if ( WANT_GC(db) )
-    { long t0 = (long)PL_query(PL_QUERY_USER_CPU);
-
-      DEBUG(1, Sdprintf("rdf_db: GC ..."));
-      rehash_triples(db);
-      db->gc_count++;
-      db->gc_time += ((double)(PL_query(PL_QUERY_USER_CPU)-t0))/1000.0;
-      DEBUG(1, Sdprintf("ok\n"));
-    }
-
-    UNLOCK_MISC(db);
-  }
 
   return TRUE;
 }
@@ -3725,8 +3534,6 @@ rdf_md5(term_t graph_name, term_t md5)
   if ( src )
   { graph *s;
 
-    if ( !RDLOCK(db) )
-      return FALSE;
     if ( (s = existing_graph(db, src)) )
     { rc = md5_unify_digest(md5, s->digest);
     } else
@@ -3735,7 +3542,6 @@ rdf_md5(term_t graph_name, term_t md5)
       memset(digest, 0, sizeof(digest));
       rc = md5_unify_digest(md5, digest);
     }
-    RDUNLOCK(db);
   } else
   { md5_byte_t digest[16];
     int i;
@@ -4335,13 +4141,6 @@ In our solution, if a triple is added as a duplicate, it is flagged such
 using  the  flag  is_duplicate.  The  `principal'  triple  has  a  count
 `duplicates',  indicating  the  number  of   duplicate  triples  in  the
 database.
-
-(*) Iff too many triples are  added,  it   may  be  time  to enlarge the
-hashtable. Note that we do not call  update_hash() blindly as this would
-cause each triple that  modifies  the   predicate  hierarchy  to force a
-rehash. As we are not searching using subPropertyOf semantics during the
-duplicate update, there is no point updating. If it is incorrect it will
-be updated on the first real query.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
@@ -4354,8 +4153,6 @@ update_duplicates_add(rdf_db *db, triple *t)
   assert(t->is_duplicate == FALSE);
   assert(t->duplicates == 0);
 
-  if ( WANT_GC(db) )			/* (*) See above */
-    update_hash(db, FALSE);
   init_triple_walker(&tw, db, t, indexed);
   while((d=next_triple(&tw)) && d != t)
   { if ( match_triples(d, t, MATCH_DUPLICATE) )
@@ -4638,9 +4435,7 @@ init_cursor_from_literal(search_state *state, literal *cursor)
 
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-(*) update_hash() is there to update  the   hash  after  a change to the
-predicate organization. If we do  not  have   a  predicate  or we do not
-search using rdf_has/3, this is not needed.
+<init_search_state(search_state *state)
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static int
@@ -4975,14 +4770,6 @@ rdf_estimate_complexity(term_t subject, term_t predicate, term_t object,
     }
   }
 
-  if ( !RDLOCK(db) )
-    return FALSE;
-  if ( !update_hash(db, TRUE) )			/* or ignore this problem? */
-  { RDUNLOCK(db);
-    free_triple(db, &t);
-    return FALSE;
-  }
-
   if ( t.indexed == BY_NONE )
   { c = db->created - db->erased;		/* = totale triple count */
 #if 0
@@ -5004,7 +4791,6 @@ rdf_estimate_complexity(term_t subject, term_t predicate, term_t object,
   }
 
   rc = PL_unify_int64(complexity, c);
-  RDUNLOCK(db);
   free_triple(db, &t);
 
   return rc;
