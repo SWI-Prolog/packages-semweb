@@ -300,9 +300,9 @@ rdf_resource(term_t r, control_t h)
 
     assert(b);
     if ( b[id] )
-    { if ( !PL_unify_atom(r, (*b)->name) )
+    { if ( !PL_unify_atom(r, b[id]->name) )
 	return FALSE;			/* error */
-      PL_retry(id);
+      PL_retry(id+1);
     }
   }
 

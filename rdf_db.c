@@ -245,8 +245,8 @@ static int WANT_GC(rdf_db *db);
 static int match_triples(triple *t, triple *p, unsigned flags);
 static int update_duplicates_add(rdf_db *db, triple *t);
 static void update_duplicates_del(rdf_db *db, triple *t);
-static void unlock_atoms(triple *t);
-static void lock_atoms(triple *t);
+static void unlock_atoms(rdf_db *db, triple *t);
+static void lock_atoms(rdf_db *db, triple *t);
 static void unlock_atoms_literal(literal *lit);
 
 static int  	update_hash(rdf_db *db, int organise);
@@ -2191,7 +2191,7 @@ new_triple(rdf_db *db)
 
 static void
 free_triple(rdf_db *db, triple *t)
-{ unlock_atoms(t);
+{ unlock_atoms(db, t);
 
   if ( t->object_is_literal && t->object.literal )
     free_literal(db, t->object.literal);
@@ -3796,28 +3796,28 @@ in the predicate structure.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static void
-lock_atoms(triple *t)
+lock_atoms(rdf_db *db, triple *t)
 { if ( !t->atoms_locked )
   { t->atoms_locked = TRUE;
 
-    PL_register_atom(t->subject);
+    lookup_resource(&db->resources, t->subject);
     if ( t->object_is_literal )
     { lock_atoms_literal(t->object.literal);
     } else
-    { PL_register_atom(t->object.resource);
+    { lookup_resource(&db->resources, t->object.resource);
     }
   }
 }
 
 
 static void
-unlock_atoms(triple *t)
+unlock_atoms(rdf_db *db, triple *t)
 { if ( t->atoms_locked )
   { t->atoms_locked = FALSE;
 
-    PL_unregister_atom(t->subject);
+    //PL_unregister_atom(t->subject);	/* TBD */
     if ( !t->object_is_literal )
-    { PL_unregister_atom(t->object.resource);
+    { //PL_unregister_atom(t->object.resource); /*TBD*/
     }
   }
 }
@@ -4539,7 +4539,7 @@ rdf_assert4(term_t subject, term_t predicate, term_t object, term_t src)
   { t->graph = ATOM_user;
     t->line = NO_LINE;
   }
-  lock_atoms(t);
+  lock_atoms(db, t);
 
   q = open_query(db);
   add_triples(q, &t, 1);
@@ -5164,7 +5164,7 @@ update_triple(rdf_db *db, term_t action, triple *t, triple **updated)
   new->line		 = tmp.line;
 
   free_triple(db, &tmp);
-  lock_atoms(new);
+  lock_atoms(db, new);
 
   *updated = new;
 
