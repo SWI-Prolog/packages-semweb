@@ -408,11 +408,13 @@ add_triples(query *q, triple **triples, size_t count)
   else
     gen = db->queries.generation + 1;
   for(tp=triples; tp < ep; tp++)
-  { (*tp)->lifespan.born = gen;
-    (*tp)->lifespan.died = GEN_MAX;
-    link_triple(db, *tp);		/* Wrong? */
+  { triple *t = *tp;
+
+    t->lifespan.born = gen;
+    t->lifespan.died = GEN_MAX;
+    link_triple(db, t);		/* Wrong? */
     if ( q->transaction )
-      buffer_triple(q->transaction->transaction_data.added, *tp);
+      buffer_triple(q->transaction->transaction_data.added, t);
   }
   if ( !q->transaction )
     db->queries.generation = gen;
@@ -436,11 +438,11 @@ del_triples(query *q, triple **triples, size_t count)
   else
     gen = db->queries.generation + 1;
   for(tp=triples; tp < ep; tp++)
-  { (*tp)->lifespan.died = gen;
-    if ( !q->transaction )
-      (*tp)->predicate.r->triple_count--;
-    else
-      buffer_triple(q->transaction->transaction_data.deleted, *tp);
+  { triple *t = *tp;
+
+    t->lifespan.died = gen;
+    if ( q->transaction )
+      buffer_triple(q->transaction->transaction_data.deleted, t);
   }
   if ( !q->transaction )
   { db->erased += count;
@@ -529,9 +531,7 @@ commit_transaction(query *q)
       tp<q->transaction_data.added->top;
       tp++)
   { (*tp)->lifespan.born = gen;
-    if ( !q->transaction )
-      (*tp)->predicate.r->triple_count++;
-    else
+    if ( q->transaction )
       buffer_triple(q->transaction->transaction_data.added, *tp);
   }
 					/* deleted triples */
@@ -539,17 +539,11 @@ commit_transaction(query *q)
       tp<q->transaction_data.deleted->top;
       tp++)
   { (*tp)->lifespan.died = gen;
-    if ( !q->transaction )
-      (*tp)->predicate.r->triple_count--;
-    else
+    if ( q->transaction )
       buffer_triple(q->transaction->transaction_data.deleted, *tp);
   }
   if ( !q->transaction )
-  { db->erased += (q->transaction_data.deleted->top -
-		   q->transaction_data.deleted->base);
-    db->created += (q->transaction_data.added->top -
-		    q->transaction_data.added->base);
-    db->queries.generation = gen;
+  { db->queries.generation = gen;
   }
   simpleMutexUnlock(&db->queries.write.lock);
 

@@ -852,6 +852,21 @@ organise_predicates(rdf_db *db)		/* TBD: rename&move */
 }
 
 
+/* TBD: Use atomic increment/decrement
+*/
+
+static void
+register_predicate(rdf_db *db, triple *t)
+{ t->predicate.r->triple_count++;
+}
+
+
+static void
+unregister_predicate(rdf_db *db, triple *t)
+{ t->predicate.r->triple_count--;
+}
+
+
 		 /*******************************
 		 *	 PREDICATE CLOUDS	*
 		 *******************************/
@@ -2602,7 +2617,7 @@ link_triple_silent(rdf_db *db, triple *t)
 
 ok:
   db->created++;
-  t->predicate.r->triple_count++;
+  register_predicate(db, t);
   register_graph(db, t);
 
   return TRUE;
@@ -2634,13 +2649,8 @@ erase_triple_silent(rdf_db *db, triple *t)
   }
 
   unregister_graph(db, t);
-
-  if ( t->object_is_literal )
-  { literal *lit = t->object.literal;
-
-    t->object.literal = NULL;
-    free_literal(db, lit);		/* TBD: thread-safe? */
-  }
+  unregister_predicate(db, t);
+  db->erased++;
 }
 
 
