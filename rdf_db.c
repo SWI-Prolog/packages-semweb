@@ -2209,7 +2209,16 @@ triple_hash_quality(rdf_db *db, int index)
 }
 
 
-/* TBD: Good criteria and fast criteria
+/* Consider resizing the hash-tables.  This seems to work quite ok, but there
+   are some issues:
+
+    * When should this be called? Just doubling the number of triples is
+    too simple. The ones based on triple_hash_quality() could easily get
+    poor. Note that once poor, the dynamic expansion trick makes it
+    impossible to improve without stopping all threads.
+
+    * triple_hash_quality() is quite costly. This could use sampling and
+    it migth be a good idea to sample only the latest expansion.
 */
 
 static void
@@ -2437,13 +2446,6 @@ init_triple_walker(triple_walker *tw, rdf_db *db, triple *pattern, int which)
   tw->hash	     = &db->hash[tw->icol];
   tw->bcount	     = tw->hash->bucket_count_epoch;
   tw->current	     = NULL;
-  if ( tw->bcount == tw->hash->bucket_count )
-  { tw->count_state = TW_COUNTING;
-    tw->hit_count = 0;
-    tw->miss_count = 0;
-  } else
-  { tw->count_state    = TW_NOCOUNT;
-  }
 }
 
 
@@ -2463,12 +2465,6 @@ next_triple(triple_walker *tw)
       tw->bcount *= 2;
     } while(!rc && tw->bcount <= tw->hash->bucket_count );
 
-    if ( tw->bcount == tw->hash->bucket_count )
-    { tw->count_state = TW_COUNTING;
-      tw->hit_count = 0;
-      tw->miss_count = 0;
-    }
-
     if ( rc )
       tw->current = rc->tp.next[tw->icol];
   } else
@@ -2479,25 +2475,9 @@ next_triple(triple_walker *tw)
 }
 
 
-static void
-hit_triple_walker(triple_walker *tw)
-{ tw->hit_count++;
-}
-
-
-static void
-miss_triple_wakler(triple_walker *tw)
-{ tw->miss_count++;
-}
-
-
-static void
+static inline void
 destroy_triple_walker(rdf_db *db, triple_walker *tw)
-{ if ( tw->count_state == TW_COUNTING )
-  { if ( TRUE || tw->miss_count > tw->hit_count )
-      DEBUG(1, Sdprintf("Index %d: %d hits, %d misses\n",
-			tw->icol, tw->hit_count, tw->miss_count));
-  }
+{
 }
 
 
@@ -2566,8 +2546,7 @@ discard_duplicate(rdf_db *db, triple *t)
   init_triple_walker(&tw, db, t, indexed);
   while((d=next_triple(&tw)) && d != t)
   { if ( match_triples(d, t, MATCH_DUPLICATE) )
-    { hit_triple_walker(&tw);
-      if ( d->graph == t->graph &&
+    { if ( d->graph == t->graph &&
 	   (d->line == NO_LINE || d->line == t->line) )
       { free_triple(db, t);
 
@@ -2575,8 +2554,6 @@ discard_duplicate(rdf_db *db, triple *t)
       }
 
       rc = DUP_DUPLICATE;
-    } else
-    { miss_triple_wakler(&tw);
     }
   }
   destroy_triple_walker(db, &tw);
@@ -4731,7 +4708,6 @@ retry:
     if ( match_triples(t, p, state->flags) )
     { term_t retpred = state->realpred ? state->realpred : state->predicate;
 
-      hit_triple_walker(tw);
       if ( !unify_triple(state->subject, retpred, state->object,
 			 state->src, t, p->inversed) )
 	continue;
@@ -4761,8 +4737,7 @@ retry:
       }
 
       return TRUE;			/* deterministic */
-    } else
-      miss_triple_wakler(tw);
+    }
   }
 
   if ( (state->flags & MATCH_INVERSE) && inverse_partial_triple(p) )

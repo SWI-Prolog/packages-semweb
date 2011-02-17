@@ -318,20 +318,12 @@ typedef struct triple_hash
   size_t	bucket_count_epoch;	/* Initial bucket count */
 } triple_hash;
 
-typedef enum triple_walker_counting
-{ TW_NOCOUNT = 0,
-  TW_COUNTING
-} triple_walker_counting;
-
 typedef struct triple_walker
 { size_t	unbounded_hash;		/* The unbounded hash-key */
   int		icol;			/* index column */
   size_t	bcount;			/* Current bucket count */
   triple_hash  *hash;			/* The hash */
   triple       *current;		/* Our current location */
-  triple_walker_counting count_state;
-  int		hit_count;		/* Counts when walking hash-chains */
-  int		miss_count;
 } triple_walker;
 
 typedef struct rdf_db
