@@ -432,6 +432,19 @@ static int col_index[INDEX_TABLES] =
   BY_PG
 };
 
+static const char *col_name[INDEX_TABLES] =
+{ "-",
+  "S",
+  "P",
+  "SP",
+  "O",
+  "PO",
+  "SPO",
+  "G",
+  "SG",
+  "PG"
+};
+
 static const int alt_index[16] =
 { BY_NONE,				/* BY_NONE */
   BY_S,					/* BY_S */
@@ -2130,8 +2143,8 @@ resize_triple_hash(rdf_db *db, int index)
   memset(t, 0, bytes);
   hash->blocks[i] = t-hash->bucket_count;
   hash->bucket_count *= 2;
-  DEBUG(0, Sdprintf("Resized triple index %d to %ld\n",
-		    index, (long)hash->bucket_count));
+  DEBUG(0, Sdprintf("Resized triple index %s to %ld\n",
+		    col_name[index], (long)hash->bucket_count));
 
   return TRUE;
 }
@@ -2193,6 +2206,57 @@ triple_hash_quality(rdf_db *db, int index)
   }
 
   return total == 0 ? 1.0 : q/(float)total;
+}
+
+
+/* TBD: Good criteria and fast criteria
+*/
+
+static void
+consider_triple_rehash(rdf_db *db)
+{ if ( db->created - db->freed > db->hash[ICOL(BY_SPO)].bucket_count )
+  { int i;
+
+    for(i=1; i<INDEX_TABLES; i++)
+    { int resize = FALSE;
+
+      switch(col_index[i])
+      { case BY_S:
+	  if ( db->resources.hash.count > db->hash[i].bucket_count )
+	    resize = TRUE;
+	  break;
+	case BY_P:
+	  if ( db->predicates.count > db->hash[i].bucket_count )
+	    resize = TRUE;
+	  break;
+	case BY_O:
+	  if ( (db->resources.hash.count + db->literals.count) >
+	       db->hash[i].bucket_count )
+	    resize = TRUE;
+	  break;
+	case BY_SPO:
+	  if ( db->created - db->freed > db->hash[i].bucket_count )
+	    resize = TRUE;
+	  break;
+	case BY_G:
+	  if ( db->graphs.count > db->graphs.bucket_count )
+	    resize = TRUE;
+	  break;
+	case BY_PO:
+	case BY_SG:
+	case BY_SP:
+	case BY_PG:
+	  if ( triple_hash_quality(db, i) < 0.5 )
+	    resize = TRUE;
+	  break;
+	default:
+	  assert(0);
+      }
+
+      if ( resize )
+	resize_triple_hash(db, i);
+    }
+  }
 }
 
 
@@ -2545,6 +2609,7 @@ link_triple_silent(rdf_db *db, triple *t)
   db->by_none.tail = t;
 
   link_triple_hash(db, t);
+  consider_triple_rehash(db);
 
   if ( dup == DUP_DUPLICATE && update_duplicates_add(db, t) )
     goto ok;				/* is a duplicate */
