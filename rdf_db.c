@@ -181,6 +181,7 @@ static functor_t FUNCTOR_object1;
 static functor_t FUNCTOR_graph1;
 static functor_t FUNCTOR_indexed16;
 static functor_t FUNCTOR_hash_quality1;
+static functor_t FUNCTOR_hash3;
 
 static functor_t FUNCTOR_exact1;
 static functor_t FUNCTOR_plain1;
@@ -191,7 +192,6 @@ static functor_t FUNCTOR_like1;
 static functor_t FUNCTOR_le1;
 static functor_t FUNCTOR_between2;
 static functor_t FUNCTOR_ge1;
-static functor_t FUNCTOR_equal2;	/* = */
 
 static functor_t FUNCTOR_symmetric1;
 static functor_t FUNCTOR_inverse_of1;
@@ -698,7 +698,7 @@ resize_pred_table(rdf_db *db)
   memset(p, 0, bytes);
   db->predicates.blocks[i] = p-db->predicates.bucket_count;
   db->predicates.bucket_count *= 2;
-  DEBUG(0, Sdprintf("Resized predicate table to %ld\n",
+  DEBUG(1, Sdprintf("Resized predicate table to %ld\n",
 		    (long)db->predicates.bucket_count));
 
   return TRUE;
@@ -1408,7 +1408,7 @@ resize_graph_table(rdf_db *db)
   memset(p, 0, bytes);
   db->graphs.blocks[i] = p-db->graphs.bucket_count;
   db->graphs.bucket_count *= 2;
-  DEBUG(0, Sdprintf("Resized graph table to %ld\n",
+  DEBUG(1, Sdprintf("Resized graph table to %ld\n",
 		    (long)db->graphs.bucket_count));
 
   return TRUE;
@@ -2143,7 +2143,7 @@ resize_triple_hash(rdf_db *db, int index)
   memset(t, 0, bytes);
   hash->blocks[i] = t-hash->bucket_count;
   hash->bucket_count *= 2;
-  DEBUG(0, Sdprintf("Resized triple index %s to %ld\n",
+  DEBUG(1, Sdprintf("Resized triple index %s to %ld\n",
 		    col_name[index], (long)hash->bucket_count));
 
   return TRUE;
@@ -6210,7 +6210,7 @@ unify_statistics(rdf_db *db, term_t key, functor_t f)
   { term_t tail, list = PL_new_term_ref();
     term_t head = PL_new_term_ref();
     term_t tmp = PL_new_term_ref();
-    term_t av = PL_new_term_refs(2);
+    term_t av = PL_new_term_refs(3);
     int i;
 
     if ( !PL_unify_functor(key, FUNCTOR_hash_quality1) )
@@ -6221,8 +6221,9 @@ unify_statistics(rdf_db *db, term_t key, functor_t f)
     for(i=0; i<INDEX_TABLES; i++)
     { if ( !PL_unify_list(tail, head, tail) ||
 	   !PL_put_integer(av+0, col_index[i]) ||
-	   !PL_put_float(av+1, triple_hash_quality(db, i)) ||
-	   !PL_cons_functor_v(tmp, FUNCTOR_equal2, av) ||
+	   !PL_put_integer(av+1, db->hash[i].bucket_count) ||
+	   !PL_put_float(av+2, triple_hash_quality(db, i)) ||
+	   !PL_cons_functor_v(tmp, FUNCTOR_hash3, av) ||
 	   !PL_unify(head, tmp) )
 	return FALSE;
     }
@@ -6542,7 +6543,7 @@ install_rdf_db()
   MKFUNCTOR(begin, 1);
   MKFUNCTOR(end, 1);
   MKFUNCTOR(hash_quality, 1);
-  FUNCTOR_equal2 = PL_new_functor(PL_new_atom("="), 2);
+  MKFUNCTOR(hash, 3);
 
   FUNCTOR_colon2 = PL_new_functor(PL_new_atom(":"), 2);
 
