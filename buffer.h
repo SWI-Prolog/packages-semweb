@@ -66,12 +66,15 @@ buffer_triple(triple_buffer *b, triple *t)
       } else
 	return FALSE;
     } else
-    { triple **tmp = realloc(b->base, ((char*)b->max-(char*)b->base)*2);
+    { size_t size = (b->max - b->base);
+      triple **tmp = realloc(b->base, size*2*sizeof(triple*));
+
+      assert(b->top == b->max);
 
       if ( tmp )
-      { b->max += tmp-b->base;
-	b->top += tmp-b->base;
-	b->base = tmp;
+      { b->base = tmp;
+	b->top  = b->base + size;
+	b->max  = b->base + size*2;
 	*b->top++ = t;
       } else
 	return FALSE;
