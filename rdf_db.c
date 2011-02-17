@@ -180,6 +180,7 @@ static functor_t FUNCTOR_predicate1;
 static functor_t FUNCTOR_object1;
 static functor_t FUNCTOR_graph1;
 static functor_t FUNCTOR_indexed16;
+static functor_t FUNCTOR_hash_quality1;
 
 static functor_t FUNCTOR_exact1;
 static functor_t FUNCTOR_plain1;
@@ -190,6 +191,7 @@ static functor_t FUNCTOR_like1;
 static functor_t FUNCTOR_le1;
 static functor_t FUNCTOR_between2;
 static functor_t FUNCTOR_ge1;
+static functor_t FUNCTOR_equal2;	/* = */
 
 static functor_t FUNCTOR_symmetric1;
 static functor_t FUNCTOR_inverse_of1;
@@ -2118,6 +2120,23 @@ init_triple_hash(rdf_db *db, int index, size_t count)
 }
 
 
+static int
+resize_triple_hash(rdf_db *db, int index)
+{ triple_hash *hash = &db->hash[index];
+  int i = MSB(hash->bucket_count);
+  size_t bytes  = sizeof(triple_bucket)*hash->bucket_count;
+  triple_bucket *t = rdf_malloc(db, bytes);
+
+  memset(t, 0, bytes);
+  hash->blocks[i] = t-hash->bucket_count;
+  hash->bucket_count *= 2;
+  DEBUG(0, Sdprintf("Resized triple index %d to %ld\n",
+		    index, (long)hash->bucket_count));
+
+  return TRUE;
+}
+
+
 static void
 reset_triple_hash(rdf_db *db, triple_hash *hash)
 { size_t bytes = sizeof(triple_bucket)*hash->bucket_count_epoch;
@@ -2126,13 +2145,54 @@ reset_triple_hash(rdf_db *db, triple_hash *hash)
   memset(hash->blocks[0], 0, bytes);
   for(i=MSB(hash->bucket_count_epoch); i<MAX_TBLOCKS; i++)
   { if ( hash->blocks[i] )
-    { size_t size = (1<<(i-1))*sizeof(triple_bucket);
+    { size_t size = (1<<i)*sizeof(triple_bucket);
 
       rdf_free(db, hash->blocks[i], size);
       hash->blocks[i] = 0;
     }
   }
   hash->bucket_count = hash->bucket_count_epoch;
+}
+
+
+static int
+count_different(triple_bucket *tb, int index)
+{ triple *t;
+  atomset hash_set;
+  int rc;
+
+  init_atomset(&hash_set);
+  for(t=tb->head; t; t=t->tp.next[ICOL(index)])
+    add_atomset(&hash_set, (atom_t)triple_hash_key(t, index));
+  rc = hash_set.tree.count;
+  destroy_atomset(&hash_set);
+
+  return rc;
+}
+
+
+static float
+triple_hash_quality(rdf_db *db, int index)
+{ triple_hash *hash = &db->hash[index];
+  int i;
+  float q = 0;
+  size_t total = 0;
+
+  if ( index == 0 )
+    return 1.0;
+
+  for(i=0; i<hash->bucket_count; i++)
+  { int entry = MSB(i);
+    triple_bucket *tb = &hash->blocks[entry][i];
+    int different = count_different(tb, col_index[index]);
+
+    if ( tb->count )
+    { q += (float)tb->count/(float)different;
+      total += tb->count;
+    }
+  }
+
+  return total == 0 ? 1.0 : q/(float)total;
 }
 
 
@@ -2371,8 +2431,8 @@ static void
 destroy_triple_walker(rdf_db *db, triple_walker *tw)
 { if ( tw->count_state == TW_COUNTING )
   { if ( TRUE || tw->miss_count > tw->hit_count )
-      Sdprintf("Index %d: %d hits, %d misses\n",
-	       tw->icol, tw->hit_count, tw->miss_count);
+      DEBUG(1, Sdprintf("Index %d: %d hits, %d misses\n",
+			tw->icol, tw->hit_count, tw->miss_count));
   }
 }
 
@@ -6081,6 +6141,28 @@ unify_statistics(rdf_db *db, term_t key, functor_t f)
     }
 
     return TRUE;
+  } else if ( f == FUNCTOR_hash_quality1 )
+  { term_t tail, list = PL_new_term_ref();
+    term_t head = PL_new_term_ref();
+    term_t tmp = PL_new_term_ref();
+    term_t av = PL_new_term_refs(2);
+    int i;
+
+    if ( !PL_unify_functor(key, FUNCTOR_hash_quality1) )
+      return FALSE;
+    _PL_get_arg(1, key, list);
+    tail = PL_copy_term_ref(list);
+
+    for(i=0; i<INDEX_TABLES; i++)
+    { if ( !PL_unify_list(tail, head, tail) ||
+	   !PL_put_integer(av+0, col_index[i]) ||
+	   !PL_put_float(av+1, triple_hash_quality(db, i)) ||
+	   !PL_cons_functor_v(tmp, FUNCTOR_equal2, av) ||
+	   !PL_unify(head, tmp) )
+	return FALSE;
+    }
+
+    return PL_unify_nil(tail);
   } else if ( f == FUNCTOR_searched_nodes1 )
   { v = db->agenda_created;
   } else if ( f == FUNCTOR_duplicates1 )
@@ -6394,6 +6476,8 @@ install_rdf_db()
   MKFUNCTOR(rehash, 1);
   MKFUNCTOR(begin, 1);
   MKFUNCTOR(end, 1);
+  MKFUNCTOR(hash_quality, 1);
+  FUNCTOR_equal2 = PL_new_functor(PL_new_atom("="), 2);
 
   FUNCTOR_colon2 = PL_new_functor(PL_new_atom(":"), 2);
 
@@ -6416,6 +6500,7 @@ install_rdf_db()
   keys[i++] = FUNCTOR_triples1;
   keys[i++] = FUNCTOR_resources1;
   keys[i++] = FUNCTOR_indexed16;
+  keys[i++] = FUNCTOR_hash_quality1;
   keys[i++] = FUNCTOR_predicates1;
   keys[i++] = FUNCTOR_searched_nodes1;
   keys[i++] = FUNCTOR_duplicates1;
@@ -6425,6 +6510,7 @@ install_rdf_db()
   keys[i++] = FUNCTOR_rehash2;
   keys[i++] = FUNCTOR_core1;
   keys[i++] = 0;
+  assert(i<=16);
 
   check_index_tables();
 					/* see struct triple */
