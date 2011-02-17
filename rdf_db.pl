@@ -637,6 +637,10 @@ rdf_statistics(lookup(Index, Count)) :-
 	Arg is I + 1,
 	arg(Arg, Indexed, Count),
 	Count \== 0.
+rdf_statistics(hash_quality(Index, Size, Quality)) :-
+	rdf_statistics_(hash_quality(List)),
+	member(hash(Place,Size,Quality), List),
+	index(Index, Place).
 rdf_statistics(searched_nodes(Count)) :-
 	rdf_statistics_(searched_nodes(Count)).
 rdf_statistics(literals(Count)) :-

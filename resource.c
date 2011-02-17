@@ -77,7 +77,7 @@ resize_resource_table(resource_db *rdb)
   memset(r, 0, bytes);
   rdb->hash.blocks[i] = r-rdb->hash.bucket_count;
   rdb->hash.bucket_count *= 2;
-  DEBUG(0, Sdprintf("Resized resource table to %ld\n",
+  DEBUG(1, Sdprintf("Resized resource table to %ld\n",
 		    (long)rdb->hash.bucket_count));
 
   return TRUE;
