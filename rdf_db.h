@@ -260,6 +260,7 @@ typedef struct triple
   unsigned	is_duplicate : 1;	/* I'm a duplicate */
   unsigned	allocated : 1;		/* Triple is allocated */
   unsigned	atoms_locked : 1;	/* Atoms have been locked */
+  unsigned	linked : 1;		/* Linked into the hash-chains */
   unsigned	duplicates : 16;	/* Duplicate count */
 					/* Total: 32 */
 } triple;
@@ -370,6 +371,7 @@ COMMON(void *)	rdf_malloc(rdf_db *db, size_t size);
 COMMON(void)	rdf_free(rdf_db *db, void *ptr, size_t size);
 COMMON(void *)	rdf_realloc(rdf_db *db, void *ptr, size_t old, size_t new);
 COMMON(int)	link_triple(rdf_db *db, triple *t);
+COMMON(predicate *) lookup_predicate(rdf_db *db, atom_t name);
 
 
 		 /*******************************

@@ -402,6 +402,17 @@ add_triples(query *q, triple **triples, size_t count)
   triple **ep = triples+count;
   triple **tp;
 
+					/* pre-lock phase */
+  for(tp=triples; tp < ep; tp++)
+  { triple *t = *tp;
+
+    if ( t->resolve_pred )
+    { t->predicate.r = lookup_predicate(db, t->predicate.u);
+      t->resolve_pred = FALSE;
+    }
+  }
+
+					/* locked phase */
   simpleMutexLock(&db->queries.write.lock);
   if ( q->transaction )
     gen = q->transaction->wr_gen;
@@ -412,7 +423,7 @@ add_triples(query *q, triple **triples, size_t count)
 
     t->lifespan.born = gen;
     t->lifespan.died = GEN_MAX;
-    link_triple(db, t);		/* Wrong? */
+    link_triple(db, t);
     if ( q->transaction )
       buffer_triple(q->transaction->transaction_data.added, t);
   }

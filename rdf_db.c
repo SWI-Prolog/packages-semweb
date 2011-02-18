@@ -761,7 +761,7 @@ existing_predicate(rdf_db *db, atom_t name)
 }
 
 
-static predicate *
+predicate *
 lookup_predicate(rdf_db *db, atom_t name)
 { predicate *p, **pp;
   predicate_cloud *cp;
@@ -2577,16 +2577,25 @@ discard_duplicate(rdf_db *db, triple *t)
 }
 
 
-/* MT: must be locked by caller */
+/* MT: Caller must be hold db->queries.write.lock
 
-static int
-link_triple_silent(rdf_db *db, triple *t)
+   Return: FALSE if nothing changed; TRUE if the database has changed
+   TBD: Not all of this requires locking.  Most should be moved out of
+   the lock:
+
+	- Resolve the predicates
+	- Check for duplicates (?)
+	- Consider re-hash
+	- subProperty admin
+*/
+
+int
+link_triple(rdf_db *db, triple *t)
 { dub_state dup;
 
-  if ( t->resolve_pred )
-  { t->predicate.r = lookup_predicate(db, t->predicate.u);
-    t->resolve_pred = FALSE;
-  }
+  if ( t->linked )
+    return FALSE;
+  t->linked = TRUE;
 
   if ( (dup=discard_duplicate(db, t)) == DUP_DISCARDED )
     return FALSE;
@@ -2619,15 +2628,6 @@ ok:
   db->created++;
   register_predicate(db, t);
   register_graph(db, t);
-
-  return TRUE;
-}
-
-
-int
-link_triple(rdf_db *db, triple *t)
-{ if ( link_triple_silent(db, t) )
-    return broadcast(EV_ASSERT, t, NULL);
 
   return TRUE;
 }
