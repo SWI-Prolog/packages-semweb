@@ -132,7 +132,7 @@ rdf_realloc(rdf_db *db, void *ptr, size_t old, size_t new)
   assert(p[-1] == old);
   p = PL_realloc(&p[-1], bytes);
   *p++ = new;
-  db->core< += new-old;
+  db->core += new-old;
 
   return p;
 }
