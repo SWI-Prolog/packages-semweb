@@ -2633,12 +2633,16 @@ ok:
 }
 
 
-/* TBD: this becomes mostly part of GC
+/* MT: Caller must be hold db->queries.write.lock
 */
 
 void
-erase_triple_silent(rdf_db *db, triple *t)
-{ update_duplicates_del(db, t);
+erase_triple(rdf_db *db, triple *t)
+{ if ( t->erased )
+    return;
+  t->erased = TRUE;
+
+  update_duplicates_del(db, t);
 
   if ( t->predicate.r->name == ATOM_subPropertyOf &&
        t->object_is_literal == FALSE )

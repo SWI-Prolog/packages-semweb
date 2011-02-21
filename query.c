@@ -452,13 +452,12 @@ del_triples(query *q, triple **triples, size_t count)
   { triple *t = *tp;
 
     t->lifespan.died = gen;
+    erase_triple(db, t);
     if ( q->transaction )
       buffer_triple(q->transaction->transaction_data.deleted, t);
   }
   if ( !q->transaction )
-  { db->erased += count;
     db->queries.generation = gen;
-  }
   simpleMutexUnlock(&db->queries.write.lock);
 				/* TBD: broadcast(EV_RETRACT, t, NULL); */
   return TRUE;
@@ -541,21 +540,29 @@ commit_transaction(query *q)
   for(tp=q->transaction_data.added->base;
       tp<q->transaction_data.added->top;
       tp++)
-  { (*tp)->lifespan.born = gen;
-    if ( q->transaction )
-      buffer_triple(q->transaction->transaction_data.added, *tp);
+  { triple *t = *tp;
+
+    if ( t->lifespan.born == q->wr_gen &&
+	 t->lifespan.died == GEN_MAX )
+    { t->lifespan.born = gen;
+      if ( q->transaction )
+	buffer_triple(q->transaction->transaction_data.added, t);
+    }
   }
 					/* deleted triples */
   for(tp=q->transaction_data.deleted->base;
       tp<q->transaction_data.deleted->top;
       tp++)
-  { (*tp)->lifespan.died = gen;
-    if ( q->transaction )
-      buffer_triple(q->transaction->transaction_data.deleted, *tp);
+  { triple *t = *tp;
+
+    if ( t->lifespan.died == q->wr_gen )
+    { t->lifespan.died = gen;
+      if ( q->transaction )
+	buffer_triple(q->transaction->transaction_data.deleted, t);
+    }
   }
   if ( !q->transaction )
-  { db->queries.generation = gen;
-  }
+    db->queries.generation = gen;
   simpleMutexUnlock(&db->queries.write.lock);
 
   close_transaction(q);
@@ -570,17 +577,29 @@ commit_transaction(query *q)
 
 int
 discard_transaction(query *q)
-{ triple **tp;
+{ rdf_db *db = q->db;
+  triple **tp;
 
   for(tp=q->transaction_data.added->base;
       tp<q->transaction_data.added->top;
       tp++)
-  { (*tp)->lifespan.born = GEN_MAX;
+  { triple *t = *tp;
+
+    if ( t->lifespan.born == q->wr_gen &&
+	 t->lifespan.died == GEN_MAX )
+    { t->lifespan.born = GEN_MAX;
+      erase_triple(db, t);
+    }
   }
   for(tp=q->transaction_data.deleted->base;
       tp<q->transaction_data.deleted->top;
       tp++)
-  { (*tp)->lifespan.died = GEN_MAX;
+  { triple *t = *tp;
+
+    if ( t->lifespan.died == q->wr_gen )
+    { t->lifespan.died = GEN_MAX;
+					/* TBD: re-link */
+    }
   }
 
   close_transaction(q);
