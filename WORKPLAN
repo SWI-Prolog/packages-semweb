@@ -2,25 +2,31 @@
 
   * Establish triple-GC
 
-  * Establish expansion of triple hash-tables
+  * Establish expansion of triple hash-tables [OK]
 
   * Remove old locking code.
 
   * Establish compatible broadcasting
 
-  * Check dubious dynamic arrays starting at 0 (MSB(0) == MSB(1) == 0)
+  * Reconsider handling of duplicate triples.  The problem:
+    We have a set of triples with different life-span.  We must return
+    one triple as long as the set is not empty for our query
+    generation.
 
-  * Reconsider implementation of rdf_subject/1 (`first')?
-    - Seperate table?
-      - Resource-table?
-    - Seperate table per graph?
+    - Old solution: assign a leader.  This is now unfeasible (I think)
+    - New solution:
+      - Maintain duplicate status, indicating that a predicate MAY have
+        duplicates.
+      - Maintain db (hash) of produced triples, avoiding dublicates.
+    - Alternative:
+      - Have source-location chain on each triple.  Source location must
+        have a generation!
 
-  * Reconsider handling of duplicate triples.
+
+
 
   * Deal with subPropertyOf predicate clouds
 
   * Test framework
     - Controlled concurrency
     - Stress testing
-
-  * add_triples: link first and update generation later?
