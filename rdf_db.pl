@@ -1890,14 +1890,24 @@ rdf_db(Subject, Pred, Object, DB) :-
 %%	rdf_save_subject(+Out:stream, +Subject:resource, +BaseURI,
 %%			 +Atts:list(Pred=Obj), +Indent:int, +Options) is det.
 %
-%	Save triples defined by Atts on Subject.
+%	Save triples defined by Atts on Subject. First tries to save the
+%	subject using a typed node (e.g.,  <MyClass ...>), where we give
+%	preference to a type that resides in  the BaseURI. If this fails
+%	we create an rdf:Description element.
 
 rdf_save_subject(Out, Subject, BaseURI, Atts, Indent, Options) :-
 	rdf_equal(rdf:type, RdfType),
-	select(RdfType=Type, Atts, Atts1),
-	\+ rdf_is_bnode(Type),
-	rdf_id(Type, BaseURI, TypeId),
-	xml_is_name(TypeId), !,
+	(   BaseURI \== [],
+	    select(RdfType=Type, Atts, Atts1),
+	    \+ rdf_is_bnode(Type),
+	    atom_concat(BaseURI, Type, TypeId),
+	    xml_is_name(TypeId)
+	->  true
+	;   select(RdfType=Type, Atts, Atts1),
+	    \+ rdf_is_bnode(Type),
+	    rdf_id(Type, BaseURI, TypeId),
+	    xml_is_name(TypeId)
+	), !,
 	format(Out, '~*|<', [Indent]),
 	rdf_write_id(Out, TypeId),
 	save_about(Out, BaseURI, Subject),
