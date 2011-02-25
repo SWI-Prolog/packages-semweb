@@ -1906,51 +1906,60 @@ compare_literals() sorts literals.  Ordering is defined as:
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static int
+cmp_qualifier(const literal *l1, const literal *l2)
+{ if ( l1->qualifier == l2->qualifier )
+    return cmp_atoms(l1->type_or_lang, l2->type_or_lang);
+
+  return l1->qualifier - l2->qualifier;
+}
+
+
+static int
 compare_literals(literal_ex *lex, literal *l2)
 { literal *l1 = lex->literal;
 
   SECURE(assert(lex->magic == LITERAL_EX_MAGIC));
 
   if ( l1->objtype == l2->objtype )
-  { switch(l1->objtype)
+  { int rc;
+
+    switch(l1->objtype)
     { case OBJ_INTEGER:
       { int64_t v1 = l1->value.integer;
 	int64_t v2 = l2->value.integer;
-	return v1 < v2 ? -1 : v1 > v2 ? 1 : 0;
+	rc = v1 < v2 ? -1 : v1 > v2 ? 1 : 0;
+	break;
       }
       case OBJ_DOUBLE:
       { double v1 = l1->value.real;
 	double v2 = l2->value.real;
-	return v1 < v2 ? -1 : v1 > v2 ? 1 : 0;
+	rc = v1 < v2 ? -1 : v1 > v2 ? 1 : 0;
+	break;
       }
       case OBJ_STRING:
-      { int rc = cmp_atom_info(&lex->atom, l2->value.string);
-
-	if ( rc == 0 )
-	{ if ( l1->qualifier == l2->qualifier )
-	    return cmp_atoms(l1->type_or_lang, l2->type_or_lang);
-	  return l1->qualifier - l2->qualifier;
-	}
-	return rc;
+      { rc = cmp_atom_info(&lex->atom, l2->value.string);
+	break;
       }
       case OBJ_TERM:
       { fid_t fid = PL_open_foreign_frame();
 	term_t t1 = PL_new_term_ref();
 	term_t t2 = PL_new_term_ref();
-	int rc;
-
 					/* can also be handled in literal_ex */
 	PL_recorded_external(l1->value.term.record, t1);
 	PL_recorded_external(l2->value.term.record, t2);
 	rc = PL_compare(t1, t2);
 
 	PL_discard_foreign_frame(fid);
-	return rc;
+	break;
       }
       default:
 	assert(0);
         return 0;
     }
+
+    if ( rc != 0 )
+      return rc;
+    return cmp_qualifier(l1, l2);
   } else if ( l1->objtype == OBJ_INTEGER && l2->objtype == OBJ_DOUBLE )
   { double v1 = (double)l1->value.integer;
     double v2 = l2->value.real;
