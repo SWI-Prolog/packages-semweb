@@ -83,6 +83,17 @@ Or, querying a local server using an =ASK= query:
 %	Remaining options are passed to   http_open/3.  The defaults for
 %	Host, Port and Path can be   set  using sparql_set_server/1. The
 %	initial default for port is 80 and path is =|/sparql/|=.
+%
+%	For example, the ClioPatria  server   understands  the parameter
+%	=entailment=. The code  below  queries   for  all  triples using
+%	_rdfs_entailment.
+%
+%	  ==
+%	  ?- sparql_query('select * where { ?s ?p ?o }',
+%			  Row,
+%			  [ search([entailment=rdfs])
+%			  ]).
+%	  ==
 
 sparql_query(Query, Row, Options) :-
 	sparql_param(host(Host), Options,  Options1),
