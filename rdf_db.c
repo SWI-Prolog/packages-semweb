@@ -4713,6 +4713,19 @@ next_search_state(search_state *state)
 { triple *t;
   triple_walker *tw = &state->cursor;
   triple *p = &state->pattern;
+  term_t retpred;
+  int unify_pred;
+
+  if ( state->realpred )
+  { retpred = state->realpred;
+    if ( PL_is_variable(state->predicate) )
+    { if ( !PL_unify(state->predicate, retpred) )
+	return FALSE;
+    }
+  } else
+  { retpred = state->predicate;
+    unify_pred = FALSE;
+  }
 
 retry:
   while( (t = next_triple(tw)) )
@@ -4729,15 +4742,9 @@ retry:
     }
 
     if ( match_triples(t, p, state->flags) )
-    { term_t retpred = state->realpred ? state->realpred : state->predicate;
-
-      if ( !unify_triple(state->subject, retpred, state->object,
+    { if ( !unify_triple(state->subject, retpred, state->object,
 			 state->src, t, p->inversed) )
 	continue;
-      if ( state->realpred && PL_is_variable(state->predicate) )
-      { if ( !PL_unify(state->predicate, retpred) )
-	  return FALSE;
-      }
 
     inv_alt:
       while( (t = next_triple(tw)) )
