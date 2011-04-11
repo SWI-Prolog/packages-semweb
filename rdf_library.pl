@@ -3,9 +3,10 @@
     Part of SWI-Prolog
 
     Author:        Jan Wielemaker
-    E-mail:        wielemak@science.uva.nl
+    E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2007, University of Amsterdam
+    Copyright (C): 2007-2011, University of Amsterdam
+			      VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License
@@ -753,7 +754,7 @@ read_triples(File, Triples) :-
 	file_name_extension(_, ttl, File), !,
 	rdf_load_turtle(File, Triples, []).
 
-%%	is_manifest_file(+Path)
+%%	is_manifest_file(+Path) is semidet.
 %
 %	True if Path is the name of a manifest file.
 
