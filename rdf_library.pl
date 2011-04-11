@@ -36,6 +36,7 @@
 	    rdf_list_library/0,
 	    rdf_list_library/1,		% +Ontology
 	    rdf_list_library/2,		% +Ontology, +Options
+	    rdf_library_source/2,	% +Ontology, -SourceURL
 	    rdf_library_index/2		% ?Id, ?Facet
 	  ]).
 :- use_module(library('semweb/rdf_db')).
@@ -121,12 +122,7 @@ rdf_load_library(Id) :-
 	rdf_load_library(Id, []).
 
 rdf_load_library(Id, Options) :-
-	load_commands(Id, Options, Pairs),
-	pairs_values(Pairs, Commands),
-	list_to_set(Commands, Cmds2),
-	delete_virtual(Cmds2, Cmds3),
-	find_conflicts(Cmds3),
-	check_existence(Cmds3, Cmds, Options),
+	cleaned_load_commands(Id, Cmds, Options),
 	(   option(concurrent(Threads), Options)
 	->  true
 	;   guess_concurrency(Cmds, Threads)
@@ -137,6 +133,30 @@ rdf_load_library(Id, Options) :-
 	->  concurrent(Threads, Cmds, [])
 	;   true
 	).
+
+%%	rdf_library_source(+Id, -Source) is nondet.
+%
+%	True of Source is the URL that is  part of the given library Id.
+%	This predicate finds all indirect   dependencies.  It does _not_
+%	check whether the source exists or is valid.
+%
+%	@see uri_file_name/2 for converting file:// URLs to a filename.
+
+rdf_library_source(Id, Source) :-
+	cleaned_load_commands(Id, Cmds,
+			      [ import(true),
+				not_found(silent)
+			      ]),
+	member(rdf_load(Source, _), Cmds).
+
+
+cleaned_load_commands(Id, Cmds, Options) :-
+	load_commands(Id, Options, Pairs),
+	pairs_values(Pairs, Commands),
+	list_to_set(Commands, Cmds2),
+	delete_virtual(Cmds2, Cmds3),
+	find_conflicts(Cmds3),
+	check_existence(Cmds3, Cmds, Options).
 
 delete_virtual([], []).
 delete_virtual([virtual(_)|T0], T) :- !,
@@ -219,7 +239,7 @@ check_existence(CommandsIn, Commands, Options) :-
 	option(not_found(Level), Options, error),
 	must_be(oneof([error,warning,silent]), Level),
 	(   Level == silent
-	->  true
+	->  Commands = CommandsIn
 	;   missing_urls(CommandsIn, Commands, Missing),
 	    (	Missing == []
 	    ->	true
