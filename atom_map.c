@@ -279,7 +279,7 @@ bits
 #define isAtomDatum(d)  ((intptr_t)(d)&ATOM_TAG)
 #define isIntDatum(d)	!isAtomDatum(d)
 
-#define MAP_MIN_INT	(-(intptr_t)(1L<<(sizeof(intptr_t)*8 - 1 - 1)))
+#define MAP_MIN_INT	(-(intptr_t)((intptr_t)1<<(sizeof(intptr_t)*8 - 1 - 1)))
 #define MAP_MAX_INT	(-MAP_MIN_INT - 1)
 
 static intptr_t atom_mask;
