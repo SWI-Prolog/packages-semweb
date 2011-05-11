@@ -144,6 +144,7 @@
 :- use_module(rdf_cache).
 
 :- use_foreign_library(foreign(rdf_db)).
+:- public rdf_print_predicate_cloud/1.	% print matrix of reachable predicates
 
 :- meta_predicate
 	rdf_transaction(0),

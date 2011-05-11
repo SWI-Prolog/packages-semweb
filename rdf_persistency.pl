@@ -342,6 +342,8 @@ same_db(DB, [db(DB,S1,_)|T0], T, S0, S) :- !,
 same_db(_, L, L, S, S).
 
 
+:- public load_source/4.		% called through make_goals/5
+
 %%	load_source(+DB, +Silent, +Nth, +Total) is det.
 %
 %	Load triples and reload  journal   from  the  indicated snapshot
