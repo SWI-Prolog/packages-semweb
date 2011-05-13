@@ -100,7 +100,7 @@ library uses plain malloc to facilitate malloc debuggers.
 #ifdef DIRECT_MALLOC
 
 #define rdf_malloc(db, size)		malloc(size)
-#define rdf_free(db, ptr, size)     	free(ptr)
+#define rdf_free(db, ptr, size)		free(ptr)
 #define rdf_realloc(db, ptr, old, new)  realloc(ptr, new)
 
 #else /*DIRECT_MALLOC*/
@@ -242,7 +242,7 @@ static atom_t	ATOM_subPropertyOf;
 
 static predicate_t PRED_call1;
 
-#define MATCH_EXACT 		0x01	/* exact triple match */
+#define MATCH_EXACT		0x01	/* exact triple match */
 #define MATCH_SUBPROPERTY	0x02	/* Use subPropertyOf relations */
 #define MATCH_SRC		0x04	/* Match graph location */
 #define MATCH_INVERSE		0x08	/* use symmetric match too */
@@ -2831,7 +2831,7 @@ The RDF triple format.  This format is intended for quick save and load
 and not for readability or exchange.  Parts are based on the SWI-Prolog
 Quick Load Format (implemented in pl-wic.c).
 
-	<file> 		::= <magic>
+	<file>		::= <magic>
 			    <version>
 			    ['S' <graph-name>]
 			    ['F' <graph-source>]
@@ -2840,10 +2840,10 @@ Quick Load Format (implemented in pl-wic.c).
 			    {<triple>}
 			    'E'
 
-	<magic> 	::= "RDF-dump\n"
-	<version> 	::= <integer>
+	<magic>		::= "RDF-dump\n"
+	<version>	::= <integer>
 
-	<md5>		::= <byte>* 		(16 bytes digest)
+	<md5>		::= <byte>*		(16 bytes digest)
 
 	<triple>	::= 'T'
 	                    <subject>
@@ -4924,11 +4924,11 @@ dec_active_queries(rdf_db *db)
 typedef struct search_state
 { rdf_db       *db;			/* our database */
   term_t	subject;		/* Prolog term references */
-  term_t 	object;
-  term_t 	predicate;
-  term_t 	src;
-  term_t 	realpred;
-  unsigned 	locked : 1;		/* State has been locked */
+  term_t	object;
+  term_t	predicate;
+  term_t	src;
+  term_t	realpred;
+  unsigned	locked : 1;		/* State has been locked */
   unsigned	allocated : 1;		/* State has been allocated */
   unsigned	flags;			/* Misc flags controlling search */
   atom_t	prefix;			/* prefix and like search */
@@ -5061,7 +5061,7 @@ init_search_state(search_state *state)
     }
   } else
   { state->cursor = state->db->table[ICOL(p->indexed)]
-    				    [triple_hash(state->db, p, p->indexed)];
+				    [triple_hash(state->db, p, p->indexed)];
   }
 
   return TRUE;
@@ -5336,7 +5336,7 @@ rdf_estimate_complexity(term_t subject, term_t predicate, term_t object,
   { if ( rc == -1 )
     { return FALSE;			/* error */
     } else
-    { return PL_unify_integer(complexity, 0); 	/* no predicate */
+    { return PL_unify_integer(complexity, 0);	/* no predicate */
     }
   }
 
@@ -6543,7 +6543,7 @@ rdf_reachable(term_t subj, term_t pred, term_t obj,
 	return FALSE;
       if ( !update_hash(db, TRUE) )
 	return FALSE;
-      if ( (a.pattern.indexed & BY_S) ) 	/* subj ... */
+      if ( (a.pattern.indexed & BY_S) )		/* subj ... */
 	append_agenda(db, &a, a.pattern.subject, 0);
       else
 	append_agenda(db, &a, a.pattern.object.resource, 0);
@@ -6688,7 +6688,7 @@ unify_statistics(rdf_db *db, term_t key, functor_t f)
   { return PL_unify_term(key,
 			 PL_FUNCTOR, f,
 			   PL_INT, db->gc_count,
-			   PL_FLOAT, db->gc_time); 	/* time spent */
+			   PL_FLOAT, db->gc_time);	/* time spent */
   } else if ( f == FUNCTOR_rehash2 )
   { return PL_unify_term(key,
 			 PL_FUNCTOR, f,
