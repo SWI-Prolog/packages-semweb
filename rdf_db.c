@@ -4858,6 +4858,7 @@ static foreign_t
 rdf_assert4(term_t subject, term_t predicate, term_t object, term_t src)
 { rdf_db *db = DB;
   triple *t = new_triple(db);
+  int rc = TRUE;
 
   if ( !get_triple(db, subject, predicate, object, t) )
   { free_triple(db, t);
@@ -4882,12 +4883,12 @@ rdf_assert4(term_t subject, term_t predicate, term_t object, term_t src)
   if ( db->tr_first )
   { record_transaction(db, TR_ASSERT, t);
   } else
-  { link_triple(db, t);
+  { rc = link_triple(db, t);
     db->generation++;
   }
   WRUNLOCK(db);
 
-  return TRUE;
+  return rc;
 }
 
 
@@ -5702,7 +5703,8 @@ do_broadcast(term_t term, long mask)
       if ( !(cb->mask & mask) )
 	continue;
 
-      qid = PL_open_query(NULL, PL_Q_CATCH_EXCEPTION, cb->pred, term);
+      if ( !(qid = PL_open_query(NULL, PL_Q_CATCH_EXCEPTION, cb->pred, term)) )
+	return FALSE;
       if ( !PL_next_solution(qid) && (ex = PL_exception(qid)) )
       { term_t av = PL_new_term_refs(2);
 
