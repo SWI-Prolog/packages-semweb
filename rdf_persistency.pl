@@ -218,10 +218,11 @@ rdf_current_db(Directory) :-
 %
 %		* min_size(+KB)
 %		Only flush if journal is over KB in size.
-%		TBD: sensible default size
+%
+%	@tbd Provide a default for min_size?
 
 rdf_flush_journals(Options) :-
-	forall(rdf_source(DB),
+	forall(rdf_graph(DB),
 	       rdf_flush_journal(DB, Options)).
 
 rdf_flush_journal(DB, Options) :-
@@ -340,6 +341,8 @@ same_db(DB, [db(DB,S1,_)|T0], T, S0, S) :- !,
 	same_db(DB, T0, T, S2, S).
 same_db(_, L, L, S, S).
 
+
+:- public load_source/4.		% called through make_goals/5
 
 %%	load_source(+DB, +Silent, +Nth, +Total) is det.
 %

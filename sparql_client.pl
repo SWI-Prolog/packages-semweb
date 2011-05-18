@@ -5,7 +5,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@cs.vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2004-2010, University of Amsterdam
+    Copyright (C): 2004-2011, University of Amsterdam
 			      VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
@@ -46,7 +46,7 @@ This module provides a SPARQL client.  For example:
 
     ==
     ?- sparql_query('select * where { ?x rdfs:label "Amsterdam" }', Row,
-		    [ host('dbpedia.org'), path('/sparql')]).
+		    [ host('dbpedia.org'), path('/sparql/')]).
 
     Row = row('http://www.ontologyportal.org/WordNet#WN30-108949737') ;
     false.
@@ -83,6 +83,17 @@ Or, querying a local server using an =ASK= query:
 %	Remaining options are passed to   http_open/3.  The defaults for
 %	Host, Port and Path can be   set  using sparql_set_server/1. The
 %	initial default for port is 80 and path is =|/sparql/|=.
+%
+%	For example, the ClioPatria  server   understands  the parameter
+%	=entailment=. The code  below  queries   for  all  triples using
+%	_rdfs_entailment.
+%
+%	  ==
+%	  ?- sparql_query('select * where { ?s ?p ?o }',
+%			  Row,
+%			  [ search([entailment=rdfs])
+%			  ]).
+%	  ==
 
 sparql_query(Query, Row, Options) :-
 	sparql_param(host(Host), Options,  Options1),
@@ -164,11 +175,13 @@ sparql_param(Param, Options, Options) :-
 %	host, port and repository.  For example:
 %
 %	    ==
-%		set_sparql_default([ host(localhost),
-%				     port(8080)
-%				     repository(world)
-%				   ])
+%		sparql_set_server([ host(localhost),
+%				    port(8080)
+%				    path(world)
+%				  ])
 %	    ==
+%
+%	The default for port is 80 and path is =|/sparql/|=.
 
 sparql_set_server([]) :- !.
 sparql_set_server([H|T]) :- !,

@@ -164,9 +164,9 @@ has the following properties:
 %
 %	    ==
 %	    triple_in(RDF, S,P,O,_G) :-
-%	    	member(rdf(S,P,O), RDF).
+%		member(rdf(S,P,O), RDF).
 %
-%	    	...,
+%		...,
 %	        rdf_save_turtle(Out, [ expand(triple_in(RDF)) ]),
 %	    ==
 %
@@ -289,6 +289,8 @@ init_prefix_map(State0, State) :-
 %	Test whether we want  to  include   the  proposed  prefix in the
 %	@prefix declaration.
 
+:- public turtle_prefix/4.		% called through rdf_graph_prefixes/3.
+
 turtle_prefix(true, _, Prefix, _) :- !,
 	rdf_current_ns(_, Prefix), !.
 turtle_prefix(_, _, Prefix, URI) :-
@@ -394,7 +396,7 @@ namespace_parts(URL, _) :-
 parts(List) -->	sep2, parts2(List).
 
 parts2([H|T]) -->
-	string(Codes), 	{Codes \== []},
+	string(Codes),	{Codes \== []},
 	sep, !,
 	{atom_codes(H, Codes)},
 	parts2(T).
@@ -961,11 +963,13 @@ subject(State, Subject) :-
 	(   atom(Graph)
 	->  rdf_subject(Subject),
 	    (   rdf(Subject, _, _, Graph)
-		->  true
+	    ->  true
 	    )
 	;   rdf_subject(Subject)
 	).
 
+
+:- public lookup/4.			% called from expand hook.
 
 lookup(S,P,O,G) :-
 	(   var(G)
@@ -1109,7 +1113,7 @@ tw_literal(literal(type(Type, Value)), State, Out) :- !,
 	tw_typed_literal(Type, Value, State, Out).
 tw_literal(literal(lang(Lang, Value)), State, Out) :- !,
 	tw_quoted_string(Value, State, Out),
-	downcase_atom(Lang, TurtleLang), 	% Turtle lang = [a-z]+('-'[a-z0-9]+)*
+	downcase_atom(Lang, TurtleLang),	% Turtle lang = [a-z]+('-'[a-z0-9]+)*
 	format(Out, '@~w', [TurtleLang]).
 tw_literal(literal(Value), State, Out) :-
 	atom(Value), !,
