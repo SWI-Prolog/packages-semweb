@@ -38,8 +38,8 @@
 	    rdf_list_library/2,		% +Ontology, +Options
 	    rdf_library_index/2		% ?Id, ?Facet
 	  ]).
-:- use_module(library('semweb/rdf_db')).
-:- use_module(library('semweb/rdf_turtle')).
+:- use_module(library(semweb/rdf_db)).
+:- use_module(library(semweb/rdf_turtle)).
 :- use_module(library(rdf)).
 :- use_module(library(lists)).
 :- use_module(library(option)).
@@ -50,6 +50,7 @@
 :- use_module(library(uri)).
 :- use_module(library(http/http_open)).
 :- use_module(library(thread)).
+:- use_module(library(apply)).
 
 /** <module> RDF Library Manager
 
@@ -317,24 +318,27 @@ dry_load(Id, Level, Options) :-
 
 merge_base_uri(Facets, Options0, Options) :-
 	(   option(base_uri(Base), Facets)
-	->  delete(Options0, base_uri(_), Options1),
+	->  exclude(name_option(base_uri), Options0, Options1),
 	    Options = [base_uri(Base)|Options1]
 	;   Options = Options0
 	).
 
 merge_source(Facets, Options0, Options) :-
 	(   option(claimed_source(Base), Facets)
-	->  delete(Options0, claimed_source(_), Options1),
+	->  exclude(name_option(claimed_source), Options0, Options1),
 	    Options = [claimed_source(Base)|Options1]
 	;   Options = Options0
 	).
 
 merge_blanks(Facets, Options0, Options) :-
 	(   option(blank_nodes(Share), Facets)
-	->  delete(Options0, blank_nodes(_), Options1),
+	->  exclude(name_option(blank_nodes), Options0, Options1),
 	    Options = [blank_nodes(Share)|Options1]
 	;   Options = Options0
 	).
+
+name_option(Name, Term) :-
+	functor(Term, Name, 1).
 
 load_options(Options, File, RDFOptions) :-
 	findall(O, load_option(Options, File, O), RDFOptions).
