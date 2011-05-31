@@ -667,7 +667,9 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
     SECURE(assert(data->magic == ND_MAGIC));
 
     if ( (rc=insert_atom_set(data->values, a2)) < 0 )
+    { WRUNLOCK(map);
       return resource_error("memory");
+    }
 
     if ( rc )
       map->value_count++;
@@ -677,7 +679,9 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
       return FALSE;
     }
     if ( !(search.data.values = new_atom_set(a2)) )
+    { WRUNLOCK(map);
       return resource_error("memory");
+    }
     lock_datum(search.data.key);
     SECURE(search.magic = ND_MAGIC);
 
