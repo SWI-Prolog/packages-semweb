@@ -411,7 +411,7 @@ format_datum(datum d, char *buf)
 
   if ( !buf )
     buf = tmp;
-  Ssprintf(buf, "%lld", (int64)integer_from_datum(d));
+  Ssprintf(buf, "%lld", (int64_t)integer_from_datum(d));
 
   return buf;
 }
