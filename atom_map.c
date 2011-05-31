@@ -3,9 +3,10 @@
     Part of SWI-Prolog
 
     Author:        Jan Wielemaker
-    E-mail:        wielemak@science.uva.nl
+    E-mail:        J.Wielemaker@cs.vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2006, University of Amsterdam
+    Copyright (C): 2006-2011, University of Amsterdam
+			      VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License
@@ -410,7 +411,7 @@ format_datum(datum d, char *buf)
 
   if ( !buf )
     buf = tmp;
-  Ssprintf(buf, "%ld", (long)integer_from_datum(d));
+  Ssprintf(buf, "%lld", (int64)integer_from_datum(d));
 
   return buf;
 }
