@@ -545,8 +545,9 @@ static int
 ttl_put_ucharacter(IOSTREAM *s, int c)
 { switch(c)
   { case '>':
+    case '\\':
       Sputcode('\\', s);
-      return Sputcode('>', s);
+      return Sputcode(c, s);
     default:
       return ttl_put_character(s, c);
   }
