@@ -12,6 +12,11 @@ PLHOME=..\..
 !include ..\..\src\rules.mk
 !include common.mk
 
+MAKEINDEXSEMWEB=chdir "$(PLBASE)" & del library\semweb\INDEX.pl & bin\swipl.exe \
+			-f none -F none \
+			-g make_library_index('library/semweb') \
+			-t halt
+
 LIBDIR=		$(PLBASE)\library\semweb
 PKGDLL=rdf_db
 
@@ -27,11 +32,7 @@ turtle.dll:	turtle.obj
 
 turtle.obj:	turtle.c turtle_chars.c
 
-!IF "$(CFG)" == "rt"
-install:	idll
-!ELSE
 install:	idll ilib
-!ENDIF
 
 idll::
 		copy $(PKGDLL).dll "$(BINDIR)"
@@ -43,6 +44,7 @@ ilib::
 		@for %f in ($(DATA)) do @copy %f "$(LIBDIR)"
 		copy README "$(LIBDIR)\README.TXT"
 		$(MAKEINDEX)
+		$(MAKEINDEXSEMWEB)
 
 html-install::
 		copy semweb.html "$(PKGDOC)"

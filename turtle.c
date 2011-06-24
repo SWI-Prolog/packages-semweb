@@ -5,7 +5,8 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@cs.vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 1985-2009, VU University Amsterdam
+    Copyright (C): 1985-2011, VU University Amsterdam
+			      Vu University Amsterdam
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public
@@ -39,6 +40,7 @@ static atom_t	 ATOM_;
 static functor_t FUNCTOR_error2;
 static functor_t FUNCTOR_type_error2;
 static functor_t FUNCTOR_syntax_error1;
+static functor_t FUNCTOR_stream4;
 static functor_t FUNCTOR_representation_error1;
 
 static int
@@ -58,16 +60,30 @@ type_error(term_t actual, const char *expected)
 }
 
 
-static int
-syntax_error(const char *culprit)
-{ term_t ex;
+/* Error context: stream(Stream, Line, LinePos, CharNo)
+*/
 
-  if ( (ex = PL_new_term_ref()) &&
+static int
+syntax_error(const char *culprit, IOSTREAM *in)
+{ term_t ex;
+  term_t loc, sterm;
+
+  if ( in->position &&
+       (loc=PL_new_term_ref()) &&
+       (sterm = PL_new_term_ref()) &&
+       PL_unify_stream(sterm, in) &&
+       PL_unify_term(loc,
+		     PL_FUNCTOR, FUNCTOR_stream4,
+		       PL_TERM, sterm,
+		       PL_INT, in->position->lineno,
+		       PL_INT, in->position->linepos,
+		       PL_INT64, in->position->charno) &&
+       (ex = PL_new_term_ref()) &&
        PL_unify_term(ex,
 		     PL_FUNCTOR, FUNCTOR_error2,
 		       PL_FUNCTOR, FUNCTOR_syntax_error1,
 		         PL_CHARS, culprit,
-		       PL_VARIABLE) )
+		       PL_TERM, loc) )
     return PL_raise_exception(ex);
 
   return FALSE;
@@ -254,9 +270,9 @@ read_hN(IOSTREAM *in, int digits, int *value)
       v = (v<<4) + c + 10 - 'a';
     else
     { if ( digits == 4 )
-	return syntax_error("Illegal \\uNNNN in string");
+	return syntax_error("Illegal \\uNNNN in string", in);
       else
-	return syntax_error("Illegal \\UNNNNNNNN in string");
+	return syntax_error("Illegal \\UNNNNNNNN in string", in);
     }
   }
 
@@ -284,7 +300,7 @@ string_escape(IOSTREAM *in, int c, int *value)
 	return FALSE;
       break;
     default:
-      return syntax_error("illegal escape in string");
+      return syntax_error("illegal escape in string", in);
   }
 
   *value = esc;
@@ -329,7 +345,7 @@ turtle_read_string(term_t C0, term_t Stream, term_t C, term_t Value)
   { if ( c == -1 )
     { free_charbuf(&b);
       PL_release_stream(in);
-      return syntax_error("eof_in_string");
+      return syntax_error("eof_in_string", in);
     } else if ( c == '"' )
     { int count = 1;
 
@@ -416,7 +432,7 @@ turtle_read_relative_uri(term_t C0, term_t Stream, term_t C, term_t Value)
     } else if ( c == -1 )
     { free_charbuf(&b);
       PL_release_stream(in);
-      return syntax_error("eof_in_uri");
+      return syntax_error("eof_in_uri", in);
     } else
     { add_charbuf(&b, c);
     }
@@ -529,8 +545,9 @@ static int
 ttl_put_ucharacter(IOSTREAM *s, int c)
 { switch(c)
   { case '>':
+    case '\\':
       Sputcode('\\', s);
-      return Sputcode('>', s);
+      return Sputcode(c, s);
     default:
       return ttl_put_character(s, c);
   }
@@ -592,11 +609,12 @@ install_turtle()
 { MKFUNCTOR(error, 2);
   MKFUNCTOR(type_error, 2);
   MKFUNCTOR(syntax_error, 1);
+  MKFUNCTOR(stream, 4);
   MKFUNCTOR(representation_error, 1);
   ATOM_ = PL_new_atom("");
 
   PL_register_foreign("turtle_name_start_char",
-		      			    1, turtle_name_start_char, 0);
+					    1, turtle_name_start_char, 0);
   PL_register_foreign("turtle_name",        1, turtle_name,        0);
   PL_register_foreign("turtle_read_name",   4, turtle_read_name,   0);
   PL_register_foreign("turtle_read_string", 4, turtle_read_string, 0);

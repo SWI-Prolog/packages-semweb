@@ -5,7 +5,8 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@cs.vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2004-2009, University of Amsterdam
+    Copyright (C): 2004-2011, University of Amsterdam
+			      VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License
@@ -266,7 +267,7 @@ init_state(In, Stream, Options, State) :-
 	;   In = stream(_)
 	->  BaseURI = []
 	;   uri_is_global(In),
-	    \+ is_absolute_file_name(In) 	% Avoid C:Path in Windows
+	    \+ is_absolute_file_name(In)	% Avoid C:Path in Windows
 	->  uri_normalized(In, BaseURI)
 	;   uri_file_name(BaseURI, In)
 	),
@@ -750,7 +751,7 @@ turtle_number(C0, In, CN, Value) :-
 	turtle_number_nn(C0, In, CN, Value).
 
 turtle_number_nn(C, In, CN, numeric(Type, Codes)) :-
-	turtle_integer_codes(C, In, CN0, Codes, T0), 	% [0-9]+
+	turtle_integer_codes(C, In, CN0, Codes, T0),	% [0-9]+
 	(   CN0 == 0'.
 	->  T0 = [CN0|T1],
 	    get_code(In, C1),

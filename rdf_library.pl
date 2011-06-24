@@ -3,9 +3,10 @@
     Part of SWI-Prolog
 
     Author:        Jan Wielemaker
-    E-mail:        wielemak@science.uva.nl
+    E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2007, University of Amsterdam
+    Copyright (C): 2007-2011, University of Amsterdam
+			      VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License
@@ -36,10 +37,12 @@
 	    rdf_list_library/0,
 	    rdf_list_library/1,		% +Ontology
 	    rdf_list_library/2,		% +Ontology, +Options
-	    rdf_library_index/2		% ?Id, ?Facet
+	    rdf_library_source/2,	% +Ontology, -SourceURL
+	    rdf_library_index/2,	% ?Id, ?Facet
+	    rdf_current_manifest/1	% -Manifest
 	  ]).
-:- use_module(library('semweb/rdf_db')).
-:- use_module(library('semweb/rdf_turtle')).
+:- use_module(library(semweb/rdf_db)).
+:- use_module(library(semweb/rdf_turtle)).
 :- use_module(library(rdf)).
 :- use_module(library(lists)).
 :- use_module(library(option)).
@@ -50,6 +53,7 @@
 :- use_module(library(uri)).
 :- use_module(library(http/http_open)).
 :- use_module(library(thread)).
+:- use_module(library(apply)).
 
 /** <module> RDF Library Manager
 
@@ -66,6 +70,7 @@ The typical usage scenario is
 ==
 
 @tbd	Add caching info
+@tbd	Allow using Manifests on HTTP servers
 @author Jan Wielemaker
 */
 
@@ -121,12 +126,7 @@ rdf_load_library(Id) :-
 	rdf_load_library(Id, []).
 
 rdf_load_library(Id, Options) :-
-	load_commands(Id, Options, Pairs),
-	pairs_values(Pairs, Commands),
-	list_to_set(Commands, Cmds2),
-	delete_virtual(Cmds2, Cmds3),
-	find_conflicts(Cmds3),
-	check_existence(Cmds3, Cmds, Options),
+	cleaned_load_commands(Id, Cmds, Options),
 	(   option(concurrent(Threads), Options)
 	->  true
 	;   guess_concurrency(Cmds, Threads)
@@ -137,6 +137,30 @@ rdf_load_library(Id, Options) :-
 	->  concurrent(Threads, Cmds, [])
 	;   true
 	).
+
+%%	rdf_library_source(+Id, -Source) is nondet.
+%
+%	True of Source is the URL that is  part of the given library Id.
+%	This predicate finds all indirect   dependencies.  It does _not_
+%	check whether the source exists or is valid.
+%
+%	@see uri_file_name/2 for converting file:// URLs to a filename.
+
+rdf_library_source(Id, Source) :-
+	cleaned_load_commands(Id, Cmds,
+			      [ import(true),
+				not_found(silent)
+			      ]),
+	member(rdf_load(Source, _), Cmds).
+
+
+cleaned_load_commands(Id, Cmds, Options) :-
+	load_commands(Id, Options, Pairs),
+	pairs_values(Pairs, Commands),
+	list_to_set(Commands, Cmds2),
+	delete_virtual(Cmds2, Cmds3),
+	find_conflicts(Cmds3),
+	check_existence(Cmds3, Cmds, Options).
 
 delete_virtual([], []).
 delete_virtual([virtual(_)|T0], T) :- !,
@@ -219,7 +243,7 @@ check_existence(CommandsIn, Commands, Options) :-
 	option(not_found(Level), Options, error),
 	must_be(oneof([error,warning,silent]), Level),
 	(   Level == silent
-	->  true
+	->  Commands = CommandsIn
 	;   missing_urls(CommandsIn, Commands, Missing),
 	    (	Missing == []
 	    ->	true
@@ -317,24 +341,27 @@ dry_load(Id, Level, Options) :-
 
 merge_base_uri(Facets, Options0, Options) :-
 	(   option(base_uri(Base), Facets)
-	->  delete(Options0, base_uri(_), Options1),
+	->  exclude(name_option(base_uri), Options0, Options1),
 	    Options = [base_uri(Base)|Options1]
 	;   Options = Options0
 	).
 
 merge_source(Facets, Options0, Options) :-
 	(   option(claimed_source(Base), Facets)
-	->  delete(Options0, claimed_source(_), Options1),
+	->  exclude(name_option(claimed_source), Options0, Options1),
 	    Options = [claimed_source(Base)|Options1]
 	;   Options = Options0
 	).
 
 merge_blanks(Facets, Options0, Options) :-
 	(   option(blank_nodes(Share), Facets)
-	->  delete(Options0, blank_nodes(_), Options1),
+	->  exclude(name_option(blank_nodes), Options0, Options1),
 	    Options = [blank_nodes(Share)|Options1]
 	;   Options = Options0
 	).
+
+name_option(Name, Term) :-
+	functor(Term, Name, 1).
 
 load_options(Options, File, RDFOptions) :-
 	findall(O, load_option(Options, File, O), RDFOptions).
@@ -505,8 +532,8 @@ rdf_list_library :-
 %		means it contains triples that have predicates or
 %		objects in the given namespace.
 %
-%		* manifest(Path)
-%		Manifest file this ontology is defined in
+%		* manifest(URL)
+%		URL of the manifest in which this ontology is defined.
 %
 %		* virtual
 %		Entry is virtual (cannot be loaded)
@@ -601,10 +628,11 @@ hidden_base('cvs').			% Windows
 
 process_manifest(Source) :-
 	(   uri_file_name(Source, Manifest0)
-	->  absolute_file_name(Manifest0, Manifest)
-	;   absolute_file_name(Source, Manifest)
+	->  absolute_file_name(Manifest0, ManifestFile)
+	;   absolute_file_name(Source, ManifestFile)
 	),				% Manifest is a canonical filename
-	source_time(Manifest, MT),
+	uri_file_name(Manifest, ManifestFile),
+	source_time(ManifestFile, MT),
 	(   manifest(Manifest, Time),
 	    (	MT =< Time
 	    ->  !
@@ -614,7 +642,7 @@ process_manifest(Source) :-
 		retractall(library_db(Id, URL, Facets)),
 		fail
 	    )
-	;   read_triples(Manifest, Triples),
+	;   read_triples(ManifestFile, Triples),
 	    process_triples(Manifest, Triples),
 	    print_message(informational, rdf(manifest(loaded, Manifest))),
 	    assert(manifest(Manifest, MT))
@@ -733,7 +761,7 @@ read_triples(File, Triples) :-
 	file_name_extension(_, ttl, File), !,
 	rdf_load_turtle(File, Triples, []).
 
-%%	is_manifest_file(+Path)
+%%	is_manifest_file(+Path) is semidet.
 %
 %	True if Path is the name of a manifest file.
 
@@ -802,6 +830,14 @@ define_namespace(ns(Mnemonic, Namespace)) :-
 	rdf_register_ns(Mnemonic, Namespace,
 			[
 			]).
+
+%%	rdf_current_manifest(-URL) is nondet.
+%
+%	True if URL is the URL of a currently loaded manifest file.
+
+rdf_current_manifest(URL) :-
+	manifest(URL, _Time).
+
 
 
 		 /*******************************

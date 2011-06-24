@@ -95,7 +95,7 @@ library uses plain malloc to facilitate malloc debuggers.
 #ifdef DIRECT_MALLOC
 
 #define rdf_malloc(db, size)		malloc(size)
-#define rdf_free(db, ptr, size)     	free(ptr)
+#define rdf_free(db, ptr, size)		free(ptr)
 #define rdf_realloc(db, ptr, old, new)  realloc(ptr, new)
 
 #else /*DIRECT_MALLOC*/
@@ -236,7 +236,7 @@ static atom_t	ATOM_subPropertyOf;
 
 static predicate_t PRED_call1;
 
-#define MATCH_EXACT 		0x01	/* exact triple match */
+#define MATCH_EXACT		0x01	/* exact triple match */
 #define MATCH_SUBPROPERTY	0x02	/* Use subPropertyOf relations */
 #define MATCH_SRC		0x04	/* Match graph location */
 #define MATCH_INVERSE		0x08	/* use symmetric match too */
@@ -1025,8 +1025,11 @@ split_cloud(rdf_db *db, predicate_cloud *cloud,
 
       pred_reachable(start, done, graph, &gsize);
       new_cloud = new_predicate_cloud(db, graph, gsize);
+      DEBUG(1, Sdprintf("Split cloud %d from %s --> %p with %d members\n",
+			found, pname(start), new_cloud, gsize));
       if ( found == 0 )
       { new_cloud->hash = cloud->hash;
+	new_cloud->dirty = cloud->dirty;
       } else
       { new_cloud->dirty = TRUE;	/* preds come from another cloud */
 	db->need_update++;
@@ -2515,6 +2518,9 @@ set_next_triple(triple_walker *tw, triple *t)
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 by_inverse[] returns the index key to use   for inverse search as needed
 to realise symmetric and inverse predicates.
+
+Note that this only deals with the   non-G(graph)  indices because it is
+only used by rdf_has/3 and rdf_reachable/3.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static int by_inverse[8] =
@@ -2817,7 +2823,7 @@ The RDF triple format.  This format is intended for quick save and load
 and not for readability or exchange.  Parts are based on the SWI-Prolog
 Quick Load Format (implemented in pl-wic.c).
 
-	<file> 		::= <magic>
+	<file>		::= <magic>
 			    <version>
 			    ['S' <graph-name>]
 			    ['F' <graph-source>]
@@ -2826,10 +2832,10 @@ Quick Load Format (implemented in pl-wic.c).
 			    {<triple>}
 			    'E'
 
-	<magic> 	::= "RDF-dump\n"
-	<version> 	::= <integer>
+	<magic>		::= "RDF-dump\n"
+	<version>	::= <integer>
 
-	<md5>		::= <byte>* 		(16 bytes digest)
+	<md5>		::= <byte>*		(16 bytes digest)
 
 	<triple>	::= 'T'
 	                    <subject>
@@ -4506,7 +4512,7 @@ rdf_assert4(term_t subject, term_t predicate, term_t object, term_t src)
   add_triples(q, &t, 1);
   close_query(q);
 
-  return TRUE;
+  return rc;
 }
 
 
@@ -4543,10 +4549,10 @@ dec_active_queries(rdf_db *db)
 typedef struct search_state
 { rdf_db       *db;			/* our database */
   term_t	subject;		/* Prolog term references */
-  term_t 	object;
-  term_t 	predicate;
-  term_t 	src;
-  term_t 	realpred;
+  term_t	object;
+  term_t	predicate;
+  term_t	src;
+  term_t	realpred;
   unsigned	allocated;		/* State has been allocated */
   unsigned	flags;			/* Misc flags controlling search */
   atom_t	prefix;			/* prefix and like search */
@@ -4936,7 +4942,7 @@ rdf_estimate_complexity(term_t subject, term_t predicate, term_t object,
   { if ( rc == -1 )
     { return FALSE;			/* error */
     } else
-    { return PL_unify_integer(complexity, 0); 	/* no predicate */
+    { return PL_unify_integer(complexity, 0);	/* no predicate */
     }
   }
 
@@ -5276,7 +5282,8 @@ do_broadcast(term_t term, long mask)
       if ( !(cb->mask & mask) )
 	continue;
 
-      qid = PL_open_query(NULL, PL_Q_CATCH_EXCEPTION, cb->pred, term);
+      if ( !(qid = PL_open_query(NULL, PL_Q_CATCH_EXCEPTION, cb->pred, term)) )
+	return FALSE;
       if ( !PL_next_solution(qid) && (ex = PL_exception(qid)) )
       { term_t av = PL_new_term_refs(2);
 
@@ -6063,10 +6070,12 @@ rdf_reachable(term_t subj, term_t pred, term_t obj,
 	atom_t inf;
 
 	if ( PL_get_atom(max_d, &inf) && inf == ATOM_infinite )
-	  a.max_d = (uintptr_t)-1;
-	if ( !get_long_ex(max_d, &md) || md < 0 )
-	  return FALSE;
-	a.max_d = md;
+	{ a.max_d = (uintptr_t)-1;
+	} else
+	{ if ( !get_long_ex(max_d, &md) || md < 0 )
+	    return FALSE;
+	  a.max_d = md;
+	}
       } else
       { a.max_d = (uintptr_t)-1;
       }
@@ -6095,7 +6104,7 @@ rdf_reachable(term_t subj, term_t pred, term_t obj,
 	return instantiation_error(subj);
 
       a.query = open_query(db);
-      if ( (a.pattern.indexed & BY_S) ) 	/* subj ... */
+      if ( (a.pattern.indexed & BY_S) )		/* subj ... */
 	append_agenda(db, &a, a.pattern.subject, 0);
       else
 	append_agenda(db, &a, a.pattern.object.resource, 0);
@@ -6259,7 +6268,7 @@ unify_statistics(rdf_db *db, term_t key, functor_t f)
   { return PL_unify_term(key,
 			 PL_FUNCTOR, f,
 			   PL_INT, db->gc_count,
-			   PL_FLOAT, db->gc_time); 	/* time spent */
+			   PL_FLOAT, db->gc_time);	/* time spent */
   } else if ( f == FUNCTOR_rehash2 )
   { return PL_unify_term(key,
 			 PL_FUNCTOR, f,
@@ -6625,7 +6634,7 @@ install_rdf_db()
 					4, rdf_estimate_complexity, 0);
   PL_register_foreign("rdf_transaction_",2, rdf_transaction, META);
   PL_register_foreign("rdf_active_transactions_",
-		      			1, rdf_active_transactions, 0);
+					1, rdf_active_transactions, 0);
   PL_register_foreign("rdf_monitor_",   2, rdf_monitor,     META);
 /*PL_register_foreign("rdf_broadcast_", 2, rdf_broadcast,   0);*/
 #ifdef WITH_MD5

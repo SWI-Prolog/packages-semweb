@@ -152,7 +152,7 @@ in \secref{litindex}.
 
     \begin{description}
 	\termitem{plain}{+Text}
-    	    Perform exact match \textbf{and} demand the language or
+	    Perform exact match \textbf{and} demand the language or
 	    type qualifiers to match. This query is fully indexed.%
 	    \footnote{This should have been the default when using
 		      literal with one argument because it is logically
@@ -162,7 +162,7 @@ in \secref{litindex}.
 		      consistent with SPARQL literal identity
 		      definition.}
 	\termitem{exact}{+Text}
-    	    Perform exact, but case-insensitive match.  This query is
+	    Perform exact, but case-insensitive match.  This query is
 	    fully indexed.
 	\termitem{substring}{+Text}
 	    Match any literal that contains \arg{Text} as a case-insensitive
@@ -445,14 +445,13 @@ triple.  \arg{SourceRef} is either an atom or a term of the format
 and \arg{Int} to the line-number where the description starts.
 
     \predicate{rdf_retractall}{3}{?Subject, ?Predicate, ?Object}
-Removes all matching triples from the database.  Previous Prolog
-implementations also provided a backtracking \predref{rdf_retract}{3},
-but this proved to be rarely used and could always be replaced with
-rdf_retractall/3. As rdf_retractall/4 using an unbound \arg{SourceRef}.
+Remove all matching triples from the database. As rdf_retractall/4 using
+an unbound \arg{SourceRef}.
 
     \predicate{rdf_retractall}{4}{?Subject, ?Predicate, ?Object, ?SourceRef}
-As rdf_retractall/4, also matching on the \arg{SourceRef}.  This is
-particulary useful to update all triples coming from a loaded file.
+As rdf_retractall/3, also matching \arg{SourceRef}. This is particulary
+useful to remove all triples coming from a loaded file. See also
+rdf_unload/1.
 
     \predicate{rdf_update}{4}{+Subject, +Predicate, +Object, +Action}
 Replaces one of the three fields on the matching triples depending
@@ -675,7 +674,7 @@ URIs relative to the document itself:
 \begin{code}
 	...,
 	rdf_save(File,
- 		 [ base_uri(BaseURI),
+		 [ base_uri(BaseURI),
 		   write_xml_base(false)
 		 ]),
 	...
@@ -1282,7 +1281,7 @@ True if \arg{Search} matches \arg{Atom} as defined by \arg{Method}.
 All matching is performed case-insensitive.  Defines methods are:
     \begin{description}
 	\termitem{exact}{}
-    	    Perform exact, but case-insensitive match.
+	    Perform exact, but case-insensitive match.
 	\termitem{substring}{}
 	    \arg{Search} is a sub-string of \arg{Text}.
 	\termitem{word}{}

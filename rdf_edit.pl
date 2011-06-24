@@ -79,8 +79,8 @@
 :- use_module(library(uri)).
 
 :- meta_predicate
-	rdfe_transaction(:),
-	rdfe_transaction(:, +).
+	rdfe_transaction(0),
+	rdfe_transaction(0, +).
 
 :- dynamic
 	undo_log/5,			% TID, Action, Subj, Pred, Obj

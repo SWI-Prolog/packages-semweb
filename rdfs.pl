@@ -272,6 +272,9 @@ label_of(Resource, Lang, Label) :-
 	rdf_equal(rdfs:label, LabelP),
 	rdf_has(Resource, LabelP, literal(lang(Lang, Label)), P),
 	P \== LabelP.
+label_of(Resource, Lang, Label) :-
+	var(Lang),
+	rdf_has(Resource, rdfs:label, literal(type(xsd:string, Label))).
 
 %%	rdfs_class_property(+Class, ?Property)
 %
@@ -452,7 +455,7 @@ generate_domain(all_values_from(Class), Individual) :-
 	;   rdfs_individual_of(Individual, Class)
 	).
 generate_domain(some_values_from(Class), Individual) :- % Actually this is
-	rdfs_individual_of(Individual, Class). 		% anything
+	rdfs_individual_of(Individual, Class).		% anything
 generate_domain(union_of(Domains), Individual) :-
 	member(Domain, Domains),
 	generate_domain(Domain, Individual).

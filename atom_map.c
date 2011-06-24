@@ -3,9 +3,10 @@
     Part of SWI-Prolog
 
     Author:        Jan Wielemaker
-    E-mail:        wielemak@science.uva.nl
+    E-mail:        J.Wielemaker@cs.vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2006, University of Amsterdam
+    Copyright (C): 2006-2011, University of Amsterdam
+			      VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License
@@ -31,6 +32,7 @@
 #include "avl.h"
 #include "lock.h"
 #include "atom.h"
+#include "murmur.h"
 #include "debug.h"
 #include <string.h>
 #include <assert.h>
@@ -67,7 +69,7 @@ Searching is done using
 #define AM_MAGIC	0x6ab19e8e
 
 typedef struct atom_map
-{ long		magic;			/* AM_MAGIC */
+{ int		magic;			/* AM_MAGIC */
   size_t	value_count;		/* total # values */
   rwlock	lock;			/* Multi-threaded access */
   avl_tree	tree;			/* AVL tree */
@@ -82,7 +84,7 @@ typedef struct atom_set
   size_t  allocated;			/* # cells allocated */
   datum *atoms;			/* allocated cells */
 #ifdef O_SECURE
-  long	  magic;
+  int	  magic;
 #endif
 } atom_set;
 
@@ -94,7 +96,7 @@ typedef struct node_data
 { datum		key;
   atom_set     *values;
 #ifdef O_SECURE
-  long		magic;
+  int		magic;
 #endif
 } node_data;
 
@@ -102,7 +104,7 @@ typedef struct node_data_ex
 { node_data	data;
   atom_info	atom;
 #ifdef O_SECURE
-  long		magic;
+  int		magic;
 #endif
 } node_data_ex;
 
@@ -236,15 +238,6 @@ get_atom_ex(term_t t, atom_t *a)
 
 
 static int
-get_long_ex(term_t t, long *v)
-{ if ( PL_get_long(t, v) )
-    return TRUE;
-
-  return type_error(t, "integer");
-}
-
-
-static int
 get_atom_map(term_t t, atom_map **map)
 { if ( PL_is_functor(t, FUNCTOR_atom_map1) )
   { term_t a = PL_new_term_ref();
@@ -283,12 +276,13 @@ bits
 
 #define ATOM_TAG_BITS 7
 #define ATOM_TAG 0x1
+#define EMPTY ((datum)ATOM_TAG)
 
-#define tag(d)		((long)(d)&0x1)
-#define isAtomDatum(d)  ((long)(d)&ATOM_TAG)
+#define tag(d)		((intptr_t)(d)&0x1)
+#define isAtomDatum(d)  ((intptr_t)(d)&ATOM_TAG)
 #define isIntDatum(d)	!isAtomDatum(d)
 
-#define MAP_MIN_INT	(-(long)(1L<<(sizeof(long)*8 - 1 - 1)))
+#define MAP_MIN_INT	(-(intptr_t)((intptr_t)1<<(sizeof(intptr_t)*8 - 1 - 1)))
 #define MAP_MAX_INT	(-MAP_MIN_INT - 1)
 
 static intptr_t atom_mask;
@@ -303,7 +297,7 @@ init_datum_store()
 
 static inline atom_t
 atom_from_datum(datum d)
-{ unsigned long v = (unsigned long)d;
+{ uintptr_t v = (uintptr_t)d;
   atom_t a;
 
   a  = ((v&~0x1)<<(ATOM_TAG_BITS-1))|atom_mask;
@@ -312,9 +306,9 @@ atom_from_datum(datum d)
 }
 
 
-static inline long
-long_from_datum(datum d)
-{ long v = (long)d;
+static inline intptr_t
+integer_from_datum(datum d)
+{ intptr_t v = (intptr_t)d;
 
   return (v>>1);
 }
@@ -332,7 +326,7 @@ atom_to_datum(atom_t a)
 
 
 static inline datum
-long_to_datum(long v)
+integer_to_datum(intptr_t v)
 { return (datum)(v<<1);
 }
 
@@ -340,16 +334,16 @@ long_to_datum(long v)
 static int
 get_datum(term_t t, datum* d)
 { atom_t a;
-  long l;
+  intptr_t l;
 
   if ( PL_get_atom(t, &a) )
   { *d = atom_to_datum(a);
     return TRUE;
-  } else if ( PL_get_long(t, &l) )
+  } else if ( PL_get_intptr(t, &l) )
   { if ( l < MAP_MIN_INT || l > MAP_MAX_INT )
       return representation_error("integer_range");
 
-    *d = long_to_datum(l);
+    *d = integer_to_datum(l);
     return TRUE;
   }
 
@@ -360,7 +354,7 @@ get_datum(term_t t, datum* d)
 static int
 get_search_datum(term_t t, node_data_ex *search)
 { atom_t a;
-  long l;
+  intptr_t l;
 
   SECURE(search->magic = ND_MAGIC_EX);
 
@@ -369,11 +363,11 @@ get_search_datum(term_t t, node_data_ex *search)
     search->atom.handle   = a;
     search->atom.resolved = FALSE;
     return TRUE;
-  } else if ( PL_get_long(t, &l) )
+  } else if ( PL_get_intptr(t, &l) )
   { if ( l < MAP_MIN_INT || l > MAP_MAX_INT )
       return representation_error("integer_range");
 
-    search->data.key = long_to_datum(l);
+    search->data.key = integer_to_datum(l);
     return TRUE;
   }
 
@@ -383,18 +377,18 @@ get_search_datum(term_t t, node_data_ex *search)
 
 static int
 unify_datum(term_t t, datum d)
-{ unsigned long v = (unsigned long)d;
+{ uintptr_t v = (uintptr_t)d;
 
   if ( isAtomDatum(v) )
     return PL_unify_atom(t, atom_from_datum(d));
   else
-    return PL_unify_integer(t, long_from_datum(d));
+    return PL_unify_integer(t, integer_from_datum(d));
 }
 
 
 static void
 lock_datum(datum d)
-{ unsigned long v = (unsigned long)d;
+{ uintptr_t v = (uintptr_t)d;
 
   if ( isAtomDatum(v) )
     PL_register_atom(atom_from_datum(d));
@@ -403,10 +397,12 @@ lock_datum(datum d)
 
 static void
 unlock_datum(datum d)
-{ unsigned long v = (unsigned long)d;
+{ if ( d != EMPTY )
+  { uintptr_t v = (uintptr_t)d;
 
-  if ( isAtomDatum(v) )
-    PL_unregister_atom(atom_from_datum(d));
+    if ( isAtomDatum(v) )
+      PL_unregister_atom(atom_from_datum(d));
+  }
 }
 
 
@@ -419,7 +415,7 @@ format_datum(datum d, char *buf)
 
   if ( !buf )
     buf = tmp;
-  Ssprintf(buf, "%ld", long_from_datum(d));
+  Ssprintf(buf, "%lld", (int64_t)integer_from_datum(d));
 
   return buf;
 }
@@ -430,13 +426,15 @@ format_datum(datum d, char *buf)
 		 *	     ATOM SETS		*
 		 *******************************/
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-A set of atoms (literals) is a   sorted  array of atom-handles. They are
-sorted simply by handle as we are  not   interested  in the value in the
-actual atom.  Search is implemeted as binary search.
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+static int insert_atom_set(atom_set *as, datum a);
 
 #define AS_INITIAL_SIZE 4
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+A set of  datums  (atoms  or  integers)   is  a  close  hash-table.  The
+implementation is an adapted copy from   XPCE's  class hash_table, using
+closed hash-tables.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static atom_set *
 new_atom_set(datum a0)
@@ -444,109 +442,138 @@ new_atom_set(datum a0)
 
   if ( (as = malloc(sizeof(*as))) &&
        (as->atoms = malloc(sizeof(datum)*AS_INITIAL_SIZE)) )
-  { lock_datum(a0);
-    as->size = 1;
+  { size_t i;
+
+    as->size = 0;
     as->allocated = AS_INITIAL_SIZE;
-    as->atoms[0] = a0;
-    SECURE(as->magic = S_MAGIC);
+    for(i=0; i<AS_INITIAL_SIZE; i++)
+      as->atoms[i] = EMPTY;
+
+    insert_atom_set(as, a0);
+    lock_datum(a0);
   }
 
   return as;
 }
 
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-find_in_atom_set(atom_set *as, datum  a)  returns   a  pointer  to  the
-location of the atom or, if the atom  isn't there, to the first location
-*after* the atom
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-static datum *
-find_in_atom_set(atom_set *as, datum a, int *found)
-{ const datum *ap = (const datum *)as->atoms;
-  const datum *ep = &ap[as->size];
-
-  SECURE(assert(as->magic == S_MAGIC));
-
-  for(;;)
-  { const datum *cp = ap+(ep-ap)/2;
-
-    if ( a < *cp )
-    { if ( ep == cp )
-      { *found = FALSE;
-	return (datum*)cp;
-      }
-      ep = cp;
-    } else if ( a > *cp )
-    { if ( ap == cp )
-      { cp++;
-	*found = FALSE;
-	return (datum*)cp;
-      }
-      ap = cp;
-    } else
-    { *found = TRUE;
-      return (datum*)cp;
-    }
-  }
+static unsigned int
+hash_datum(datum d)
+{ return rdf_murmer_hash(&d, sizeof(d), MURMUR_SEED);
 }
 
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+in_atom_set(atom_set *as, datum a) returns TRUE if datum is in the set
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static int
 in_atom_set(atom_set *as, datum a)
-{ int found;
+{ unsigned int start = hash_datum(a) % as->allocated;
+  datum *d = &as->atoms[start];
+  datum *e = &as->atoms[as->allocated];
 
-  find_in_atom_set(as, a, &found);
-
-  return found;
+  for(;;)
+  { if ( *d == a )
+      return TRUE;
+    if ( *d == EMPTY )
+      return FALSE;
+    if ( ++d == e )
+      d = as->atoms;
+  }
 }
 
 
-#define ptr_diff(p1, p2) ((char *)(p1) - (char *)(p2))
+static int
+resize_atom_set(atom_set *as, size_t size)
+{ datum *old = as->atoms;
+  size_t oldsize = as->allocated;
+
+  if ( (as->atoms = malloc(sizeof(datum)*size)) )
+  { size_t i;
+
+    as->allocated = size;
+    as->size = 0;
+
+    for(i=0; i<size; i++)
+      as->atoms[i] = EMPTY;
+
+    for(i=0; i<oldsize; i++)
+    { if ( old[i] != EMPTY )
+	insert_atom_set(as, old[i]);
+    }
+
+    free(old);
+    return TRUE;
+  }
+
+  return FALSE;
+}
+
+
+/* Adds a datum to the set.  Returns 0 if nothing was added; 1 if the
+   datum was added or -1 if we are out of memory.
+*/
 
 static int
 insert_atom_set(atom_set *as, datum a)
-{ int found;
-  datum *ap = find_in_atom_set(as, a, &found);
+{ unsigned int start;
+  datum *d, *e;
 
-  if ( !found )
-  { lock_datum(a);
-
-    if ( as->size == as->allocated )
-    { datum *na;
-      size_t newsize = as->allocated*2;
-
-      if ( !(na = realloc(as->atoms, sizeof(datum)*newsize)) )
-	return -1;
-      ap += na-as->atoms;
-      as->atoms = na;
-      as->allocated = newsize;
-    }
-    assert(as->size < as->allocated);
-
-    memmove(ap+1, ap, ptr_diff(&as->atoms[as->size], ap));
-    as->size++;
-    *ap = a;
-
-    return 1;
+  if ( 4*as->size + 5 > 3*as->allocated )
+  { if ( !resize_atom_set(as, 2*as->size) )
+      return -1;				/* no memory */
   }
 
-  return 0;
+  start = hash_datum(a) % as->allocated;
+  d = &as->atoms[start];
+  e = &as->atoms[as->allocated];
+
+  for(;;)
+  { if ( *d == a )
+      return 0;					/* nothing added */
+    if ( *d == EMPTY )
+    { as->size++;
+      *d = a;
+      return 1;
+    }
+    if ( ++d == e )
+      d = as->atoms;
+  }
 }
 
 
 static int
 delete_atom_set(atom_set *as, datum a)
-{ int found;
-  datum *ap = find_in_atom_set(as, a, &found);
+{ unsigned int i = hash_datum(a) % as->allocated;
+  int j, r;
 
-  if ( found )
-  { unlock_datum(a);
-    as->size--;
-    memmove(ap, ap+1, ptr_diff(&as->atoms[as->size], ap));
+  while(as->atoms[i] != EMPTY && as->atoms[i] != a)
+  { if ( ++i == as->allocated )
+      i = 0;
   }
+  if ( as->atoms[i] == EMPTY )
+    return FALSE;				/* not in table */
 
-  return found;
+  as->size--;
+  as->atoms[i] = EMPTY;				/* R1 */
+  j = i;
+
+  for(;;)
+  { if ( ++i == as->allocated )
+      i = 0;
+
+    if ( as->atoms[i] == EMPTY )
+      return TRUE;
+
+    r = hash_datum(as->atoms[i]) % as->allocated;
+    if ( (i >= r && r > j) || (r > j && j > i) || (j > i && i >= r) )
+      continue;
+
+    as->atoms[j] = as->atoms[i];
+    as->atoms[i] = EMPTY;
+    j = i;
+  }
 }
 
 
@@ -554,7 +581,7 @@ static void
 destroy_atom_set(atom_set *as)
 { size_t i;
 
-  for(i=0; i<as->size; i++)
+  for(i=0; i<as->allocated; i++)
     unlock_datum(as->atoms[i]);
 
   free(as->atoms);
@@ -594,8 +621,8 @@ cmp_node_data(void *l, void *r, NODE type)
   { if ( isAtomDatum(d1) )
     { return cmp_atom_info(&e1->atom, atom_from_datum(d2));
     } else
-    { long l1 = long_from_datum(d1);
-      long l2 = long_from_datum(d2);
+    { intptr_t l1 = integer_from_datum(d1);
+      intptr_t l2 = integer_from_datum(d2);
 
       return l1 > l2 ? 1 : l1 < l2 ? -1 : 0;
     }
@@ -676,17 +703,23 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
     SECURE(assert(data->magic == ND_MAGIC));
 
     if ( (rc=insert_atom_set(data->values, a2)) < 0 )
+    { WRUNLOCK(map);
       return resource_error("memory");
+    }
 
     if ( rc )
+    { lock_datum(a2);
       map->value_count++;
+    }
   } else
   { if ( keys && !PL_unify_integer(keys, map->tree.count+1) )
     { WRUNLOCK(map);
       return FALSE;
     }
     if ( !(search.data.values = new_atom_set(a2)) )
+    { WRUNLOCK(map);
       return resource_error("memory");
+    }
     lock_datum(search.data.key);
     SECURE(search.magic = ND_MAGIC);
 
@@ -760,7 +793,8 @@ delete_atom_map3(term_t handle, term_t from, term_t to)
 
     LOCKOUT_READERS(map);
     if ( delete_atom_set(as, a2) )
-    { map->value_count--;
+    { unlock_datum(a2);
+      map->value_count--;
       if ( as->size == 0 )
       { search.data = *data;
 	avldel(&map->tree, &search);
@@ -861,9 +895,12 @@ find_atom_map(term_t handle, term_t keys, term_t literals)
 
   PL_put_term(tail, literals);
 
-  for(ca=0; ca<s0->size; ca++)
+  for(ca=0; ca<s0->allocated; ca++)
   { datum a = s0->atoms[ca];
     int i;
+
+    if ( a == EMPTY )
+      continue;
 
     for(i=1; i<ns; i++)
     { if ( !as[i].neg )
@@ -934,20 +971,20 @@ unify_keys(term_t head, term_t tail, AVLnode *node)
 
 
 static int
-between_keys(atom_map *map, long min, long max, term_t head, term_t tail)
+between_keys(atom_map *map, intptr_t min, intptr_t max, term_t head, term_t tail)
 { avl_enum state;
   node_data *data;
   node_data_ex search;
 
   DEBUG(2, Sdprintf("between %ld .. %ld\n", min, max));
 
-  search.data.key = long_to_datum(min);
+  search.data.key = integer_to_datum(min);
   SECURE(search.magic = ND_MAGIC_EX);
 
   if ( (data = avlfindfirst(&map->tree, &search, &state)) &&
        isIntDatum(data->key) )
   { for(;;)
-    { if ( long_from_datum(data->key) > max )
+    { if ( integer_from_datum(data->key) > max )
 	break;
 
       if ( !PL_unify_list(tail, head, tail) ||
@@ -1000,7 +1037,7 @@ rdf_keys_in_literal_map(term_t handle, term_t spec, term_t keys)
       goto failure;
 
     if ( (data = avlfind(&map->tree, &search)) )
-    { long size = (long)data->values->size;
+    { intptr_t size = (intptr_t)data->values->size;
 
       RDUNLOCK(map);
       assert(size > 0);
@@ -1044,10 +1081,10 @@ rdf_keys_in_literal_map(term_t handle, term_t spec, term_t keys)
     avlfinddestroy(&state);
   } else if ( (name == ATOM_ge || name == ATOM_le) && arity == 1 )
   { term_t a = PL_new_term_ref();
-    long val, min, max;
+    intptr_t val, min, max;
 
     _PL_get_arg(1, spec, a);
-    if ( !get_long_ex(a, &val) )
+    if ( !PL_get_intptr_ex(a, &val) )
       goto failure;
 
     if ( name == ATOM_ge )
@@ -1059,13 +1096,13 @@ rdf_keys_in_literal_map(term_t handle, term_t spec, term_t keys)
       goto failure;
   } else if ( name == ATOM_between && arity == 2 )
   { term_t a = PL_new_term_ref();
-    long min, max;
+    intptr_t min, max;
 
     _PL_get_arg(1, spec, a);
-    if ( !get_long_ex(a, &min) )
+    if ( !PL_get_intptr_ex(a, &min) )
       goto failure;
     _PL_get_arg(2, spec, a);
-    if ( !get_long_ex(a, &max) )
+    if ( !PL_get_intptr_ex(a, &max) )
       goto failure;
 
     if ( !between_keys(map, min, max, head, tail) )

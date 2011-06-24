@@ -74,6 +74,7 @@ install:	$(TARGETS) $(LIBPL)
 		for f in $(DATA) $(LIBPL) README; do \
 		  $(INSTALL_DATA) $$f $(DESTDIR)$(LIBDIR); \
 		done
+		$(PL) -f none -g true -t "make_library_index('$(DESTDIR)$(LIBDIR)')"
 		$(PL) -f none -g make -t halt
 
 ln-install::
