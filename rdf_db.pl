@@ -552,7 +552,7 @@ rdf_node(Resource) :-
 rdf_bnode(Value) :-
 	repeat,
 	gensym('__bnode', Value),
-	\+ rdf_subject(Value),
+	\+ rdf(Value, _, _),
 	\+ rdf(_, _, Value),
 	\+ rdf(_, Value, _), !.
 
