@@ -30,58 +30,7 @@
 		 *******************************/
 
 static functor_t FUNCTOR_error2;
-static functor_t FUNCTOR_type_error2;
-static functor_t FUNCTOR_domain_error2;
 static functor_t FUNCTOR_literal1;
-
-int
-instantiation_error(term_t actual)
-{ term_t ex;
-
-  if ( (ex = PL_new_term_ref()) &&
-       PL_unify_term(ex,
-		     PL_FUNCTOR, FUNCTOR_error2,
-		       PL_CHARS, "instantiation_error",
-		       PL_VARIABLE) )
-    return PL_raise_exception(ex);
-
-  return FALSE;
-}
-
-
-int
-type_error(term_t actual, const char *expected)
-{ term_t ex;
-
-  if ( (ex = PL_new_term_ref()) &&
-       PL_unify_term(ex,
-		     PL_FUNCTOR, FUNCTOR_error2,
-		       PL_FUNCTOR, FUNCTOR_type_error2,
-		         PL_CHARS, expected,
-		         PL_TERM, actual,
-		       PL_VARIABLE) )
-    return PL_raise_exception(ex);
-
-  return FALSE;
-}
-
-
-int
-domain_error(term_t actual, const char *expected)
-{ term_t ex;
-
-  if ( (ex = PL_new_term_ref()) &&
-       PL_unify_term(ex,
-		     PL_FUNCTOR, FUNCTOR_error2,
-		       PL_FUNCTOR, FUNCTOR_domain_error2,
-		         PL_CHARS, expected,
-		         PL_TERM, actual,
-		       PL_VARIABLE) )
-    return PL_raise_exception(ex);
-
-  return FALSE;
-}
-
 
 int
 permission_error(const char *op, const char *type, const char *obj,
@@ -123,8 +72,6 @@ is_literal(term_t t)
 int
 init_errors(void)
 { MKFUNCTOR(error, 2);
-  MKFUNCTOR(type_error, 2);
-  MKFUNCTOR(domain_error, 2);
   MKFUNCTOR(literal, 1);
 
   return TRUE;

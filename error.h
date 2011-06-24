@@ -25,40 +25,10 @@
 #ifndef ERROR_H_INCLUDED
 #define ERROR_H_INCLUDED
 
-COMMON(int)	instantiation_error(term_t actual);
-COMMON(int)	type_error(term_t actual, const char *expected);
-COMMON(int)	domain_error(term_t actual, const char *expected);
-COMMON(int)	permission_error(const char *op, const char *type,
-				 const char *obj, const char *msg);
-COMMON(int)	is_literal(term_t t);
-COMMON(int)	init_errors(void);
-
-static inline int
-get_atom_ex(term_t t, atom_t *a)
-{ if ( PL_get_atom(t, a) )
-    return TRUE;
-
-  return type_error(t, "atom");
-}
-
-
-static inline int
-get_long_ex(term_t t, long *v)
-{ if ( PL_get_long(t, v) )
-    return TRUE;
-
-  return type_error(t, "integer");
-}
-
-
-static inline int
-get_double_ex(term_t t, double *v)
-{ if ( PL_get_float(t, v) )
-    return TRUE;
-
-  return type_error(t, "float");
-}
-
+COMMON(int) is_literal(term_t t);
+COMMON(int) init_errors(void);
+COMMON(int) permission_error(const char *op, const char *type, const char *obj,
+			     const char *msg);
 
 static inline int
 get_atom_or_var_ex(term_t t, atom_t *a)
@@ -69,7 +39,7 @@ get_atom_or_var_ex(term_t t, atom_t *a)
     return TRUE;
   }
 
-  return type_error(t, "atom");
+  return PL_type_error("atom", t);
 }
 
 
@@ -84,7 +54,7 @@ get_resource_or_var_ex(term_t t, atom_t *a)
   if ( is_literal(t) )
     return FALSE;			/* fail on rdf(literal(_), ...) */
 
-  return type_error(t, "atom");
+  return PL_type_error("atom", t);
 }
 
 
@@ -93,11 +63,9 @@ get_bool_arg_ex(int a, term_t t, int *val)
 { term_t arg = PL_new_term_ref();
 
   if ( !PL_get_arg(a, t, arg) )
-    return type_error(t, "compound");
-  if ( !PL_get_bool(arg, val) )
-    return type_error(arg, "bool");
+    return PL_type_error("compound", t);
 
-  return TRUE;
+  return PL_get_bool_ex(arg, val);
 }
 
 

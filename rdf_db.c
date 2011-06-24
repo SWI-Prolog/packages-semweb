@@ -1621,7 +1621,7 @@ rdf_graph(term_t name, control_t h)
 	eg->i  = 0;
 	eg->g  = NULL;
 	goto next;
-      } else if ( get_atom_ex(name, &a) )
+      } else if ( PL_get_atom_ex(name, &a) )
       { graph *g;
 
 	if ( (g=existing_graph(db, a)) &&
@@ -1681,7 +1681,7 @@ rdf_graph_source(term_t graph_name, term_t source, term_t modified)
   } else
   { atom_t src;
 
-    if ( get_atom_ex(source, &src) )
+    if ( PL_get_atom_ex(source, &src) )
     { int i;
 
       for(i=0; i<db->graphs.bucket_count; i++)
@@ -1709,9 +1709,9 @@ rdf_set_graph_source(term_t graph_name, term_t source, term_t modified)
   graph *s;
   double mtime;
 
-  if ( !get_atom_ex(graph_name, &gn) ||
-       !get_atom_ex(source, &src) ||
-       !get_double_ex(modified, &mtime) )
+  if ( !PL_get_atom_ex(graph_name, &gn) ||
+       !PL_get_atom_ex(source, &src) ||
+       !PL_get_float_ex(modified, &mtime) )
     return FALSE;
 
   if ( (s = lookup_graph(db, gn)) )
@@ -1737,7 +1737,7 @@ rdf_unset_graph_source(term_t graph_name)
   rdf_db *db = DB;
   graph *s;
 
-  if ( !get_atom_ex(graph_name, &gn) )
+  if ( !PL_get_atom_ex(graph_name, &gn) )
     return FALSE;
   if ( (s = lookup_graph(db, gn)) )
   { LOCK_MISC(db);
@@ -3159,7 +3159,7 @@ rdf_save_db(term_t stream, term_t graph)
   int rc;
 
   if ( !PL_get_stream_handle(stream, &out) )
-    return type_error(stream, "stream");
+    return PL_type_error("stream", stream);
   if ( !get_atom_or_var_ex(graph, &src) )
     return FALSE;
 
@@ -3535,7 +3535,7 @@ rdf_load_db(term_t stream, term_t id, term_t graphs)
   int rc;
 
   if ( !PL_get_stream_handle(stream, &in) )
-    return type_error(stream, "stream");
+    return PL_type_error("stream", stream);
 
   memset(&ctx, 0, sizeof(ctx));
   init_triple_buffer(&ctx.triples);
@@ -3738,12 +3738,12 @@ rdf_atom_md5(term_t text, term_t times, term_t md5)
   size_t len;
   md5_byte_t digest[16];
 
-  if ( !PL_get_nchars(text, &len, &s, CVT_ALL) )
-    return type_error(text, "text");
-  if ( !PL_get_integer(times, &n) )
-    return type_error(times, "integer");
+  if ( !PL_get_nchars(text, &len, &s, CVT_ALL|CVT_EXCEPTION) )
+    return FALSE;
+  if ( !PL_get_integer_ex(times, &n) )
+    return FALSE;
   if ( n < 1 )
-    return domain_error(times, "positive_integer");
+    return PL_domain_error("positive_integer", times);
 
   for(i=0; i<n; i++)
   { md5_state_t state;
@@ -3816,7 +3816,7 @@ get_lit_atom_ex(term_t t, atom_t *a, int flags)
     return TRUE;
   }
 
-  return type_error(t, "atom");
+  return PL_type_error("atom", t);
 }
 
 
@@ -3858,7 +3858,7 @@ get_literal(rdf_db *db, term_t litt, literal *lit, int flags)
     return get_literal(db, a, lit, LIT_TYPED|flags);
   } else if ( !PL_is_ground(litt) )
   { if ( !(flags & LIT_PARTIAL) )
-      return type_error(litt, "rdf_object");
+      return PL_type_error("rdf_object", litt);
     if ( !PL_is_variable(litt) )
       lit->objtype = OBJ_TERM;
   } else
@@ -3881,7 +3881,7 @@ get_object(rdf_db *db, term_t object, triple *t)
     alloc_literal_triple(db, t);
     return get_literal(db, a, t->object.literal, 0);
   } else
-    return type_error(object, "rdf_object");
+    return PL_type_error("rdf_object", object);
 
   return TRUE;
 }
@@ -3903,9 +3903,9 @@ get_src(term_t src, triple *t)
       if ( PL_get_long(a, &line) )
 	t->line = line;
       else if ( !PL_is_variable(a) )
-	return type_error(a, "integer");
+	return PL_type_error("integer", a);
     } else
-      return type_error(src, "rdf_graph");
+      return PL_type_error("rdf_graph", src);
   }
 
   return TRUE;
@@ -3926,7 +3926,7 @@ get_existing_predicate(rdf_db *db, term_t t, predicate **p)
   if ( !PL_get_atom(t, &name ) )
   { if ( PL_is_functor(t, FUNCTOR_literal1) )
       return 0;				/* rdf(_, literal(_), _) */
-    return type_error(t, "atom");
+    return PL_type_error("atom", t);
   }
 
   if ( (*p = existing_predicate(db, name)) )
@@ -3941,7 +3941,7 @@ static int
 get_predicate(rdf_db *db, term_t t, predicate **p)
 { atom_t name;
 
-  if ( !get_atom_ex(t, &name ) )
+  if ( !PL_get_atom_ex(t, &name ) )
     return FALSE;
 
   *p = lookup_predicate(db, name);
@@ -3953,7 +3953,7 @@ static int
 get_triple(rdf_db *db,
 	   term_t subject, term_t predicate, term_t object,
 	   triple *t)
-{ if ( !get_atom_ex(subject, &t->subject) ||
+{ if ( !PL_get_atom_ex(subject, &t->subject) ||
        !get_predicate(db, predicate, &t->predicate.r) ||
        !get_object(db, object, t) )
     return FALSE;
@@ -4031,7 +4031,7 @@ get_partial_triple(rdf_db *db,
 	  return FALSE;
 	t->match = STR_MATCH_BETWEEN;
       } else
-	return domain_error(a, "match_type");
+	return PL_domain_error("match_type", a);
 
       _PL_get_arg(1, a, a);
       if ( t->match >= STR_MATCH_LE )
@@ -4043,7 +4043,7 @@ get_partial_triple(rdf_db *db,
 	lit->objtype = OBJ_STRING;
       }
     } else
-      return type_error(object, "rdf_object");
+      return PL_type_error("rdf_object", object);
   }
 					/* the graph */
   if ( !get_src(src, t) )
@@ -4127,17 +4127,17 @@ get_graph(term_t src, triple *t)
     long line;
 
     _PL_get_arg(1, src, a);
-    if ( !get_atom_ex(a, &t->graph) )
+    if ( !PL_get_atom_ex(a, &t->graph) )
       return FALSE;
     _PL_get_arg(2, src, a);
-    if ( !get_long_ex(a, &line) )
+    if ( !PL_get_long_ex(a, &line) )
       return FALSE;
     t->line = line;
 
     return TRUE;
   }
 
-  return type_error(src, "rdf_graph");
+  return PL_type_error("rdf_graph", src);
 }
 
 
@@ -4170,7 +4170,7 @@ unify_graph(term_t src, triple *t)
       }
     }
     default:
-      return type_error(src, "rdf_graph");
+      return PL_type_error("rdf_graph", src);
   }
 }
 
@@ -4491,6 +4491,7 @@ static foreign_t
 rdf_assert4(term_t subject, term_t predicate, term_t object, term_t src)
 { rdf_db *db = DB;
   triple *t = new_triple(db);
+  int rc;
   query *q;
 
   if ( !get_triple(db, subject, predicate, object, t) )
@@ -5050,12 +5051,12 @@ update_triple(rdf_db *db, term_t action, triple *t, triple **updated)
     tmp.object.literal = copy_literal(db, t->object.literal);
 
   if ( !PL_get_arg(1, action, a) )
-    return type_error(action, "rdf_action");
+    return PL_type_error("rdf_action", action);
 
   if ( PL_is_functor(action, FUNCTOR_subject1) )
   { atom_t s;
 
-    if ( !get_atom_ex(a, &s) )
+    if ( !PL_get_atom_ex(a, &s) )
       return FALSE;
     if ( tmp.subject == s )
     { *updated = NULL;
@@ -5109,7 +5110,7 @@ update_triple(rdf_db *db, term_t action, triple *t, triple **updated)
     tmp.graph = t2.graph;
     tmp.line = t2.line;
   } else
-    return domain_error(action, "rdf_action");
+    return PL_domain_error("rdf_action", action);
 
   for(i=0; i<INDEX_TABLES; i++)
     tmp.tp.next[i] = NULL;
@@ -5453,8 +5454,8 @@ rdf_monitor(term_t goal, term_t mask)
 
   PL_strip_module(goal, &m, goal);
 
-  if ( !get_atom_ex(goal, &name) ||
-       !get_long_ex(mask, &msk) )
+  if ( !PL_get_atom_ex(goal, &name) ||
+       !PL_get_long_ex(mask, &msk) )
     return FALSE;
 
   p = PL_pred(PL_new_functor(name, 1), m);
@@ -5537,7 +5538,7 @@ rdf_set_predicate(term_t pred, term_t option)
 
     return TRUE;
   } else
-    return type_error(option, "predicate_option");
+    return PL_type_error("predicate_option", option);
 }
 
 
@@ -5600,7 +5601,7 @@ rdf_current_predicate(term_t name, control_t h)
 	ep->i  = 0;
 	ep->p  = NULL;
 	goto next;
-      } else if ( get_atom_ex(name, &a) )
+      } else if ( PL_get_atom_ex(name, &a) )
       { predicate *p;
 
 	if ( (p=existing_predicate(db, a)) &&
@@ -5677,9 +5678,9 @@ rdf_predicate_property(term_t pred, term_t option, control_t h)
 	    return unify_predicate_property(db, p, option, f);
 	  }
 	}
-	return domain_error(option, "rdf_predicate_property");
+	return PL_domain_error("rdf_predicate_property", option);
       } else
-	return type_error(option, "rdf_predicate_property");
+	return PL_type_error("rdf_predicate_property", option);
     }
     case PL_REDO:
       n = (int)PL_foreign_context(h);
@@ -6061,7 +6062,7 @@ rdf_reachable(term_t subj, term_t pred, term_t obj,
       int is_det = FALSE;
 
       if ( PL_is_variable(pred) )
-	return instantiation_error(pred);
+	return PL_instantiation_error(pred);
 
       memset(&a, 0, sizeof(a));
       a.magic = AGENDA_LOCAL_MAGIC;
@@ -6072,7 +6073,7 @@ rdf_reachable(term_t subj, term_t pred, term_t obj,
 	if ( PL_get_atom(max_d, &inf) && inf == ATOM_infinite )
 	{ a.max_d = (uintptr_t)-1;
 	} else
-	{ if ( !get_long_ex(max_d, &md) || md < 0 )
+	{ if ( !PL_get_long_ex(max_d, &md) || md < 0 )
 	    return FALSE;
 	  a.max_d = md;
 	}
@@ -6101,7 +6102,7 @@ rdf_reachable(term_t subj, term_t pred, term_t obj,
 	  return FALSE;			/* rdf_reachable(-,+,literal(...)) */
 	target_term = subj;
       } else
-	return instantiation_error(subj);
+	return PL_instantiation_error(subj);
 
       a.query = open_query(db);
       if ( (a.pattern.indexed & BY_S) )		/* subj ... */
@@ -6255,8 +6256,8 @@ unify_statistics(rdf_db *db, term_t key, functor_t f)
     atom_t name;
 
     _PL_get_arg(1, key, a);
-    if ( !PL_get_atom(a, &name) )
-      return type_error(a, "atom");
+    if ( !PL_get_atom_ex(a, &name) )
+      return FALSE;
     if ( (src = existing_graph(db, name)) )
       v = src->triple_count;
     else
@@ -6297,9 +6298,9 @@ rdf_statistics(term_t key, control_t h)
 	{ if ( keys[n] == f )
 	    return unify_statistics(db, key, f);
 	}
-	return domain_error(key, "rdf_statistics");
+	return PL_domain_error("rdf_statistics", key);
       } else
-	return type_error(key, "rdf_statistics");
+	return PL_type_error("rdf_statistics", key);
     }
     case PL_REDO:
       n = (int)PL_foreign_context(h);
@@ -6442,9 +6443,9 @@ match_label(term_t how, term_t search, term_t label)
 { atom_t h, f, l;
   int type;
 
-  if ( !get_atom_ex(how, &h) ||
-       !get_atom_ex(search, &f) ||
-       !get_atom_ex(label, &l) )
+  if ( !PL_get_atom_ex(how, &h) ||
+       !PL_get_atom_ex(search, &f) ||
+       !PL_get_atom_ex(label, &l) )
     return FALSE;
 
   if ( h == ATOM_exact )
@@ -6458,7 +6459,7 @@ match_label(term_t how, term_t search, term_t label)
   else if ( h == ATOM_like )
     type = STR_MATCH_LIKE;
   else
-    return domain_error(how, "search_method");
+    return PL_domain_error("search_method", how);
 
   return match_atoms(type, f, l);
 }
@@ -6468,8 +6469,8 @@ static foreign_t
 lang_matches(term_t lang, term_t pattern)
 { atom_t l, p;
 
-  if ( !get_atom_ex(lang, &l) ||
-       !get_atom_ex(pattern, &p) )
+  if ( !PL_get_atom_ex(lang, &l) ||
+       !PL_get_atom_ex(pattern, &p) )
     return FALSE;
 
   return atom_lang_matches(l, p);
