@@ -852,18 +852,21 @@ organise_predicates(rdf_db *db)		/* TBD: rename&move */
 }
 
 
-/* TBD: Use atomic increment/decrement
-*/
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Keep track of the triple count. This   now uses GCC atomic instructions.
+We need to provide emulations thereof in  a portability header. See also
+MSB().
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-static void
+static inline void
 register_predicate(rdf_db *db, triple *t)
-{ t->predicate.r->triple_count++;
+{ __sync_add_and_fetch(&t->predicate.r->triple_count, 1);
 }
 
 
-static void
+static inline void
 unregister_predicate(rdf_db *db, triple *t)
-{ t->predicate.r->triple_count--;
+{ __sync_sub_and_fetch(&t->predicate.r->triple_count, 1);
 }
 
 
