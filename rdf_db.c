@@ -2601,7 +2601,6 @@ discard_duplicate(rdf_db *db, triple *t)
    TBD: Not all of this requires locking.  Most should be moved out of
    the lock:
 
-	- Resolve the predicates
 	- Check for duplicates (?)
 	- Consider re-hash
 	- subProperty admin
