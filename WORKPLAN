@@ -16,14 +16,11 @@
     - Old solution: assign a leader.  This is now unfeasible (I think)
     - New solution:
       - Maintain duplicate status, indicating that a predicate MAY have
-        duplicates.
-      - Maintain db (hash) of produced triples, avoiding dublicates.
-    - Alternative:
-      - Have source-location chain on each triple.  Source location must
-        have a generation!
-
-
-
+        duplicates.  This means, set a duplicate flag on a triple if we
+	added a duplicate triple.
+      - When producing answers, put duplicate-marked triples in a
+        (hash-)table and filter new duplicate triples according to
+	this table.
 
   * Deal with subPropertyOf predicate clouds
 
