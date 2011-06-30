@@ -2269,6 +2269,16 @@ rdf_split_url(Prefix, Local, URL) :-
 rdf_url_namespace(URL, Prefix) :-
 	iri_xml_namespace(URL, Prefix).
 
+%%	rdf_quote_uri(IRI, URI) is det.
+%
+%	Quote an IRI as a URI by using %-encoding where needed.
+%
+%	@deprecated	Quoting is moved to library(uri). This predicate is
+%			mapped to uri_iri/2 (with reversed arguments).
+
+rdf_quote_uri(IRI, URI) :-
+	uri_iri(URI, IRI).
+
 
 		 /*******************************
 		 *	       MESSAGES		*

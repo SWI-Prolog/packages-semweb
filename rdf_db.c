@@ -6920,12 +6920,6 @@ rdf_version(term_t v)
 
 
 		 /*******************************
-		 *	     MORE STUFF		*
-		 *******************************/
-
-#include "quote.c"
-
-		 /*******************************
 		 *	     REGISTER		*
 		 *******************************/
 
@@ -7068,7 +7062,6 @@ install_rdf_db()
   PL_register_foreign("rdf_md5",	2, rdf_md5,	    0);
   PL_register_foreign("rdf_atom_md5",	3, rdf_atom_md5,    0);
 #endif
-  PL_register_foreign("rdf_quote_uri",	2, rdf_quote_uri,   0);
 
 #ifdef O_DEBUG
   PL_register_foreign("rdf_debug",      1, rdf_debug,       0);
