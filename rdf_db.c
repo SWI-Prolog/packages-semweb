@@ -57,6 +57,8 @@
 #include "memory.h"
 #include "buffer.h"
 
+#define ERROR -1
+
 #undef UNLOCK
 
 static void md5_triple(triple *t, md5_byte_t *digest);
@@ -4266,6 +4268,12 @@ unify_object(term_t object, triple *t)
 }
 
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+TRUE:  ok
+FALSE: failure
+ERROR: error
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 static int
 unify_triple(term_t subject, term_t pred, term_t object,
 	     term_t src, triple *t, int inversed)
@@ -4287,7 +4295,12 @@ unify_triple(term_t subject, term_t pred, term_t object,
        !PL_unify_atom(pred, p->name) ||
        !unify_object(object, t) ||
        (src && !unify_graph(src, t)) )
-  { PL_discard_foreign_frame(fid);
+  { if ( PL_exception(0) )
+    { PL_close_foreign_frame(fid);
+      return ERROR;
+    }
+
+    PL_discard_foreign_frame(fid);
     return FALSE;
   } else
   { PL_close_foreign_frame(fid);
@@ -4751,9 +4764,13 @@ retry:
     }
 
     if ( match_triples(t, p, state->flags) )
-    { if ( !unify_triple(state->subject, retpred, state->object,
-			 state->src, t, p->inversed) )
+    { int rc;
+
+      if ( (rc=unify_triple(state->subject, retpred, state->object,
+			    state->src, t, p->inversed)) == FALSE )
 	continue;
+      if ( rc == ERROR )
+	return FALSE;				/* makes rdf/3 return FALSE */
 
     inv_alt:
       while( (t = next_triple(tw)) )

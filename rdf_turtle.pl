@@ -870,6 +870,7 @@ turtle_ws(0x9).
 turtle_ws(0xA).
 turtle_ws(0xD).
 turtle_ws(0x20).
+turtle_ws(0xFEFF).			% Unicode BOM marker and zero-width space
 
 syntax_error(Stream, Line, Which) :-
 	syntax_error_term(Stream, Line, Which, Error),
