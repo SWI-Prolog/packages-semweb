@@ -6544,6 +6544,8 @@ rdf_reachable(term_t subj, term_t pred, term_t obj,
 	    return FALSE;
 	}
 	is_det = PL_is_ground(obj);
+	if ( a.pattern.object_is_literal )
+	  return FALSE;			/* rdf_reachable(literal(...),?,?) */
 	target_term = obj;
       } else if ( !PL_is_variable(obj) )	/* obj .... subj */
       {	switch(get_partial_triple(db, 0, pred, obj, 0, &a.pattern))
