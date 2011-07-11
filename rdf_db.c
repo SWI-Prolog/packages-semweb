@@ -4282,6 +4282,9 @@ unify_literal(term_t lit, literal *l)
 			 PL_TERM, v) )
       return TRUE;
 
+    if ( PL_exception(0) )
+      return FALSE;
+
     return PL_unify(lit, v);		/* allow rdf(X, Y, literal(foo)) */
   } else if ( PL_unify(lit, v) )
   { return TRUE;
