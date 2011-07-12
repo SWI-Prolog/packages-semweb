@@ -3125,8 +3125,10 @@ write_md5(rdf_db *db, IOSTREAM *out, atom_t src)
 
 static int
 save_db(rdf_db *db, IOSTREAM *out, atom_t src)
-{ triple *t;
+{ triple *t, p;
   save_context ctx;
+
+  memset(&p, 0, sizeof(p));
 
   if ( !RDLOCK(db) )
     return FALSE;
@@ -3139,13 +3141,19 @@ save_db(rdf_db *db, IOSTREAM *out, atom_t src)
     save_atom(db, out, src, &ctx);
     write_source(db, out, src, &ctx);
     write_md5(db, out, src);
+    p.graph = src;
+    p.indexed = BY_G;
+  } else
+  { p.indexed = BY_NONE;
   }
   if ( Sferror(out) )
   { RDUNLOCK(db);
     return FALSE;
   }
 
-  for(t = db->by_none; t; t = t->tp.next[ICOL(BY_NONE)])
+  for(t = db->table[ICOL(p.indexed)][triple_hash(db, &p, p.indexed)];
+      t;
+      t = t->tp.next[ICOL(p.indexed)])
   { if ( !t->erased &&
 	 (!src || t->graph == src) )
     { write_triple(db, out, t, &ctx);
