@@ -877,16 +877,21 @@ syntax_error(Stream, Line, Which) :-
 	throw(Error).
 
 syntax_error_term(Stream, -1, Which, Error) :- !,
-	stream_property(Stream, file_name(File)),
+	stream_file_name(Stream, File),
 	line_count(Stream, LineNo),
 	line_position(Stream, LinePos),
 	character_count(Stream, CharIndex),
 	Error = error(syntax_error(Which),
 		      file(File, LineNo, LinePos, CharIndex)).
 syntax_error_term(Stream, LineNo, Which, Error) :-
-	stream_property(Stream, file_name(File)),
+	stream_file_name(Stream, File),
 	Error = error(syntax_error(Which),
 		      file(File, LineNo, -1, -1)).
+
+stream_file_name(Stream, File) :-
+	stream_property(Stream, file_name(File)), !.
+stream_file_name(_, '<no file>').
+
 
 
 		 /*******************************
