@@ -62,6 +62,7 @@
 #include "hash.h"
 #include "murmur.h"
 
+#undef ERROR				/* also in wingdi.h; we do not care */
 #define ERROR -1
 
 #undef UNLOCK
