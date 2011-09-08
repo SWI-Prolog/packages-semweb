@@ -58,21 +58,21 @@ Ontologies imported.  If rdf_load_library/2 is used to load this
 ontology, the ontologies referenced here are loaded as well.  There
 are two subProperties: lib:schema and lib:instances with the obvious
 meaning.
-	\resitem {owl:providesNamespace}
+	\resitem {lib:providesNamespace}
 Informally, providing a namespace is defined as providing subjects that
 resides in the namespace.
-	\resitem {owl:usesNamespace}
+	\resitem {lib:usesNamespace}
 Informally, using a namespace is defined as providing objects that
 reside in the namespace.
 	\resitem {lib:source}
 Defines the named graph into which the resource is loaded.  If this
 ends in a \const{/}, the basename of each loaded file is appended to
 the given source.  Defaults to the URL the RDF is loaded from.
-	\resitem {owl:baseURI}
+	\resitem {lib:baseURI}
 Defines the base for processing the RDF data.  If not provided this
 defaults to the named graph, which in turn defaults to the URL the
 RDF is loaded from.
-	\resitem {owl:blankNodes}
+	\resitem {lib:blankNodes}
 One of \const{share} or \const{noshare}.  A SWI-Prolog RDF library
 extension that allows for sharing equivalent blank nodes.  Sharing
 is the default.
