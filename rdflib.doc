@@ -110,6 +110,15 @@ declarations.  E.g.\
 \end{code}
 \end{description}
 
+\subsubsection{Relation to other RDF meta-vocabularies}
+
+The \url[VoID]{http://www.w3.org/TR/void/} aims at resolving the same
+problem as the Manifest files described here. In addition, the
+\url[VANN]{http://vocab.org/vann/} vocabulary provides the information
+about preferred namepaces prefixes.
+
+
+
 
 \subsubsection{Finding manifest files}
 
