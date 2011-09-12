@@ -509,7 +509,7 @@ monitor(retract(S,P,O,DB)) :-
 	sync_journal(DB, Fd).
 monitor(update(S,P,O,DB:Line,Action)) :- !,
 	\+ blocked_db(DB, _),
-	(   Action = source(NewDB)
+	(   Action = graph(NewDB)
 	->  monitor(assert(S,P,O,NewDB)),
 	    monitor(retract(S,P,O,DB:Line))
 	;   journal_fd(DB, Fd),
@@ -518,7 +518,7 @@ monitor(update(S,P,O,DB:Line,Action)) :- !,
 	).
 monitor(update(S,P,O,DB,Action)) :-
 	\+ blocked_db(DB, _),
-	(   Action = source(NewDB)
+	(   Action = graph(NewDB)
 	->  monitor(assert(S,P,O,NewDB)),
 	    monitor(retract(S,P,O,DB))
 	;   journal_fd(DB, Fd),
