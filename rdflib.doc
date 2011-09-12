@@ -6,34 +6,22 @@ wish to load these in different combinations. For example loading a
 small subset of the data for debugging purposes or load a different set
 of files for experimentation. The library \pllib{semweb/rdf_library.pl}
 manages sets of RDF files spread over different locations, including
-file and network locations. RDF files are annotated using a
-\jargon{Manifest} file in RDF format.
-
-Currently (September 2007), the E-culture server loads more than 120 RDF
-files, containing many different schemas, instance repositories and
-ontology mappings. Some resources, such as the W3C version of Wordnet
-come in many files. The server is initialised by loading (a subset of)
-these files. The subset is defined by predicates called
-\predref{load_medium}{0}, \predref{load_tgn}{1}, etc. This has become
-unmanageable. There is no way to find out exactly what will be loaded or
-whether all RDF files are in place except for actually executing the
-load. There is also no easy way to exploit concurrency to speedup the
-process.
-
-For this reason we introduce RDF \jargon{Manifest} files that describe
-one or more RDF resources and their dependencies. The manifest file can
-be distributed along with a set of RDF files, providing a machine
-readable portable and declarative description of how the RDF files are
-intended to be combined. Software allows for listing the content of the
-library or loading an entry with all dependencies.
+file and network locations. The original version of this library
+supported metadata about collections of RDF sources in an RDF file
+called \jargon{Manifest}. The current version supports both the
+\url[VoID]{http://www.w3.org/TR/void/} format and the original format.
+VoID files (typically named \file{void.ttl}) can use elements from the
+RDF Manifest vocabulary to support features that are not supported by
+VoID.
 
 
 \subsection{The Manifest file}
 
-A manifest file is an RDF file, often in Turtle \cite{turtle} format,
-that provides meta-data about RDF resources. Often a manifest will
-describe RDF files in the current directory, but it can also describe
-RDF resources at arbitrary URL locations. The RDF schema for RDF library
+A manifest file is an RDF file, often in
+\url[Turtle]{http://www.w3.org/TeamSubmission/turtle/} format, that
+provides meta-data about RDF resources. Often, a manifest will describe
+RDF files in the current directory, but it can also describe RDF
+resources at arbitrary URL locations. The RDF schema for RDF library
 meta-data can be found in \file{rdf_library.ttl}. The namespace for the
 RDF library format is defined as
 \url{http://www.swi-prolog.org/rdf/library/} and abbreviated as
@@ -58,12 +46,6 @@ Ontologies imported.  If rdf_load_library/2 is used to load this
 ontology, the ontologies referenced here are loaded as well.  There
 are two subProperties: lib:schema and lib:instances with the obvious
 meaning.
-	\resitem {lib:providesNamespace}
-Informally, providing a namespace is defined as providing subjects that
-resides in the namespace.
-	\resitem {lib:usesNamespace}
-Informally, using a namespace is defined as providing objects that
-reside in the namespace.
 	\resitem {lib:source}
 Defines the named graph into which the resource is loaded.  If this
 ends in a \const{/}, the basename of each loaded file is appended to
@@ -72,10 +54,6 @@ the given source.  Defaults to the URL the RDF is loaded from.
 Defines the base for processing the RDF data.  If not provided this
 defaults to the named graph, which in turn defaults to the URL the
 RDF is loaded from.
-	\resitem {lib:blankNodes}
-One of \const{share} or \const{noshare}.  A SWI-Prolog RDF library
-extension that allows for sharing equivalent blank nodes.  Sharing
-is the default.
     \end{description}
 
     \resitem{lib:Virtual}
@@ -91,6 +69,10 @@ The lib:Virtual resource is used as a second rdf:type:
 	...
 \end{code}
 
+    \resitem{lib:CloudNode}
+Used by ClioPatria to combine this ontology and all data it imports into
+a node in the automatically generated datacloud.
+
     \resitem{lib:Namespace}
 Defines a URL to be a namespace. The definition provides the preferred
 mnemonic and can be referenced in the lib:providesNamespace and
@@ -103,56 +85,83 @@ declarations.  E.g.\
 @prefix	    lib: <http://www.swi-prolog.org/rdf/library/> .
 @prefix    rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 
-:rdfs
-	a lib:Namespace ;
-	lib:mnemonic "rdfs" ;
-	lib:namespace rdfs: .
+[ a lib:Namespace ;
+  lib:mnemonic "rdfs" ;
+  lib:namespace rdfs:
+] .
 \end{code}
 \end{description}
 
-\subsubsection{Relation to other RDF meta-vocabularies}
+\subsubsection{Support for the VoID and VANN vocabularies}
 
 The \url[VoID]{http://www.w3.org/TR/void/} aims at resolving the same
 problem as the Manifest files described here. In addition, the
 \url[VANN]{http://vocab.org/vann/} vocabulary provides the information
-about preferred namepaces prefixes.
+about preferred namepaces prefixes.  The RDF library manager can deal
+with VoID files.  The following relations apply:
 
+\begin{itemize}
+    \item VoID \const{Dataset} and \const{Linkset} are similar to
+    \const{lib:Ontology}, but a VoID resource is always
+    \jargon{Virtual}.  I.e., the VoID URI itself never refers to
+    an RDF document.
 
+    \item The \const{owl:imports} and its lib specializations are
+    replaced by \const{void:subset} (referring to another VoID
+    dataset) and \const{void:dataDump} (referring to a concrete
+    document).
+
+    \item A description of the dataset is given using \const{dcterms:description}
+    rather than \const{rdfs:comment}
+
+    \item The RDF library recognises \const{lib:source}, \const{lib:baseURI}
+    and \const{lib:Cloudnode}, which have no equivalent in VoID.
+
+    \item The RDF library recognises \const{vann:preferredNamespacePrefix} and
+    \const{vann:preferredNamespaceUri} as alternatives to its
+    proprietary way for defining prefixes. The domain of these
+    predicates is unclear. The library recognises them regardless of the
+    domain. Note that the range of \const{vann:preferredNamespaceUri} is
+    a \emph{literal}.  A disadvantage of that is that the Turtle prefix
+    declaration cannot be reused.
+\end{itemize}
+
+Currently, the RDF metadata is \emph{not} stored in the RDF database. It
+is processed by low-level primitives that do \emph{not} perform RDFS
+reasoning. In particular, this means that rdfs:supPropertyOf and
+rdfs:subClassOf cannot be used to specialise the RDF meta vocabulary.
 
 
 \subsubsection{Finding manifest files}
 
-The initial manifest file(s) are loaded into the system using
+The initial metadata file(s) are loaded into the system using
 rdf_attach_library/1.
 
 \begin{description}
     \predicate{rdf_attach_library}{1}{+FileOrDirectory}
 Load meta-data on RDF repositories from \arg{FileOrDirectory}. If the
 argument is a directory, this directory is processed recursively and
-each file named \file{Manifest.ttl} or \file{Manifest.rdf} is loaded.
+each for each directory, a file named \file{void.ttl},
+\file{Manifest.ttl} or \file{Manifest.rdf} is loaded (in this order of
+preference).
 
 Declared namespaces are added to the rdf-db namespace list. Encountered
 ontologies are added to a private database of
-\file{rdf_list_library.pl}.%
-	\footnote{We could have used the global RDF store, but
-		  decided against that to avoid poluting the triple
-		  space.}
-Each ontology is given an \jargon{identifier}, derived from the
-basename of the URL without the extension.  This, using the
-declaration below, the identifier of the declared ontology is
-\const{wn-basic}.
+\file{rdf_list_library.pl}. Each ontology is given an
+\jargon{identifier}, derived from the basename of the URL without the
+extension. This, using the declaration below, the identifier of the
+declared ontology is \const{wn-basic}.
 
 \begin{code}
 <wn-basic>
-	a lib:Ontology ;
-	a lib:Virtual ;
-	dc:title "Basic WordNet" ;
+	a void:Dataset ;
+	dcterms:title "Basic WordNet" ;
 	...
 \end{code}
 
     \predicate{rdf_list_library}{0}{}
 List the available resources in the library.  Currently only lists
-resources that have a dc:title property.  See \secref{usage} for
+resources that have a dcterms:title property.  See \secref{usage} for
 an example.
 \end{description}
 
@@ -257,7 +266,7 @@ cannot be defined relative to other prefixes. In addition, a prefix can
 only be followed by a Qname, which excludes \verb$.$ and \verb$/$.
 
 Easily relocatable manifests must define all resources relative to the
-base URL. Relocation is automatical if the manifest remains in the same
+base URL. Relocation is automatic if the manifest remains in the same
 hierarchy as the resources it references. If the manifest is copied
 elsewhere (i.e.\ for creating a local version) it can use @{base} to
 refer to the resource hierarchy. We can point to directories holding
@@ -289,7 +298,6 @@ definition of the virtual RDFS resource.
 	a lib:Virtual ;
 	rdfs:comment "RDF Schema" ;
 	lib:source rdfs: ;
-	lib:providesNamespace :rdfs ;
 	lib:schema <rdfs.rdfs> .
 \end{code}
 
@@ -299,7 +307,7 @@ In this section we provide skeleton code for filling the RDF database
 from a password protected HTTP repository. The first line loads the
 application. Next we include modules that enable us to manage the RDF
 library, RDF database caching and HTTP connections. Then we setup the
-HTTP authetication, enable caching of processed RDF files and load the
+HTTP authentication, enable caching of processed RDF files and load the
 initial manifest. Finally load_data/0 loads all our RDF data.
 
 \begin{code}
@@ -327,11 +335,11 @@ load_data :-
 	rdf_load_library('all').
 \end{code}
 
-\subsection{Example: A Manifest for W3C WordNet}
+\subsection{Example: A metadata file for W3C WordNet}
 \label{sec:w3cmanifest}
 
-The manifest below allows for loading WordNet in the two predefined
-versions using one of
+The VoID metadata below allows for loading WordNet in the two
+predefined versions using one of
 
 \begin{code}
 ?- rdf_load_library('wn-basic', []).
@@ -341,98 +349,98 @@ versions using one of
 
 
 \begin{code}
+@prefix    void: <http://rdfs.org/ns/void#> .
+@prefix    vann: <http://purl.org/vocab/vann/> .
 @prefix	    lib: <http://www.swi-prolog.org/rdf/library/> .
 @prefix     owl: <http://www.w3.org/2002/07/owl#> .
 @prefix     rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix    rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix     xsd: <http://www.w3.org/2001/XMLSchema#> .
-@prefix      dc: <http://purl.org/dc/elements/1.1/> .
-@prefix wn20schema: <http://www.w3.org/2006/03/wn/wn20/schema/> .
-@prefix wn20instances: <http://www.w3.org/2006/03/wn/wn20/instances/> .
+@prefix      dc: <http://purl.org/dc/terms/> .
+@prefix   wn20s: <http://www.w3.org/2006/03/wn/wn20/schema/> .
+@prefix   wn20i: <http://www.w3.org/2006/03/wn/wn20/instances/> .
 
-# Source from http://www.cs.vu.nl/~mark/pub/wntestrdf.zip
+[ vann:preferredNamespacePrefix "wn20i" ;
+  vann:preferredNamespaceUri "http://www.w3.org/2006/03/wn/wn20/instances/"
+] .
 
-:wn20instances
-	a lib:Namespace ;
-	lib:mnemonic "wn20instances" ;
-	lib:namespace wn20instances: .
+[ vann:preferredNamespacePrefix "wn20s" ;
+  vann:preferredNamespaceUri "http://www.w3.org/2006/03/wn/wn20/schema/"
+] .
 
-:wn20schema
-	a lib:Namespace ;
-	lib:mnemonic "wn20schema" ;
-	lib:namespace wn20schema: .
+<wn20-common>
+	a void:Dataset ;
+	dc:description "Common files between full and basic version" ;
+	lib:source wn20i: ;
+	void:dataDump
+		<wordnet-attribute.rdf.gz> ,
+		<wordnet-causes.rdf.gz> ,
+		<wordnet-classifiedby.rdf.gz> ,
+		<wordnet-entailment.rdf.gz> ,
+		<wordnet-glossary.rdf.gz> ,
+		<wordnet-hyponym.rdf.gz> ,
+		<wordnet-membermeronym.rdf.gz> ,
+		<wordnet-partmeronym.rdf.gz> ,
+		<wordnet-sameverbgroupas.rdf.gz> ,
+		<wordnet-similarity.rdf.gz> ,
+		<wordnet-synset.rdf.gz> ,
+		<wordnet-substancemeronym.rdf.gz> ,
+		<wordnet-senselabels.rdf.gz> .
 
-:dc
-	a lib:Namespace ;
-	lib:mnemonic "dc" ;
-	lib:namespace dc: .
+<wn20-skos>
+	a void:Dataset ;
+	void:subset <wnskosmap> ;
+	void:dataDump <wnSkosInScheme.ttl.gz> .
 
-:owl
-	a lib:Namespace ;
-	lib:mnemonic "owl" ;
-	lib:namespace owl: .
-
-#	WordNet
-
-<wn-common>
-	a lib:Instances ;
-	a lib:Virtual ;
-	rdfs:comment "Common files between full and basic version of WordNet" ;
-	lib:source wn20instances: ;
-	lib:instances <wordnet-attribute.rdf> ;
-	lib:instances <wordnet-causes.rdf> ;
-	lib:instances <wordnet-classifiedby.rdf> ;
-	lib:instances <wordnet-entailment.rdf> ;
-	lib:instances <wordnet-frame.rdf> ;
-	lib:instances <wordnet-glossary.rdf> ;
-	lib:instances <wordnet-hyponym.rdf> ;
-	lib:instances <wordnet-membermeronym.rdf> ;
-	lib:instances <wordnet-partmeronym.rdf> ;
-	lib:instances <wordnet-sameverbgroupas.rdf> ;
-	lib:instances <wordnet-similarity.rdf> ;
-	lib:instances <wordnet-synset.rdf> ;
-	lib:instances <wordnet-substancemeronym.rdf> .
-
-<wnbasic.rdfs>
+<wnskosmap>
 	a lib:Schema ;
-	lib:source wn20schema: ;
-	lib:usesNamespace :owl .
+	lib:source wn20s: ;
+	void:dataDump
+		<wnskosmap.rdfs> .
 
-<wn-basic>
-	a lib:Ontology ;
-	a lib:Virtual ;
+<wnbasic-schema>
+	a void:Dataset ;
+	lib:source wn20s: ;
+	void:dataDump
+		<wnbasic.rdfs> .
+
+<wn20-basic>
+	a void:Dataset ;
+	a lib:CloudNode ;
 	dc:title "Basic WordNet" ;
+	dc:description "Light version of W3C WordNet" ;
 	owl:versionInfo "2.0" ;
-	rdfs:comment "Light version of W3C WordNet" ;
-	lib:schema <wnbasic.rdfs> ;
-	lib:source wn20instances: ;
-	lib:instances <wn-common> ;
-	lib:instances <wordnet-senselabels.rdf> ;
-	lib:providesNamespace :wn20schema ;
-	lib:providesNamespace :wn20instances .
+	lib:source wn20i: ;
+	void:subset
+		<wnbasic-schema> ,
+		<wn20-skos> ,
+		<wn20-common> .
 
-<wnfull.rdfs>
-	a lib:Schema ;
-	lib:source wn20schema: ;
-	lib:usesNamespace :owl .
+<wnfull-schema>
+	a void:Dataset ;
+	lib:source wn20s: ;
+	void:dataDump
+		<wnfull.rdfs> .
 
-<wn-full>
-	a lib:Ontology ;
-	a lib:Virtual ;
+<wn20-full>
+	a void:Dataset ;
+	a lib:CloudNode ;
 	dc:title "Full WordNet" ;
+	dc:description "Full version of W3C WordNet" ;
 	owl:versionInfo "2.0" ;
-	rdfs:comment "Full version of W3C WordNet" ;
-	lib:schema <full/wnfull.rdfs> ;
-	lib:source wn20instances: ;
-	lib:instances <wn-common> ;
-	lib:instances <wordnet-antonym.rdf> ;
-	lib:instances <wordnet-derivationallyrelated.rdf> ;
-	lib:instances <wordnet-participleof.rdf> ;
-	lib:instances <wordnet-pertainsto.rdf> ;
-	lib:instances <wordnet-seealso.rdf> ;
-	lib:instances <wordnet-wordsensesandwords.rdf> ;
-	lib:providesNamespace :wn20schema ;
-	lib:providesNamespace :wn20instances .
+	lib:source wn20i: ;
+	void:subset
+		<wnfull-schema> ,
+		<wn20-skos> ,
+		<wn20-common> ;
+	void:dataDump
+		<wordnet-antonym.rdf.gz> ,
+		<wordnet-derivationallyrelated.rdf.gz> ,
+		<wordnet-participleof.rdf.gz> ,
+		<wordnet-pertainsto.rdf.gz> ,
+		<wordnet-seealso.rdf.gz> ,
+		<wordnet-wordsensesandwords.rdf.gz> ,
+		<wordnet-frame.rdf.gz> .
 \end{code}
 
 %%
