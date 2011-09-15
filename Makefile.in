@@ -48,6 +48,7 @@ LDFLAGS=@LDSOFLAGS@
 INSTALL=@INSTALL@
 INSTALL_PROGRAM=@INSTALL_PROGRAM@
 INSTALL_DATA=@INSTALL_DATA@
+INSTALL_PLARCH=@INSTALL_PLARCH@
 
 include common.mk
 
@@ -67,9 +68,9 @@ turtle.o:	turtle.c turtle_chars.c
 
 install:	$(TARGETS) $(LIBPL)
 		mkdir -p $(DESTDIR)$(LIBDIR)
-		mkdir -p $(DESTDIR)$(PLBASE)/lib/$(PLARCH)
+		mkdir -p $(DESTDIR)$(PLBASE)/lib/$(INSTALL_PLARCH)
 		for f in $(TARGETS); do \
-		  $(INSTALL) -m 755 $$f $(DESTDIR)$(PLBASE)/lib/$(PLARCH); \
+		  $(INSTALL) -m 755 $$f $(DESTDIR)$(PLBASE)/lib/$(INSTALL_PLARCH); \
 		done
 		for f in $(DATA) $(LIBPL) README; do \
 		  $(INSTALL_DATA) $$f $(DESTDIR)$(LIBDIR); \
@@ -94,7 +95,7 @@ pdf-install::
 		$(INSTALL) -m 644 $(DOC).pdf $(DESTDIR)$(PKGDOC)
 
 uninstall::
-		(cd $(PLBASE)/lib/$(PLARCH) && rm -f $(TARGETS))
+		(cd $(PLBASE)/lib/$(INSTALL_PLARCH) && rm -f $(TARGETS))
 		(cd $(PLBASE)/library && rm -f $(LIBPL))
 		$(PL) -f none -g make -t halt
 
