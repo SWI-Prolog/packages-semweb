@@ -71,7 +71,7 @@ install:	$(TARGETS) $(LIBPL)
 		mkdir -p $(DESTDIR)$(LIBDIR)
 		mkdir -p $(DESTDIR)$(PLBASE)/$(SOLIB)/$(INSTALL_PLARCH)
 		for f in $(TARGETS); do \
-		  $(INSTALL) -m 755 $$f $(DESTDIR)$(PLBASE)/$(SOLIB)/$(INSTALL_PLARCH); \
+		  $(INSTALL_PROGRAM) $$f $(DESTDIR)$(PLBASE)/$(SOLIB)/$(INSTALL_PLARCH); \
 		done
 		for f in $(DATA) $(LIBPL) README; do \
 		  $(INSTALL_DATA) $$f $(DESTDIR)$(LIBDIR); \
@@ -82,6 +82,7 @@ install:	$(TARGETS) $(LIBPL)
 ln-install::
 		$(MAKE) INSTALL=../ln-install \
 			INSTALL_DATA=../ln-install \
+			INSTALL_PROGRAM=../ln-install \
 			install
 
 rpm-install:	install
