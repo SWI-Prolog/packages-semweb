@@ -23,6 +23,7 @@ PKGDOC=$(PLBASE)/doc/packages
 PCEHOME=../xpce
 LIBDIR=$(PLBASE)/library/semweb
 SOLIB=@SOLIB@
+TXTEXT=@TXTEXT@
 
 CC=@CC@
 COFLAGS=@COFLAGS@
@@ -73,9 +74,10 @@ install:	$(TARGETS) $(LIBPL)
 		for f in $(TARGETS); do \
 		  $(INSTALL_PROGRAM) $$f $(DESTDIR)$(PLBASE)/$(SOLIB)/$(INSTALL_PLARCH); \
 		done
-		for f in $(DATA) $(LIBPL) README; do \
+		for f in $(DATA) $(LIBPL); do \
 		  $(INSTALL_DATA) $$f $(DESTDIR)$(LIBDIR); \
 		done
+		$(INSTALL_DATA) README $(DESTDIR)$(LIBDIR)/README$(TXTEXT)
 		$(PL) -f none -g true -t "make_library_index('$(DESTDIR)$(LIBDIR)')"
 		$(PL) -f none -g make -t halt
 
