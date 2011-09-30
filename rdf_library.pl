@@ -604,8 +604,10 @@ attach_dir(Path, Visited) :-
 attach_dir(Path, Visited) :-
 	atom_concat(Path, '/*', Pattern),
 	expand_file_name(Pattern, Members),
-	(   member(Manifest, Members),
-	    is_manifest_file(Manifest)
+	(   manifest_file(MBase),
+	    rdf_extension(Ext),
+	    atomic_list_concat([Path, /, MBase, '.', Ext], Manifest),
+	    exists_file(Manifest)
 	->  process_manifest(Manifest)
 	;   print_message(silent, rdf(no_manifest(Path)))
 	),
