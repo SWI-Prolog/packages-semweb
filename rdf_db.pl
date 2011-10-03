@@ -2285,7 +2285,7 @@ rdf_quote_uri(IRI, URI) :-
 		 *******************************/
 
 :- multifile
-	prolog:message/3.
+	prolog:message//1.
 
 prolog:message(rdf(loaded(How, What, BaseURI, Triples, Time))) -->
 	how(How),
