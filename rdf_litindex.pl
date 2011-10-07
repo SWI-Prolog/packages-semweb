@@ -416,11 +416,7 @@ threaded_literal_index(_) :-
 
 create_index_threads(N, Q, [Id|T]) :-
 	N > 0, !,
-	thread_create(index_worker(Q), Id,
-		      [ local(1000),
-			global(1000),
-			trail(1000)
-		      ]),
+	thread_create(index_worker(Q), Id, []),
 	N2 is N - 1,
 	create_index_threads(N2, Q, T).
 create_index_threads(_, _, []) :- !.
@@ -466,10 +462,7 @@ create_update_literal_thread(Threads) :-
 	forall(between(1, Threads, N),
 	       (   atom_concat(rdf_literal_monitor_, N, Alias),
 		   thread_create(monitor_literals, _,
-				 [ alias(Alias),
-				   local(1000),
-				   global(1000),
-				   trail(1000)
+				 [ alias(Alias)
 				 ])
 	       )).
 
@@ -553,7 +546,7 @@ del_tokens([H|T], Literal, Map) :-
 %	generally domain dependent.
 
 rdf_tokenize_literal(Literal, Tokens) :-
-	tokenization(Literal, Tokens), !. 		% Hook
+	tokenization(Literal, Tokens), !.		% Hook
 rdf_tokenize_literal(Literal, Tokens) :-
 	text_of(Literal, Text),
 	atom(Text),
