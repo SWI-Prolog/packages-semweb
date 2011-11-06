@@ -55,6 +55,21 @@
 :- use_module(library(thread)).
 :- use_module(library(apply)).
 
+:- predicate_options(rdf_list_library/2, 2,
+		     [ indent(atom),
+		       show_graph(boolean),
+		       show_source(boolean),
+		       show_virtual(boolean)
+		     ]).
+:- predicate_options(rdf_load_library/2, 2,
+		     [ concurrent(positive_integer),
+		       import(boolean),
+		       load(boolean),
+		       base_uri(atom),
+		       claimed_source(atom),
+		       not_found(oneof([error,warning,silent]))
+		     ]).
+
 /** <module> RDF Library Manager
 
 This module manages an ontology library. Such   a  library consists of a

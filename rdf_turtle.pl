@@ -47,6 +47,31 @@
 :- meta_predicate
 	rdf_process_turtle(+,2,+).
 
+:- predicate_options(rdf_load_turtle/3, 3,
+		     [pass_to(rdf_read_turtle/3, 3)]).
+:- predicate_options(rdf_process_turtle/3, 3,
+		     [ anon_prefix(atom),
+		       base_uri(atom),
+		       base_used(-atom),
+		       db(atom),
+		       error_count(-integer),
+		       namespaces(-list),
+		       on_error(oneof([warning,error])),
+		       prefixes(-list),
+		       resources(oneof([uri,iri]))
+		     ]).
+:- predicate_options(rdf_read_turtle/3, 3,
+		     [ anon_prefix(atom),
+		       base_uri(atom),
+		       base_used(-atom),
+		       db(atom),
+		       error_count(-integer),
+		       namespaces(-list),
+		       on_error(oneof([warning,error])),
+		       prefixes(-list),
+		       resources(oneof([uri,iri]))
+		     ]).
+
 /** <module> Turtle: Terse RDF Triple Language
 
 This module implements the Turtle  language   for  representing  the RDF

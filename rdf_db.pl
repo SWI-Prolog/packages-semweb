@@ -153,6 +153,43 @@
 	rdf_save(+, :),
 	rdf_load(+, :).
 
+:- predicate_options(rdf_graph_prefixes/3, 3,
+		     [expand(callable), filter(callable), min_count(nonneg)]).
+:- predicate_options(rdf_load/2, 2,
+		     [ base_uri(atom),
+		       cache(boolean),
+		       db(atom),
+		       format(oneof([xml,triples,turtle])),
+		       graph(atom),
+		       if(oneof([true,changed,not_loaded])),
+		       modified(-float),
+		       silent(boolean),
+		       register_namespaces(boolean)
+		     ]).
+:- predicate_options(rdf_register_ns/3, 3, [force(boolean), keep(boolean)]).
+:- predicate_options(rdf_save/2, 2,
+		     [ graph(atom),
+		       db(atom),
+		       anon(boolean),
+		       base_uri(atom),
+		       write_xml_base(boolean),
+		       convert_typed_literal(callable),
+		       encoding(encoding),
+		       document_language(atom),
+		       namespaces(list(atom))
+		     ]).
+:- predicate_options(rdf_save_header/2, 2,
+		     [ graph(atom),
+		       db(atom),
+		       namespaces(list(atom))
+		     ]).
+:- predicate_options(rdf_save_subject/3, 3,
+		     [ graph(atom),
+		       base_uri(atom),
+		       convert_typed_literal(callable),
+		       document_language(atom)
+		     ]).
+
 :- multifile
 	ns/2,
 	rdf_meta_specification/3.	% UnboundHead, Module, Head
@@ -1929,7 +1966,7 @@ save_about(Out, BaseURI, Subject) :-
 	rdf_value(Subject, BaseURI, QSubject, Encoding),
 	format(Out, ' rdf:about="~w"', [QSubject]).
 
-%%	save_attributes(+List, +BaseURI, +Stream, Element)
+%%	save_attributes(+List, +BaseURI, +Stream, +Element, +Indent, +Options)
 %
 %	Save the attributes.  Short literal attributes are saved in the
 %	tag.  Others as the content of the description element.  The
