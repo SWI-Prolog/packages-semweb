@@ -684,6 +684,9 @@ process_triples(Manifest, Triples) :-
 extract_namespace(Triples, Mnemonic, Namespace) :-
 	edge(Triples, Decl, lib:mnemonic, literal(Mnemonic)),
 	edge(Triples, Decl, lib:namespace, Namespace).
+extract_namespace(Triples, Mnemonic, Namespace) :-
+	edge(Triples, Decl, vann:preferredNamespacePrefix, literal(Mnemonic)),
+	edge(Triples, Decl, vann:preferredNamespaceUri, literal(Namespace)).
 
 %%	extract_ontology(+Triples, -Ontology) is nondet.
 %
