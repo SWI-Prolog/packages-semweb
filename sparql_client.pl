@@ -38,6 +38,7 @@
 :- use_module(library(http/http_open)).
 :- use_module(library(lists)).
 :- use_module(library(rdf)).
+:- use_module(library(semweb/rdf_turtle)).
 :- use_module(library(option)).
 
 /** <module> SPARQL client library
@@ -118,6 +119,9 @@ sparql_query(Query, Row, Options) :-
 
 read_reply('application/rdf+xml', In, _, Row) :- !,
 	call_cleanup(load_rdf(stream(In), RDF), close(In)),
+	member(Row, RDF).
+read_reply('text/rdf+n3', In, _, Row) :- !,
+	call_cleanup(rdf_read_turtle(stream(In), RDF, []), close(In)),
 	member(Row, RDF).
 read_reply(MIME, In, VarNames, Row) :-
 	sparql_result_mime(MIME), !,
