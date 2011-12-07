@@ -277,7 +277,7 @@ rdf_resource(term_t r, control_t h)
       if ( PL_is_variable(r) )
       { id = 0;
 	break;
-      } else if ( get_atom_ex(r, &name) )
+      } else if ( PL_get_atom_ex(r, &name) )
       { if ( existing_resource(&db->resources, name) )
 	  return TRUE;
 	return FALSE;
@@ -316,7 +316,7 @@ pl_lookup_resource(term_t name, term_t id)
   resource *r;
   atom_t a;
 
-  if ( !get_atom_ex(name, &a) )
+  if ( !PL_get_atom_ex(name, &a) )
     return FALSE;
 
   r = lookup_resource(&db->resources, a);

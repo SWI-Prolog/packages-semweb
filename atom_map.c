@@ -229,15 +229,6 @@ representation_error(const char *what)
 
 
 static int
-get_atom_ex(term_t t, atom_t *a)
-{ if ( PL_get_atom(t, a) )
-    return TRUE;
-
-  return type_error(t, "atom");
-}
-
-
-static int
 get_atom_map(term_t t, atom_map **map)
 { if ( PL_is_functor(t, FUNCTOR_atom_map1) )
   { term_t a = PL_new_term_ref();
@@ -1054,7 +1045,7 @@ rdf_keys_in_literal_map(term_t handle, term_t spec, term_t keys)
     int match = (name == ATOM_prefix ? STR_MATCH_PREFIX : STR_MATCH_EXACT);
 
     _PL_get_arg(1, spec, a);
-    if ( !get_atom_ex(a, &prefix) )
+    if ( !PL_get_atom_ex(a, &prefix) )
       goto failure;
     first_a = first_atom(prefix, STR_MATCH_PREFIX);
 
