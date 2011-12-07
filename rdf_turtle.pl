@@ -20,7 +20,7 @@
 
     You should have received a copy of the GNU Lesser General Public
     License along with this library; if not, write to the Free Software
-    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
     As a special exception, if you link this library with other files,
     compiled with a Free Software compiler, to produce an executable, this
@@ -46,6 +46,31 @@
 
 :- meta_predicate
 	rdf_process_turtle(+,2,+).
+
+:- predicate_options(rdf_load_turtle/3, 3,
+		     [pass_to(rdf_read_turtle/3, 3)]).
+:- predicate_options(rdf_process_turtle/3, 3,
+		     [ anon_prefix(atom),
+		       base_uri(atom),
+		       base_used(-atom),
+		       db(atom),
+		       error_count(-integer),
+		       namespaces(-list),
+		       on_error(oneof([warning,error])),
+		       prefixes(-list),
+		       resources(oneof([uri,iri]))
+		     ]).
+:- predicate_options(rdf_read_turtle/3, 3,
+		     [ anon_prefix(atom),
+		       base_uri(atom),
+		       base_used(-atom),
+		       db(atom),
+		       error_count(-integer),
+		       namespaces(-list),
+		       on_error(oneof([warning,error])),
+		       prefixes(-list),
+		       resources(oneof([uri,iri]))
+		     ]).
 
 /** <module> Turtle: Terse RDF Triple Language
 
@@ -877,16 +902,21 @@ syntax_error(Stream, Line, Which) :-
 	throw(Error).
 
 syntax_error_term(Stream, -1, Which, Error) :- !,
-	stream_property(Stream, file_name(File)),
+	stream_file_name(Stream, File),
 	line_count(Stream, LineNo),
 	line_position(Stream, LinePos),
 	character_count(Stream, CharIndex),
 	Error = error(syntax_error(Which),
 		      file(File, LineNo, LinePos, CharIndex)).
 syntax_error_term(Stream, LineNo, Which, Error) :-
-	stream_property(Stream, file_name(File)),
+	stream_file_name(Stream, File),
 	Error = error(syntax_error(Which),
 		      file(File, LineNo, -1, -1)).
+
+stream_file_name(Stream, File) :-
+	stream_property(Stream, file_name(File)), !.
+stream_file_name(_, '<no file>').
+
 
 
 		 /*******************************

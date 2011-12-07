@@ -20,7 +20,7 @@
 
     You should have received a copy of the GNU Lesser General Public
     License along with this library; if not, write to the Free Software
-    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
     As a special exception, if you link this library with other files,
     compiled with a Free Software compiler, to produce an executable, this
@@ -153,6 +153,43 @@
 	rdf_monitor(1, +),
 	rdf_save(+, :),
 	rdf_load(+, :).
+
+:- predicate_options(rdf_graph_prefixes/3, 3,
+		     [expand(callable), filter(callable), min_count(nonneg)]).
+:- predicate_options(rdf_load/2, 2,
+		     [ base_uri(atom),
+		       cache(boolean),
+		       db(atom),
+		       format(oneof([xml,triples,turtle])),
+		       graph(atom),
+		       if(oneof([true,changed,not_loaded])),
+		       modified(-float),
+		       silent(boolean),
+		       register_namespaces(boolean)
+		     ]).
+:- predicate_options(rdf_register_ns/3, 3, [force(boolean), keep(boolean)]).
+:- predicate_options(rdf_save/2, 2,
+		     [ graph(atom),
+		       db(atom),
+		       anon(boolean),
+		       base_uri(atom),
+		       write_xml_base(boolean),
+		       convert_typed_literal(callable),
+		       encoding(encoding),
+		       document_language(atom),
+		       namespaces(list(atom))
+		     ]).
+:- predicate_options(rdf_save_header/2, 2,
+		     [ graph(atom),
+		       db(atom),
+		       namespaces(list(atom))
+		     ]).
+:- predicate_options(rdf_save_subject/3, 3,
+		     [ graph(atom),
+		       base_uri(atom),
+		       convert_typed_literal(callable),
+		       document_language(atom)
+		     ]).
 
 :- multifile
 	ns/2,
@@ -461,8 +498,8 @@ mk_global(NS:Local, Global) :-
 	rdf(r,r,o,?),
 	rdf_assert(r,r,o,+),
 	rdf_retractall(r,r,o,?),
-	rdf_reachable(r,r,r),
-	rdf_reachable(r,r,r,+,?),
+	rdf_reachable(r,r,o),
+	rdf_reachable(r,r,o,+,?),
 	rdf_update(r,r,o,t),
 	rdf_update(r,r,o,+,t),
 	rdf_equal(r,r),
@@ -1914,7 +1951,7 @@ save_about(Out, BaseURI, Subject) :-
 	rdf_value(Subject, BaseURI, QSubject, Encoding),
 	format(Out, ' rdf:about="~w"', [QSubject]).
 
-%%	save_attributes(+List, +BaseURI, +Stream, Element)
+%%	save_attributes(+List, +BaseURI, +Stream, +Element, +Indent, +Options)
 %
 %	Save the attributes.  Short literal attributes are saved in the
 %	tag.  Others as the content of the description element.  The
@@ -2254,13 +2291,23 @@ rdf_split_url(Prefix, Local, URL) :-
 rdf_url_namespace(URL, Prefix) :-
 	iri_xml_namespace(URL, Prefix).
 
+%%	rdf_quote_uri(IRI, URI) is det.
+%
+%	Quote an IRI as a URI by using %-encoding where needed.
+%
+%	@deprecated	Quoting is moved to library(uri). This predicate is
+%			mapped to uri_iri/2 (with reversed arguments).
+
+rdf_quote_uri(IRI, URI) :-
+	uri_iri(URI, IRI).
+
 
 		 /*******************************
 		 *	       MESSAGES		*
 		 *******************************/
 
 :- multifile
-	prolog:message/3.
+	prolog:message//1.
 
 prolog:message(rdf(loaded(How, What, BaseURI, Triples, Time))) -->
 	how(How),

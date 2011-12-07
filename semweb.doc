@@ -836,10 +836,19 @@ is one of:
     \predicate{rdf_save_footer}{1}{+Stream}
 Close the work opened with rdf_save_header/2.
 
-    \predicate{rdf_save_subject}{3}{+Stream, +Subject, +FileRef}
-Save everything known about \arg{Subject} that matches \arg{FileRef}.
-Using an variable for \arg{FileRef} saves all triples with
-\arg{Subject}.
+    \predicate{rdf_save_subject}{3}{+Stream, +Subject, :Options}
+Save everything known about \arg{Subject}.  Options:
+
+    \begin{description}
+        \termitem{graph}{+Graph}
+	Only save properties from \arg{Graph}.
+	\termitem{base_uri}{+URI}
+	\nodescription
+	\termitem{convert_typed_literal}{:Goal}
+	\nodescription
+	\termitem{document_language}{+XMLLang}
+	See rdf_save/2 for a description of these options.
+    \end{description}
 
     \predicate{rdf_quote_uri}{2}{+URI, -Quoted}
 Quote a UNICODE \arg{URI}.  First the Unicode is represented as UTF-8

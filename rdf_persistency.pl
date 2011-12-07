@@ -19,7 +19,7 @@
 
     You should have received a copy of the GNU Lesser General Public
     License along with this library; if not, write to the Free Software
-    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
     As a special exception, if you link this library with other files,
     compiled with a Free Software compiler, to produce an executable, this
@@ -509,7 +509,7 @@ monitor(retract(S,P,O,DB)) :-
 	sync_journal(DB, Fd).
 monitor(update(S,P,O,DB:Line,Action)) :- !,
 	\+ blocked_db(DB, _),
-	(   Action = source(NewDB)
+	(   Action = graph(NewDB)
 	->  monitor(assert(S,P,O,NewDB)),
 	    monitor(retract(S,P,O,DB:Line))
 	;   journal_fd(DB, Fd),
@@ -518,7 +518,7 @@ monitor(update(S,P,O,DB:Line,Action)) :- !,
 	).
 monitor(update(S,P,O,DB,Action)) :-
 	\+ blocked_db(DB, _),
-	(   Action = source(NewDB)
+	(   Action = graph(NewDB)
 	->  monitor(assert(S,P,O,NewDB)),
 	    monitor(retract(S,P,O,DB))
 	;   journal_fd(DB, Fd),

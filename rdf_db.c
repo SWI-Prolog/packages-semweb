@@ -20,7 +20,7 @@
 
     You should have received a copy of the GNU Lesser General Public
     License along with this library; if not, write to the Free Software
-    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #ifdef HAVE_CONFIG_H
@@ -57,6 +57,7 @@
 #include "memory.h"
 #include "buffer.h"
 
+#undef ERROR				/* also in wingdi.h; we do not care */
 #define ERROR -1
 
 #undef UNLOCK
@@ -3120,9 +3121,11 @@ write_md5(rdf_db *db, IOSTREAM *out, atom_t src)
 static int
 save_db(query *q, IOSTREAM *out, atom_t src)
 { rdf_db *db = q->db;
-  triple *t;
+  triple *t, p;
   save_context ctx;
+  triple_walker tw;
 
+  memset(&p, 0, sizeof(p));
   init_saved(db, &ctx);
 
   Sfprintf(out, "%s", SAVE_MAGIC);
@@ -3132,11 +3135,16 @@ save_db(query *q, IOSTREAM *out, atom_t src)
     save_atom(db, out, src, &ctx);
     write_source(db, out, src, &ctx);
     write_md5(db, out, src);
+    p.graph = src;
+    p.indexed = BY_G;
+  } else
+  { p.indexed = BY_NONE;
   }
   if ( Sferror(out) )
     return FALSE;
 
-  for(t = db->by_none.head; t; t = t->tp.next[ICOL(BY_NONE)])
+  init_triple_walker(&tw, db, &p, p.indexed);
+  while((t=next_triple(&tw)))
   { if ( alive_triple(q, t) &&
 	 (!src || t->graph == src) )
     { write_triple(db, out, t, &ctx);
@@ -4230,6 +4238,9 @@ unify_literal(term_t lit, literal *l)
 			 PL_ATOM, l->type_or_lang,
 			 PL_TERM, v) )
       return TRUE;
+
+    if ( PL_exception(0) )
+      return FALSE;
 
     return PL_unify(lit, v);		/* allow rdf(X, Y, literal(foo)) */
   } else if ( PL_unify(lit, v) )
@@ -6109,6 +6120,8 @@ rdf_reachable(term_t subj, term_t pred, term_t obj,
 	    return FALSE;
 	}
 	is_det = PL_is_ground(obj);
+	if ( a.pattern.object_is_literal )
+	  return FALSE;			/* rdf_reachable(literal(...),?,?) */
 	target_term = obj;
       } else if ( !PL_is_variable(obj) )	/* obj .... subj */
       {	switch(get_partial_triple(db, 0, pred, obj, 0, &a.pattern))
@@ -6509,12 +6522,6 @@ rdf_version(term_t v)
 
 
 		 /*******************************
-		 *	     MORE STUFF		*
-		 *******************************/
-
-#include "quote.c"
-
-		 /*******************************
 		 *	     REGISTER		*
 		 *******************************/
 
@@ -6661,7 +6668,6 @@ install_rdf_db()
   PL_register_foreign("rdf_md5",	2, rdf_md5,	    0);
   PL_register_foreign("rdf_atom_md5",	3, rdf_atom_md5,    0);
 #endif
-  PL_register_foreign("rdf_quote_uri",	2, rdf_quote_uri,   0);
 
 #ifdef O_DEBUG
   PL_register_foreign("rdf_debug",      1, rdf_debug,       0);

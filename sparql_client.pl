@@ -20,7 +20,7 @@
 
     You should have received a copy of the GNU Lesser General Public
     License along with this library; if not, write to the Free Software
-    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
     As a special exception, if you link this library with other files,
     compiled with a Free Software compiler, to produce an executable, this
@@ -38,6 +38,7 @@
 :- use_module(library(http/http_open)).
 :- use_module(library(lists)).
 :- use_module(library(rdf)).
+:- use_module(library(semweb/rdf_turtle)).
 :- use_module(library(option)).
 
 /** <module> SPARQL client library
@@ -110,13 +111,17 @@ sparql_query(Query, Row, Options) :-
 			   ])
 		  | Options5
 		  ], In,
-		  [ header(content_type, ContentType)
+		  [ header(content_type, ContentType),
+		    request_header('Accept' = '*/*')
 		  ]),
 	plain_content_type(ContentType, CleanType),
 	read_reply(CleanType, In, VarNames, Row).
 
 read_reply('application/rdf+xml', In, _, Row) :- !,
 	call_cleanup(load_rdf(stream(In), RDF), close(In)),
+	member(Row, RDF).
+read_reply('text/rdf+n3', In, _, Row) :- !,
+	call_cleanup(rdf_read_turtle(stream(In), RDF, []), close(In)),
 	member(Row, RDF).
 read_reply(MIME, In, VarNames, Row) :-
 	sparql_result_mime(MIME), !,

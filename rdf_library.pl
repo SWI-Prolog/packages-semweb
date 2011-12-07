@@ -20,7 +20,7 @@
 
     You should have received a copy of the GNU Lesser General Public
     License along with this library; if not, write to the Free Software
-    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
     As a special exception, if you link this library with other files,
     compiled with a Free Software compiler, to produce an executable, this
@@ -55,6 +55,21 @@
 :- use_module(library(thread)).
 :- use_module(library(apply)).
 
+:- predicate_options(rdf_list_library/2, 2,
+		     [ indent(atom),
+		       show_graph(boolean),
+		       show_source(boolean),
+		       show_virtual(boolean)
+		     ]).
+:- predicate_options(rdf_load_library/2, 2,
+		     [ concurrent(positive_integer),
+		       import(boolean),
+		       load(boolean),
+		       base_uri(atom),
+		       claimed_source(atom),
+		       not_found(oneof([error,warning,silent]))
+		     ]).
+
 /** <module> RDF Library Manager
 
 This module manages an ontology library. Such   a  library consists of a
@@ -74,7 +89,9 @@ The typical usage scenario is
 @author Jan Wielemaker
 */
 
-:- rdf_register_ns(lib, 'http://www.swi-prolog.org/rdf/library/').
+:- rdf_register_ns(lib,  'http://www.swi-prolog.org/rdf/library/').
+:- rdf_register_ns(void, 'http://rdfs.org/ns/void#').
+:- rdf_register_ns(vann, 'http://purl.org/vocab/vann/').
 
 :- dynamic
 	manifest/2,			% Path, Time
@@ -602,8 +619,10 @@ attach_dir(Path, Visited) :-
 attach_dir(Path, Visited) :-
 	atom_concat(Path, '/*', Pattern),
 	expand_file_name(Pattern, Members),
-	(   member(Manifest, Members),
-	    is_manifest_file(Manifest)
+	(   manifest_file(MBase),
+	    rdf_extension(Ext),
+	    atomic_list_concat([Path, /, MBase, '.', Ext], Manifest),
+	    exists_file(Manifest)
 	->  process_manifest(Manifest)
 	;   print_message(silent, rdf(no_manifest(Path)))
 	),
@@ -665,6 +684,9 @@ process_triples(Manifest, Triples) :-
 extract_namespace(Triples, Mnemonic, Namespace) :-
 	edge(Triples, Decl, lib:mnemonic, literal(Mnemonic)),
 	edge(Triples, Decl, lib:namespace, Namespace).
+extract_namespace(Triples, Mnemonic, Namespace) :-
+	edge(Triples, Decl, vann:preferredNamespacePrefix, literal(Mnemonic)),
+	edge(Triples, Decl, vann:preferredNamespaceUri, literal(Namespace)).
 
 %%	extract_ontology(+Triples, -Ontology) is nondet.
 %
@@ -682,6 +704,8 @@ ontology_type(X) :-
 	(   rdf_equal(X, lib:'Ontology')
 	;   rdf_equal(X, lib:'Schema')
 	;   rdf_equal(X, lib:'Instances')
+	;   rdf_equal(X, void:'Dataset')
+	;   rdf_equal(X, void:'Linkset')
 	).
 
 %%	facet(+Triples, +File, -Facet) is nondet.
@@ -690,11 +714,7 @@ ontology_type(X) :-
 %	with rdf_library_index/2.
 
 facet(Triples, File, title(Title)) :-
-	edge(Triples, File, dc:title, literal(Title)).
-:- if(rdf_current_ns(dcterms, _)).
-facet(Triples, File, title(Title)) :-
 	edge(Triples, File, dcterms:title, literal(Title)).
-:- endif.
 facet(Triples, File, version(Version)) :-
 	edge(Triples, File, owl:versionInfo, literal(Version)).
 facet(Triples, File, comment(Comment)) :-
@@ -712,6 +732,10 @@ facet(Triples, File, imports(schema, Path)) :-
 	edge(Triples, File, lib:schema, Path).
 facet(Triples, File, imports(instances, Path)) :-
 	edge(Triples, File, lib:instances, Path).
+facet(Triples, File, imports(subset, Path)) :-
+	edge(Triples, File, void:subset, Path).
+facet(Triples, File, imports(data_dump, Path)) :-
+	edge(Triples, File, void:dataDump, Path).
 facet(Triples, File, provides_ns(NS)) :-
 	edge(Triples, File, lib:providesNamespace, NSDecl),
 	edge(Triples, NSDecl, lib:namespace, NS).
@@ -719,14 +743,40 @@ facet(Triples, File, uses_ns(NS)) :-
 	edge(Triples, File, lib:usesNamespace, NSDecl),
 	edge(Triples, NSDecl, lib:namespace, NS).
 facet(Triples, File, virtual) :-
-	edge(Triples, File, rdf:type, lib:'Virtual').
+	(   edge(Triples, File, rdf:type, lib:'Virtual')
+	;   edge(Triples, File, rdf:type, void:'Dataset')
+	;   edge(Triples, File, rdf:type, void:'Linkset')
+	) -> true.
 
 %%	edge(+Triples, ?S, ?P, ?O) is nondet.
 %
-%	Like rdf/3 over a list of Triples.
+%	Like rdf_has/3 over a list of Triples.
 
 edge(Triples, S, P, O) :-
-	member(rdf(S,P,O), Triples).
+	nonvar(P), !,
+	sub_p(SubP, P),
+	member(rdf(S,SubP,O), Triples).
+edge(Triples, S, P, O) :-
+	member(rdf(S,SubP,O), Triples),
+	sub_p(SubP, P).
+
+sub_p(P, P).
+sub_p(Sub, P) :-
+	(   nonvar(Sub)
+	->  sub_property_of(Sub, Sub1),
+	    sub_p(Sub1, P)
+	;   sub_property_of(Sub1, P),
+	    sub_p(Sub, Sub1)
+	).
+
+:- rdf_meta
+	sub_property_of(r,r).
+
+sub_property_of(void:subset, owl:imports).
+sub_property_of(dcterms:description, rdfs:comment).
+sub_property_of(void:subset, owl:imports).
+sub_property_of(void:dataDump, owl:imports).
+sub_property_of(dc:title, dcterms:title).
 
 %%	source_time(+Source, -Modified) is semidet.
 %
@@ -772,6 +822,7 @@ is_manifest_file(Path) :-
 	manifest_file(Base),
 	rdf_extension(Ext), !.
 
+manifest_file('void').			% make order optional?
 manifest_file('Manifest').
 manifest_file('manifest').
 

@@ -13,43 +13,13 @@
 # Author: Jan Wielemaker (J.Wielemaker@vu.nl)
 ################################################################
 
-.SUFFIXES: .tex .dvi .doc .pl
-
-PL=@PL@
-PLBASE=@PLBASE@
-PLARCH=@PLARCH@
-PLINCL=@PLINCL@
-PKGDOC=$(PLBASE)/doc/packages
-PCEHOME=../xpce
-LIBDIR=$(PLBASE)/library/semweb
-
-CC=@CC@
-COFLAGS=@COFLAGS@
-CWFLAGS=@CWFLAGS@
-CMFLAGS=@CMFLAGS@
-CIFLAGS=-I.
-CFLAGS=$(COFLAGS) $(CWFLAGS) $(CMFLAGS) $(CIFLAGS) @DEFS@
-LIBS=@LIBS@
-NETLIBS=@NETLIBS@
-
-PUBLICPL=swipl
-DOCTOTEX=$(PCEHOME)/bin/doc2tex
-PLTOTEX=$(PUBLICPL) -q -s pltotex.pl -g pltotex --
+PACKAGE=semweb
 DOC=semweb
-TEX=$(DOC).tex	rdfturtle.tex rdfturtlewrite.tex rdfcompare.tex \
-		rdfportray.tex rdflib.tex sparqlclient.tex
-DVI=$(DOC).dvi
-PDF=$(DOC).pdf
-RUNTEX=../../man/runtex
-
-LD=@LD@
-LDFLAGS=@LDSOFLAGS@
-
-INSTALL=@INSTALL@
-INSTALL_PROGRAM=@INSTALL_PROGRAM@
-INSTALL_DATA=@INSTALL_DATA@
-
+include ../Makefile.defs
 include common.mk
+CFLAGS+= -I.
+LIBDIR=$(PLBASE)/library/semweb
+PKGDOC=$(PKGDOCDIR)/semweb
 
 TARGETS=	rdf_db.@SO@ turtle.@SO@
 
@@ -59,27 +29,29 @@ RDFDBOBJ=	rdf_db.o atom.o lock.o md5.o avl.o atom_map.o debug.o \
 all:		$(TARGETS)
 
 rdf_db.@SO@:	$(RDFDBOBJ)
-		$(LD) $(LDFLAGS) -o $@ $(RDFDBOBJ) $(LIBS)
+		$(LD) $(LDSOFLAGS) -o $@ $(RDFDBOBJ) $(LIBS)
 turtle.@SO@:	turtle.o
-		$(LD) $(LDFLAGS) -o $@ turtle.o $(LIBS)
+		$(LD) $(LDSOFLAGS) -o $@ turtle.o $(LIBS)
 
 turtle.o:	turtle.c turtle_chars.c
 
 install:	$(TARGETS) $(LIBPL)
 		mkdir -p $(DESTDIR)$(LIBDIR)
-		mkdir -p $(DESTDIR)$(PLBASE)/lib/$(PLARCH)
+		mkdir -p $(DESTDIR)$(SOLIBDIR)
 		for f in $(TARGETS); do \
-		  $(INSTALL) -m 755 $$f $(DESTDIR)$(PLBASE)/lib/$(PLARCH); \
+		  $(INSTALL_PROGRAM) $$f $(DESTDIR)$(SOLIBDIR); \
 		done
-		for f in $(DATA) $(LIBPL) README; do \
+		for f in $(DATA) $(LIBPL); do \
 		  $(INSTALL_DATA) $$f $(DESTDIR)$(LIBDIR); \
 		done
-		$(PL) -f none -g true -t "make_library_index('$(DESTDIR)$(LIBDIR)')"
-		$(PL) -f none -g make -t halt
+		$(INSTALL_DATA) README $(DESTDIR)$(LIBDIR)/README$(TXTEXT)
+		$(MKPKGINDEX)
+		$(MKINDEX)
 
 ln-install::
 		$(MAKE) INSTALL=../ln-install \
 			INSTALL_DATA=../ln-install \
+			INSTALL_PROGRAM=../ln-install \
 			install
 
 rpm-install:	install
@@ -94,43 +66,32 @@ pdf-install::
 		$(INSTALL) -m 644 $(DOC).pdf $(DESTDIR)$(PKGDOC)
 
 uninstall::
-		(cd $(PLBASE)/lib/$(PLARCH) && rm -f $(TARGETS))
+		(cd $(SOLIBDIR) && rm -f $(TARGETS))
 		(cd $(PLBASE)/library && rm -f $(LIBPL))
-		$(PL) -f none -g make -t halt
+		$(MKINDEX)
 
-rdf_db.o:	quote.c unicode_map.c buffer.h error.h
+rdf_db.o:	unicode_map.c buffer.h error.h
 query.o:	buffer.h
 
 ################################################################
 # Documentation
 ################################################################
 
-pdf:		$(PDF)
+TEXEXTRA=	rdfturtle.tex rdfturtlewrite.tex rdfcompare.tex \
+                rdfportray.tex rdflib.tex sparqlclient.tex
 
-$(DVI):		$(TEX)
-		$(RUNTEX) $(DOC)
+$(TEX):		$(TEXEXTRA)
 
-$(PDF):		$(TEX)
-		$(RUNTEX) --pdf $(DOC)
-
-html:		$(TEX)
-		latex2html $(DOC)
-
-$(TEX):		$(DOCTOTEX)
-
-rdfturtle.tex:	rdf_turtle.pl
+rdfturtle.tex:  rdf_turtle.pl
 		$(PLTOTEX) --section 'library(semweb/rdf_turtle)'
-rdfturtlewrite.tex:	rdf_turtle_write.pl
+rdfturtlewrite.tex:     rdf_turtle_write.pl
 		$(PLTOTEX) --section 'library(semweb/rdf_turtle_write)'
-rdfcompare.tex:	rdf_compare.pl
+rdfcompare.tex: rdf_compare.pl
 		$(PLTOTEX) --section 'library(semweb/rdf_compare)'
-rdfportray.tex:	rdf_portray.pl
+rdfportray.tex: rdf_portray.pl
 		$(PLTOTEX) --section 'library(semweb/rdf_portray)'
-sparqlclient.tex:	sparql_client.pl
+sparqlclient.tex:       sparql_client.pl
 		$(PLTOTEX) --section 'library(semweb/sparql_client)'
-
-.doc.tex:
-		$(DOCTOTEX) $*.doc > $*.tex
 
 ################################################################
 # Check

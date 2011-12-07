@@ -19,7 +19,7 @@
 
     You should have received a copy of the GNU Lesser General Public
     License along with this library; if not, write to the Free Software
-    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #ifdef HAVE_CONFIG_H
@@ -297,7 +297,6 @@ first_atom(atom_t a, int match)
     wchar_t buf[256];
     wchar_t *out, *s;
     int i;
-    wint_t c;
     atom_t rc;
 
     if ( len <= 256 )
@@ -305,13 +304,16 @@ first_atom(atom_t a, int match)
     else
       out = PL_malloc(len*sizeof(wchar_t));
 
-    for(s=out,i=0; (c=fetch(&t,i)); s++,i++)
-    { if ( c == '*' && match == STR_MATCH_LIKE )
+    for(s=out,i=0; i<len; s++,i++)
+    { wint_t c = fetch(&t,i);
+
+      if ( c == '*' && match == STR_MATCH_LIKE )
       { if ( i == 0 )			/* like '*...' */
 	{ rc = 0;
 	  goto out;
 	}
 	len = i;			/* only up to the first * */
+	break;
       }
       *s = sort_point(c)>>8;
     }
