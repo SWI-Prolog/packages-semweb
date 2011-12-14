@@ -259,7 +259,7 @@ step_error(State, Error) :-
 
 open_input(stream(Stream), Stream, true) :- !,
 	stream_property(Stream, encoding(Old)),
-	(   Old == utf8
+	(   unicode_encoding(Old)
 	->  Close = true
 	;   set_stream(Stream, encoding(utf8)),
 	    Close = set_stream(Stream, encoding(Old))
@@ -277,6 +277,11 @@ open_input(File, Stream, close(Stream)) :-
 			     extensions([ttl, ''])
 			   ]),
 	open(Path, read, Stream, [encoding(utf8)]).
+
+unicode_encoding(utf8).
+unicode_encoding(wchar_t).
+unicode_encoding(unicode_be).
+unicode_encoding(unicode_le).
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 The parser is a two-stage processor. The  first reads the raw file input
