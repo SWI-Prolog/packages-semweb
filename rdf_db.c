@@ -2924,7 +2924,7 @@ destroy_saved(rdf_db *db, save_context *ctx)
 
       for(c=*s; c; c = n)
       { n = c->next;
-	free(c);
+	rdf_free(db, c, sizeof(saved));
       }
     }
 
