@@ -29,7 +29,7 @@
 
 #include <SWI-Stream.h>
 #include <SWI-Prolog.h>
-#include "avl.h"
+#include "skiplist/skiplist.h"
 #include "lock.h"
 #include "atom.h"
 #include "murmur.h"
@@ -72,7 +72,7 @@ typedef struct atom_map
 { int		magic;			/* AM_MAGIC */
   size_t	value_count;		/* total # values */
   rwlock	lock;			/* Multi-threaded access */
-  avl_tree	tree;			/* AVL tree */
+  skiplist	tree;			/* Skip list */
 } atom_map;
 
 typedef void *datum;
@@ -82,7 +82,7 @@ typedef void *datum;
 typedef struct atom_set
 { size_t  size;				/* # cells in use */
   size_t  allocated;			/* # cells allocated */
-  datum *atoms;			/* allocated cells */
+  datum  *atoms;			/* allocated cells */
 #ifdef O_SECURE
   int	  magic;
 #endif
@@ -599,7 +599,7 @@ free_node_data(void *ptr)
 		 *******************************/
 
 static int
-cmp_node_data(void *l, void *r, NODE type)
+cmp_node_data(void *l, void *r)
 { node_data_ex *e1 = l;
   node_data *n2 = r;
   datum *d1 = e1->data.key;
@@ -625,12 +625,10 @@ cmp_node_data(void *l, void *r, NODE type)
 
 static void
 init_tree_map(atom_map *m)
-{ avlinit(&m->tree,
-	  NULL, sizeof(node_data),
-	  cmp_node_data,
-	  free_node_data,		/* destroy */
-	  NULL,				/* alloc */
-	  NULL);			/* free */
+{ skiplist_init(&m->tree,
+		sizeof(node_data),
+		cmp_node_data,
+		free_node_data);	/* destroy */
 }
 
 
@@ -658,7 +656,7 @@ destroy_atom_map(term_t handle)
     return FALSE;
 
   WRLOCK(m, FALSE);
-  avlfree(&m->tree);
+  skiplist_destroy(&m->tree);
   m->magic = 0;
   WRUNLOCK(m);
   destroy_lock(&m->lock);
@@ -688,7 +686,7 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
   if ( !WRLOCK(map, FALSE) )
     return FALSE;
 
-  if ( (data=avlfind(&map->tree, &search)) )
+  if ( (data=skiplist_find(&map->tree, &search)) )
   { int rc;
 
     SECURE(assert(data->magic == ND_MAGIC));
@@ -714,8 +712,7 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
     lock_datum(search.data.key);
     SECURE(search.magic = ND_MAGIC);
 
-    data = avlins(&map->tree, &search);
-    assert(!data);
+    data = skiplist_insert(&map->tree, &search, NULL);
     map->value_count++;
   }
 
@@ -749,11 +746,11 @@ delete_atom_map2(term_t handle, term_t from)
     return FALSE;
 
 					/* TBD: Single pass? */
-  if ( (data = avlfind(&map->tree, &search)) )
+  if ( (data = skiplist_find(&map->tree, &search)) )
   { LOCKOUT_READERS(map);
     map->value_count -= data->values->size;
     search.data = *data;
-    avldel(&map->tree, &search);
+    skiplist_delete(&map->tree, &search);
     REALLOW_READERS(map);
   }
 
@@ -778,7 +775,7 @@ delete_atom_map3(term_t handle, term_t from, term_t to)
   if ( !WRLOCK(map, TRUE) )
     return FALSE;
 
-  if ( (data = avlfind(&map->tree, &search)) &&
+  if ( (data = skiplist_find(&map->tree, &search)) &&
        in_atom_set(data->values, a2) )
   { atom_set *as = data->values;
 
@@ -788,7 +785,7 @@ delete_atom_map3(term_t handle, term_t from, term_t to)
       map->value_count--;
       if ( as->size == 0 )
       { search.data = *data;
-	avldel(&map->tree, &search);
+	skiplist_delete(&map->tree, &search);
       }
     }
     REALLOW_READERS(map);
@@ -857,7 +854,7 @@ find_atom_map(term_t handle, term_t keys, term_t literals)
 	goto failure;
     }
 
-    if ( (data = avlfind(&map->tree, &search)) )
+    if ( (data = skiplist_find(&map->tree, &search)) )
     { if ( ns+1 >= MAX_SETS )
 	return resource_error("max_search_atoms");
 
@@ -934,36 +931,9 @@ Spec is one of
 	* between(Low, High)
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-/* TBD: should use avlwalk(), but this isn't fine as it does not allow a
-   failure return and does not allow passing our term-handles
-*/
-
-static int
-unify_keys(term_t head, term_t tail, AVLnode *node)
-{ node_data *data;
-
-  if ( node )
-  { if ( node->subtree[LEFT] )
-    { if ( !unify_keys(head, tail, node->subtree[LEFT]) )
-	return FALSE;
-    }
-
-    data = (node_data*)node->data;
-    if ( !PL_unify_list(tail, head, tail) ||
-	 !unify_datum(head, data->key) )
-      return FALSE;
-
-    if ( node->subtree[RIGHT] )
-      return unify_keys(head, tail, node->subtree[RIGHT]);
-  }
-
-  return TRUE;
-}
-
-
 static int
 between_keys(atom_map *map, intptr_t min, intptr_t max, term_t head, term_t tail)
-{ avl_enum state;
+{ skiplist_enum state;
   node_data *data;
   node_data_ex search;
 
@@ -972,7 +942,7 @@ between_keys(atom_map *map, intptr_t min, intptr_t max, term_t head, term_t tail
   search.data.key = integer_to_datum(min);
   SECURE(search.magic = ND_MAGIC_EX);
 
-  if ( (data = avlfindfirst(&map->tree, &search, &state)) &&
+  if ( (data = skiplist_find_first(&map->tree, &search, &state)) &&
        isIntDatum(data->key) )
   { for(;;)
     { if ( integer_from_datum(data->key) > max )
@@ -980,16 +950,16 @@ between_keys(atom_map *map, intptr_t min, intptr_t max, term_t head, term_t tail
 
       if ( !PL_unify_list(tail, head, tail) ||
 	   !unify_datum(head, data->key) )
-      { avlfinddestroy(&state);
+      { skiplist_find_destroy(&state);
 	return FALSE;
       }
 
-      if ( !(data = avlfindnext(&state)) ||
+      if ( !(data = skiplist_find_next(&state)) ||
 	   !isIntDatum(data->key) )
 	break;
     }
 
-    avlfinddestroy(&state);
+    skiplist_find_destroy(&state);
   }
 
   return TRUE;
@@ -1014,10 +984,19 @@ rdf_keys_in_literal_map(term_t handle, term_t spec, term_t keys)
     type_error(spec, "key-specifier");
 
   if ( name == ATOM_all )
-  { AVLnode *node = map->tree.root;
+  { skiplist_enum state;
+    node_data *data;
 
-    if ( !unify_keys(head, tail, node) )
-      goto failure;
+    for(data = skiplist_find_first(&map->tree, NULL, &state);
+	data;
+	data=skiplist_find_next(&state))
+    { if ( !PL_unify_list(tail, head, tail) ||
+	   !unify_datum(head, data->key) )
+      { skiplist_find_destroy(&state);
+	goto failure;
+      }
+    }
+    skiplist_find_destroy(&state);
   } else if ( name == ATOM_key && arity == 1 )
   { term_t a = PL_new_term_ref();
     node_data *data;
@@ -1027,7 +1006,7 @@ rdf_keys_in_literal_map(term_t handle, term_t spec, term_t keys)
     if ( !get_search_datum(a, &search) )
       goto failure;
 
-    if ( (data = avlfind(&map->tree, &search)) )
+    if ( (data = skiplist_find(&map->tree, &search)) )
     { intptr_t size = (intptr_t)data->values->size;
 
       RDUNLOCK(map);
@@ -1039,7 +1018,7 @@ rdf_keys_in_literal_map(term_t handle, term_t spec, term_t keys)
   } else if ( (name == ATOM_prefix || name == ATOM_case) && arity == 1 )
   { term_t a = PL_new_term_ref();
     atom_t prefix, first_a;
-    avl_enum state;
+    skiplist_enum state;
     node_data *data;
     node_data_ex search;
     int match = (name == ATOM_prefix ? STR_MATCH_PREFIX : STR_MATCH_EXACT);
@@ -1054,9 +1033,9 @@ rdf_keys_in_literal_map(term_t handle, term_t spec, term_t keys)
     search.atom.resolved = FALSE;
     SECURE(search.magic = ND_MAGIC_EX);
 
-    for(data = avlfindfirst(&map->tree, &search, &state);
+    for(data = skiplist_find_first(&map->tree, &search, &state);
 	data;
-	data=avlfindnext(&state))
+	data=skiplist_find_next(&state))
     { assert(isAtomDatum(data->key));
 
       if ( !match_atoms(match,
@@ -1065,11 +1044,12 @@ rdf_keys_in_literal_map(term_t handle, term_t spec, term_t keys)
 
       if ( !PL_unify_list(tail, head, tail) ||
 	   !unify_datum(head, data->key) )
-      { avlfinddestroy(&state);
+      { skiplist_find_destroy(&state);
 	goto failure;
       }
+
+      skiplist_find_destroy(&state);
     }
-    avlfinddestroy(&state);
   } else if ( (name == ATOM_ge || name == ATOM_le) && arity == 1 )
   { term_t a = PL_new_term_ref();
     intptr_t val, min, max;
@@ -1126,7 +1106,7 @@ rdf_reset_literal_map(term_t handle)
 
   if ( !WRLOCK(map, FALSE) )
     return FALSE;
-  avlfree(&map->tree);
+  skiplist_destroy(&map->tree);
   init_tree_map(map);
   map->value_count = 0;
   WRUNLOCK(map);
