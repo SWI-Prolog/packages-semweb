@@ -47,26 +47,7 @@ typedef struct lifespan
 
 
 typedef struct rdf_db *rdf_dbp;
-
-		 /*******************************
-		 *	      WAITERS		*
-		 *******************************/
-
-typedef void (*onready)(rdf_dbp db, void *closure);
-
-typedef struct wait_on_queries
-{ simpleMutex	lock;			/* Protect active count */
-  int		active_count;		/* #Running queries */
-  rdf_dbp	db;			/* Database I'm associated to */
-  void	       *data;			/* Closure data */
-  onready      *onready;		/* Call-back */
-} wait_on_queries;
-
-
-typedef struct wait_list
-{ wait_on_queries  *waiter;		/* Waiting structure */
-  struct wait_list *next;		/* Next waiting */
-} wait_list;
+typedef struct triple *triplep;
 
 
 		 /*******************************
@@ -82,7 +63,6 @@ typedef struct query
 { gen_t		rd_gen;			/* generation for reading */
   gen_t		wr_gen;			/* generation for writing */
   rdf_dbp	db;			/* Database on which we run */
-  wait_list    *waiters;		/* things waiting for me to die */
   struct query *parent;			/* Parent query */
   struct query_stack  *stack;		/* Query-stack I am part of */
   q_type	type;			/* Q_* */
@@ -138,7 +118,7 @@ typedef struct query_admin
 
 
 		 /*******************************
-		 *	    	API		*
+		 *		API		*
 		 *******************************/
 
 COMMON(void)	init_query_admin(rdf_dbp db);
@@ -152,8 +132,6 @@ COMMON(int)	empty_transaction(query *q);
 COMMON(int)	commit_transaction(query *q);
 COMMON(void)	close_transaction(query *q);
 COMMON(int)	discard_transaction(query *q);
-
-typedef struct triple *triplep;
 
 COMMON(int)	add_triples(query *q, triplep *triples, size_t count);
 COMMON(int)	del_triples(query *q, triplep *triples, size_t count);

@@ -95,41 +95,6 @@ rdf_thread_info(rdf_db *db, int tid)
 
 
 		 /*******************************
-		 *	       WAITER		*
-		 *******************************/
-
-wait_on_queries *
-alloc_waiter(rdf_db *db, onready *onready, void *data)
-{ wait_on_queries *w = rdf_malloc(db, sizeof(*w));
-
-  simpleMutexInit(&w->lock);
-  w->active_count = 0;
-  w->db           = db;
-  w->data         = data;
-  w->onready      = onready;
-
-  return w;
-}
-
-
-static void
-wakeup(wait_on_queries *w)
-{ int count;
-
-  simpleMutexLock(&w->lock);
-  count = --w->active_count;
-  simpleMutexUnlock(&w->lock);
-  if ( count == 0 )
-  { simpleMutexDelete(&w->lock);
-    Sdprintf("Wait complete!\n");
-    if ( w->onready )
-      (*w->onready)(w->db, w->data);
-    rdf_free(w->db, w, sizeof(*w));
-  }
-}
-
-
-		 /*******************************
 		 *	    QUERY-STACK		*
 		 *******************************/
 
@@ -199,17 +164,13 @@ alloc_query(query_stack *qs)
 
 static void
 push_query(query *q)
-{ simpleMutexLock(&q->stack->lock);
-  q->stack->top++;
-  simpleMutexUnlock(&q->stack->lock);
+{ q->stack->top++;
 }
 
 
 static void
 pop_query(query *q)
-{ simpleMutexLock(&q->stack->lock);
-  q->stack->top--;
-  simpleMutexUnlock(&q->stack->lock);
+{ q->stack->top--;
 }
 
 
@@ -272,20 +233,7 @@ open_transaction(rdf_db *db, triple_buffer *added, triple_buffer *deleted)
 
 void
 close_query(query *q)
-{ wait_list *wl;
-
-  if ( (wl=q->waiters) )
-  { wait_list *n;
-
-    q->waiters = NULL;
-    for(; wl; wl=n)
-    { n = wl->next;
-      wakeup(wl->waiter);
-      rdf_free(q->db, wl, sizeof(*wl));
-    }
-  }
-
-  pop_query(q);
+{ pop_query(q);
 }
 
 
