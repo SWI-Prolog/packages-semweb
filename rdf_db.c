@@ -4517,7 +4517,6 @@ static foreign_t
 rdf_assert4(term_t subject, term_t predicate, term_t object, term_t src)
 { rdf_db *db = DB;
   triple *t = new_triple(db);
-  int rc;
   query *q;
 
   if ( !get_triple(db, subject, predicate, object, t) )
@@ -4539,7 +4538,7 @@ rdf_assert4(term_t subject, term_t predicate, term_t object, term_t src)
   add_triples(q, &t, 1);
   close_query(q);
 
-  return rc;
+  return TRUE;
 }
 
 
