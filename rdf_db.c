@@ -4763,7 +4763,7 @@ next_search_state(search_state *state)
 retry:
   while( (t = next_triple(tw)) )
   { if ( t->is_duplicate && !state->src )
-      continue;
+      continue;				/* TBD: Table of returned */
     if ( !alive_triple(state->query, t) )
       continue;
 
