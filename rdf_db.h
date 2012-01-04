@@ -61,7 +61,7 @@ supposed to be local to the SWI-Prolog kernel are declared using
 #include "memory.h"
 #include "hash.h"
 #include "error.h"
-#include "avl.h"
+#include "skiplist/skiplist.h"
 #ifdef WITH_MD5
 #include "md5.h"
 #endif
@@ -116,8 +116,8 @@ supposed to be local to the SWI-Prolog kernel are declared using
 #define BY_SPOG	(BY_S|BY_P|BY_O|BY_G)	/* 15 */
 
 /* (*) INDEX_TABLES must be consistent with index_col[] in rdf_db.c */
-#define INDEX_TABLES 		        10 	/* (*)  */
-#define INITIAL_TABLE_SIZE   		1024
+#define INDEX_TABLES		        10	/* (*)  */
+#define INITIAL_TABLE_SIZE		1024
 #define INITIAL_RESOURCE_TABLE_SIZE	8192
 #define INITIAL_PREDICATE_TABLE_SIZE	64
 #define INITIAL_GRAPH_TABLE_SIZE	64
@@ -158,10 +158,10 @@ typedef struct predicate
   int		    label;		/* Numeric label in cloud */
   struct predicate_cloud *cloud;	/* cloud I belong to */
   size_t	    hash;		/* key used for hashing
-  					   (=hash if ->cloud is up-to-date) */
+					   (=hash if ->cloud is up-to-date) */
 					/* properties */
   struct predicate *inverse_of;		/* my inverse predicate */
-  unsigned 	    transitive : 1;	/* P(a,b)&P(b,c) --> P(a,c) */
+  unsigned	    transitive : 1;	/* P(a,b)&P(b,c) --> P(a,c) */
 					/* statistics */
   size_t	    triple_count;	/* # triples on this predicate */
   size_t	    distinct_updated[2];/* Is count still valid? */
@@ -197,7 +197,7 @@ typedef struct graph
   int		    triple_count;	/* # triples associated to it */
 #ifdef WITH_MD5
   unsigned	    md5 : 1;		/* do/don't record MD5 */
-  md5_byte_t 	    digest[16];		/* MD5 digest */
+  md5_byte_t	    digest[16];		/* MD5 digest */
 #endif
 } graph;
 
@@ -248,7 +248,7 @@ typedef struct triple
 					/* indexing */
   union
   { struct triple*next[INDEX_TABLES];	/* hash-table next links */
-    literal 	end;			/* end for between(X,Y) patterns */
+    literal	end;			/* end for between(X,Y) patterns */
   } tp;					/* triple or pattern */
 					/* smaller objects (e.g., flags) */
   uint32_t      line;			/* graph-line number */
@@ -286,7 +286,7 @@ typedef struct transaction_record
   tr_type			type;
   triple		       *triple;		/* new/deleted triple */
   union
-  { triple		       *triple; 	/* used for update */
+  { triple		       *triple;		/* used for update */
     struct
     { atom_t			atom;
       unsigned long		line;
@@ -356,11 +356,11 @@ typedef struct rdf_db
   transaction_record *tr_last;		/* last transaction record */
   int		tr_nesting;		/* nesting depth of transactions */
   int		tr_reset;		/* transaction contains reset */
-  int 		resetting;		/* We are in rdf_reset_db() */
+  int		resetting;		/* We are in rdf_reset_db() */
 
   rwlock	lock;			/* threaded access */
 
-  avl_tree      literals;
+  skiplist      literals;
 } rdf_db;
 
 

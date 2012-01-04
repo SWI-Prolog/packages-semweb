@@ -1858,7 +1858,7 @@ free_literal_value(rdf_db *db, literal *lit)
     lex.literal = lit;
     prepare_literal_ex(&lex);
 
-    if ( !avldel(&db->literals, &lex) )
+    if ( !skiplist_delete(&db->literals, &lex) )
     { Sdprintf("Failed to delete %p (size=%ld): ", lit, db->literals.count);
       print_literal(lit);
       Sdprintf("\n");
@@ -2027,23 +2027,11 @@ compare_literals(literal_ex *lex, literal *l2)
 
 
 static int
-avl_compare_literals(void *p1, void *p2, NODE type)
+sl_compare_literals(void *p1, void *p2)
 { literal_ex *lex = p1;
   literal *l2 = *(literal**)p2;
 
   return compare_literals(lex, l2);
-}
-
-
-static void*
-avl_malloc(void *ptr, size_t size)
-{ return rdf_malloc(ptr, size);
-}
-
-
-static void
-avl_free(void *ptr, void *data, size_t size)
-{ rdf_free(ptr, data, size);
 }
 
 
@@ -2055,12 +2043,10 @@ free_literal() or by rdf_reset_db().
 
 static int
 init_literal_table(rdf_db *db)
-{ avlinit(&db->literals,
-	  db, sizeof(literal*),
-	  avl_compare_literals,
-	  NULL,
-	  avl_malloc,
-	  avl_free);
+{ skiplist_init(&db->literals,
+		sizeof(literal*),
+		sl_compare_literals,
+		NULL);
 
   return TRUE;
 }
@@ -2077,11 +2063,14 @@ static literal *
 share_literal(rdf_db *db, literal *from)
 { literal **data;
   literal_ex lex;
+  int is_new;
 
   lex.literal = from;
   prepare_literal_ex(&lex);
 
-  if ( (data = avlins(&db->literals, &lex)) )
+  data = skiplist_insert(&db->literals, &lex, &is_new);
+
+  if ( is_new )
   { literal *l2 = *data;
 
     DEBUG(2,
@@ -4594,30 +4583,6 @@ rdf_assert3(term_t subject, term_t predicate, term_t object)
 }
 
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-inc_active_queries(rdf_db *db);
-dec_active_queries(rdf_db *db);
-
-TBD: Either delete this or use atomic inc/dec.
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-static void
-inc_active_queries(rdf_db *db)
-{ LOCK_MISC(db);
-  db->active_queries++;
-  UNLOCK_MISC(db);
-}
-
-
-static void
-dec_active_queries(rdf_db *db)
-{ LOCK_MISC(db);
-  db->active_queries--;
-  assert(db->active_queries>=0);
-  UNLOCK_MISC(db);
-}
-
-
 typedef struct search_state
 { rdf_db       *db;			/* our database */
   term_t	subject;		/* Prolog term references */
@@ -4628,7 +4593,8 @@ typedef struct search_state
   unsigned	allocated;		/* State has been allocated */
   unsigned	flags;			/* Misc flags controlling search */
   atom_t	prefix;			/* prefix and like search */
-  avl_enum     *literal_state;		/* Literal search state */
+  int		has_literal_state;	/* Literal state is present */
+  skiplist_enum literal_state;		/* Literal search state */
   literal      *literal_cursor;		/* pointer in current literal */
   literal_ex    lit_ex;			/* extended literal for fast compare */
   triple_walker cursor;			/* Pointer in triple DB */
@@ -4701,13 +4667,13 @@ init_search_state(search_state *state)
 
     lit = *p->object.literal;
     lit.value.string = state->prefix;
-    state->literal_state = rdf_malloc(state->db,
-				      sizeof(*state->literal_state));
     state->lit_ex.literal = &lit;
     prepare_literal_ex(&state->lit_ex);
-    rlitp = avlfindfirst(&state->db->literals, &state->lit_ex, state->literal_state);
+    rlitp = skiplist_find_first(&state->db->literals,
+				&state->lit_ex, &state->literal_state);
     if ( rlitp )
     { init_cursor_from_literal(state, *rlitp);
+      state->has_literal_state = TRUE;
     } else
     { free_search_state(state);
       return FALSE;
@@ -4715,20 +4681,21 @@ init_search_state(search_state *state)
   } else if ( p->indexed != BY_SP && p->match >= STR_MATCH_LE )
   { literal **rlitp;
 
-    state->literal_state = rdf_malloc(state->db,
-				      sizeof(*state->literal_state));
     state->lit_ex.literal = p->object.literal;
     prepare_literal_ex(&state->lit_ex);
 
     switch(p->match)
     { case STR_MATCH_LE:
-	rlitp = avlfindfirst(&state->db->literals, NULL, state->literal_state);
+	rlitp = skiplist_find_first(&state->db->literals,
+				    NULL, &state->literal_state);
         break;
       case STR_MATCH_GE:
-	rlitp = avlfindfirst(&state->db->literals, &state->lit_ex, state->literal_state);
+	rlitp = skiplist_find_first(&state->db->literals,
+				    &state->lit_ex, &state->literal_state);
         break;
       case STR_MATCH_BETWEEN:
-	rlitp = avlfindfirst(&state->db->literals, &state->lit_ex, state->literal_state);
+	rlitp = skiplist_find_first(&state->db->literals,
+				    &state->lit_ex, &state->literal_state);
         state->lit_ex.literal = &p->tp.end;
 	prepare_literal_ex(&state->lit_ex);
         break;
@@ -4758,8 +4725,6 @@ free_search_state(search_state *state)
   free_triple(state->db, &state->pattern);
   if ( state->prefix )
     PL_unregister_atom(state->prefix);
-  if ( state->literal_state )
-    rdf_free(state->db, state->literal_state, sizeof(*state->literal_state));
   if ( state->allocated )		/* also means redo! */
     rdf_free(state->db, state, sizeof(*state));
   destroy_triple_walker(state->db, &state->cursor);
@@ -4813,7 +4778,7 @@ retry:
       continue;
 
 					/* hash-collision, skip */
-    if ( state->literal_state )
+    if ( state->has_literal_state )
     { if ( !(t->object_is_literal &&
 	     t->object.literal == state->literal_cursor) )
 	continue;
@@ -4830,7 +4795,7 @@ retry:
 
     inv_alt:
       while( (t = next_triple(tw)) )
-      { if ( state->literal_state )
+      { if ( state->has_literal_state )
 	{ if ( !(t->object_is_literal &&
 		 t->object.literal == state->literal_cursor) )
 	    continue;
@@ -4857,10 +4822,10 @@ retry:
     goto retry;
   }
 
-  if ( state->literal_state )
+  if ( state->has_literal_state )
   { literal **litp;
 
-    if ( (litp = avlfindnext(state->literal_state)) )
+    if ( (litp = skiplist_find_next(&state->literal_state)) )
     { literal *lit = *litp;
 
       DEBUG(2, Sdprintf("next: ");
@@ -4939,7 +4904,7 @@ rdf(term_t subject, term_t predicate, term_t object,
 
     search:
       if ( (rc=next_search_state(state)) )
-      { if ( state->cursor.current || state->literal_state )
+      { if ( state->cursor.current || state->has_literal_state )
 	  return allow_retry_state(state);
       }
 
@@ -5057,7 +5022,7 @@ static foreign_t
 rdf_current_literal(term_t t, control_t h)
 { rdf_db *db = DB;
   literal **data;
-  avl_enum *state;
+  skiplist_enum *state;
   int rc;
 
   switch(PL_foreign_control(h))
@@ -5065,18 +5030,16 @@ rdf_current_literal(term_t t, control_t h)
       if ( PL_is_variable(t) )
       { state = rdf_malloc(db, sizeof(*state));
 
-	RDLOCK(db);
-	inc_active_queries(db);
-	data = avlfindfirst(&db->literals, NULL, state);
+	data = skiplist_find_first(&db->literals, NULL, state);
 	goto next;
       } else
       { return FALSE;			/* TBD */
       }
     case PL_REDO:
       state = PL_foreign_context_address(h);
-      data = avlfindnext(state);
+      data  = skiplist_find_next(state);
     next:
-      for(; data; data=avlfindnext(state))
+      for(; data; data=skiplist_find_next(state))
       { literal *lit = *data;
 
 	if ( unify_literal(t, lit) )
@@ -5091,10 +5054,7 @@ rdf_current_literal(term_t t, control_t h)
 
     cleanup:
       state = PL_foreign_context_address(h);
-      avlfinddestroy(state);
       rdf_free(db, state, sizeof(*state));
-      RDUNLOCK(db);
-      dec_active_queries(db);
 
       return rc;
     default:
@@ -6474,7 +6434,7 @@ reset_db(rdf_db *db)
   erase_graphs(db);
   db->need_update = FALSE;
   db->agenda_created = 0;
-  avlfree(&db->literals);
+  skiplist_destroy(&db->literals);
 
   rc = (init_resource_db(db, &db->resources) &&
 	init_literal_table(db));

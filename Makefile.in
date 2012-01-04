@@ -24,7 +24,7 @@ PKGDOC=$(PKGDOCDIR)/semweb
 TARGETS=	rdf_db.@SO@ turtle.@SO@
 
 RDFDBOBJ=	rdf_db.o atom.o lock.o md5.o avl.o atom_map.o debug.o \
-		hash.o murmur.o query.o resource.o error.o
+		hash.o murmur.o query.o resource.o error.o skiplist/skiplist.o
 
 all:		$(TARGETS)
 
