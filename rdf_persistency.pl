@@ -38,7 +38,7 @@
 	    rdf_journal_file/2,		% ?DB, ?JournalFile
 	    rdf_db_to_file/2		% ?DB, ?FileBase
 	  ]).
-:- use_module(library('semweb/rdf_db')).
+:- use_module(library(semweb/rdf_db)).
 :- use_module(library(lists)).
 :- use_module(library(url)).
 :- use_module(library(debug)).
@@ -178,8 +178,10 @@ option_type(log_nested_transactions(X),	must_be(boolean, X)).
 
 no_agc(Goal) :-
 	current_prolog_flag(agc_margin, Old),
-	set_prolog_flag(agc_margin, 0),
-	call_cleanup(Goal, set_prolog_flag(agc_margin, Old)).
+	setup_call_cleanup(
+	    set_prolog_flag(agc_margin, 0),
+	    Goal,
+	    set_prolog_flag(agc_margin, Old)).
 
 
 %%	rdf_detach_db is det.
