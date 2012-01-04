@@ -3486,8 +3486,8 @@ load_db(rdf_db *db, IOSTREAM *in, ld_context *ctx)
 
 static int
 link_loaded_triples(rdf_db *db, ld_context *ctx)
-{ size_t created0 = db->created;
-  graph *graph;
+{ graph *graph;
+  triple **t;
 
   if ( ctx->graph )			/* lookup named graph */
   { graph = lookup_graph(db, ctx->graph);
@@ -3511,6 +3511,8 @@ link_loaded_triples(rdf_db *db, ld_context *ctx)
   }
 
 					/* TBD: broadcast(EV_ASSERT_LOAD, ...) */
+  for(t=ctx->triples.base; t<ctx->triples.top; t++)
+    lock_atoms(db, *t);
   add_triples(ctx->query, ctx->triples.base, ctx->triples.top-ctx->triples.base);
 
 					/* update the graph info */
@@ -3519,7 +3521,7 @@ link_loaded_triples(rdf_db *db, ld_context *ctx)
     graph->md5 = TRUE;
   }
 
-  db->generation += (db->created-created0);
+  db->generation += (ctx->triples.top - ctx->triples.base);
 
   return TRUE;
 }
