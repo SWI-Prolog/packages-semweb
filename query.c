@@ -68,7 +68,7 @@ rdf_thread_info(rdf_db *db, int tid)
   if ( !td->blocks[idx] )
   { simpleMutexLock(&qa->query.lock);
     if ( !td->blocks[idx] )
-    { size_t bs = (size_t)1<<idx;
+    { size_t bs = BLOCKLEN(idx);
       thread_info **newblock = rdf_malloc(db, bs*sizeof(thread_info*));
 
       memset(newblock, 0, bs*sizeof(thread_info*));
@@ -140,7 +140,7 @@ alloc_query(query_stack *qs)
 
   simpleMutexLock(&qs->lock);
   if ( !qs->blocks[b] )
-  { size_t bytes = (1<<b) * sizeof(query);
+  { size_t bytes = BLOCKLEN(b) * sizeof(query);
     query *ql = rdf_malloc(qs->db, bytes);
     query *parent;
     int i;

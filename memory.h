@@ -27,18 +27,27 @@
 Stuff for lock-free primitives
 
   * MSB(unsigned int i)
-  Computes the most-significant bit, which often translates to
-  a single machine operation.  Returns 0 if i=0;
+  Computes the most-significant bit+1, which often translates to
+  a single machine operation.
 
-     MSB(0) = undefined
-     MSB(1) = 0
-     MSB(2) = 1
+     MSB(0) = 0
+     MSB(1) = 1
+     MSB(2) = 2
      ...
+
+     blocks[0] --> [0]
+     blocks[1] --> [1]
+     blocks[2] --> [2,3]
+     ...
+
+     size of array at i is i=0 ? 1 : 1<<(i-1)
 
   * MemoryBarrier()
   Realises a (full) memory barrier.  This means that memory operations
   before the barrier are all executed before those after the barrier.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+#define BLOCKLEN(i) ((i) ? 1<<(i-1) : 1)
 
 #ifdef _MSC_VER				/* Windows MSVC version */
 
@@ -46,6 +55,8 @@ static inline int
 MSB(unsigned int i)
 { unsigned long mask = i;
   unsigned long index;
+
+  assert(0);				/* TBD */
 
   _BitScanReverse(&index, mask);	/* 0 if mask is 0 */
   return index;
@@ -57,7 +68,7 @@ MSB(unsigned int i)
 
 #elif defined(__GNUC__)			/* GCC version */
 
-#define MSB(i) (assert(i), 31 - __builtin_clz(i))
+#define MSB(i) ((i) ? (32 - __builtin_clz(i)) : 0)
 #define MemoryBarrier() __sync_synchronize()
 
 #else					/* Other */
@@ -71,6 +82,7 @@ MSB(unsigned int i)
   if (i >=    0x10) {i >>=  4; j +=  4;}
   if (i >=     0x4) {i >>=  2; j +=  2;}
   if (i >=     0x2) j++;
+  if (i >=     0x1) j++;
 
   return j;
 }

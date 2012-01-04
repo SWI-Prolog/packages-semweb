@@ -74,7 +74,7 @@ erase_resource_hash(resource_db *rdb)
     { resource **r = rdb->hash.blocks[i];
 
       if ( r )
-      { int size = 1<<i;
+      { int size = BLOCKLEN(i);
 
 	r += size;
 	free_resource_chains(rdb->db, r, size);
@@ -230,7 +230,7 @@ rdf_resource(term_t r, control_t h)
       { state = rdf_malloc(db, sizeof(*state));
 	state->rdb = &db->resources;
 	state->current = NULL;
-	state->current_entry = 0;
+	state->current_entry = -1;
 	break;
       } else if ( PL_get_atom_ex(r, &name) )
       { if ( existing_resource(&db->resources, name) )
@@ -274,11 +274,30 @@ rdf_resource(term_t r, control_t h)
 }
 
 
+#ifdef O_DEBUG
+#define RDF_LOOKUP_RESOURCE
+static foreign_t
+rdf_lookup_resource(term_t r)
+{ rdf_db *db = DB;
+  atom_t a;
+
+  if ( !PL_get_atom_ex(r, &a) )
+    return FALSE;
+
+  lookup_resource(&db->resources, a);
+
+  return TRUE;
+}
+#endif
+
 #define NDET PL_FA_NONDETERMINISTIC
 
 int
 register_resource_predicates(void)
-{ PL_register_foreign("rdf_resource", 1, rdf_resource, NDET);
+{ PL_register_foreign("rdf_resource",        1, rdf_resource,        NDET);
+#ifdef RDF_LOOKUP_RESOURCE
+  PL_register_foreign("rdf_lookup_resource", 1, rdf_lookup_resource, 0);
+#endif
 
   return TRUE;
 }

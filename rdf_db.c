@@ -2191,7 +2191,7 @@ reset_triple_hash(rdf_db *db, triple_hash *hash)
   memset(hash->blocks[0], 0, bytes);
   for(i=MSB(hash->bucket_count_epoch); i<MAX_TBLOCKS; i++)
   { if ( hash->blocks[i] )
-    { size_t size = (1<<i)*sizeof(triple_bucket);
+    { size_t size = BLOCKLEN(i)*sizeof(triple_bucket);
 
       rdf_free(db, hash->blocks[i], size);
       hash->blocks[i] = 0;
