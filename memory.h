@@ -30,6 +30,11 @@ Stuff for lock-free primitives
   Computes the most-significant bit, which often translates to
   a single machine operation.  Returns 0 if i=0;
 
+     MSB(0) = undefined
+     MSB(1) = 0
+     MSB(2) = 1
+     ...
+
   * MemoryBarrier()
   Realises a (full) memory barrier.  This means that memory operations
   before the barrier are all executed before those after the barrier.
@@ -52,8 +57,7 @@ MSB(unsigned int i)
 
 #elif defined(__GNUC__)			/* GCC version */
 
-/*__builtin_clz() is undefined for i=0*/
-#define MSB(i) ((i) ? (31 - __builtin_clz(i)) : 0)
+#define MSB(i) (assert(i), 31 - __builtin_clz(i))
 #define MemoryBarrier() __sync_synchronize()
 
 #else					/* Other */

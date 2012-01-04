@@ -24,13 +24,11 @@
 
 #include "rdf_db.h"
 
-static void	erase_resource_array(resource_db *rdb);
-
 static int
 init_resource_hash(resource_db *rdb)
 { size_t bytes = sizeof(resource**)*INITIAL_RESOURCE_TABLE_SIZE;
   resource **r = rdf_malloc(rdb->db, bytes);
-  int i, count = INITIAL_PREDICATE_TABLE_SIZE;
+  int i, count = INITIAL_RESOURCE_TABLE_SIZE;
 
   memset(r, 0, bytes);
   for(i=0; i<MSB(count); i++)
@@ -45,11 +43,32 @@ init_resource_hash(resource_db *rdb)
 
 
 static void
+free_resource_chain(rdf_db *db, resource *r)
+{ resource *n;
+
+  for(; r; r=n)
+  { n = r->next;
+    PL_unregister_atom(r->name);
+    rdf_free(db, r, sizeof(*r));
+  }
+}
+
+static void
+free_resource_chains(rdf_db *db, resource **rl, int count)
+{ int i;
+
+  for(i=0; i<count; i++)
+    free_resource_chain(db, rl[i]);
+
+  rdf_free(db, rl, sizeof(resource**)*count);
+}
+
+static void
 erase_resource_hash(resource_db *rdb)
 { if ( rdb->hash.blocks[0] )
-  { int i, count = INITIAL_PREDICATE_TABLE_SIZE;
+  { int i, count = INITIAL_RESOURCE_TABLE_SIZE;
 
-    rdf_free(rdb->db, rdb->hash.blocks[0], sizeof(resource**)*count);
+    free_resource_chains(rdb->db, rdb->hash.blocks[0], count);
 
     for(i=MSB(count); i<MAX_RBLOCKS; i++)
     { resource **r = rdb->hash.blocks[i];
@@ -58,7 +77,7 @@ erase_resource_hash(resource_db *rdb)
       { int size = 1<<i;
 
 	r += size;
-	rdf_free(rdb->db, r, size*sizeof(resource**));
+	free_resource_chains(rdb->db, r, size);
       } else
 	break;
     }
@@ -96,77 +115,6 @@ init_resource_db(rdf_db *db, resource_db *rdb)
 void
 erase_resources(resource_db *rdb)
 { erase_resource_hash(rdb);
-  erase_resource_array(rdb);
-}
-
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-    MSB	 IDs		Offset
-     0	 0,1		0
-     1   2,3		2
-     2   4,5,6,7	4
-
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-static int
-set_id_resource(resource_db *rdb, resource *r)
-{ size_t id;
-
-  MUST_HOLD(rdb->db);
-
-  for(id=rdb->array.first_free; ; id++)
-  { int idx = MSB(id);
-    resource **b = rdb->array.blocks[idx];
-
-    if ( !b )
-    { size_t count = id < 2 ? 2 : 1<<idx;
-      size_t bytes = count*sizeof(resource*);
-
-      b = rdf_malloc(rdb->db, bytes);
-      memset(b, 0, bytes);
-      if ( id >= 2 )
-	b -= count;
-      rdb->array.blocks[idx] = b;
-    }
-
-    if ( !b[id] )
-    { b[id] = r;
-      r->id = id;
-      rdb->array.first_free = id+1;
-      if ( rdb->array.highest_id < id )
-	rdb->array.highest_id = id;
-
-      return TRUE;
-    }
-  }
-}
-
-
-static void
-erase_resource_array(resource_db *rdb)
-{ int i;
-
-  for(i=0; i<MAX_RBLOCKS; i++)
-  { resource **r = rdb->hash.blocks[i];
-
-    if ( r )
-    { int size = i == 0	? 2 : 1<<i;
-      int n;
-
-      r += size;
-      for(n=0; n<size; n++)
-      { if ( r[n] )
-	{ if ( r[n]->name )
-	    PL_unregister_atom(r[n]->name);
-	  rdf_free(rdb->db, r[n], sizeof(r[n]));
-	}
-      }
-
-      rdf_free(rdb->db, r, size*sizeof(resource**));
-    } else
-      break;
-  }
 }
 
 
@@ -244,7 +192,6 @@ lookup_resource(resource_db *rdb, atom_t name)
   r = rdf_malloc(rdb->db, sizeof(*r));
   memset(r, 0, sizeof(*r));
   r->name = name;
-  set_id_resource(rdb, r);
   PL_register_atom(name);
   if ( rdb->hash.count > rdb->hash.bucket_count )
     resize_resource_table(rdb);
@@ -253,8 +200,6 @@ lookup_resource(resource_db *rdb, atom_t name)
   r->next = *rp;
   *rp = r;
   rdb->hash.count++;
-  DEBUG(5, Sdprintf("Resource %s (id = %ld)\n",
-		    PL_atom_chars(name), (long)r->id));
   UNLOCK_MISC(rdb->db);
 
   return r;
@@ -265,17 +210,27 @@ lookup_resource(resource_db *rdb, atom_t name)
 		 *	       PROLOG		*
 		 *******************************/
 
+typedef struct res_enum
+{ resource_db *rdb;
+  resource    *current;
+  int	       current_entry;
+} res_enum;
+
+
 static foreign_t
 rdf_resource(term_t r, control_t h)
 { rdf_db *db = DB;
-  size_t id;
+  res_enum *state;
 
   switch( PL_foreign_control(h) )
   { case PL_FIRST_CALL:
     { atom_t name;
 
       if ( PL_is_variable(r) )
-      { id = 0;
+      { state = rdf_malloc(db, sizeof(*state));
+	state->rdb = &db->resources;
+	state->current = NULL;
+	state->current_entry = 0;
 	break;
       } else if ( PL_get_atom_ex(r, &name) )
       { if ( existing_resource(&db->resources, name) )
@@ -286,42 +241,36 @@ rdf_resource(term_t r, control_t h)
       return FALSE;
     }
     case PL_REDO:
-      id = PL_foreign_context(h);
+      state = PL_foreign_context_address(h);
       break;
     case PL_PRUNED:
+      state = PL_foreign_context_address(h);
+      rdf_free(db, state, sizeof(*state));
       return TRUE;
     default:
       assert(0);
       return FALSE;
   }
 
-  for(; id<=db->resources.array.highest_id; id++)
-  { resource **b = db->resources.array.blocks[MSB(id)];
+  for(;;)
+  { int ce;
 
-    assert(b);
-    if ( b[id] )
-    { if ( !PL_unify_atom(r, b[id]->name) )
-	return FALSE;			/* error */
-      PL_retry(id+1);
+    if ( state->current )
+    { if ( !PL_unify_atom(r, state->current->name) )
+      { rdf_free(db, state, sizeof(*state));
+	return FALSE;				/* error */
+      }
+      state->current = state->current->next;
+      PL_retry_address(state);
+    }
+
+    if ( (ce = ++state->current_entry) < state->rdb->hash.bucket_count )
+    { state->current = state->rdb->hash.blocks[MSB(ce)][ce];
+    } else
+    { rdf_free(db, state, sizeof(*state));
+      return FALSE;
     }
   }
-
-  return FALSE;
-}
-
-
-static foreign_t
-pl_lookup_resource(term_t name, term_t id)
-{ rdf_db *db = DB;
-  resource *r;
-  atom_t a;
-
-  if ( !PL_get_atom_ex(name, &a) )
-    return FALSE;
-
-  r = lookup_resource(&db->resources, a);
-
-  return PL_unify_int64(id, r->id);
 }
 
 
@@ -329,8 +278,7 @@ pl_lookup_resource(term_t name, term_t id)
 
 int
 register_resource_predicates(void)
-{ PL_register_foreign("rdf_resource",	     1, rdf_resource,       NDET);
-  PL_register_foreign("rdf_lookup_resource", 2, pl_lookup_resource, 0);
+{ PL_register_foreign("rdf_resource", 1, rdf_resource, NDET);
 
   return TRUE;
 }

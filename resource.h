@@ -30,7 +30,6 @@
 typedef struct resource
 { atom_t	name;			/* identifier of the resource */
   struct resource *next;		/* Next in hash */
-  unsigned int	id;			/* Integer id */
 } resource;
 
 typedef struct resource_hash
@@ -40,15 +39,8 @@ typedef struct resource_hash
   size_t	count;			/* Total #resources */
 } resource_hash;
 
-typedef struct resource_array
-{ resource    **blocks[MAX_RBLOCKS];
-  size_t	first_free;
-  size_t	highest_id;
-} resource_array;
-
 typedef struct resource_db
 { resource_hash	hash;			/* Hash atom-->id */
-  resource_array array;			/* Array id-->resource */
   struct rdf_db	*db;			/* RDF database I belong to */
 } resource_db;
 

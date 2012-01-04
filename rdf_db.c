@@ -2315,14 +2315,15 @@ init_tables(rdf_db *db)
       return FALSE;
   }
 
-  return (init_pred_table(db) &&
+  return (init_resource_db(db, &db->resources) &&
+	  init_pred_table(db) &&
 	  init_graph_table(db) &&
 	  init_literal_table(db));
 }
 
 
 static rdf_db *
-new_db()
+new_db(void)
 { rdf_db *db = rdf_malloc(NULL, sizeof(*db));
 
   memset(db, 0, sizeof(*db));
@@ -6418,7 +6419,9 @@ erase_predicates(rdf_db *db)
 
 static int
 reset_db(rdf_db *db)
-{ db->resetting = TRUE;
+{ int rc;
+
+  db->resetting = TRUE;
 
   erase_triples(db);
   erase_predicates(db);
@@ -6427,11 +6430,13 @@ reset_db(rdf_db *db)
   db->need_update = FALSE;
   db->agenda_created = 0;
   avlfree(&db->literals);
-  init_literal_table(db);
+
+  rc = (init_resource_db(db, &db->resources) &&
+	init_literal_table(db));
 
   db->resetting = FALSE;
 
-  return TRUE;
+  return rc;
 }
 
 
@@ -6624,7 +6629,6 @@ install_rdf_db()
 
 					/* setup the database */
   DB = new_db();
-  init_resource_db(DB, &DB->resources);
 
   PL_register_foreign("rdf_version",    1, rdf_version,     0);
   PL_register_foreign("rdf_assert",	3, rdf_assert3,	    0);
