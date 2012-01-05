@@ -67,6 +67,24 @@ Searching is done using
 	rdf_find_literal_map(Map, SetOfAbstract, -Literals)
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+			      TODO
+
+Concurrency issues:
+    - Both node_data (payload for the skiplist) and the close hash-table
+      array must be left to GC.
+    - Search in atom sets must reliably get pointer and size.  See
+      resize_atom_set();
+    - The map itself must be left to GC to avoid interaction on destroy
+    - The set must be handled by a Prolog symbol to ensure clean
+      destruction.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+		 /*******************************
+		 *	    PRIVATE DATA	*
+		 *******************************/
+
 #define AM_MAGIC	0x6ab19e8e
 
 typedef struct atom_map
@@ -90,8 +108,8 @@ typedef struct atom_set
 } atom_set;
 
 
-#define ND_MAGIC 0x67b49a23
-#define ND_MAGIC_EX 0x753ab3c
+#define ND_MAGIC    0x67b49a20
+#define ND_MAGIC_EX 0x67b49a21
 
 typedef struct node_data
 { datum		key;
