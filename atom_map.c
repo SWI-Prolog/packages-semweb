@@ -31,7 +31,7 @@
 #include <SWI-Stream.h>
 #include <SWI-Prolog.h>
 #include "skiplist/skiplist.h"
-#include "lock.h"
+#include "mutex.h"
 #include "atom.h"
 #include "murmur.h"
 #include "debug.h"
@@ -71,8 +71,8 @@ Searching is done using
 
 typedef struct atom_map
 { int		magic;			/* AM_MAGIC */
-  size_t	value_count;		/* total # values */
-  rwlock	lock;			/* Multi-threaded access */
+  size_t	value_count;		/* total # values in all keys */
+  simpleMutex	lock;			/* Multi-threaded access */
   skiplist	list;			/* Skip list */
 } atom_map;
 
@@ -110,12 +110,9 @@ typedef struct node_data_ex
 } node_data_ex;
 
 
-#define RDLOCK(map)			rdlock(&map->lock)
-#define WRLOCK(map, allowreaders)	wrlock(&map->lock, allowreaders)
-#define LOCKOUT_READERS(map)		lockout_readers(&map->lock)
-#define REALLOW_READERS(map)		reallow_readers(&map->lock)
-#define WRUNLOCK(map)			unlock(&map->lock, FALSE)
-#define RDUNLOCK(map)			unlock(&map->lock, TRUE)
+#define LOCK(map)			simpleMutexLock(&map->lock)
+#define UNLOCK(map)			simpleMutexUnlock(&map->lock)
+
 
 		 /*******************************
 		 *	     BASIC STUFF	*
@@ -550,12 +547,13 @@ cmp_node_data(void *l, void *r)
 
 
 static void
-init_tree_map(atom_map *m)
+init_map(atom_map *m)
 { skiplist_init(&m->list,
 		sizeof(node_data),
 		cmp_node_data,
-		free_node_data);	/* destroy */
+		free_node_data);
 }
+
 
 
 static foreign_t
@@ -566,8 +564,8 @@ new_atom_map(term_t handle)
     return PL_resource_error("memory");
 
   memset(m, 0, sizeof(*m));
-  init_lock(&m->lock);
-  init_tree_map(m);
+  simpleMutexInit(&m->lock);
+  init_map(m);
   m->magic = AM_MAGIC;
 
   return unify_atom_map(handle, m);
@@ -581,11 +579,11 @@ destroy_atom_map(term_t handle)
   if ( !get_atom_map(handle, &m) )
     return FALSE;
 
-  WRLOCK(m, FALSE);
-  skiplist_destroy(&m->list);
+  LOCK(m);
   m->magic = 0;
-  WRUNLOCK(m);
-  destroy_lock(&m->lock);
+  skiplist_destroy(&m->list);
+  UNLOCK(m);
+  simpleMutexDelete(&m->lock);
   free(m);
 
   return TRUE;
@@ -609,18 +607,17 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
        !get_datum(to, &a2) )
     return FALSE;
 
-  if ( !WRLOCK(map, FALSE) )
-    return FALSE;
-
   if ( (data=skiplist_find(&map->list, &search)) )
   { int rc;
 
     SECURE(assert(data->magic == ND_MAGIC));
 
-    if ( (rc=insert_atom_set(data->values, a2)) < 0 )
-    { WRUNLOCK(map);
+    LOCK(map);				/* TBD: use a distinct lock */
+    rc=insert_atom_set(data->values, a2);
+    UNLOCK(map);
+
+    if ( rc < 0 )
       return PL_resource_error("memory");
-    }
 
     if ( rc )
     { lock_datum(a2);
@@ -628,21 +625,17 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
     }
   } else
   { if ( keys && !PL_unify_integer(keys, map->list.count+1) )
-    { WRUNLOCK(map);
       return FALSE;
-    }
     if ( !(search.data.values = new_atom_set(a2)) )
-    { WRUNLOCK(map);
       return PL_resource_error("memory");
-    }
     lock_datum(search.data.key);
 
+    LOCK(map);
     data = skiplist_insert(&map->list, &search, NULL);
     SECURE(data->magic = ND_MAGIC);
     map->value_count++;
+    UNLOCK(map);
   }
-
-  WRUNLOCK(map);
 
   return TRUE;
 }
@@ -668,19 +661,14 @@ delete_atom_map2(term_t handle, term_t from)
        !get_search_datum(from, &search) )
     return FALSE;
 
-  if ( !WRLOCK(map, TRUE) )
-    return FALSE;
-
 					/* TBD: Single pass? */
   if ( (data = skiplist_find(&map->list, &search)) )
-  { LOCKOUT_READERS(map);
+  { LOCK(map);
     map->value_count -= data->values->size;
     search.data = *data;
     skiplist_delete(&map->list, &search);
-    REALLOW_READERS(map);
+    UNLOCK(map);
   }
-
-  WRUNLOCK(map);
 
   return TRUE;
 }
@@ -698,14 +686,11 @@ delete_atom_map3(term_t handle, term_t from, term_t to)
        !get_datum(to, &a2) )
     return FALSE;
 
-  if ( !WRLOCK(map, TRUE) )
-    return FALSE;
-
   if ( (data = skiplist_find(&map->list, &search)) &&
        in_atom_set(data->values, a2) )
   { atom_set *as = data->values;
 
-    LOCKOUT_READERS(map);
+    LOCK(map);
     if ( delete_atom_set(as, a2) )
     { unlock_datum(a2);
       map->value_count--;
@@ -714,10 +699,8 @@ delete_atom_map3(term_t handle, term_t from, term_t to)
 	skiplist_delete(&map->list, &search);
       }
     }
-    REALLOW_READERS(map);
+    UNLOCK(map);
   }
-
-  WRUNLOCK(map);
 
   return TRUE;
 }
@@ -762,9 +745,6 @@ find_atom_map(term_t handle, term_t keys, term_t literals)
   if ( !get_atom_map(handle, &map) )
     return FALSE;
 
-  if ( !RDLOCK(map) )
-    return FALSE;
-
   while(PL_get_list(tail, head, tail))
   { node_data *data;
     node_data_ex search;
@@ -773,11 +753,11 @@ find_atom_map(term_t handle, term_t keys, term_t literals)
     if ( PL_is_functor(head, FUNCTOR_not1) )
     { _PL_get_arg(1, head, tmp);
       if ( !get_search_datum(tmp, &search) )
-	goto failure;
+	return FALSE;
       neg = TRUE;
     } else
     { if ( !get_search_datum(head, &search) )
-	goto failure;
+	return FALSE;
     }
 
     if ( (data = skiplist_find(&map->list, &search)) )
@@ -789,21 +769,15 @@ find_atom_map(term_t handle, term_t keys, term_t literals)
       DEBUG(2, Sdprintf("Found atom-set of size %d\n", as[ns].set->size));
       ns++;
     } else if ( !neg )
-    { RDUNLOCK(map);		/* failure on positive literal: empty */
-
-      return PL_unify_nil(literals);
+    { return PL_unify_nil(literals);
     }
   }
   if ( !PL_get_nil(tail) )
-  { PL_type_error("list", tail);
-    goto failure;
-  }
+    return PL_type_error("list", tail);
 
   qsort(as, ns, sizeof(*as), cmp_atom_set_size);
   if ( ns==0 || as[0].neg )
-  { PL_domain_error("keywords", keys);
-    goto failure;
-  }
+    return PL_domain_error("keywords", keys);
 
   s0 = as[0].set;
 
@@ -820,7 +794,7 @@ find_atom_map(term_t handle, term_t keys, term_t literals)
     { if ( !as[i].neg )
       { if ( !in_atom_set(as[i].set, a) )
 	{ if ( a > as[i].set->atoms[as[i].set->size-1] )
-	    goto empty;
+	    return PL_unify_nil(tail);
 	  goto next;
 	}
       } else
@@ -831,17 +805,11 @@ find_atom_map(term_t handle, term_t keys, term_t literals)
 
     if ( !PL_unify_list(tail, head, tail) ||
 	 !unify_datum(head, a) )
-      goto failure;
+      return FALSE;
 next:;
   }
 
-empty:
-  RDUNLOCK(map);
   return PL_unify_nil(tail);
-
-failure:
-  RDUNLOCK(map);
-  return FALSE;
 }
 
 
@@ -903,9 +871,6 @@ rdf_keys_in_literal_map(term_t handle, term_t spec, term_t keys)
   if ( !get_atom_map(handle, &map) )
     return FALSE;
 
-  if ( !RDLOCK(map) )
-    return FALSE;
-
   if ( !PL_get_name_arity(spec, &name, &arity) )
     PL_type_error("key-specifier", spec);
 
@@ -919,7 +884,7 @@ rdf_keys_in_literal_map(term_t handle, term_t spec, term_t keys)
     { if ( !PL_unify_list(tail, head, tail) ||
 	   !unify_datum(head, data->key) )
       { skiplist_find_destroy(&state);
-	goto failure;
+	return FALSE;
       }
     }
     skiplist_find_destroy(&state);
@@ -930,17 +895,17 @@ rdf_keys_in_literal_map(term_t handle, term_t spec, term_t keys)
 
     _PL_get_arg(1, spec, a);
     if ( !get_search_datum(a, &search) )
-      goto failure;
+      return FALSE;
 
     if ( (data = skiplist_find(&map->list, &search)) )
     { intptr_t size = (intptr_t)data->values->size;
 
-      RDUNLOCK(map);
       assert(size > 0);
 
       return PL_unify_integer(keys, size);
     }
-    goto failure;
+
+    return FALSE;
   } else if ( (name == ATOM_prefix || name == ATOM_case) && arity == 1 )
   { term_t a = PL_new_term_ref();
     atom_t prefix, first_a;
@@ -951,7 +916,7 @@ rdf_keys_in_literal_map(term_t handle, term_t spec, term_t keys)
 
     _PL_get_arg(1, spec, a);
     if ( !PL_get_atom_ex(a, &prefix) )
-      goto failure;
+      return FALSE;
     first_a = first_atom(prefix, STR_MATCH_PREFIX);
 
     search.data.key = atom_to_datum(first_a);
@@ -971,7 +936,7 @@ rdf_keys_in_literal_map(term_t handle, term_t spec, term_t keys)
       if ( !PL_unify_list(tail, head, tail) ||
 	   !unify_datum(head, data->key) )
       { skiplist_find_destroy(&state);
-	goto failure;
+	return FALSE;
       }
 
       skiplist_find_destroy(&state);
@@ -982,7 +947,7 @@ rdf_keys_in_literal_map(term_t handle, term_t spec, term_t keys)
 
     _PL_get_arg(1, spec, a);
     if ( !PL_get_intptr_ex(a, &val) )
-      goto failure;
+      return FALSE;
 
     if ( name == ATOM_ge )
       min = val, max = MAP_MAX_INT;
@@ -990,32 +955,25 @@ rdf_keys_in_literal_map(term_t handle, term_t spec, term_t keys)
       max = val, min = MAP_MIN_INT;
 
     if ( !between_keys(map, min, max, head, tail) )
-      goto failure;
+      return FALSE;
   } else if ( name == ATOM_between && arity == 2 )
   { term_t a = PL_new_term_ref();
     intptr_t min, max;
 
     _PL_get_arg(1, spec, a);
     if ( !PL_get_intptr_ex(a, &min) )
-      goto failure;
+      return FALSE;
     _PL_get_arg(2, spec, a);
     if ( !PL_get_intptr_ex(a, &max) )
-      goto failure;
+      return FALSE;
 
     if ( !between_keys(map, min, max, head, tail) )
-      goto failure;
+      return FALSE;
   } else
-  { PL_type_error("key-specifier", spec);
-    goto failure;
+  { return PL_type_error("key-specifier", spec);
   }
 
-  RDUNLOCK(map);
-
   return PL_unify_nil(tail);
-
-failure:
-  RDUNLOCK(map);
-  return FALSE;
 }
 
 
@@ -1030,12 +988,11 @@ rdf_reset_literal_map(term_t handle)
   if ( !get_atom_map(handle, &map) )
     return FALSE;
 
-  if ( !WRLOCK(map, FALSE) )
-    return FALSE;
+  LOCK(map);
   skiplist_destroy(&map->list);
-  init_tree_map(map);
+  init_map(map);
   map->value_count = 0;
-  WRUNLOCK(map);
+  UNLOCK(map);
 
   return TRUE;
 }
