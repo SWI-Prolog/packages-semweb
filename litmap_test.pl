@@ -106,6 +106,17 @@ vk(all) :-
 	setof(X, Y^map(X, Y), Xs),
 	(   Xs == Keys
 	->  true
+	;   (   ord_subtract(Xs, Keys, Missing),
+		Missing \== []
+	    ->	format('Missing: ~p~n', [Missing])
+	    ;	true
+	    ),
+	    (   ord_subtract(Keys, Xs, TooMany),
+		TooMany \== []
+	    ->	format('TooMany: ~p~n', [TooMany])
+	    ;	true
+	    ),
+	    fail
 	).
 vk(prefix(Prefix)) :-
 	map(Map),
@@ -113,7 +124,8 @@ vk(prefix(Prefix)) :-
 	prefix_keys(Prefix, KeysOK),
 	(   KeysOK == Keys
 	->  true
-	;   format('prefix(~w): ~p (must be ~p)~n', [Prefix, Keys, KeysOK])
+	;   format('prefix(~w): ~p (must be ~p)~n', [Prefix, Keys, KeysOK]),
+	    fail
 	).
 vk(ge(Min)) :-
 	map(Map),
@@ -121,7 +133,8 @@ vk(ge(Min)) :-
 	between_keys(Min, 0x5fffffff, KeysOK),
 	(   KeysOK == Keys
 	->  true
-	;   format('ge(~w): ~p (must be ~p)~n', [Min, Keys, KeysOK])
+	;   format('ge(~w): ~p (must be ~p)~n', [Min, Keys, KeysOK]),
+	    fail
 	).
 vk(le(Max)) :-
 	map(Map),
@@ -129,7 +142,8 @@ vk(le(Max)) :-
 	between_keys(-0x60000000, Max, KeysOK),
 	(   KeysOK == Keys
 	->  true
-	;   format('le(~w): ~p (must be ~p)~n', [Max, Keys, KeysOK])
+	;   format('le(~w): ~p (must be ~p)~n', [Max, Keys, KeysOK]),
+	    fail
 	).
 vk(between(Min, Max)) :-
 	map(Map),
@@ -138,7 +152,8 @@ vk(between(Min, Max)) :-
 	(   KeysOK == Keys
 	->  true
 	;   format('between(~w, ~w): ~p (must be ~p)~n',
-		   [Min, Max, Keys, KeysOK])
+		   [Min, Max, Keys, KeysOK]),
+	    fail
 	).
 
 prefix_keys(Prefix, Keys) :-
