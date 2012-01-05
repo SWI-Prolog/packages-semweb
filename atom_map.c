@@ -73,7 +73,7 @@ typedef struct atom_map
 { int		magic;			/* AM_MAGIC */
   size_t	value_count;		/* total # values */
   rwlock	lock;			/* Multi-threaded access */
-  skiplist	tree;			/* Skip list */
+  skiplist	list;			/* Skip list */
 } atom_map;
 
 typedef void *datum;
@@ -551,7 +551,7 @@ cmp_node_data(void *l, void *r)
 
 static void
 init_tree_map(atom_map *m)
-{ skiplist_init(&m->tree,
+{ skiplist_init(&m->list,
 		sizeof(node_data),
 		cmp_node_data,
 		free_node_data);	/* destroy */
@@ -582,7 +582,7 @@ destroy_atom_map(term_t handle)
     return FALSE;
 
   WRLOCK(m, FALSE);
-  skiplist_destroy(&m->tree);
+  skiplist_destroy(&m->list);
   m->magic = 0;
   WRUNLOCK(m);
   destroy_lock(&m->lock);
@@ -612,7 +612,7 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
   if ( !WRLOCK(map, FALSE) )
     return FALSE;
 
-  if ( (data=skiplist_find(&map->tree, &search)) )
+  if ( (data=skiplist_find(&map->list, &search)) )
   { int rc;
 
     SECURE(assert(data->magic == ND_MAGIC));
@@ -627,7 +627,7 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
       map->value_count++;
     }
   } else
-  { if ( keys && !PL_unify_integer(keys, map->tree.count+1) )
+  { if ( keys && !PL_unify_integer(keys, map->list.count+1) )
     { WRUNLOCK(map);
       return FALSE;
     }
@@ -637,7 +637,7 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
     }
     lock_datum(search.data.key);
 
-    data = skiplist_insert(&map->tree, &search, NULL);
+    data = skiplist_insert(&map->list, &search, NULL);
     SECURE(data->magic = ND_MAGIC);
     map->value_count++;
   }
@@ -672,11 +672,11 @@ delete_atom_map2(term_t handle, term_t from)
     return FALSE;
 
 					/* TBD: Single pass? */
-  if ( (data = skiplist_find(&map->tree, &search)) )
+  if ( (data = skiplist_find(&map->list, &search)) )
   { LOCKOUT_READERS(map);
     map->value_count -= data->values->size;
     search.data = *data;
-    skiplist_delete(&map->tree, &search);
+    skiplist_delete(&map->list, &search);
     REALLOW_READERS(map);
   }
 
@@ -701,7 +701,7 @@ delete_atom_map3(term_t handle, term_t from, term_t to)
   if ( !WRLOCK(map, TRUE) )
     return FALSE;
 
-  if ( (data = skiplist_find(&map->tree, &search)) &&
+  if ( (data = skiplist_find(&map->list, &search)) &&
        in_atom_set(data->values, a2) )
   { atom_set *as = data->values;
 
@@ -711,7 +711,7 @@ delete_atom_map3(term_t handle, term_t from, term_t to)
       map->value_count--;
       if ( as->size == 0 )
       { search.data = *data;
-	skiplist_delete(&map->tree, &search);
+	skiplist_delete(&map->list, &search);
       }
     }
     REALLOW_READERS(map);
@@ -780,7 +780,7 @@ find_atom_map(term_t handle, term_t keys, term_t literals)
 	goto failure;
     }
 
-    if ( (data = skiplist_find(&map->tree, &search)) )
+    if ( (data = skiplist_find(&map->list, &search)) )
     { if ( ns+1 >= MAX_SETS )
 	return PL_resource_error("max_search_atoms");
 
@@ -868,7 +868,7 @@ between_keys(atom_map *map, intptr_t min, intptr_t max, term_t head, term_t tail
   search.data.key = integer_to_datum(min);
   SECURE(search.magic = ND_MAGIC_EX);
 
-  if ( (data = skiplist_find_first(&map->tree, &search, &state)) &&
+  if ( (data = skiplist_find_first(&map->list, &search, &state)) &&
        isIntDatum(data->key) )
   { for(;;)
     { if ( integer_from_datum(data->key) > max )
@@ -913,7 +913,7 @@ rdf_keys_in_literal_map(term_t handle, term_t spec, term_t keys)
   { skiplist_enum state;
     node_data *data;
 
-    for(data = skiplist_find_first(&map->tree, NULL, &state);
+    for(data = skiplist_find_first(&map->list, NULL, &state);
 	data;
 	data=skiplist_find_next(&state))
     { if ( !PL_unify_list(tail, head, tail) ||
@@ -932,7 +932,7 @@ rdf_keys_in_literal_map(term_t handle, term_t spec, term_t keys)
     if ( !get_search_datum(a, &search) )
       goto failure;
 
-    if ( (data = skiplist_find(&map->tree, &search)) )
+    if ( (data = skiplist_find(&map->list, &search)) )
     { intptr_t size = (intptr_t)data->values->size;
 
       RDUNLOCK(map);
@@ -959,7 +959,7 @@ rdf_keys_in_literal_map(term_t handle, term_t spec, term_t keys)
     search.atom.resolved = FALSE;
     SECURE(search.magic = ND_MAGIC_EX);
 
-    for(data = skiplist_find_first(&map->tree, &search, &state);
+    for(data = skiplist_find_first(&map->list, &search, &state);
 	data;
 	data=skiplist_find_next(&state))
     { assert(isAtomDatum(data->key));
@@ -1032,7 +1032,7 @@ rdf_reset_literal_map(term_t handle)
 
   if ( !WRLOCK(map, FALSE) )
     return FALSE;
-  skiplist_destroy(&map->tree);
+  skiplist_destroy(&map->list);
   init_tree_map(map);
   map->value_count = 0;
   WRUNLOCK(map);
@@ -1058,7 +1058,7 @@ rdf_statistics_literal_map(term_t map, term_t key)
   { term_t a = PL_new_term_ref();
 
     _PL_get_arg(1, key, a);
-    if ( !PL_unify_integer(a, m->tree.count) )
+    if ( !PL_unify_integer(a, m->list.count) )
       return FALSE;
     _PL_get_arg(2, key, a);
 
