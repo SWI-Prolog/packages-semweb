@@ -27,6 +27,7 @@
 #include <config.h>
 #endif
 
+/*#define O_SECURE 1*/
 #include <SWI-Stream.h>
 #include <SWI-Prolog.h>
 #include "skiplist/skiplist.h"
@@ -710,9 +711,9 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
       return resource_error("memory");
     }
     lock_datum(search.data.key);
-    SECURE(search.magic = ND_MAGIC);
 
     data = skiplist_insert(&map->tree, &search, NULL);
+    SECURE(data->magic = ND_MAGIC);
     map->value_count++;
   }
 
