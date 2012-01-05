@@ -121,10 +121,6 @@ typedef struct node_data_ex
 		 *	     BASIC STUFF	*
 		 *******************************/
 
-static functor_t FUNCTOR_error2;
-static functor_t FUNCTOR_type_error2;
-static functor_t FUNCTOR_domain_error2;
-static functor_t FUNCTOR_resource_error1;
 static functor_t FUNCTOR_atom_map1;
 static functor_t FUNCTOR_size2;
 static functor_t FUNCTOR_not1;
@@ -145,10 +141,6 @@ static void
 init_functors()
 { FUNCTOR_atom_map1 = PL_new_functor(PL_new_atom("$literal_map"), 1);
 
-  MKFUNCTOR(error, 2);
-  MKFUNCTOR(type_error, 2);
-  MKFUNCTOR(domain_error, 2);
-  MKFUNCTOR(resource_error, 1);
   MKFUNCTOR(size, 2);
   MKFUNCTOR(not, 1);
 
@@ -160,73 +152,6 @@ init_functors()
   MKATOM(between);
   MKATOM(key);
 }
-
-
-static int
-type_error(term_t actual, const char *expected)
-{ term_t ex;
-
-  if ( (ex = PL_new_term_ref()) &&
-       PL_unify_term(ex,
-		     PL_FUNCTOR, FUNCTOR_error2,
-		       PL_FUNCTOR, FUNCTOR_type_error2,
-		         PL_CHARS, expected,
-		         PL_TERM, actual,
-		       PL_VARIABLE) )
-    return PL_raise_exception(ex);
-
-  return FALSE;
-}
-
-
-static int
-domain_error(term_t actual, const char *expected)
-{ term_t ex;
-
-  if ( (ex = PL_new_term_ref()) &&
-       PL_unify_term(ex,
-		     PL_FUNCTOR, FUNCTOR_error2,
-		       PL_FUNCTOR, FUNCTOR_domain_error2,
-		         PL_CHARS, expected,
-		         PL_TERM, actual,
-		       PL_VARIABLE) )
-    return PL_raise_exception(ex);
-
-  return FALSE;
-}
-
-
-static int
-resource_error(const char *what)
-{ term_t ex;
-
-  if ( (ex = PL_new_term_ref()) &&
-       PL_unify_term(ex,
-		     PL_FUNCTOR, FUNCTOR_error2,
-		       PL_FUNCTOR, FUNCTOR_resource_error1,
-		         PL_CHARS, what,
-		       PL_VARIABLE) )
-    return PL_raise_exception(ex);
-
-  return FALSE;
-}
-
-
-static int
-representation_error(const char *what)
-{ term_t ex = PL_new_term_ref();
-
-  if ( (ex = PL_new_term_ref()) &&
-       PL_unify_term(ex,
-		     PL_FUNCTOR, FUNCTOR_error2,
-		       PL_FUNCTOR_CHARS, "representation_error", 1,
-		         PL_CHARS, what,
-		       PL_VARIABLE) )
-    return PL_raise_exception(ex);
-
-  return FALSE;
-}
-
 
 
 static int
@@ -246,7 +171,7 @@ get_atom_map(term_t t, atom_map **map)
     }
   }
 
-  return type_error(t, "atom_map");
+  return PL_type_error("atom_map", t);
 }
 
 
@@ -333,13 +258,13 @@ get_datum(term_t t, datum* d)
     return TRUE;
   } else if ( PL_get_intptr(t, &l) )
   { if ( l < MAP_MIN_INT || l > MAP_MAX_INT )
-      return representation_error("integer_range");
+      return PL_representation_error("integer_range");
 
     *d = integer_to_datum(l);
     return TRUE;
   }
 
-  return type_error(t, "atom or integer");
+  return PL_type_error("atom or integer", t);
 }
 
 
@@ -357,13 +282,13 @@ get_search_datum(term_t t, node_data_ex *search)
     return TRUE;
   } else if ( PL_get_intptr(t, &l) )
   { if ( l < MAP_MIN_INT || l > MAP_MAX_INT )
-      return representation_error("integer_range");
+      return PL_representation_error("integer_range");
 
     search->data.key = integer_to_datum(l);
     return TRUE;
   }
 
-  return type_error(t, "atom or integer");
+  return PL_type_error("atom or integer", t);
 }
 
 
@@ -638,7 +563,7 @@ new_atom_map(term_t handle)
 { atom_map *m;
 
   if ( !(m=malloc(sizeof(*m))) )
-    return resource_error("memory");
+    return PL_resource_error("memory");
 
   memset(m, 0, sizeof(*m));
   init_lock(&m->lock);
@@ -694,7 +619,7 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
 
     if ( (rc=insert_atom_set(data->values, a2)) < 0 )
     { WRUNLOCK(map);
-      return resource_error("memory");
+      return PL_resource_error("memory");
     }
 
     if ( rc )
@@ -708,7 +633,7 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
     }
     if ( !(search.data.values = new_atom_set(a2)) )
     { WRUNLOCK(map);
-      return resource_error("memory");
+      return PL_resource_error("memory");
     }
     lock_datum(search.data.key);
 
@@ -857,7 +782,7 @@ find_atom_map(term_t handle, term_t keys, term_t literals)
 
     if ( (data = skiplist_find(&map->tree, &search)) )
     { if ( ns+1 >= MAX_SETS )
-	return resource_error("max_search_atoms");
+	return PL_resource_error("max_search_atoms");
 
       as[ns].set = data->values;
       as[ns].neg = neg;
@@ -870,13 +795,13 @@ find_atom_map(term_t handle, term_t keys, term_t literals)
     }
   }
   if ( !PL_get_nil(tail) )
-  { type_error(tail, "list");
+  { PL_type_error("list", tail);
     goto failure;
   }
 
   qsort(as, ns, sizeof(*as), cmp_atom_set_size);
   if ( ns==0 || as[0].neg )
-  { domain_error(keys, "keywords");
+  { PL_domain_error("keywords", keys);
     goto failure;
   }
 
@@ -982,7 +907,7 @@ rdf_keys_in_literal_map(term_t handle, term_t spec, term_t keys)
     return FALSE;
 
   if ( !PL_get_name_arity(spec, &name, &arity) )
-    type_error(spec, "key-specifier");
+    PL_type_error("key-specifier", spec);
 
   if ( name == ATOM_all )
   { skiplist_enum state;
@@ -1080,7 +1005,7 @@ rdf_keys_in_literal_map(term_t handle, term_t spec, term_t keys)
     if ( !between_keys(map, min, max, head, tail) )
       goto failure;
   } else
-  { type_error(spec, "key-specifier");
+  { PL_type_error("key-specifier", spec);
     goto failure;
   }
 
@@ -1140,7 +1065,7 @@ rdf_statistics_literal_map(term_t map, term_t key)
     return PL_unify_integer(a, m->value_count);
   }
 
-  return type_error(key, "statistics_key");
+  return PL_type_error("statistics_key", key);
 }
 
 
@@ -1153,7 +1078,7 @@ rdf_statistics_literal_map(term_t map, term_t key)
 #define PRED(n,a,f,o) PL_register_foreign(n,a,f,o)
 
 install_t
-install_atom_map()
+install_atom_map(void)
 { init_functors();
   init_datum_store();
 
