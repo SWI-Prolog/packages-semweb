@@ -341,6 +341,7 @@ format_datum(datum d, char *buf)
 		 *******************************/
 
 static int insert_atom_set(atom_set *as, datum a);
+static int insert_atom_hash(datum *d, size_t allocated, datum add);
 
 #define AS_INITIAL_SIZE 4
 
@@ -400,28 +401,48 @@ in_atom_set(atom_set *as, datum a)
 
 static int
 resize_atom_set(atom_set *as, size_t size)
-{ datum *old = as->atoms;
-  size_t oldsize = as->allocated;
+{ datum *new = malloc(sizeof(datum)*size);
 
-  if ( (as->atoms = malloc(sizeof(datum)*size)) )
+  if ( new )
   { size_t i;
-
-    as->allocated = size;
-    as->size = 0;
+    datum *p = as->atoms;
+    datum *e = &p[as->allocated];
 
     for(i=0; i<size; i++)
-      as->atoms[i] = EMPTY;
+      new[i] = EMPTY;
 
-    for(i=0; i<oldsize; i++)
-    { if ( old[i] != EMPTY )
-	insert_atom_set(as, old[i]);
+    for(; p<e; p++)
+    { if ( *p != EMPTY )
+	insert_atom_hash(new, size, *p);
     }
 
-    free(old);
+    p = as->atoms;
+    as->atoms = new;			/* must be synchronized */
+    as->allocated = size;
+    free(p);				/* leave to GC */
+
     return TRUE;
   }
 
   return FALSE;
+}
+
+
+static int
+insert_atom_hash(datum *d0, size_t allocated, datum add)
+{ datum *d = &d0[hash_datum(add) % allocated];
+  datum *e = &d0[allocated];
+
+  for(;;)
+  { if ( *d == add )
+      return 0;					/* nothing added */
+    if ( *d == EMPTY )
+    { *d = add;
+      return 1;
+    }
+    if ( ++d == e )
+      d = d0;
+  }
 }
 
 
@@ -431,29 +452,17 @@ resize_atom_set(atom_set *as, size_t size)
 
 static int
 insert_atom_set(atom_set *as, datum a)
-{ unsigned int start;
-  datum *d, *e;
+{ int rc;
 
-  if ( 4*as->size + 5 > 3*as->allocated )
-  { if ( !resize_atom_set(as, 2*as->size) )
+  if ( 4*as->size > 3*as->allocated )
+  { if ( !resize_atom_set(as, 2*as->allocated) )
       return -1;				/* no memory */
   }
 
-  start = hash_datum(a) % as->allocated;
-  d = &as->atoms[start];
-  e = &as->atoms[as->allocated];
+  rc = insert_atom_hash(as->atoms, as->allocated, a);
+  as->size += rc;
 
-  for(;;)
-  { if ( *d == a )
-      return 0;					/* nothing added */
-    if ( *d == EMPTY )
-    { as->size++;
-      *d = a;
-      return 1;
-    }
-    if ( ++d == e )
-      d = as->atoms;
-  }
+  return rc;
 }
 
 
