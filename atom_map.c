@@ -113,7 +113,7 @@ typedef struct atom_set
 
 typedef struct node_data
 { datum		key;
-  atom_set     *values;
+  atom_set      values;
 #ifdef O_SECURE
   int		magic;
 #endif
@@ -369,12 +369,9 @@ implementation is an adapted copy from   XPCE's  class hash_table, using
 closed hash-tables.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-static atom_set *
-new_atom_set(datum a0)
-{ atom_set *as;
-
-  if ( (as = malloc(sizeof(*as))) &&
-       (as->atoms = malloc(sizeof(datum)*AS_INITIAL_SIZE)) )
+static int
+init_atom_set(atom_set *as, datum a0)
+{ if ( (as->atoms = malloc(sizeof(datum)*AS_INITIAL_SIZE)) )
   { size_t i;
 
     as->size = 0;
@@ -384,9 +381,11 @@ new_atom_set(datum a0)
 
     insert_atom_set(as, a0);
     lock_datum(a0);
+
+    return TRUE;
   }
 
-  return as;
+  return FALSE;
 }
 
 
@@ -519,14 +518,13 @@ delete_atom_set(atom_set *as, datum a)
 
 
 static void
-destroy_atom_set(atom_set *as)
+finalize_atom_set(atom_set *as)
 { size_t i;
 
   for(i=0; i<as->allocated; i++)
     unlock_datum(as->atoms[i]);
 
-  free(as->atoms);
-  free(as);
+  free(as->atoms);			/* leave to GC */
 }
 
 
@@ -540,7 +538,7 @@ free_node_data(void *cd, void *ptr)
 		 format_datum(data->key, b)));
 
   unlock_datum(data->key);
-  destroy_atom_set(data->values);
+  finalize_atom_set(&data->values);
 }
 
 
@@ -646,8 +644,8 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
 
     SECURE(assert(data->magic == ND_MAGIC));
 
-    LOCK(map);				/* TBD: use a distinct lock */
-    rc=insert_atom_set(data->values, a2);
+    LOCK(map);
+    rc=insert_atom_set(&data->values, a2);
     UNLOCK(map);
 
     if ( rc < 0 )
@@ -660,7 +658,7 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
   } else
   { if ( keys && !PL_unify_integer(keys, map->list.count+1) )
       return FALSE;
-    if ( !(search.data.values = new_atom_set(a2)) )
+    if ( !init_atom_set(&search.data.values, a2) )
       return PL_resource_error("memory");
     lock_datum(search.data.key);
 
@@ -698,7 +696,7 @@ delete_atom_map2(term_t handle, term_t from)
 					/* TBD: Single pass? */
   if ( (data = skiplist_find(&map->list, &search)) )
   { LOCK(map);
-    map->value_count -= data->values->size;
+    map->value_count -= data->values.size;
     search.data = *data;
     skiplist_delete(&map->list, &search);
     UNLOCK(map);
@@ -721,8 +719,8 @@ delete_atom_map3(term_t handle, term_t from, term_t to)
     return FALSE;
 
   if ( (data = skiplist_find(&map->list, &search)) &&
-       in_atom_set(data->values, a2) )
-  { atom_set *as = data->values;
+       in_atom_set(&data->values, a2) )
+  { atom_set *as = &data->values;
 
     LOCK(map);
     if ( delete_atom_set(as, a2) )
@@ -798,7 +796,7 @@ find_atom_map(term_t handle, term_t keys, term_t literals)
     { if ( ns+1 >= MAX_SETS )
 	return PL_resource_error("max_search_atoms");
 
-      as[ns].set = data->values;
+      as[ns].set = &data->values;
       as[ns].neg = neg;
       DEBUG(2, Sdprintf("Found atom-set of size %d\n", as[ns].set->size));
       ns++;
@@ -932,7 +930,7 @@ rdf_keys_in_literal_map(term_t handle, term_t spec, term_t keys)
       return FALSE;
 
     if ( (data = skiplist_find(&map->list, &search)) )
-    { intptr_t size = (intptr_t)data->values->size;
+    { intptr_t size = (intptr_t)data->values.size;
 
       assert(size > 0);
 
