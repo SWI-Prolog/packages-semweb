@@ -46,7 +46,7 @@ This file realises the low-level support   for  indexing literals in the
 semantic web library. The idea is to   make a map from abstracted tokens
 from each literal to  the  exact   literals.  Abstraction  introduces  a
 certain amount of ambiguity that  makes   fuzzy  matching possible. Good
-abstraction candidates are the Porter Stem  or Snowbal algorithm and the
+abstraction candidates are the Porter Stem or Snowball algorithm and the
 Double Metaphone algorithm. Both  are  provide   by  the  SWI-Prolog NLP
 package.
 
@@ -513,7 +513,7 @@ destroy_atom_set(atom_set *as)
 
 
 static void
-free_node_data(void *ptr)
+free_node_data(void *cd, void *ptr)
 { node_data *data = ptr;
 
   DEBUG(2,
@@ -531,7 +531,7 @@ free_node_data(void *ptr)
 		 *******************************/
 
 static int
-cmp_node_data(void *l, void *r)
+cmp_node_data(void *cd, void *l, void *r)
 { node_data_ex *e1 = l;
   node_data *n2 = r;
   datum *d1 = e1->data.key;
@@ -555,14 +555,21 @@ cmp_node_data(void *l, void *r)
 }
 
 
+static void *
+map_alloc(void *cd, size_t size)
+{ return malloc(size);
+}
+
+
 static void
 init_map(atom_map *m)
 { skiplist_init(&m->list,
-		sizeof(node_data),
-		cmp_node_data,
-		free_node_data);
+		sizeof(node_data),	/* Payload size */
+		NULL,			/* Client data */
+		cmp_node_data,		/* Compare */
+		map_alloc,		/* Allocate */
+		free_node_data);	/* Destroy */
 }
-
 
 
 static foreign_t

@@ -2027,11 +2027,17 @@ compare_literals(literal_ex *lex, literal *l2)
 
 
 static int
-sl_compare_literals(void *p1, void *p2)
+sl_compare_literals(void *cd, void *p1, void *p2)
 { literal_ex *lex = p1;
   literal *l2 = *(literal**)p2;
 
   return compare_literals(lex, l2);
+}
+
+
+static void *
+sl_rdf_malloc(void *cd, size_t bytes)
+{ return rdf_malloc(cd, bytes);
 }
 
 
@@ -2044,9 +2050,11 @@ free_literal() or by rdf_reset_db().
 static int
 init_literal_table(rdf_db *db)
 { skiplist_init(&db->literals,
-		sizeof(literal*),
-		sl_compare_literals,
-		NULL);
+		sizeof(literal*),	/* Payload size */
+		db,			/* Client data */
+		sl_compare_literals,	/* Compare */
+		sl_rdf_malloc,		/* Allocate */
+		NULL);			/* Destroy */
 
   return TRUE;
 }
