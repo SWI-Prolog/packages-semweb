@@ -371,7 +371,7 @@ closed hash-tables.
 
 static int
 init_atom_set(atom_set *as, datum a0)
-{ if ( (as->atoms = malloc(sizeof(datum)*AS_INITIAL_SIZE)) )
+{ if ( (as->atoms = PL_malloc_atomic_unmanaged(sizeof(datum)*AS_INITIAL_SIZE)) )
   { size_t i;
 
     as->size = 0;
@@ -418,7 +418,7 @@ in_atom_set(atom_set *as, datum a)
 
 static int
 resize_atom_set(atom_set *as, size_t size)
-{ datum *new = malloc(sizeof(datum)*size);
+{ datum *new = PL_malloc_atomic_unmanaged(sizeof(datum)*size);
 
   if ( new )
   { size_t i;
@@ -436,7 +436,7 @@ resize_atom_set(atom_set *as, size_t size)
     p = as->atoms;
     as->atoms = new;			/* must be synchronized */
     as->allocated = size;
-    free(p);				/* leave to GC */
+    PL_linger(p);			/* leave to GC */
 
     return TRUE;
   }
@@ -524,7 +524,7 @@ finalize_atom_set(atom_set *as)
   for(i=0; i<as->allocated; i++)
     unlock_datum(as->atoms[i]);
 
-  free(as->atoms);			/* leave to GC */
+  PL_linger(as->atoms);			/* leave to GC */
 }
 
 
@@ -573,7 +573,7 @@ cmp_node_data(void *cd, void *l, void *r)
 
 static void *
 map_alloc(void *cd, size_t size)
-{ return malloc(size);
+{ return PL_malloc_unmanaged(size);
 }
 
 
@@ -592,7 +592,7 @@ static foreign_t
 new_atom_map(term_t handle)
 { atom_map *m;
 
-  if ( !(m=malloc(sizeof(*m))) )
+  if ( !(m=PL_malloc_unmanaged(sizeof(*m))) )
     return PL_resource_error("memory");
 
   memset(m, 0, sizeof(*m));
@@ -616,7 +616,7 @@ destroy_atom_map(term_t handle)
   skiplist_destroy(&m->list);
   UNLOCK(m);
   simpleMutexDelete(&m->lock);
-  free(m);
+  PL_linger(m);
 
   return TRUE;
 }
@@ -700,6 +700,7 @@ delete_atom_map2(term_t handle, term_t from)
     search.data = *data;
     skiplist_delete(&map->list, &search);
     UNLOCK(map);
+    free_node_data(NULL, data);
   }
 
   return TRUE;
@@ -729,6 +730,7 @@ delete_atom_map3(term_t handle, term_t from, term_t to)
       if ( as->size == 0 )
       { search.data = *data;
 	skiplist_delete(&map->list, &search);
+	free_node_data(NULL, data);
       }
     }
     UNLOCK(map);
@@ -1070,6 +1072,11 @@ install_t
 install_atom_map(void)
 { init_functors();
   init_datum_store();
+
+  if ( !PL_linger(0) )
+    Sdprintf("Warning: SWI-Prolog is not compiled with customized "
+	     "Boehm-GC\n");
+
 
   PRED("rdf_new_literal_map",	     1,	new_atom_map,		    0);
   PRED("rdf_destroy_literal_map",    1,	destroy_atom_map,	    0);
