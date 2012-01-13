@@ -58,12 +58,14 @@ mk(N) :-
 	clear,
 	rdf_new_literal_map(Map),
 	assert(map(Map)),
-	forall(between(1, N, _), m1(Map)).
+	forall(between(1, N, _), m1(N, Map)).
 
-m1(Map) :-
-	rnd_value(1000, Key),
-	rnd_value(100, Value),
-	(   random(3, 0)
+m1(N, Map) :-
+	KeyRange is N//10,
+	ValRange is N//100,
+	rnd_value(KeyRange, Key),
+	rnd_value(ValRange, Value),
+	(   random(2, 0)
 	->  (   retract(map(Key, Value))
 	    ->  debug(delete, 'Deleted ~q --> ~q', [Key, Value]),
 		rdf_delete_literal_map(Map, Key, Value)
