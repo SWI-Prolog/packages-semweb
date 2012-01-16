@@ -517,8 +517,15 @@ insert_atom_set(atom_set *as, datum a)
 
 static int
 delete_atom_set(atom_set *as, datum a)
-{ unsigned int i = hash_datum(a) % as->allocated;
+{ unsigned int i;
   int j, r;
+
+  if ( as->size < as->allocated/4 )
+  { if ( !resize_atom_set(as, 2*as->allocated) )
+      return -1;				/* no memory */
+  }
+
+  i = hash_datum(a) % as->allocated;
 
   while(as->atoms[i] != EMPTY && as->atoms[i] != a)
   { if ( ++i == as->allocated )
