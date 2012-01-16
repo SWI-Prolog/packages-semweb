@@ -38,6 +38,7 @@
 #include "debug.h"
 #include <string.h>
 #include <assert.h>
+#include <gc/gc.h>
 #ifdef __WINDOWS__
 #define inline __inline
 #endif
@@ -735,7 +736,8 @@ delete_atom_map2(term_t handle, term_t from)
     if ( data != skiplist_delete(&map->list, &search) )
       assert(0);
     UNLOCK(map);
-    free_node_data(data, NULL);
+    GC_REGISTER_FINALIZER(data, free_node_data, NULL, NULL, NULL);
+    PL_linger(data);
   }
 
   return TRUE;
@@ -766,7 +768,8 @@ delete_atom_map3(term_t handle, term_t from, term_t to)
       { search.data = *data;
 	if ( data != skiplist_delete(&map->list, &search) )
 	  assert(0);
-	free_node_data(data, NULL);
+	GC_REGISTER_FINALIZER(data, free_node_data, NULL, NULL, NULL);
+	PL_linger(data);
       }
     }
     UNLOCK(map);
