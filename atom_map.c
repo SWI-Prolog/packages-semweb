@@ -646,15 +646,15 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
 
     LOCK(map);
     rc=insert_atom_set(&data->values, a2);
+    if ( rc )
+      map->value_count++;
     UNLOCK(map);
 
     if ( rc < 0 )
       return PL_resource_error("memory");
 
     if ( rc )
-    { lock_datum(a2);
-      map->value_count++;
-    }
+      lock_datum(a2);
   } else
   { if ( keys && !PL_unify_integer(keys, map->list.count+1) )
       return FALSE;
