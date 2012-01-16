@@ -520,8 +520,8 @@ delete_atom_set(atom_set *as, datum a)
 { unsigned int i;
   int j, r;
 
-  if ( as->size < as->allocated/4 )
-  { if ( !resize_atom_set(as, 2*as->allocated) )
+  if ( as->size < as->allocated/4 && as->allocated > AS_INITIAL_SIZE )
+  { if ( !resize_atom_set(as, as->allocated/2) )
       return -1;				/* no memory */
   }
 
