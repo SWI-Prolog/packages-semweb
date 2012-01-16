@@ -32,6 +32,7 @@
 #include <SWI-Prolog.h>
 #include "skiplist/skiplist.h"
 #include "mutex.h"
+#include "memory.h"
 #include "atom.h"
 #include "murmur.h"
 #include "debug.h"
@@ -130,6 +131,8 @@ typedef struct node_data_ex
 
 #define LOCK(map)			simpleMutexLock(&map->lock)
 #define UNLOCK(map)			simpleMutexUnlock(&map->lock)
+
+static int	snap_atom_set(atom_set *as, atom_set *snap);
 
 
 		 /*******************************
@@ -396,23 +399,32 @@ hash_datum(datum d)
 
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-in_atom_set(atom_set *as, datum a) returns TRUE if datum is in the set
+in_atom_set(atom_set *as, datum a)
+
+returns TRUE if datum is in the  set. This function can run concurrently
+with insert/delete.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static int
 in_atom_set(atom_set *as, datum a)
-{ unsigned int start = hash_datum(a) % as->allocated;
-  datum *d = &as->atoms[start];
-  datum *e = &as->atoms[as->allocated];
+{ atom_set snap;
 
-  for(;;)
-  { if ( *d == a )
-      return TRUE;
-    if ( *d == EMPTY )
-      return FALSE;
-    if ( ++d == e )
-      d = as->atoms;
+  if ( snap_atom_set(as, &snap) )
+  { unsigned int start = hash_datum(a) % snap.allocated;
+    datum *d = &snap.atoms[start];
+    datum *e = &snap.atoms[snap.allocated];
+
+    for(;;)
+    { if ( *d == a )
+	return TRUE;
+      if ( *d == EMPTY )
+	return FALSE;
+      if ( ++d == e )
+	d = as->atoms;
+    }
   }
+
+  return FALSE;
 }
 
 
@@ -435,6 +447,7 @@ resize_atom_set(atom_set *as, size_t size)
 
     p = as->atoms;
     as->atoms = new;			/* must be synchronized */
+    MemoryBarrier();
     as->allocated = size;
     PL_linger(p);			/* leave to GC */
 
@@ -442,6 +455,24 @@ resize_atom_set(atom_set *as, size_t size)
   }
 
   return FALSE;
+}
+
+
+/* snap_atom_set() initializes a copy of an atom_set with consistent
+   values for atoms and allocated.  It must synchronize with changing
+   ->atoms and ->allocated in resize_atom_set().
+*/
+
+static int
+snap_atom_set(atom_set *as, atom_set *snap)
+{ do
+  { snap->allocated = as->allocated;
+    MemoryBarrier();
+    snap->atoms     = as->atoms;
+    MemoryBarrier();
+  } while(snap->allocated != as->allocated);
+
+  return TRUE;
 }
 
 
