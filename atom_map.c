@@ -729,7 +729,8 @@ delete_atom_map2(term_t handle, term_t from)
   { LOCK(map);
     map->value_count -= data->values.size;
     search.data = *data;
-    skiplist_delete(&map->list, &search);
+    if ( data != skiplist_delete(&map->list, &search) )
+      assert(0);
     UNLOCK(map);
     free_node_data(NULL, data);
   }
@@ -760,7 +761,8 @@ delete_atom_map3(term_t handle, term_t from, term_t to)
       map->value_count--;
       if ( as->size == 0 )
       { search.data = *data;
-	skiplist_delete(&map->list, &search);
+	if ( data != skiplist_delete(&map->list, &search) )
+	  assert(0);
 	free_node_data(NULL, data);
       }
     }
