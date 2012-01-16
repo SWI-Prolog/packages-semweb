@@ -2027,16 +2027,17 @@ compare_literals(literal_ex *lex, literal *l2)
 
 
 static int
-sl_compare_literals(void *cd, void *p1, void *p2)
+sl_compare_literals(void *p1, void *p2, void *cd)
 { literal_ex *lex = p1;
   literal *l2 = *(literal**)p2;
+  (void)cd;
 
   return compare_literals(lex, l2);
 }
 
 
 static void *
-sl_rdf_malloc(void *cd, size_t bytes)
+sl_rdf_malloc(size_t bytes, void *cd)
 { return rdf_malloc(cd, bytes);
 }
 

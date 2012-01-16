@@ -560,7 +560,7 @@ finalize_atom_set(atom_set *as)
 
 
 static void
-free_node_data(void *cd, void *ptr)
+free_node_data(void *ptr, void *cd)
 { node_data *data = ptr;
 
   DEBUG(2,
@@ -578,12 +578,13 @@ free_node_data(void *cd, void *ptr)
 		 *******************************/
 
 static int
-cmp_node_data(void *cd, void *l, void *r)
+cmp_node_data(void *l, void *r, void *cd)
 { node_data_ex *e1 = l;
   node_data *n2 = r;
   datum *d1 = e1->data.key;
   datum *d2 = n2->key;
   int d;
+  (void)cd;
 
   SECURE(assert(e1->magic == ND_MAGIC_EX));
 
@@ -603,8 +604,10 @@ cmp_node_data(void *cd, void *l, void *r)
 
 
 static void *
-map_alloc(void *cd, size_t size)
-{ return PL_malloc_unmanaged(size);
+map_alloc(size_t size, void *cd)
+{ (void)cd;
+
+  return PL_malloc_unmanaged(size);
 }
 
 
@@ -732,7 +735,7 @@ delete_atom_map2(term_t handle, term_t from)
     if ( data != skiplist_delete(&map->list, &search) )
       assert(0);
     UNLOCK(map);
-    free_node_data(NULL, data);
+    free_node_data(data, NULL);
   }
 
   return TRUE;
@@ -763,7 +766,7 @@ delete_atom_map3(term_t handle, term_t from, term_t to)
       { search.data = *data;
 	if ( data != skiplist_delete(&map->list, &search) )
 	  assert(0);
-	free_node_data(NULL, data);
+	free_node_data(data, NULL);
       }
     }
     UNLOCK(map);
