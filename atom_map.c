@@ -819,7 +819,7 @@ find_atom_map(term_t handle, term_t keys, term_t literals)
   term_t tmp = PL_new_term_ref();
   term_t tail = PL_copy_term_ref(keys);
   term_t head = PL_new_term_ref();
-  atom_set *s0;
+  atom_set s0;
   size_t ca;
 
   if ( !get_atom_map(handle, &map) )
@@ -859,12 +859,11 @@ find_atom_map(term_t handle, term_t keys, term_t literals)
   if ( ns==0 || as[0].neg )
     return PL_domain_error("keywords", keys);
 
-  s0 = as[0].set;
-
+  snap_atom_set(as[0].set, &s0);
   PL_put_term(tail, literals);
 
-  for(ca=0; ca<s0->allocated; ca++)
-  { datum a = s0->atoms[ca];
+  for(ca=0; ca<s0.allocated; ca++)
+  { datum a = s0.atoms[ca];
     int i;
 
     if ( a == EMPTY )
