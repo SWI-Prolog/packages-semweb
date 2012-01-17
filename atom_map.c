@@ -100,10 +100,16 @@ typedef void *datum;
 
 #define S_MAGIC 0x8734abcd
 
+typedef struct atom_hash
+{ size_t allocated;
+  datum  atoms[1];
+} atom_hash;
+
+#define SIZEOF_ATOM_HASH(n)	offsetof(atom_hash, atoms[n])
+
 typedef struct atom_set
-{ size_t  size;				/* # cells in use */
-  size_t  allocated;			/* # cells allocated */
-  datum  *atoms;			/* allocated cells */
+{ size_t	size;			/* # cells in use */
+  atom_hash    *entries;		/* Close hash table */
 #ifdef O_SECURE
   int	  magic;
 #endif
@@ -132,8 +138,6 @@ typedef struct node_data_ex
 
 #define LOCK(map)			simpleMutexLock(&map->lock)
 #define UNLOCK(map)			simpleMutexUnlock(&map->lock)
-
-static int	snap_atom_set(atom_set *as, atom_set *snap);
 
 
 		 /*******************************
@@ -224,7 +228,7 @@ bits
 static intptr_t atom_mask;
 
 static void
-init_datum_store()
+init_datum_store(void)
 { atom_t a = PL_new_atom("[]");
 
   atom_mask = a & ((1<<(ATOM_TAG_BITS-1))-1);
@@ -363,7 +367,7 @@ format_datum(datum d, char *buf)
 		 *******************************/
 
 static int insert_atom_set(atom_set *as, datum a);
-static int insert_atom_hash(datum *d, size_t allocated, datum add);
+static int insert_atom_hash(atom_hash *hash, datum add);
 
 #define AS_INITIAL_SIZE 4
 
@@ -375,13 +379,14 @@ closed hash-tables.
 
 static int
 init_atom_set(atom_set *as, datum a0)
-{ if ( (as->atoms = PL_malloc_atomic_unmanaged(sizeof(datum)*AS_INITIAL_SIZE)) )
+{ if ( (as->entries = PL_malloc_atomic_unmanaged(
+			  SIZEOF_ATOM_HASH(AS_INITIAL_SIZE))) )
   { size_t i;
 
     as->size = 0;
-    as->allocated = AS_INITIAL_SIZE;
+    as->entries->allocated = AS_INITIAL_SIZE;
     for(i=0; i<AS_INITIAL_SIZE; i++)
-      as->atoms[i] = EMPTY;
+      as->entries->atoms[i] = EMPTY;
 
     insert_atom_set(as, a0);
     lock_datum(a0);
@@ -408,21 +413,18 @@ with insert/delete.
 
 static int
 in_atom_set(atom_set *as, datum a)
-{ atom_set snap;
+{ atom_hash *snap = as->entries;
+  unsigned int start = hash_datum(a) % snap->allocated;
+  datum *d = &snap->atoms[start];
+  datum *e = &snap->atoms[snap->allocated];
 
-  if ( snap_atom_set(as, &snap) )
-  { unsigned int start = hash_datum(a) % snap.allocated;
-    datum *d = &snap.atoms[start];
-    datum *e = &snap.atoms[snap.allocated];
-
-    for(;;)
-    { if ( *d == a )
-	return TRUE;
-      if ( *d == EMPTY )
-	return FALSE;
-      if ( ++d == e )
-	d = as->atoms;
-    }
+  for(;;)
+  { if ( *d == a )
+      return TRUE;
+    if ( *d == EMPTY )
+      return FALSE;
+    if ( ++d == e )
+      d = snap->atoms;
   }
 
   return FALSE;
@@ -431,26 +433,26 @@ in_atom_set(atom_set *as, datum a)
 
 static int
 resize_atom_set(atom_set *as, size_t size)
-{ datum *new = PL_malloc_atomic_unmanaged(sizeof(datum)*size);
+{ atom_hash *new = PL_malloc_atomic_unmanaged(SIZEOF_ATOM_HASH(size));
 
   if ( new )
   { size_t i;
-    datum *p = as->atoms;
-    datum *e = &p[as->allocated];
+    datum *p = as->entries->atoms;
+    datum *e = &p[as->entries->allocated];
+    atom_hash *old;
 
+    new->allocated = size;
     for(i=0; i<size; i++)
-      new[i] = EMPTY;
+      new->atoms[i] = EMPTY;
 
     for(; p<e; p++)
     { if ( *p != EMPTY )
-	insert_atom_hash(new, size, *p);
+	insert_atom_hash(new, *p);
     }
 
-    p = as->atoms;
-    as->atoms = new;			/* must be synchronized */
-    MemoryBarrier();
-    as->allocated = size;
-    PL_linger(p);			/* leave to GC */
+    old = as->entries;
+    as->entries = new;			/* must be synchronized */
+    PL_linger(old);			/* leave to GC */
 
     return TRUE;
   }
@@ -459,28 +461,10 @@ resize_atom_set(atom_set *as, size_t size)
 }
 
 
-/* snap_atom_set() initializes a copy of an atom_set with consistent
-   values for atoms and allocated.  It must synchronize with changing
-   ->atoms and ->allocated in resize_atom_set().
-*/
-
 static int
-snap_atom_set(atom_set *as, atom_set *snap)
-{ do
-  { snap->allocated = as->allocated;
-    MemoryBarrier();
-    snap->atoms     = as->atoms;
-    MemoryBarrier();
-  } while(snap->allocated != as->allocated);
-
-  return TRUE;
-}
-
-
-static int
-insert_atom_hash(datum *d0, size_t allocated, datum add)
-{ datum *d = &d0[hash_datum(add) % allocated];
-  datum *e = &d0[allocated];
+insert_atom_hash(atom_hash *hash, datum add)
+{ datum *d = &hash->atoms[hash_datum(add) % hash->allocated];
+  datum *e = &hash->atoms[hash->allocated];
 
   for(;;)
   { if ( *d == add )
@@ -490,7 +474,7 @@ insert_atom_hash(datum *d0, size_t allocated, datum add)
       return 1;
     }
     if ( ++d == e )
-      d = d0;
+      d = hash->atoms;
   }
 }
 
@@ -503,12 +487,12 @@ static int
 insert_atom_set(atom_set *as, datum a)
 { int rc;
 
-  if ( 4*as->size > 3*as->allocated )
-  { if ( !resize_atom_set(as, 2*as->allocated) )
+  if ( 4*as->size > 3*as->entries->allocated )
+  { if ( !resize_atom_set(as, 2*as->entries->allocated) )
       return -1;				/* no memory */
   }
 
-  rc = insert_atom_hash(as->atoms, as->allocated, a);
+  rc = insert_atom_hash(as->entries, a);
   as->size += rc;
 
   return rc;
@@ -520,37 +504,38 @@ delete_atom_set(atom_set *as, datum a)
 { unsigned int i;
   int j, r;
 
-  if ( as->size < as->allocated/4 && as->allocated > AS_INITIAL_SIZE )
-  { if ( !resize_atom_set(as, as->allocated/2) )
+  if ( as->size < as->entries->allocated/4 &&
+       as->entries->allocated > AS_INITIAL_SIZE )
+  { if ( !resize_atom_set(as, as->entries->allocated/2) )
       return -1;				/* no memory */
   }
 
-  i = hash_datum(a) % as->allocated;
+  i = hash_datum(a) % as->entries->allocated;
 
-  while(as->atoms[i] != EMPTY && as->atoms[i] != a)
-  { if ( ++i == as->allocated )
+  while(as->entries->atoms[i] != EMPTY && as->entries->atoms[i] != a)
+  { if ( ++i == as->entries->allocated )
       i = 0;
   }
-  if ( as->atoms[i] == EMPTY )
+  if ( as->entries->atoms[i] == EMPTY )
     return FALSE;				/* not in table */
 
   as->size--;
-  as->atoms[i] = EMPTY;				/* R1 */
+  as->entries->atoms[i] = EMPTY;				/* R1 */
   j = i;
 
   for(;;)
-  { if ( ++i == as->allocated )
+  { if ( ++i == as->entries->allocated )
       i = 0;
 
-    if ( as->atoms[i] == EMPTY )
+    if ( as->entries->atoms[i] == EMPTY )
       return TRUE;
 
-    r = hash_datum(as->atoms[i]) % as->allocated;
+    r = hash_datum(as->entries->atoms[i]) % as->entries->allocated;
     if ( (i >= r && r > j) || (r > j && j > i) || (j > i && i >= r) )
       continue;
 
-    as->atoms[j] = as->atoms[i];
-    as->atoms[i] = EMPTY;
+    as->entries->atoms[j] = as->entries->atoms[i];
+    as->entries->atoms[i] = EMPTY;
     j = i;
   }
 }
@@ -560,10 +545,10 @@ static void
 finalize_atom_set(atom_set *as)
 { size_t i;
 
-  for(i=0; i<as->allocated; i++)
-    unlock_datum(as->atoms[i]);
+  for(i=0; i<as->entries->allocated; i++)
+    unlock_datum(as->entries->atoms[i]);
 
-  PL_linger(as->atoms);			/* leave to GC */
+  PL_linger(as->entries);			/* leave to GC */
 }
 
 
@@ -819,7 +804,7 @@ find_atom_map(term_t handle, term_t keys, term_t literals)
   term_t tmp = PL_new_term_ref();
   term_t tail = PL_copy_term_ref(keys);
   term_t head = PL_new_term_ref();
-  atom_set s0;
+  atom_hash *ah;
   size_t ca;
 
   if ( !get_atom_map(handle, &map) )
@@ -859,11 +844,11 @@ find_atom_map(term_t handle, term_t keys, term_t literals)
   if ( ns==0 || as[0].neg )
     return PL_domain_error("keywords", keys);
 
-  snap_atom_set(as[0].set, &s0);
   PL_put_term(tail, literals);
+  ah=as[0].set->entries;
 
-  for(ca=0; ca<s0.allocated; ca++)
-  { datum a = s0.atoms[ca];
+  for(ca=0; ca<ah->allocated; ca++)
+  { datum a = ah->atoms[ca];
     int i;
 
     if ( a == EMPTY )
@@ -872,10 +857,7 @@ find_atom_map(term_t handle, term_t keys, term_t literals)
     for(i=1; i<ns; i++)
     { if ( !as[i].neg )
       { if ( !in_atom_set(as[i].set, a) )
-	{ if ( a > as[i].set->atoms[as[i].set->size-1] )
-	    return PL_unify_nil(tail);
 	  goto next;
-	}
       } else
       { if ( in_atom_set(as[i].set, a) )
 	  goto next;
