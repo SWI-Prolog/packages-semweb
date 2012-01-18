@@ -720,17 +720,14 @@ delete_atom_map2(term_t handle, term_t from)
        !get_search_datum(from, &search) )
     return FALSE;
 
-					/* TBD: Single pass? */
-  if ( (data = skiplist_find(&map->list, &search)) )
-  { LOCK(map);
-    map->value_count -= data->values.size;
-    search.data = *data;
-    if ( data != skiplist_delete(&map->list, &search) )
-      assert(0);
+  LOCK(map);
+  if ( (data = skiplist_delete(&map->list, &search)) )
+  { map->value_count -= data->values.size;
     UNLOCK(map);
     GC_REGISTER_FINALIZER(data, free_node_data, NULL, NULL, NULL);
     PL_linger(data);
   }
+  UNLOCK(map);
 
   return TRUE;
 }
