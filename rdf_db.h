@@ -65,7 +65,7 @@ supposed to be local to the SWI-Prolog kernel are declared using
 #ifdef WITH_MD5
 #include "md5.h"
 #endif
-#include "lock.h"
+#include "mutex.h"
 #include "query.h"
 #include "resource.h"
 
@@ -80,8 +80,9 @@ supposed to be local to the SWI-Prolog kernel are declared using
 		 *******************************/
 
 #define MUST_HOLD(lock)			((void)0)
-#define LOCK_MISC(db)			lock_misc(&db->lock)
-#define UNLOCK_MISC(db)			unlock_misc(&db->lock)
+#define LOCK_MISC(db)			simpleMutexLock(&db->locks.misc)
+#define UNLOCK_MISC(db)			simpleMutexUnlock(&db->locks.misc)
+
 
 		 /*******************************
 		 *               C		*
@@ -358,7 +359,10 @@ typedef struct rdf_db
   int		tr_reset;		/* transaction contains reset */
   int		resetting;		/* We are in rdf_reset_db() */
 
-  rwlock	lock;			/* threaded access */
+  struct
+  { simpleMutex	literal;		/* threaded access to literals */
+    simpleMutex misc;			/* general DB locks */
+  } locks;
 
   skiplist      literals;
 } rdf_db;

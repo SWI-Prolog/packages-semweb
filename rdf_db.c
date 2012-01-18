@@ -60,8 +60,6 @@
 #undef ERROR				/* also in wingdi.h; we do not care */
 #define ERROR -1
 
-#undef UNLOCK
-
 static void md5_triple(triple *t, md5_byte_t *digest);
 static void sum_digest(md5_byte_t *digest, md5_byte_t *add);
 static void dec_digest(md5_byte_t *digest, md5_byte_t *add);
@@ -270,14 +268,14 @@ static int	check_predicate_cloud(predicate_cloud *c);
 		 *	       LOCKING		*
 		 *******************************/
 
-#define RDLOCK(db)			rdlock(&db->lock)
-#define WRLOCK(db, allowreaders)	wrlock(&db->lock, allowreaders)
-#define LOCKOUT_READERS(db)		lockout_readers(&db->lock)
-#define REALLOW_READERS(db)		reallow_readers(&db->lock)
-#define WRUNLOCK(db)			unlock(&db->lock, FALSE)
-#define RDUNLOCK(db)			unlock(&db->lock, TRUE)
-#define INIT_LOCK(db)			init_lock(&db->lock)
+#define LOCK_LIT(db)			simpleMutexLock(&db->locks.literal)
+#define UNLOCK_LIT(db)			simpleMutexUnlock(&db->locks.literal)
 
+static void
+INIT_LOCK(rdf_db *db)
+{ simpleMutexInit(&db->locks.literal);
+  simpleMutexInit(&db->locks.misc);
+}
 
 
 		 /*******************************
@@ -2103,86 +2101,6 @@ share_literal(rdf_db *db, literal *from)
     return from;
   }
 }
-
-
-#ifdef O_SECURE
-static literal **
-add_literals(AVLtree node, literal **p)
-{ literal **litp;
-
-  if ( node->subtree[LEFT] )
-    p = add_literals(node->subtree[LEFT], p);
-  litp = (literal**)node->data;
-  *p++ = *litp;
-  if ( node->subtree[RIGHT] )
-    p = add_literals(node->subtree[RIGHT], p);
-
-  return p;
-}
-
-
-static foreign_t
-check_transitivity()
-{ rdf_db *db = DB;
-  literal **array = malloc(sizeof(literal*)*db->literals.count);
-  literal **p = array;
-  int i,j;
-
-  add_literals(db->literals.root, p);
-  Sdprintf("Checking %ld literals ...\n", db->literals.count);
-
-  for(i=0; i<db->literals.count; i++)
-  { int end;
-
-    Sdprintf("\r%6ld", i);
-    end = i+100;
-    if ( end > db->literals.count )
-      end = db->literals.count;
-
-    for(j=i+1; j<end; j++)
-    { literal_ex lex;
-
-      lex.literal = &array[i];
-      prepare_literal_ex(&lex);
-
-      if ( compare_literals(&lex, array[j]) >= 0 )
-      { Sdprintf("\nERROR: i,j=%d,%d: ", i, j);
-	print_literal(array[i]);
-	Sdprintf(" >= ");
-	print_literal(array[j]);
-	Sdprintf("\n");
-      }
-    }
-  }
-
-  free(array);
-
-  return TRUE;
-}
-
-
-static void
-dump_lnode(AVLtree node)
-{ literal **litp;
-
-  if ( node->subtree[LEFT] )
-    dump_lnode(node->subtree[LEFT]);
-  litp = (literal**)node->data;
-  print_literal(*litp);
-  Sdprintf("\n");
-  if ( node->subtree[RIGHT] )
-    dump_lnode(node->subtree[RIGHT]);
-}
-
-static foreign_t
-dump_literals()
-{ rdf_db *db = DB;
-
-  dump_lnode(db->literals.root);
-  return TRUE;
-}
-#endif
-
 
 
 		 /*******************************
