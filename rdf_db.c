@@ -145,7 +145,8 @@ rdf_malloc(rdf_db *db, size_t size)
 { if ( db )
     db->core += size;
 
-  return PL_malloc(size);
+//  return PL_malloc_atomic_uncollectable(size);
+  return PL_malloc_unmanaged(size);
 }
 
 void
@@ -718,7 +719,7 @@ TBD: We can do a partial re-hash in that case!
 static int
 init_pred_table(rdf_db *db)
 { size_t bytes = sizeof(predicate**)*INITIAL_PREDICATE_TABLE_SIZE;
-  predicate **p = rdf_malloc(db, bytes);
+  predicate **p = PL_malloc_uncollectable(bytes);
   int i, count = INITIAL_PREDICATE_TABLE_SIZE;
 
   memset(p, 0, bytes);
@@ -737,7 +738,7 @@ static int
 resize_pred_table(rdf_db *db)
 { int i = MSB(db->predicates.bucket_count);
   size_t bytes  = sizeof(predicate**)*db->predicates.bucket_count;
-  predicate **p = rdf_malloc(db, bytes);
+  predicate **p = PL_malloc_uncollectable(bytes);
 
   memset(p, 0, bytes);
   db->predicates.blocks[i] = p-db->predicates.bucket_count;
@@ -1449,7 +1450,7 @@ object_branch_factor(rdf_db *db, predicate *p, int which)
 static int
 init_graph_table(rdf_db *db)
 { size_t bytes = sizeof(graph**)*INITIAL_PREDICATE_TABLE_SIZE;
-  graph **p = rdf_malloc(db, bytes);
+  graph **p = PL_malloc_uncollectable(bytes);
   int i, count = INITIAL_PREDICATE_TABLE_SIZE;
 
   memset(p, 0, bytes);
@@ -1468,7 +1469,7 @@ static int
 resize_graph_table(rdf_db *db)
 { int i = MSB(db->graphs.bucket_count);
   size_t bytes  = sizeof(graph**)*db->graphs.bucket_count;
-  graph **p = rdf_malloc(db, bytes);
+  graph **p = PL_malloc_uncollectable(bytes);
 
   memset(p, 0, bytes);
   db->graphs.blocks[i] = p-db->graphs.bucket_count;
@@ -2111,7 +2112,7 @@ static int
 init_triple_hash(rdf_db *db, int index, size_t count)
 { triple_hash *h = &db->hash[index];
   size_t bytes = sizeof(triple_bucket)*count;
-  triple_bucket *t = rdf_malloc(db, bytes);
+  triple_bucket *t = PL_malloc_uncollectable(bytes);
   int i;
 
   memset(t, 0, bytes);
@@ -2130,7 +2131,7 @@ resize_triple_hash(rdf_db *db, int index)
 { triple_hash *hash = &db->hash[index];
   int i = MSB(hash->bucket_count);
   size_t bytes  = sizeof(triple_bucket)*hash->bucket_count;
-  triple_bucket *t = rdf_malloc(db, bytes);
+  triple_bucket *t = PL_malloc_uncollectable(bytes);
 
   memset(t, 0, bytes);
   hash->blocks[i] = t-hash->bucket_count;
@@ -2150,10 +2151,8 @@ reset_triple_hash(rdf_db *db, triple_hash *hash)
   memset(hash->blocks[0], 0, bytes);
   for(i=MSB(hash->bucket_count_epoch); i<MAX_TBLOCKS; i++)
   { if ( hash->blocks[i] )
-    { size_t size = BLOCKLEN(i)*sizeof(triple_bucket);
-
-      rdf_free(db, hash->blocks[i], size);
-      hash->blocks[i] = 0;
+    { PL_free(hash->blocks[i]);
+      hash->blocks[i] = NULL;
     }
   }
   hash->bucket_count = hash->bucket_count_epoch;
@@ -2283,7 +2282,7 @@ init_tables(rdf_db *db)
 
 static rdf_db *
 new_db(void)
-{ rdf_db *db = rdf_malloc(NULL, sizeof(*db));
+{ rdf_db *db = PL_malloc_uncollectable(sizeof(*db));
 
   memset(db, 0, sizeof(*db));
   INIT_LOCK(db);
@@ -2376,6 +2375,8 @@ init_cursor_from_literal().
 static size_t
 triple_hash_key(triple *t, int which)
 { size_t v;
+
+  assert(t->resolve_pred == FALSE);
 
   switch(which)
   { case BY_NONE:
@@ -3226,14 +3227,13 @@ add_atom(rdf_db *db, atom_t a, ld_context *ctx)
 { if ( ctx->loaded_id >= ctx->atoms_size )
   { if ( ctx->atoms_size == 0 )
     { ctx->atoms_size = 1024;
-      ctx->loaded_atoms = rdf_malloc(db, sizeof(atom_t)*ctx->atoms_size);
+      ctx->loaded_atoms = malloc(sizeof(atom_t)*ctx->atoms_size);
     } else
-    { long obytes = sizeof(atom_t)*ctx->atoms_size;
-      long  bytes;
+    { size_t  bytes;
 
       ctx->atoms_size *= 2;
       bytes = sizeof(atom_t)*ctx->atoms_size;
-      ctx->loaded_atoms = rdf_realloc(db, ctx->loaded_atoms, obytes, bytes);
+      ctx->loaded_atoms = realloc(ctx->loaded_atoms, bytes);
     }
   }
 
@@ -3307,8 +3307,7 @@ load_triple(rdf_db *db, IOSTREAM *in, ld_context *ctx)
   int c;
 
   t->subject   = load_atom(db, in, ctx);
-  t->predicate.u = load_atom(db, in, ctx);
-  t->resolve_pred = TRUE;
+  t->predicate.r = lookup_predicate(db, load_atom(db, in, ctx));
   if ( (c=Sgetc(in)) == 'R' )
   { t->object.resource = load_atom(db, in, ctx);
   } else
@@ -3544,7 +3543,7 @@ rdf_load_db(term_t stream, term_t id, term_t graphs)
     for(ap=ctx.loaded_atoms, ep=ap+ctx.loaded_id; ap<ep; ap++)
       PL_unregister_atom(*ap);
 
-    rdf_free(db, ctx.loaded_atoms, sizeof(atom_t)*ctx.atoms_size);
+    free(ctx.loaded_atoms);
   }
 
   return rc;
