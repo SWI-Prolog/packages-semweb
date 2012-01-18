@@ -672,7 +672,9 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
     SECURE(assert(data->magic == ND_MAGIC));
 
     LOCK(map);
-    rc=insert_atom_set(&data->values, a2);
+    rc = ( !skiplist_erased_payload(&map->list, data) &&
+	   insert_atom_set(&data->values, a2)
+	 );
     if ( rc )
       map->value_count++;
     UNLOCK(map);
@@ -683,16 +685,28 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
     if ( rc )
       lock_datum(a2);
   } else
-  { if ( keys && !PL_unify_integer(keys, map->list.count+1) )
+  { int is_new;
+
+    if ( keys && !PL_unify_integer(keys, map->list.count+1) )
       return FALSE;
     if ( !init_atom_set(&search.data.values, a2) )
       return PL_resource_error("memory");
     lock_datum(search.data.key);
 
     LOCK(map);
-    data = skiplist_insert(&map->list, &search, NULL);
+    data = skiplist_insert(&map->list, &search, &is_new);
     SECURE(data->magic = ND_MAGIC);
-    map->value_count++;
+    if ( is_new )
+    { map->value_count++;
+    } else
+    { int rc;
+
+      if ( (rc = insert_atom_set(&data->values, a2)) < 0 )
+      { UNLOCK(map);
+	return PL_resource_error("memory");
+      }
+      map->value_count += rc;
+    }
     UNLOCK(map);
   }
 
@@ -750,7 +764,8 @@ delete_atom_map3(term_t handle, term_t from, term_t to)
   { atom_set *as = &data->values;
 
     LOCK(map);
-    if ( delete_atom_set(as, a2) )
+    if ( !skiplist_erased_payload(&map->list, data) &&
+	 delete_atom_set(as, a2) )
     { unlock_datum(a2);
       map->value_count--;
       if ( as->size == 0 )
