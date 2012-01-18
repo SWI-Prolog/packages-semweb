@@ -733,11 +733,13 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
     } else
     { int rc;
 
-      if ( (rc = insert_atom_set(&data->values, a2)) < 0 )
+      if ( (rc = insert_atom_set(&data->values, a2)) > 0 )
+      { map->value_count++;
+	lock_datum(a2);
+      } else if ( rc < 0 )
       { UNLOCK(map);
 	return PL_resource_error("memory");
       }
-      map->value_count += rc;
     }
     UNLOCK(map);
     if ( !is_new )
