@@ -61,7 +61,7 @@ supposed to be local to the SWI-Prolog kernel are declared using
 #include "memory.h"
 #include "hash.h"
 #include "error.h"
-#include "skiplist/skiplist.h"
+#include "skiplist.h"
 #ifdef WITH_MD5
 #include "md5.h"
 #endif

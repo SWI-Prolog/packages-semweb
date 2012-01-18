@@ -30,7 +30,7 @@
 /*#define O_SECURE 1*/
 #include <SWI-Stream.h>
 #include <SWI-Prolog.h>
-#include "skiplist/skiplist.h"
+#include "skiplist.h"
 #include "mutex.h"
 #include "memory.h"
 #include "atom.h"
