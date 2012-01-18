@@ -563,6 +563,17 @@ delete_atom_set(atom_set *as, datum a)
 
 
 static void
+destroy_atom_set(atom_set *as)
+{ size_t i;
+
+  for(i=0; i<as->entries->allocated; i++)
+    unlock_datum(as->entries->atoms[i]);
+
+  PL_free(as->entries);
+}
+
+
+static void
 finalize_atom_set(atom_set *as)
 { size_t i;
 
@@ -697,14 +708,14 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
 	   insert_atom_set(&data->values, a2)
 	 );
     if ( rc )
+    { lock_datum(a2);			/* Must be locked because it may */
+					/* otherwise be deleted concurrently */
       map->value_count++;
+    }
     UNLOCK(map);
 
     if ( rc < 0 )
       return PL_resource_error("memory");
-
-    if ( rc )
-      lock_datum(a2);
   } else
   { int is_new;
 
@@ -712,13 +723,13 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
       return FALSE;
     if ( !init_atom_set(&search.data.values, a2) )
       return PL_resource_error("memory");
-    lock_datum(search.data.key);
 
     LOCK(map);
     data = skiplist_insert(&map->list, &search, &is_new);
     SECURE(data->magic = ND_MAGIC);
     if ( is_new )
     { map->value_count++;
+      lock_datum(search.data.key);
     } else
     { int rc;
 
@@ -729,6 +740,9 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
       map->value_count += rc;
     }
     UNLOCK(map);
+    if ( !is_new )
+    { destroy_atom_set(&search.data.values);
+    }
   }
 
   return TRUE;
