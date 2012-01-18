@@ -404,6 +404,22 @@ hash_datum(datum d)
 }
 
 
+#ifdef O_SECURE
+static int
+at_least_one_empty(atom_hash *ah)
+{ datum *p = ah->atoms;
+  datum *e = &ah->atoms[ah->allocated];
+
+  for(; p<e; p++)
+  { if ( *p == EMPTY )
+      return TRUE;
+  }
+
+  return FALSE;
+}
+#endif
+
+
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 in_atom_set(atom_set *as, datum a)
 
@@ -487,13 +503,14 @@ static int
 insert_atom_set(atom_set *as, datum a)
 { int rc;
 
-  if ( 4*as->size > 3*as->entries->allocated )
+  if ( 4*(as->size+1) > 3*as->entries->allocated )
   { if ( !resize_atom_set(as, 2*as->entries->allocated) )
       return -1;				/* no memory */
   }
 
   rc = insert_atom_hash(as->entries, a);
   as->size += rc;
+  SECURE(assert(at_least_one_empty(as->entries)));
 
   return rc;
 }
@@ -520,7 +537,7 @@ delete_atom_set(atom_set *as, datum a)
     return FALSE;				/* not in table */
 
   as->size--;
-  as->entries->atoms[i] = EMPTY;				/* R1 */
+  as->entries->atoms[i] = EMPTY;		/* R1 */
   j = i;
 
   for(;;)
@@ -528,16 +545,20 @@ delete_atom_set(atom_set *as, datum a)
       i = 0;
 
     if ( as->entries->atoms[i] == EMPTY )
-      return TRUE;
+      break;
 
     r = hash_datum(as->entries->atoms[i]) % as->entries->allocated;
     if ( (i >= r && r > j) || (r > j && j > i) || (j > i && i >= r) )
       continue;
 
     as->entries->atoms[j] = as->entries->atoms[i];
+    SECURE(assert(at_least_one_empty(as->entries)));
     as->entries->atoms[i] = EMPTY;
     j = i;
   }
+
+  SECURE(assert(at_least_one_empty(as->entries)));
+  return TRUE;
 }
 
 
