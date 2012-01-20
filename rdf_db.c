@@ -4546,11 +4546,11 @@ init_cursor_from_literal(search_state *state, literal *cursor)
 
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-init_search_state(search_state *state)
+init_search_state(search_state *state, query *q)
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static int
-init_search_state(search_state *state)
+init_search_state(search_state *state, query *query)
 { triple *p = &state->pattern;
 
   if ( get_partial_triple(state->db,
@@ -4560,7 +4560,7 @@ init_search_state(search_state *state)
     return FALSE;
   }
 
-  state->query = open_query(state->db);
+  state->query = query;
 
   if ( (p->match == STR_MATCH_PREFIX ||	p->match == STR_MATCH_LIKE) &&
        p->indexed != BY_SP &&
@@ -4636,17 +4636,7 @@ free_search_state(search_state *state)
 
 static foreign_t
 allow_retry_state(search_state *state)
-{ if ( !state->allocated )
-  { search_state *copy = rdf_malloc(state->db, sizeof(*copy));
-    *copy = *state;
-    if ( state->lit_ex.literal == &state->pattern.tp.end )
-      copy->lit_ex.literal = &copy->pattern.tp.end;
-    copy->allocated = TRUE;
-
-    state = copy;
-  }
-
-  PL_retry_address(state);
+{ PL_retry_address(state);
 }
 
 
@@ -4782,9 +4772,9 @@ rdf(term_t subject, term_t predicate, term_t object,
 
   switch(PL_foreign_control(h))
   { case PL_FIRST_CALL:
-    { search_state buf;
+    { query *q = open_query(db);
 
-      state = &buf;
+      state = &q->search_state;
       memset(state, 0, sizeof(*state));
       state->db	       = db;
       state->subject   = subject;
@@ -4794,7 +4784,7 @@ rdf(term_t subject, term_t predicate, term_t object,
       state->realpred  = realpred;
       state->flags     = flags;
 
-      if ( !init_search_state(state) )
+      if ( !init_search_state(state, q) )
 	return FALSE;
 
       goto search;
@@ -4815,7 +4805,7 @@ rdf(term_t subject, term_t predicate, term_t object,
       return rc;
     }
     case PL_PRUNED:
-    { search_state *state = PL_foreign_context_address(h);
+    { state = PL_foreign_context_address(h);
 
       free_search_state(state);
       return TRUE;
