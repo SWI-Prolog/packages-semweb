@@ -25,6 +25,7 @@
 
 #ifndef RDFDB_H_INCLUDED
 #define RDFDB_H_INCLUDED
+#include "atom.h"
 
 		 /*******************************
 		 *	     OPTIONS		*
@@ -66,7 +67,6 @@ supposed to be local to the SWI-Prolog kernel are declared using
 #include "md5.h"
 #endif
 #include "mutex.h"
-#include "query.h"
 #include "resource.h"
 
 #define RDF_VERSION 30000		/* 3.0.0 */
@@ -85,7 +85,27 @@ supposed to be local to the SWI-Prolog kernel are declared using
 
 
 		 /*******************************
-		 *               C		*
+		 *	    GENERATIONS		*
+		 *******************************/
+
+typedef uint64_t gen_t;			/* Basic type for generations */
+
+typedef struct lifespan
+{ gen_t		born;			/* Generation we were born */
+  gen_t		died;			/* Generation we died */
+} lifespan;
+
+#define GEN_UNDEF	0xffffffffffffffff /* no defined generation */
+#define GEN_MAX		0x7fffffffffffffff /* Max `normal' generation */
+#define GEN_TBASE	0x8000000000000000 /* Transaction generation base */
+#define GEN_TNEST	0x0000000100000000 /* Max transaction nesting */
+
+					/* Generation of a transaction */
+#define T_GEN(tid,d)	(GEN_TBASE + (tid)*GEN_TNEST + (d))
+
+
+		 /*******************************
+		 *	       TRIPLES		*
 		 *******************************/
 
 /* Keep consistent with md5_type[] in rdf_db.c! */
@@ -329,6 +349,24 @@ typedef struct triple_walker
   triple       *current;		/* Our current location */
 } triple_walker;
 
+#define MAX_BLOCKS 20			/* allows for 2M threads */
+
+typedef struct per_thread
+{ struct thread_info **blocks[MAX_BLOCKS];
+} per_thread;
+
+typedef struct query_admin
+{ gen_t		generation;		/* Global heart-beat */
+  struct
+  { simpleMutex	lock;
+    per_thread	per_thread;
+  } query;				/* active query administration */
+  struct
+  { simpleMutex	lock;
+  } write;				/* write administration */
+} query_admin;
+
+
 typedef struct rdf_db
 { triple_bucket by_none;		/* Plain linked list of triples */
   triple_hash   hash[INDEX_TABLES];	/* Hash-tables */
@@ -367,6 +405,42 @@ typedef struct rdf_db
   skiplist      literals;
 } rdf_db;
 
+
+		 /*******************************
+		 *	    QUERY TYPES		*
+		 *******************************/
+
+#define LITERAL_EX_MAGIC 0x2b97e881
+
+typedef struct literal_ex
+{ literal  *literal;			/* the real literal */
+  atom_info atom;			/* prepared info on value */
+#ifdef O_SECURE
+  long	    magic;
+#endif
+} literal_ex;
+
+
+typedef struct search_state
+{ rdf_db       *db;			/* our database */
+  term_t	subject;		/* Prolog term references */
+  term_t	object;
+  term_t	predicate;
+  term_t	src;
+  term_t	realpred;
+  unsigned	allocated;		/* State has been allocated */
+  unsigned	flags;			/* Misc flags controlling search */
+  atom_t	prefix;			/* prefix and like search */
+  int		has_literal_state;	/* Literal state is present */
+  skiplist_enum literal_state;		/* Literal search state */
+  literal      *literal_cursor;		/* pointer in current literal */
+  literal_ex    lit_ex;			/* extended literal for fast compare */
+  triple_walker cursor;			/* Pointer in triple DB */
+  struct query *query;			/* Associated query */
+  triple	pattern;		/* Pattern triple */
+} search_state;
+
+#include "query.h"
 
 		 /*******************************
 		 *	      FUNCTIONS		*

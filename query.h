@@ -23,27 +23,10 @@
 #ifndef RDF_QUERY_H_INCLUDED
 #define RDF_QUERY_H_INCLUDED
 #include <stdint.h>
+#include "rdf_db.h"
 #include "mutex.h"
 
 
-		 /*******************************
-		 *	    GENERATIONS		*
-		 *******************************/
-
-typedef uint64_t gen_t;			/* Basic type for generations */
-
-typedef struct lifespan
-{ gen_t		born;			/* Generation we were born */
-  gen_t		died;			/* Generation we died */
-} lifespan;
-
-#define GEN_UNDEF	0xffffffffffffffff /* no defined generation */
-#define GEN_MAX		0x7fffffffffffffff /* Max `normal' generation */
-#define GEN_TBASE	0x8000000000000000 /* Transaction generation base */
-#define GEN_TNEST	0x0000000100000000 /* Max transaction nesting */
-
-					/* Generation of a transaction */
-#define T_GEN(tid,d)	(GEN_TBASE + (tid)*GEN_TNEST + (d))
 
 
 typedef struct rdf_db *rdf_dbp;
@@ -75,6 +58,7 @@ typedef struct query
     struct triple_buffer *deleted;
     term_t	prolog_id;		/* Prolog transaction identifier */
   } transaction_data;
+  search_state	search_state;		/* State for searches */
 } query;
 
 #define MAX_QBLOCKS 20			/* allows for 2M concurrent queries */
@@ -98,24 +82,6 @@ typedef struct query_stack
 typedef struct thread_info
 { query_stack   queries;		/* Open queries */
 } thread_info;
-
-#define MAX_BLOCKS 20			/* allows for 2M threads */
-
-typedef struct per_thread
-{ thread_info **blocks[MAX_BLOCKS];
-} per_thread;
-
-typedef struct query_admin
-{ gen_t		generation;		/* Global heart-beat */
-  struct
-  { simpleMutex	lock;
-    per_thread	per_thread;
-  } query;				/* active query administration */
-  struct
-  { simpleMutex	lock;
-  } write;				/* write administration */
-} query_admin;
-
 
 		 /*******************************
 		 *		API		*

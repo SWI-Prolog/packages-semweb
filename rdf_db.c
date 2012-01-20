@@ -47,12 +47,10 @@
 #endif
 
 #include "rdf_db.h"
-#include <wchar.h>
 #include <wctype.h>
 #include <ctype.h>
 #ifdef WITH_MD5
 #include "md5.h"
-#include "atom.h"
 #include "murmur.h"
 #include "memory.h"
 #include "buffer.h"
@@ -1805,17 +1803,6 @@ rdf_unset_graph_source(term_t graph_name)
 		 /*******************************
 		 *	     LITERALS		*
 		 *******************************/
-
-#define LITERAL_EX_MAGIC 0x2b97e881
-
-typedef struct literal_ex
-{ literal  *literal;
-  atom_info atom;
-#ifdef O_SECURE
-  long	    magic;
-#endif
-} literal_ex;
-
 
 static inline void
 prepare_literal_ex(literal_ex *lex)
@@ -4517,26 +4504,6 @@ static foreign_t
 rdf_assert3(term_t subject, term_t predicate, term_t object)
 { return rdf_assert4(subject, predicate, object, 0);
 }
-
-
-typedef struct search_state
-{ rdf_db       *db;			/* our database */
-  term_t	subject;		/* Prolog term references */
-  term_t	object;
-  term_t	predicate;
-  term_t	src;
-  term_t	realpred;
-  unsigned	allocated;		/* State has been allocated */
-  unsigned	flags;			/* Misc flags controlling search */
-  atom_t	prefix;			/* prefix and like search */
-  int		has_literal_state;	/* Literal state is present */
-  skiplist_enum literal_state;		/* Literal search state */
-  literal      *literal_cursor;		/* pointer in current literal */
-  literal_ex    lit_ex;			/* extended literal for fast compare */
-  triple_walker cursor;			/* Pointer in triple DB */
-  query	       *query;			/* Associated query */
-  triple	pattern;		/* Pattern triple */
-} search_state;
 
 
 static void	free_search_state(search_state *state);
