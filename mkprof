@@ -1,0 +1,17 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+  echo "Usage: $0 command"
+  echo "See also: http://google-perftools.googlecode.com/svn/trunk/doc/cpuprofile.html"
+  exit 1
+fi
+
+tmp=prof.$$
+
+CPUPROFILE_FREQUENCY=1000 \
+CPUPROFILE=$tmp \
+LD_PRELOAD=/usr/local/lib/libprofiler.so \
+	"$@"
+
+pprof --callgrind `which $1` $tmp > ppprof.out.$$
+kcachegrind ppprof.out.$$
