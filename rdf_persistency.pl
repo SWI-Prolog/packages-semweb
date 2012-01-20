@@ -260,15 +260,16 @@ load_db :-
 	rdf_directory(Dir),
 	load_prefixes(Dir),
 	working_directory(Old, Dir),
+	concurrency(Jobs),
+	cpu_stat_key(Jobs, StatKey),
 	get_time(Wall0),
-	statistics(cputime, T0),
+	statistics(StatKey, T0),
 	call_cleanup(find_dbs(DBs), working_directory(_, Old)),
 	length(DBs, DBCount),
 	verbosity(DBCount, Silent),
 	make_goals(DBs, Silent, 1, DBCount, Goals),
-	concurrency(Jobs),
 	concurrent(Jobs, Goals, []),
-	statistics(cputime, T1),
+	statistics(StatKey, T1),
 	get_time(Wall1),
 	T is T1 - T0,
 	Wall is Wall1 - Wall0,
@@ -300,6 +301,9 @@ concurrency(Jobs) :-
 	current_prolog_flag(cpu_count, Jobs),
 	Jobs > 0, !.
 concurrency(1).
+
+cpu_stat_key(1, cputime) :- !.
+cpu_stat_key(_, process_cputime).
 
 
 %%	find_dbs(-DBs:list(atom)) is det.
