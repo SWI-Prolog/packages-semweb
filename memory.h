@@ -45,6 +45,10 @@ Stuff for lock-free primitives
   * MemoryBarrier()
   Realises a (full) memory barrier.  This means that memory operations
   before the barrier are all executed before those after the barrier.
+
+  * PREFETCH_FOR_WRITE(p)
+  * PREFETCH_FOR_READ(p)
+  Cache-prefetch instructions
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #define BLOCKLEN(i) ((i) ? 1<<(i-1) : 1)
@@ -62,17 +66,16 @@ MSB(unsigned int i)
   return index;
 }
 
-#ifndef MemoryBarrier
-#define MemoryBarrier() (void)0
-#endif
-
 #elif defined(__GNUC__)			/* GCC version */
 
 #define MSB(i) ((i) ? (32 - __builtin_clz(i)) : 0)
 #define MemoryBarrier() __sync_synchronize()
+#define PREFETCH_FOR_WRITE(p) __builtin_prefetch(p, 1, 0)
+#define PREFETCH_FOR_READ(p) __builtin_prefetch(p, 0, 0)
 
-#else					/* Other */
+#endif /*_MSC_VER|__GNUC__*/
 
+#ifndef MSB
 static inline int
 MSB(unsigned int i)
 { int j = 0;
@@ -86,10 +89,15 @@ MSB(unsigned int i)
 
   return j;
 }
-#define MemoryBarrier() (void)0
-
 #endif
 
+#ifndef MemoryBarrier
+#define MemoryBarrier() (void)0
+#endif
 
+#ifndef PREFETCH_FOR_WRITE
+#define PREFETCH_FOR_WRITE(p) (void)0
+#define PREFETCH_FOR_READ(p) (void)0
+#endif
 
 #endif /*RDF_MEMORY_H_INCLUDED*/
