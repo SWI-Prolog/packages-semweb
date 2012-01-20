@@ -2444,13 +2444,10 @@ init_triple_walker(triple_walker *tw, rdf_db *db, triple *pattern, int which)
 
 
 static triple *
-next_triple(triple_walker *tw)
+next_hash_triple(triple_walker *tw)
 { triple *rc;
 
-  if ( tw->current )
-  { rc = tw->current;
-    tw->current = rc->tp.next[tw->icol];
-  } else if ( tw->bcount <= tw->hash->bucket_count )
+  if ( tw->bcount <= tw->hash->bucket_count )
   { do
     { int entry = tw->unbounded_hash % tw->bcount;
       triple_bucket *bucket = &tw->hash->blocks[MSB(entry)][entry];
@@ -2466,6 +2463,19 @@ next_triple(triple_walker *tw)
   }
 
   return rc;
+}
+
+
+static inline triple *
+next_triple(triple_walker *tw)
+{ triple *rc;
+
+  if ( (rc=tw->current) )
+  { tw->current = rc->tp.next[tw->icol];
+    return rc;
+  } else
+  { return next_hash_triple(tw);
+  }
 }
 
 
