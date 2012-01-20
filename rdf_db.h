@@ -358,11 +358,11 @@ typedef struct per_thread
 typedef struct query_admin
 { gen_t		generation;		/* Global heart-beat */
   struct
-  { simpleMutex	lock;
+  { simpleMutex	lock;			/* used to lock creation of per_thread */
     per_thread	per_thread;
   } query;				/* active query administration */
   struct
-  { simpleMutex	lock;
+  { simpleMutex	lock;			/* Locks writing triples */
   } write;				/* write administration */
 } query_admin;
 
