@@ -92,6 +92,13 @@ move the .new to the plain snapshot name as a means of recovery.
 :- meta_predicate
 	no_agc(0).
 
+:- predicate_options(rdf_attach_db/2, 2,
+		     [ concurrency(positive_integer),
+		       max_open_journals(positive_integer),
+		       silent(oneof([true,false,brief])),
+		       log_nested_transactions(boolean)
+		     ]).
+
 %%	rdf_attach_db(+Directory, +Options)
 %
 %	Start persistent operations using Directory   as  place to store
