@@ -30,6 +30,15 @@
 #ifndef SKIPLIST_H_DEFINED
 #define SKIPLIST_H_DEFINED
 
+#ifndef SO_LOCAL
+#ifdef HAVE_VISIBILITY_ATTRIBUTE
+#define SO_LOCAL __attribute__((visibility("hidden")))
+#else
+#define SO_LOCAL
+#endif
+#define COMMON(type) SO_LOCAL type
+#endif
+
 #define SKIPCELL_MAX_HEIGHT 31
 #define SKIPCELL_MAGIC	    2367357
 
