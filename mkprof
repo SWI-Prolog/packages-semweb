@@ -10,8 +10,8 @@ tmp=prof.$$
 
 CPUPROFILE_FREQUENCY=1000 \
 CPUPROFILE=$tmp \
-LD_PRELOAD=/usr/local/lib/libprofiler.so \
+LD_PRELOAD=/usr/lib/libprofiler.so \
 	"$@"
 
-pprof --callgrind `which $1` $tmp > ppprof.out.$$
-kcachegrind ppprof.out.$$
+google-pprof --callgrind `which $1` $tmp > prof.out.$$
+kcachegrind prof.out.$$
