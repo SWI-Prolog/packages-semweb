@@ -2574,7 +2574,10 @@ next_hash_triple(triple_walker *tw)
       triple_bucket *bucket = &tw->hash->blocks[MSB(entry)][entry];
 
       rc = bucket->head;
-      tw->bcount *= 2;
+      do
+      { tw->bcount *= 2;
+      } while ( tw->bcount <= tw->hash->bucket_count &&
+		tw->unbounded_hash % tw->bcount == entry );
     } while(!rc && tw->bcount <= tw->hash->bucket_count );
 
     if ( rc )
