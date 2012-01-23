@@ -281,9 +281,8 @@ typedef struct triple
   unsigned	is_duplicate : 1;	/* I'm a duplicate */
   unsigned	allocated : 1;		/* Triple is allocated */
   unsigned	atoms_locked : 1;	/* Atoms have been locked */
-  unsigned	linked : 1;		/* Linked into the hash-chains */
-  unsigned	erased : 1;		/* Triple is erased */
-  unsigned	duplicates : 16;	/* Duplicate count */
+  unsigned	linked : 4;		/* Linked into the hash-chains */
+  unsigned	duplicates : 14;	/* Duplicate count */
 					/* Total: 32 */
 } triple;
 
@@ -381,7 +380,6 @@ typedef struct rdf_db
   size_t	core;			/* core in use */
   resource_db	resources;		/* admin of used resources */
   pred_hash	predicates;		/* Predicate table */
-  int		active_queries;		/* Calls with choicepoints */
   int		need_update;		/* We need to update */
   size_t	agenda_created;		/* #visited nodes in agenda */
   size_t	duplicates;		/* #duplicate triples */
@@ -390,16 +388,13 @@ typedef struct rdf_db
   graph	       *last_graph;		/* last accessed graph */
   query_admin	queries;		/* Active query administration */
 
-  active_transaction *tr_active;	/* open transactions */
-  transaction_record *tr_first;		/* first transaction record */
-  transaction_record *tr_last;		/* last transaction record */
-  int		tr_nesting;		/* nesting depth of transactions */
-  int		tr_reset;		/* transaction contains reset */
   int		resetting;		/* We are in rdf_reset_db() */
+  int		gc_busy;		/* Processing a GC */
 
   struct
   { simpleMutex	literal;		/* threaded access to literals */
     simpleMutex misc;			/* general DB locks */
+    simpleMutex gc;			/* DB garbage collection lock */
   } locks;
 
   skiplist      literals;

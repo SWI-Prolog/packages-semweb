@@ -94,6 +94,37 @@ rdf_thread_info(rdf_db *db, int tid)
 }
 
 
+gen_t
+oldest_query_geneneration(rdf_db *db)
+{ int tid;
+  gen_t gen = GEN_MAX;
+  query_admin *qa = &db->queries;
+  per_thread *td = &qa->query.per_thread;
+  thread_info **tis;
+
+  for(tid=1; (tis=td->blocks[MSB(tid)]); tid++)
+  { thread_info *ti;
+
+    if ( (ti=tis[tid]) )
+    { query_stack *qs = &ti->queries;
+
+      if ( qs->top > 0 )
+      { query *q = &qs->preallocated[0];
+
+	DEBUG(0, Sdprintf("Thread %d: query at gen %ld\n",
+			  tid, (long)q->rd_gen));
+
+	if ( q->rd_gen < gen )
+	  gen = q->rd_gen;
+      }
+    }
+  }
+
+  return gen;
+}
+
+
+
 		 /*******************************
 		 *	    QUERY-STACK		*
 		 *******************************/

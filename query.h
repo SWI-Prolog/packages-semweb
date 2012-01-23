@@ -90,6 +90,7 @@ typedef struct thread_info
 COMMON(void)	init_query_admin(rdf_dbp db);
 COMMON(query *)	open_query(rdf_dbp db);
 COMMON(void)	close_query(query *q);
+COMMON(gen_t)	oldest_query_geneneration(rdf_db *db);
 
 COMMON(query *)	open_transaction(rdf_dbp db,
 				 struct triple_buffer *added,

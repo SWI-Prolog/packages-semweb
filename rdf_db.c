@@ -256,6 +256,7 @@ static void	link_triple_hash(rdf_db *db, triple *t);
 static void	init_triple_walker(triple_walker *tw, rdf_db *db,
 				   triple *t, int index);
 static triple  *next_triple(triple_walker *tw);
+static void	free_triple(rdf_db *db, triple *t, int linger);
 
 static void	create_reachability_matrix(rdf_db *db, predicate_cloud *cloud);
 static int	get_predicate(rdf_db *db, term_t t, predicate **p);
@@ -275,6 +276,7 @@ static void
 INIT_LOCK(rdf_db *db)
 { simpleMutexInit(&db->locks.literal);
   simpleMutexInit(&db->locks.misc);
+  simpleMutexInit(&db->locks.gc);
 }
 
 
@@ -2268,6 +2270,114 @@ init_tables(rdf_db *db)
 }
 
 
+		 /*******************************
+		 *               C		*
+		 *******************************/
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Garbage collect triples, given that the   oldest  running query reads at
+generation gen.	 There are two thing we can do:
+
+  - Remove any triple that died before gen.  These triples must be left
+    to GC.  We can do this
+  - Reindex triples that are indexed before the latest hash-table
+    resize.  There are two ways:
+    - Decide based on the generation where the triple was added.
+    - See whether the triple is not optimally hashed.
+      - We could do that in match_triples()?
+        - Have a next_matching_triple()?
+	  - Problem: false info when using a 2nd best hash
+      - We could walk a hash-chain, and find the ones that are
+        incorrectly hashed.
+  - Implement as `doing a little', so we can either mix it into the
+    normal workflow or run a thread.
+
+There should be only one GC thread.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+static void
+gc_hash_chain(rdf_db *db, size_t bucket_no, int icol, gen_t gen)
+{ triple_bucket *bucket = &db->hash[icol].blocks[MSB(bucket_no)][bucket_no];
+  triple *prev = NULL;
+  triple *t = bucket->head;
+
+  for(; t; t=t->tp.next[icol])
+  { if ( t->lifespan.died < gen )
+    { if ( prev )
+	prev->tp.next[icol] = t->tp.next[icol];
+      else
+	bucket->head = t->tp.next[icol];
+      if ( t == bucket->tail )
+	bucket->tail = prev;
+
+      if ( --t->linked == 0 )
+      { DEBUG(0, Sdprintf("GC at gen=%ld..%ld: ",
+			  (long)t->lifespan.born,
+			  (long)t->lifespan.died);
+	         print_triple(t, 0));
+	free_triple(db, t, TRUE);
+      }
+    } else
+    { prev=t;
+    }
+  }
+}
+
+
+static void
+gc_hash(rdf_db *db, int icol, gen_t gen)
+{ size_t mb = db->hash[icol].bucket_count;
+  size_t b;
+
+  for(b=0; b<mb; b++)
+    gc_hash_chain(db, b, icol, gen);
+}
+
+
+static void
+gc_hashes(rdf_db *db, gen_t gen)
+{ int icol;
+
+  for(icol=0; icol<INDEX_TABLES; icol++)
+    gc_hash(db, icol, gen);
+}
+
+
+
+static int
+gc_db(rdf_db *db, gen_t gen)
+{ simpleMutexLock(&db->locks.gc);
+  if ( db->gc_busy )
+  { simpleMutexUnlock(&db->locks.gc);
+    return FALSE;			/* in progress */
+  }
+
+  DEBUG(0, Sdprintf("RDF GC; gen = %ld\n", (long)gen));
+
+  db->gc_busy = TRUE;
+  gc_hashes(db, gen);
+  db->gc_busy = FALSE;
+  simpleMutexUnlock(&db->locks.gc);
+
+  return TRUE;
+}
+
+
+static foreign_t
+rdf_gc(void)
+{ rdf_db *db = DB;
+  gen_t gen = oldest_query_geneneration(db);
+
+  gc_db(db, gen);
+
+  return TRUE;
+}
+
+
+		 /*******************************
+		 *	  OVERALL DATABASE	*
+		 *******************************/
+
 static rdf_db *
 new_db(void)
 { rdf_db *db = PL_malloc_uncollectable(sizeof(*db));
@@ -2308,7 +2418,7 @@ reindex_triple(rdf_db *db, triple *t)
 
 
 static void
-free_triple(rdf_db *db, triple *t)
+free_triple(rdf_db *db, triple *t, int linger)
 { unlock_atoms(db, t);
 
   if ( t->object_is_literal && t->object.literal )
@@ -2317,7 +2427,11 @@ free_triple(rdf_db *db, triple *t)
     free_literal_value(db, &t->tp.end);
 
   if ( t->allocated )
-    rdf_free(db, t, sizeof(*t));
+  { if ( linger )
+      PL_linger(t);
+    else
+      rdf_free(db, t, sizeof(*t));
+  }
 }
 
 
@@ -2541,6 +2655,8 @@ link_triple_hash(rdf_db *db, triple *t)
     bucket->tail = t;
     bucket->count++;
   }
+
+  t->linked = INDEX_TABLES;
 }
 
 
@@ -2566,7 +2682,7 @@ discard_duplicate(rdf_db *db, triple *t)
   { if ( match_triples(d, t, MATCH_DUPLICATE) )
     { if ( d->graph == t->graph &&
 	   (d->line == NO_LINE || d->line == t->line) )
-      { free_triple(db, t);
+      { free_triple(db, t, FALSE);
 
 	return DUP_DISCARDED;
       }
@@ -2597,7 +2713,6 @@ link_triple(rdf_db *db, triple *t)
 
   if ( t->linked )
     return FALSE;
-  t->linked = TRUE;
 
   if ( (dup=discard_duplicate(db, t)) == DUP_DISCARDED )
     return FALSE;
@@ -2634,11 +2749,7 @@ ok:
 
 void
 erase_triple(rdf_db *db, triple *t)
-{ if ( t->erased )
-    return;
-  t->erased = TRUE;
-
-  update_duplicates_del(db, t);
+{ update_duplicates_del(db, t);
 
   if ( t->predicate.r->name == ATOM_subPropertyOf &&
        t->object_is_literal == FALSE )
@@ -4496,12 +4607,12 @@ rdf_assert4(term_t subject, term_t predicate, term_t object, term_t src)
   query *q;
 
   if ( !get_triple(db, subject, predicate, object, t) )
-  { free_triple(db, t);
+  { free_triple(db, t, FALSE);
     return FALSE;
   }
   if ( src )
   { if ( !get_graph(src, t) )
-    { free_triple(db, t);
+    { free_triple(db, t, FALSE);
       return FALSE;
     }
   } else
@@ -4574,7 +4685,7 @@ init_search_state(search_state *state, query *query)
   if ( get_partial_triple(state->db,
 			  state->subject, state->predicate, state->object,
 			  state->src, p) != TRUE )
-  { free_triple(state->db, p);
+  { free_triple(state->db, p, FALSE);
     return FALSE;
   }
 
@@ -4643,7 +4754,7 @@ free_search_state(search_state *state)
 { if ( state->query )
     close_query(state->query);
 
-  free_triple(state->db, &state->pattern);
+  free_triple(state->db, &state->pattern, FALSE);
   if ( state->prefix )
     PL_unregister_atom(state->prefix);
   if ( state->allocated )		/* also means redo! */
@@ -4919,7 +5030,7 @@ rdf_estimate_complexity(term_t subject, term_t predicate, term_t object,
   }
 
   rc = PL_unify_int64(complexity, c);
-  free_triple(db, &t);
+  free_triple(db, &t, FALSE);
 
   return rc;
 }
@@ -5023,11 +5134,11 @@ update_triple(rdf_db *db, term_t action, triple *t, triple **updated)
     memset(&t2, 0, sizeof(t2));
 
     if ( !get_object(db, a, &t2) )
-    { free_triple(db, &t2);
+    { free_triple(db, &t2, FALSE);
       return FALSE;
     }
     if ( match_object(&t2, &tmp, MATCH_QUAL) )
-    { free_triple(db, &t2);
+    { free_triple(db, &t2, FALSE);
       return TRUE;
     }
 
@@ -5067,7 +5178,7 @@ update_triple(rdf_db *db, term_t action, triple *t, triple **updated)
   new->graph		 = tmp.graph;
   new->line		 = tmp.line;
 
-  free_triple(db, &tmp);
+  free_triple(db, &tmp, FALSE);
   lock_atoms(db, new);
 
   *updated = new;
@@ -5134,7 +5245,7 @@ rdf_update5(term_t subject, term_t predicate, term_t object, term_t src,
 out:
   close_query(q);
   free_triple_buffer(&matches);
-  free_triple(db, &t);
+  free_triple(db, &t, FALSE);
 
   return (rc && count > 0) ? TRUE : FALSE;
 }
@@ -5185,7 +5296,7 @@ rdf_retractall4(term_t subject, term_t predicate, term_t object, term_t src)
       buffer_triple(&buf, p);
     }
   }
-  free_triple(db, &t);
+  free_triple(db, &t, FALSE);
   del_triples(q, buf.base, buf.top-buf.base);
   close_query(q);
   free_triple_buffer(&buf);
@@ -6284,7 +6395,7 @@ erase_triples(rdf_db *db)
   for(t=db->by_none.head; t; t=n)
   { n = t->tp.next[ICOL(BY_NONE)];
 
-    free_triple(db, t);
+    free_triple(db, t, FALSE);		/* ? */
     db->freed++;
   }
   db->by_none.head = db->by_none.tail = NULL;
@@ -6554,6 +6665,7 @@ install_rdf_db()
   PL_register_foreign("rdf",		3, rdf3,	    NDET);
   PL_register_foreign("rdf",		4, rdf4,	    NDET);
   PL_register_foreign("rdf_has",	4, rdf_has,	    NDET);
+  PL_register_foreign("rdf_gc",		0, rdf_gc,	    0);
   PL_register_foreign("rdf_statistics_",1, rdf_statistics,  NDET);
   PL_register_foreign("rdf_generation", 1, rdf_generation,  0);
   PL_register_foreign("rdf_match_label",3, match_label,     0);
