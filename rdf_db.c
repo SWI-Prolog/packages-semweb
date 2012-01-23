@@ -1870,10 +1870,22 @@ static int
 free_literal(rdf_db *db, literal *lit)
 { int rc = TRUE;
 
-  if ( --lit->references == 0 )
-  { rc = free_literal_value(db, lit);
+  if ( lit->shared )
+  { simpleMutexLock(&db->queries.write.lock);
+    if ( --lit->references == 0 )
+    { rc = free_literal_value(db, lit);
+      simpleMutexUnlock(&db->queries.write.lock);
 
-    rdf_free(db, lit, sizeof(*lit));
+      rdf_free(db, lit, sizeof(*lit));
+    } else
+    { simpleMutexUnlock(&db->queries.write.lock);
+    }
+  } else				/* not shared; no locking needed */
+  { if ( --lit->references == 0 )
+    { rc = free_literal_value(db, lit);
+
+      rdf_free(db, lit, sizeof(*lit));
+    }
   }
 
   return rc;
