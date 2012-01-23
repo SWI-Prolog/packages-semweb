@@ -72,8 +72,10 @@ MSB(unsigned int i)
 #define MemoryBarrier()		__sync_synchronize()
 #define PREFETCH_FOR_WRITE(p)	__builtin_prefetch(p, 1, 0)
 #define PREFETCH_FOR_READ(p)	__builtin_prefetch(p, 0, 0)
-#define ATOMIC_INC(ptr)		__sync_add_and_fetch(ptr, 1)
-#define ATOMIC_DEC(ptr)		__sync_sub_and_fetch(ptr, 1)
+#define ATOMIC_ADD(ptr, v)	__sync_add_and_fetch(ptr, v)
+#define ATOMIC_SUB(ptr, v)	__sync_sub_and_fetch(ptr, v)
+#define ATOMIC_INC(ptr)		ATOMIC_ADD(ptr, 1) /* ++(*ptr) */
+#define ATOMIC_DEC(ptr)		ATOMIC_SUB(ptr, 1) /* --(*ptr) */
 
 #endif /*_MSC_VER|__GNUC__*/
 

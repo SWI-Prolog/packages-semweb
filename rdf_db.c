@@ -2302,6 +2302,7 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol, gen_t gen)
 { triple_bucket *bucket = &db->hash[icol].blocks[MSB(bucket_no)][bucket_no];
   triple *prev = NULL;
   triple *t = bucket->head;
+  int collected = 0;
 
   for(; t; t=t->tp.next[icol])
   { if ( t->lifespan.died < gen )
@@ -2311,6 +2312,8 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol, gen_t gen)
 	bucket->head = t->tp.next[icol];
       if ( t == bucket->tail )
 	bucket->tail = prev;
+
+      collected++;
 
       if ( --t->linked == 0 )
       { DEBUG(2, Sdprintf("GC at gen=%ld..%ld: ",
@@ -2326,6 +2329,9 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol, gen_t gen)
     { prev=t;
     }
   }
+
+  if ( collected )			/* concurrent with hashing new ones */
+    ATOMIC_SUB(&bucket->count, collected);
 }
 
 
@@ -2346,7 +2352,6 @@ gc_hashes(rdf_db *db, gen_t gen)
   for(icol=0; icol<INDEX_TABLES; icol++)
     gc_hash(db, icol, gen);
 }
-
 
 
 static int
@@ -2662,7 +2667,7 @@ link_triple_hash(rdf_db *db, triple *t)
     { bucket->head = t;
     }
     bucket->tail = t;
-    bucket->count++;
+    ATOMIC_INC(&bucket->count);
   }
 
   t->linked = INDEX_TABLES;
