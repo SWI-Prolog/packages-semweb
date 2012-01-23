@@ -371,7 +371,6 @@ typedef struct rdf_db
   triple_hash   hash[INDEX_TABLES];	/* Hash-tables */
   size_t	created;		/* #triples created */
   size_t	erased;			/* #triples erased */
-  size_t	freed;			/* #triples actually erased */
   size_t	indexed[16];		/* Count calls */
   int		rehash_count;		/* # rehashes */
   resource_db	resources;		/* admin of used resources */

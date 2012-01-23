@@ -2206,7 +2206,7 @@ triple_hash_quality(rdf_db *db, int index)
 
 static void
 consider_triple_rehash(rdf_db *db)
-{ if ( db->created - db->freed > db->hash[ICOL(BY_SPO)].bucket_count )
+{ if ( db->created - db->erased > db->hash[ICOL(BY_SPO)].bucket_count )
   { int i;
 
     for(i=1; i<INDEX_TABLES; i++)
@@ -2227,7 +2227,7 @@ consider_triple_rehash(rdf_db *db)
 	    resize = TRUE;
 	  break;
 	case BY_SPO:
-	  if ( db->created - db->freed > db->hash[i].bucket_count )
+	  if ( db->created - db->erased > db->hash[i].bucket_count )
 	    resize = TRUE;
 	  break;
 	case BY_G:
@@ -6406,7 +6406,6 @@ erase_triples(rdf_db *db)
   { n = t->tp.next[ICOL(BY_NONE)];
 
     free_triple(db, t, FALSE);		/* ? */
-    db->freed++;
   }
   db->by_none.head = db->by_none.tail = NULL;
 
@@ -6418,7 +6417,6 @@ erase_triples(rdf_db *db)
 
   db->created = 0;
   db->erased = 0;
-  db->freed = 0;
   db->erased = 0;
   db->rehash_count = 0;
   memset(db->indexed, 0, sizeof(db->indexed));
