@@ -106,8 +106,6 @@ rdf_malloc(rdf_db *db, size_t size)
   size_t *ptr = PL_malloc(bytes);
 
   *ptr++ = size;
-  if ( db )
-    db->core += size;
 
   return ptr;
 }
@@ -118,7 +116,6 @@ rdf_free(rdf_db *db, void *ptr, size_t size)
 
   assert(p[-1] == size);
 
-  db->core -= size;
   PL_free(&p[-1]);
 }
 
@@ -131,7 +128,6 @@ rdf_realloc(rdf_db *db, void *ptr, size_t old, size_t new)
   assert(p[-1] == old);
   p = PL_realloc(&p[-1], bytes);
   *p++ = new;
-  db->core += new-old;
 
   return p;
 }
@@ -140,26 +136,18 @@ rdf_realloc(rdf_db *db, void *ptr, size_t old, size_t new)
 
 void *
 rdf_malloc(rdf_db *db, size_t size)
-{ if ( db )
-    db->core += size;
-
-//  return PL_malloc_atomic_uncollectable(size);
-  return PL_malloc_unmanaged(size);
+{ return PL_malloc_unmanaged(size);
 }
 
 void
 rdf_free(rdf_db *db, void *ptr, size_t size)
-{ db->core -= size;
-
-  PL_free(ptr);
+{ PL_free(ptr);
 }
 
 
 void *
 rdf_realloc(rdf_db *db, void *ptr, size_t old, size_t new)
-{ db->core += new-old;
-
-  return PL_realloc(ptr, new);
+{ return PL_realloc(ptr, new);
 }
 
 #endif /*CHECK_MALLOC_SIZES*/
@@ -206,7 +194,6 @@ static functor_t FUNCTOR_lang2;
 static functor_t FUNCTOR_type2;
 
 static functor_t FUNCTOR_gc3;
-static functor_t FUNCTOR_core1;
 
 static functor_t FUNCTOR_assert4;
 static functor_t FUNCTOR_retract4;
@@ -1835,6 +1822,7 @@ free_literal_value(rdf_db *db, literal *lit)
 
   if ( lit->shared && !db->resetting )
   { literal_ex lex;
+    literal **data;
 
     lit->shared = FALSE;
     rc = broadcast(EV_OLD_LITERAL, lit, NULL);
@@ -1846,7 +1834,9 @@ free_literal_value(rdf_db *db, literal *lit)
     lex.literal = lit;
     prepare_literal_ex(&lex);
 
-    if ( !skiplist_delete(&db->literals, &lex) )
+    if ( (data=skiplist_delete(&db->literals, &lex)) )
+    { PL_linger(data);				/* someone else may be reading */
+    } else
     { Sdprintf("Failed to delete %p (size=%ld): ", lit, db->literals.count);
       print_literal(lit);
       Sdprintf("\n");
@@ -6284,8 +6274,6 @@ unify_statistics(rdf_db *db, term_t key, functor_t f)
   { v = db->resources.hash.count;
   } else if ( f == FUNCTOR_predicates1 )
   { v = db->predicates.count;
-  } else if ( f == FUNCTOR_core1 )
-  { v = db->core;
   } else if ( f == FUNCTOR_indexed16 )
   { int i;
     term_t a = PL_new_term_ref();
@@ -6617,7 +6605,6 @@ install_rdf_db()
   MKFUNCTOR(rdfs_subject_branch_factor, 1);
   MKFUNCTOR(rdfs_object_branch_factor, 1);
   MKFUNCTOR(gc, 3);
-  MKFUNCTOR(core, 1);
   MKFUNCTOR(assert, 4);
   MKFUNCTOR(retract, 4);
   MKFUNCTOR(update, 5);
@@ -6659,7 +6646,6 @@ install_rdf_db()
   keys[i++] = FUNCTOR_literals1;
   keys[i++] = FUNCTOR_triples2;
   keys[i++] = FUNCTOR_gc3;
-  keys[i++] = FUNCTOR_core1;
   keys[i++] = 0;
   assert(i<=16);
 

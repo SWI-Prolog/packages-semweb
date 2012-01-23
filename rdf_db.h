@@ -374,7 +374,6 @@ typedef struct rdf_db
   size_t	freed;			/* #triples actually erased */
   size_t	indexed[16];		/* Count calls */
   int		rehash_count;		/* # rehashes */
-  size_t	core;			/* core in use */
   resource_db	resources;		/* admin of used resources */
   pred_hash	predicates;		/* Predicate table */
   int		need_update;		/* We need to update */

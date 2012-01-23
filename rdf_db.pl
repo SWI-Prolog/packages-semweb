@@ -663,12 +663,8 @@ rdf_statistics(properties(Count)) :-
 	rdf_statistics_(predicates(Count)).
 rdf_statistics(triples(Count)) :-
 	rdf_statistics_(triples(Count)).
-rdf_statistics(gc(Count, Time)) :-
-	rdf_statistics_(gc(Count, Time)).
-rdf_statistics(rehash(Count, Time)) :-
-	rdf_statistics_(rehash(Count, Time)).
-rdf_statistics(core(Bytes)) :-
-	rdf_statistics_(core(Bytes)).
+rdf_statistics(gc(Count, Reclaimed, Time)) :-
+	rdf_statistics_(gc(Count, Reclaimed, Time)).
 rdf_statistics(lookup(Index, Count)) :-
 	functor(Indexed, indexed, 16),
 	rdf_statistics_(Indexed),
