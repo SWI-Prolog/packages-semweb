@@ -252,6 +252,7 @@ static void unlock_atoms_literal(literal *lit);
 
 static size_t	triple_hash_key(triple *t, int which);
 static size_t	object_hash(triple *t);
+static void	link_triple_hash(rdf_db *db, triple *t);
 static void	init_triple_walker(triple_walker *tw, rdf_db *db,
 				   triple *t, int index);
 static triple  *next_triple(triple_walker *tw);
@@ -2289,6 +2290,23 @@ new_triple(rdf_db *db)
 }
 
 
+/* reindex_triple() is used to add a duplicate of the triple to the table
+   using the new indexing regime. The old one will be left to GC, but it
+   can only be really deleted if no queries exist with the old indexing.
+   This will be based on the generation.
+*/
+
+static void
+reindex_triple(rdf_db *db, triple *t)
+{ triple *t2 = rdf_malloc(db, sizeof(*t));
+
+  *t2 = *t;
+  memset(&t2->tp, 0, sizeof(t2->tp));
+  link_triple_hash(db, t2);
+  t->lifespan.died = 0;			/* Died long ago */
+}
+
+
 static void
 free_triple(rdf_db *db, triple *t)
 { unlock_atoms(db, t);
@@ -2503,6 +2521,12 @@ static void
 link_triple_hash(rdf_db *db, triple *t)
 { int ic;
 
+  if ( db->by_none.tail )		/* non-indexed chain */
+    db->by_none.tail->tp.next[ICOL(BY_NONE)] = t;
+  else
+    db->by_none.head = t;
+  db->by_none.tail = t;
+
   for(ic=1; ic<INDEX_TABLES; ic++)
   { triple_hash *hash = &db->hash[ic];
     int i = col_index[ic];
@@ -2580,12 +2604,6 @@ link_triple(rdf_db *db, triple *t)
 
   if ( t->object_is_literal )
     t->object.literal = share_literal(db, t->object.literal);
-
-  if ( db->by_none.tail )
-    db->by_none.tail->tp.next[ICOL(BY_NONE)] = t;
-  else
-    db->by_none.head = t;
-  db->by_none.tail = t;
 
   link_triple_hash(db, t);
   consider_triple_rehash(db);
@@ -4987,9 +5005,7 @@ update_triple(rdf_db *db, term_t action, triple *t, triple **updated)
     if ( !PL_get_atom_ex(a, &s) )
       return FALSE;
     if ( tmp.subject == s )
-    { *updated = NULL;
       return TRUE;			/* no change */
-    }
 
     tmp.subject = s;
   } else if ( PL_is_functor(action, FUNCTOR_predicate1) )
@@ -4998,9 +5014,7 @@ update_triple(rdf_db *db, term_t action, triple *t, triple **updated)
     if ( !get_predicate(db, a, &p) )
       return FALSE;
     if ( tmp.predicate.r == p )
-    { *updated = NULL;
       return TRUE;			/* no change */
-    }
 
     tmp.predicate.r = p;
   } else if ( PL_is_functor(action, FUNCTOR_object1) )
@@ -5014,7 +5028,6 @@ update_triple(rdf_db *db, term_t action, triple *t, triple **updated)
     }
     if ( match_object(&t2, &tmp, MATCH_QUAL) )
     { free_triple(db, &t2);
-      *updated = NULL;
       return TRUE;
     }
 
@@ -5100,19 +5113,22 @@ rdf_update5(term_t subject, term_t predicate, term_t object, term_t src,
     count = matches.top-matches.base;
     init_triple_buffer(&replacements);
     for(tp=matches.base; tp<matches.top; tp++)
-    { if ( !update_triple(db, action, *tp, &new) )
+    { new = NULL;
+      if ( !update_triple(db, action, *tp, &new) )
       { rc = FALSE;
 	free_triple_buffer(&replacements);
 	goto out;
-      } else
-      { updated++;
       }
+
+      updated++;
       buffer_triple(&replacements, new);
     }
 
     if ( updated )
       update_triples(q, matches.base, replacements.base, count);
     free_triple_buffer(&replacements);
+  } else
+  { count = 0;
   }
 
 out:
