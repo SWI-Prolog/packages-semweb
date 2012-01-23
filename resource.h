@@ -30,6 +30,7 @@
 typedef struct resource
 { atom_t	name;			/* identifier of the resource */
   struct resource *next;		/* Next in hash */
+  size_t	references;		/* #times used */
 } resource;
 
 typedef struct resource_hash
@@ -48,5 +49,7 @@ COMMON(int)	   init_resource_db(struct rdf_db *db, resource_db *rdb);
 COMMON(void)	   erase_resources(resource_db *rdb);
 COMMON(resource *) lookup_resource(resource_db *rdb, atom_t name);
 COMMON(int)	   register_resource_predicates(void);
+COMMON(resource *) register_resource(resource_db *rdb, atom_t name);
+COMMON(resource *) unregister_resource(resource_db *rdb, atom_t name);
 
 #endif /*RESOURCE_H_INCLUDED*/

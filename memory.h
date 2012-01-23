@@ -68,10 +68,12 @@ MSB(unsigned int i)
 
 #elif defined(__GNUC__)			/* GCC version */
 
-#define MSB(i) ((i) ? (32 - __builtin_clz(i)) : 0)
-#define MemoryBarrier() __sync_synchronize()
-#define PREFETCH_FOR_WRITE(p) __builtin_prefetch(p, 1, 0)
-#define PREFETCH_FOR_READ(p) __builtin_prefetch(p, 0, 0)
+#define MSB(i)			((i) ? (32 - __builtin_clz(i)) : 0)
+#define MemoryBarrier()		__sync_synchronize()
+#define PREFETCH_FOR_WRITE(p)	__builtin_prefetch(p, 1, 0)
+#define PREFETCH_FOR_READ(p)	__builtin_prefetch(p, 0, 0)
+#define ATOMIC_INC(ptr)		__sync_add_and_fetch(ptr, 1)
+#define ATOMIC_DEC(ptr)		__sync_sub_and_fetch(ptr, 1)
 
 #endif /*_MSC_VER|__GNUC__*/
 

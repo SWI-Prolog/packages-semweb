@@ -3893,11 +3893,11 @@ lock_atoms(rdf_db *db, triple *t)
 { if ( !t->atoms_locked )
   { t->atoms_locked = TRUE;
 
-    lookup_resource(&db->resources, t->subject);
+    register_resource(&db->resources, t->subject);
     if ( t->object_is_literal )
     { lock_atoms_literal(t->object.literal);
     } else
-    { lookup_resource(&db->resources, t->object.resource);
+    { register_resource(&db->resources, t->object.resource);
     }
   }
 }
@@ -3908,9 +3908,11 @@ unlock_atoms(rdf_db *db, triple *t)
 { if ( t->atoms_locked )
   { t->atoms_locked = FALSE;
 
-    //PL_unregister_atom(t->subject);	/* TBD */
-    if ( !t->object_is_literal )
-    { //PL_unregister_atom(t->object.resource); /*TBD*/
+    unregister_resource(&db->resources, t->subject);
+    if ( t->object_is_literal )
+    { unlock_atoms_literal(t->object.literal);
+    } else
+    { unregister_resource(&db->resources, t->object.resource);
     }
   }
 }

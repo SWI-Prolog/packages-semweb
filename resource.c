@@ -206,6 +206,28 @@ lookup_resource(resource_db *rdb, atom_t name)
 }
 
 
+resource *
+register_resource(resource_db *rdb, atom_t name)
+{ resource *r = lookup_resource(rdb, name);
+
+  assert(r);
+  ATOMIC_INC(&r->references);
+
+  return r;
+}
+
+
+resource *
+unregister_resource(resource_db *rdb, atom_t name)
+{ resource *r = existing_resource(rdb, name);
+
+  ATOMIC_DEC(&r->references);
+
+  return r;
+}
+
+
+
 		 /*******************************
 		 *	       PROLOG		*
 		 *******************************/
@@ -227,13 +249,17 @@ rdf_resource(term_t r, control_t h)
     { atom_t name;
 
       if ( PL_is_variable(r) )
-      { state = rdf_malloc(db, sizeof(*state));
+      { state = PL_malloc_uncollectable(sizeof(*state));
 	state->rdb = &db->resources;
 	state->current = NULL;
 	state->current_entry = -1;
 	break;
       } else if ( PL_get_atom_ex(r, &name) )
-      { if ( existing_resource(&db->resources, name) )
+      { resource *r;
+
+	if ( (r=existing_resource(&db->resources, name)) &&
+	     r->references > 0
+	   )
 	  return TRUE;
 	return FALSE;
       }
@@ -255,19 +281,21 @@ rdf_resource(term_t r, control_t h)
   for(;;)
   { int ce;
 
-    if ( state->current )
-    { if ( !PL_unify_atom(r, state->current->name) )
-      { rdf_free(db, state, sizeof(*state));
-	return FALSE;				/* error */
+    for ( ; state->current; state->current = state->current->next )
+    { if ( state->current->references )
+      { if ( !PL_unify_atom(r, state->current->name) )
+	{ PL_free(state);
+	  return FALSE;				/* error */
+	}
+	state->current = state->current->next;
+	PL_retry_address(state);
       }
-      state->current = state->current->next;
-      PL_retry_address(state);
     }
 
     if ( (ce = ++state->current_entry) < state->rdb->hash.bucket_count )
     { state->current = state->rdb->hash.blocks[MSB(ce)][ce];
     } else
-    { rdf_free(db, state, sizeof(*state));
+    { PL_free(state);
       return FALSE;
     }
   }
