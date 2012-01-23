@@ -206,7 +206,6 @@ static functor_t FUNCTOR_lang2;
 static functor_t FUNCTOR_type2;
 
 static functor_t FUNCTOR_gc2;
-static functor_t FUNCTOR_rehash2;
 static functor_t FUNCTOR_core1;
 
 static functor_t FUNCTOR_assert4;
@@ -2314,7 +2313,9 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol, gen_t gen)
       { DEBUG(0, Sdprintf("GC at gen=%ld..%ld: ",
 			  (long)t->lifespan.born,
 			  (long)t->lifespan.died);
-	         print_triple(t, 0));
+	         print_triple(t, 0);
+	         Sdprintf("\n"));
+
 	free_triple(db, t, TRUE);
       }
     } else
@@ -2347,16 +2348,17 @@ gc_hashes(rdf_db *db, gen_t gen)
 static int
 gc_db(rdf_db *db, gen_t gen)
 { simpleMutexLock(&db->locks.gc);
-  if ( db->gc_busy )
+  if ( db->gc.busy )
   { simpleMutexUnlock(&db->locks.gc);
     return FALSE;			/* in progress */
   }
 
   DEBUG(0, Sdprintf("RDF GC; gen = %ld\n", (long)gen));
 
-  db->gc_busy = TRUE;
+  db->gc.busy = TRUE;
   gc_hashes(db, gen);
-  db->gc_busy = FALSE;
+  db->gc.count++;
+  db->gc.busy = FALSE;
   simpleMutexUnlock(&db->locks.gc);
 
   return TRUE;
@@ -6325,13 +6327,8 @@ unify_statistics(rdf_db *db, term_t key, functor_t f)
   } else if ( f == FUNCTOR_gc2 )
   { return PL_unify_term(key,
 			 PL_FUNCTOR, f,
-			   PL_INT, db->gc_count,
-			   PL_FLOAT, db->gc_time);	/* time spent */
-  } else if ( f == FUNCTOR_rehash2 )
-  { return PL_unify_term(key,
-			 PL_FUNCTOR, f,
-			   PL_INT, db->rehash_count,
-			   PL_FLOAT, db->rehash_time);
+			   PL_INT, db->gc.count,
+			   PL_FLOAT, db->gc.time);	/* time spent */
   } else
     assert(0);
 
@@ -6600,7 +6597,6 @@ install_rdf_db()
   MKFUNCTOR(rdfs_subject_branch_factor, 1);
   MKFUNCTOR(rdfs_object_branch_factor, 1);
   MKFUNCTOR(gc, 2);
-  MKFUNCTOR(rehash, 2);
   MKFUNCTOR(core, 1);
   MKFUNCTOR(assert, 4);
   MKFUNCTOR(retract, 4);
@@ -6643,7 +6639,6 @@ install_rdf_db()
   keys[i++] = FUNCTOR_literals1;
   keys[i++] = FUNCTOR_triples2;
   keys[i++] = FUNCTOR_gc2;
-  keys[i++] = FUNCTOR_rehash2;
   keys[i++] = FUNCTOR_core1;
   keys[i++] = 0;
   assert(i<=16);

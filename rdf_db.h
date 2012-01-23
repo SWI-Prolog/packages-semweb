@@ -374,9 +374,6 @@ typedef struct rdf_db
   size_t	freed;			/* #triples actually erased */
   size_t	indexed[16];		/* Count calls */
   int		rehash_count;		/* # rehashes */
-  int		gc_count;		/* # garbage collections */
-  double	rehash_time;		/* time spent in rehash */
-  double	gc_time;		/* time spent in GC */
   size_t	core;			/* core in use */
   resource_db	resources;		/* admin of used resources */
   pred_hash	predicates;		/* Predicate table */
@@ -389,7 +386,11 @@ typedef struct rdf_db
   query_admin	queries;		/* Active query administration */
 
   int		resetting;		/* We are in rdf_reset_db() */
-  int		gc_busy;		/* Processing a GC */
+  struct
+  { int		count;			/* # garbage collections */
+    double	time;			/* time spent in GC */
+    int		busy;			/* Processing a GC */
+  } gc;
 
   struct
   { simpleMutex	literal;		/* threaded access to literals */
