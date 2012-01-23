@@ -2079,7 +2079,7 @@ share_literal(rdf_db *db, literal *from)
 
   data = skiplist_insert(&db->literals, &lex, &is_new);
 
-  if ( is_new )
+  if ( !is_new )
   { literal *l2 = *data;
 
     DEBUG(2,
@@ -2098,6 +2098,7 @@ share_literal(rdf_db *db, literal *from)
 	  print_literal(from);
 	  Sdprintf("\n"));
 
+    assert(from->references==1);
     from->shared = TRUE;
     broadcast(EV_NEW_LITERAL, from, NULL);
     return from;
