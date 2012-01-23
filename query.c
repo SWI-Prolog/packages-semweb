@@ -86,6 +86,8 @@ rdf_thread_info(rdf_db *db, int tid)
       init_query_stack(db, &ti->queries);
       MemoryBarrier();
       td->blocks[idx][tid] = ti;
+      if ( tid > qa->query.thread_max )
+	qa->query.thread_max = tid;
     }
     simpleMutexUnlock(&qa->query.lock);
   }
@@ -100,22 +102,27 @@ oldest_query_geneneration(rdf_db *db)
   gen_t gen = GEN_MAX;
   query_admin *qa = &db->queries;
   per_thread *td = &qa->query.per_thread;
-  thread_info **tis;
 
-  for(tid=1; (tis=td->blocks[MSB(tid)]); tid++)
-  { thread_info *ti;
+  for(tid=1; tid <= qa->query.thread_max; tid++)
+  { thread_info **tis;
+    thread_info *ti;
 
-    if ( (ti=tis[tid]) )
+    if ( (tis=td->blocks[MSB(tid)]) &&
+	 (ti=tis[tid]) )
     { query_stack *qs = &ti->queries;
+
+      DEBUG(1, Sdprintf("Thread %d: %d queries\n", tid));
 
       if ( qs->top > 0 )
       { query *q = &qs->preallocated[0];
 
-	DEBUG(1, Sdprintf("Thread %d: query at gen %ld\n",
-			  tid, (long)q->rd_gen));
+	DEBUG(1, Sdprintf("Thread %d: %d queries; oldest gen %ld\n",
+			  tid, qs->top, (long)q->rd_gen));
 
 	if ( q->rd_gen < gen )
 	  gen = q->rd_gen;
+      } else
+      { DEBUG(2, Sdprintf("Thread %d: no queries\n", tid));
       }
     }
   }

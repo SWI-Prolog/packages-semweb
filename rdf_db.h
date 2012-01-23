@@ -359,6 +359,7 @@ typedef struct query_admin
   struct
   { simpleMutex	lock;			/* used to lock creation of per_thread */
     per_thread	per_thread;
+    int		thread_max;		/* highest thread seen  */
   } query;				/* active query administration */
   struct
   { simpleMutex	lock;			/* Locks writing triples */
