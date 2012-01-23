@@ -2323,7 +2323,7 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol, gen_t gen)
 	bucket->tail = prev;
 
       if ( --t->linked == 0 )
-      { DEBUG(0, Sdprintf("GC at gen=%ld..%ld: ",
+      { DEBUG(2, Sdprintf("GC at gen=%ld..%ld: ",
 			  (long)t->lifespan.born,
 			  (long)t->lifespan.died);
 	         print_triple(t, 0);
@@ -2366,7 +2366,7 @@ gc_db(rdf_db *db, gen_t gen)
     return FALSE;			/* in progress */
   }
 
-  DEBUG(0, Sdprintf("RDF GC; gen = %ld\n", (long)gen));
+  DEBUG(1, Sdprintf("RDF GC; gen = %ld\n", (long)gen));
 
   db->gc.busy = TRUE;
   gc_hashes(db, gen);

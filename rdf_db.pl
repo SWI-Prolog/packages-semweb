@@ -86,6 +86,7 @@
 	    rdf_source/1,		% ?File
 	    rdf_source/2,		% ?DB, ?SourceURL
 	    rdf_make/0,			% Reload modified databases
+	    rdf_gc/0,			% Reload modified databases
 
 	    rdf_source_location/2,	% +Subject, -Source
 	    rdf_statistics/1,		% -Key
