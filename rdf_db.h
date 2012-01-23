@@ -390,6 +390,7 @@ typedef struct rdf_db
   { int		count;			/* # garbage collections */
     double	time;			/* time spent in GC */
     int		busy;			/* Processing a GC */
+    size_t	reclaimed_triples;	/* # reclaimed triples */
   } gc;
 
   struct

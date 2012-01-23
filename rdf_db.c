@@ -205,7 +205,7 @@ static functor_t FUNCTOR_searched_nodes1;
 static functor_t FUNCTOR_lang2;
 static functor_t FUNCTOR_type2;
 
-static functor_t FUNCTOR_gc2;
+static functor_t FUNCTOR_gc3;
 static functor_t FUNCTOR_core1;
 
 static functor_t FUNCTOR_assert4;
@@ -2329,6 +2329,7 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol, gen_t gen)
 	         print_triple(t, 0);
 	         Sdprintf("\n"));
 
+	db->gc.reclaimed_triples++;
 	free_triple(db, t, TRUE);
       }
     } else
@@ -6342,10 +6343,11 @@ unify_statistics(rdf_db *db, term_t key, functor_t f)
 
     _PL_get_arg(2, key, a);
     return PL_unify_int64(a, v);
-  } else if ( f == FUNCTOR_gc2 )
+  } else if ( f == FUNCTOR_gc3 )
   { return PL_unify_term(key,
 			 PL_FUNCTOR, f,
-			   PL_INT, db->gc.count,
+			   PL_INT,   db->gc.count,
+			   PL_INT64, db->gc.reclaimed_triples,
 			   PL_FLOAT, db->gc.time);	/* time spent */
   } else
     assert(0);
@@ -6614,7 +6616,7 @@ install_rdf_db()
   MKFUNCTOR(rdf_object_branch_factor, 1);
   MKFUNCTOR(rdfs_subject_branch_factor, 1);
   MKFUNCTOR(rdfs_object_branch_factor, 1);
-  MKFUNCTOR(gc, 2);
+  MKFUNCTOR(gc, 3);
   MKFUNCTOR(core, 1);
   MKFUNCTOR(assert, 4);
   MKFUNCTOR(retract, 4);
@@ -6656,7 +6658,7 @@ install_rdf_db()
   keys[i++] = FUNCTOR_duplicates1;
   keys[i++] = FUNCTOR_literals1;
   keys[i++] = FUNCTOR_triples2;
-  keys[i++] = FUNCTOR_gc2;
+  keys[i++] = FUNCTOR_gc3;
   keys[i++] = FUNCTOR_core1;
   keys[i++] = 0;
   assert(i<=16);
