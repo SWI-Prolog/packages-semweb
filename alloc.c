@@ -27,6 +27,36 @@
 #include <gc/gc.h>
 #include <gc/gc_mark.h>
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Triples are removed in two steps:
+
+  - rdf_gc() removes triples died before the oldest active generation
+    from the hash-chains. They are there left to be reclaimed by
+    Boehm-GC.
+  - Boehm-GC won't collect the triple as long as there are pointers
+    (e.g., from Prolog choice-points or threads scanning the clause
+    list) pointing to the triple.
+
+Unfortunately, Boehm-GC is a  _conservative_   garbage  collector.  This
+means that it may  incorrectly  (due  to   bits  being  recognised  as a
+pointer) not release a triple. This is fine as long as it only affects a
+small minority of the triples, but   if multiple consequtive triples are
+removed, these form a chain of  garbage.   If  some  triple in the chain
+cannot be removed,  the  remainder  of   the  chain  cannot  be removed.
+Experiments show this works out poorly for the triple-store.
+
+We fix this using a private mark procedure. This procedure is called for
+triples *after* step (1) above. It first scans for the first life triple
+(or NULL) and then replaces all next  pointers in the garbage chain with
+a direct pointer to the life cell (or NULL). Note that these markers may
+run concurrently, but in  a  stop-the-world   situation  this  is  not a
+problem.
+
+It is probably not even a problem   for the incremental GC scenario, but
+this remains to be proven. As  long  as   we  use  Boehm-GC to deal with
+deleted data, this is unlikely to become an issue.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 static void **triple_free_list;
 static unsigned triple_kind;
 
