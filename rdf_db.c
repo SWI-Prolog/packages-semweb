@@ -273,6 +273,8 @@ INIT_LOCK(rdf_db *db)
 #ifdef O_DEBUG
 
 #define PRT_SRC	0x1
+#define PRT_NL	0x2
+#define PRT_GEN	0x4
 
 static void
 print_literal(literal *lit)
@@ -356,6 +358,31 @@ print_src(triple *t)
 }
 
 
+static char *
+triple_status_flags(triple *t, char *buf)
+{ char *o = buf;
+
+  if ( t->atoms_locked )
+    *o++ = 'L';
+
+  *o = '\0';
+  return buf;
+}
+
+
+static void
+print_gen(triple *t)
+{ char buf[16];
+
+  if ( t->lifespan.died == GEN_MAX )
+    Sdprintf("%ld..%s", t->lifespan.born,
+	     triple_status_flags(t, buf));
+  else
+    Sdprintf("%ld..%ld%s", t->lifespan.born, t->lifespan.died,
+	     triple_status_flags(t, buf));
+}
+
+
 static void
 print_triple(triple *t, int flags)
 { Sdprintf("<%s %s ",
@@ -364,7 +391,9 @@ print_triple(triple *t, int flags)
   print_object(t);
   if ( (flags & PRT_SRC) )
     print_src(t);
-  Sdprintf(">");
+  if ( (flags & PRT_GEN) )
+    print_gen(t);
+  Sdprintf((flags & PRT_NL) ? ">\n" : ">");
 }
 
 #endif
