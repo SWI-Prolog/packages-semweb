@@ -47,6 +47,7 @@
 #endif
 
 #include "rdf_db.h"
+#include "alloc.h"
 #include <wctype.h>
 #include <ctype.h>
 #ifdef WITH_MD5
@@ -2432,8 +2433,7 @@ new_db(void)
 
 static triple *
 new_triple(rdf_db *db)
-{ triple *t = rdf_malloc(db, sizeof(*t));
-  memset(t, 0, sizeof(*t));
+{ triple *t = alloc_triple();
   t->allocated = TRUE;
 
   return t;
@@ -2467,11 +2467,7 @@ free_triple(rdf_db *db, triple *t, int linger)
     free_literal_value(db, &t->tp.end);
 
   if ( t->allocated )
-  { if ( linger )
-      PL_linger(t);
-    else
-      rdf_free(db, t, sizeof(*t));
-  }
+    unalloc_triple(t, linger);
 }
 
 
@@ -6602,6 +6598,7 @@ install_rdf_db()
   extern install_t install_atom_map(void);
 
   init_errors();
+  init_alloc();
   register_resource_predicates();
 
   MKFUNCTOR(literal, 1);
