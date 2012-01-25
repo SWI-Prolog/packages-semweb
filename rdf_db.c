@@ -920,20 +920,18 @@ organise_predicates(rdf_db *db)		/* TBD: rename&move */
 
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Keep track of the triple count. This   now uses GCC atomic instructions.
-We need to provide emulations thereof in  a portability header. See also
-MSB().
+Keep track of the triple count.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static inline void
 register_predicate(rdf_db *db, triple *t)
-{ __sync_add_and_fetch(&t->predicate.r->triple_count, 1);
+{ ATOMIC_ADD(&t->predicate.r->triple_count, 1);
 }
 
 
 static inline void
 unregister_predicate(rdf_db *db, triple *t)
-{ __sync_sub_and_fetch(&t->predicate.r->triple_count, 1);
+{ ATOMIC_SUB(&t->predicate.r->triple_count, 1);
 }
 
 
@@ -2338,6 +2336,7 @@ reindex_triple(rdf_db *db, triple *t)
   db->queries.generation++;
   simpleMutexUnlock(&db->queries.write.lock);
   t->reindexed = TRUE;
+  db->reindexed++;
 }
 
 
@@ -2436,6 +2435,8 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol, gen_t gen)
 	         print_triple(t, 0);
 	         Sdprintf("\n"));
 
+	if ( t->reindexed )
+	  db->reindexed--;
 	db->gc.reclaimed_triples++;
 	free_triple(db, t, TRUE);
       }
@@ -2845,8 +2846,11 @@ link_triple(rdf_db *db, triple *t)
 }
 
 
-/* MT: Caller must be hold db->queries.write.lock
-*/
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Erase a triple from the DB.
+
+MT: Caller must be hold db->queries.write.lock
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 void
 erase_triple(rdf_db *db, triple *t)
@@ -2858,8 +2862,8 @@ erase_triple(rdf_db *db, triple *t)
     delSubPropertyOf(db, me, super);
   }
 
-  unregister_graph(db, t);
-  unregister_predicate(db, t);
+  unregister_graph(db, t);		/* Updates count and MD5 */
+  unregister_predicate(db, t);		/* Updates count */
   db->erased++;
 }
 

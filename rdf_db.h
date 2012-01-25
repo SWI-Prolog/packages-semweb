@@ -372,6 +372,7 @@ typedef struct rdf_db
   triple_hash   hash[INDEX_TABLES];	/* Hash-tables */
   size_t	created;		/* #triples created */
   size_t	erased;			/* #triples erased */
+  size_t	reindexed;		/* #triples reindexed (gc_hash_chain) */
   size_t	indexed[16];		/* Count calls */
   int		rehash_count;		/* # rehashes */
   resource_db	resources;		/* admin of used resources */
@@ -386,8 +387,8 @@ typedef struct rdf_db
   int		resetting;		/* We are in rdf_reset_db() */
   struct
   { int		count;			/* # garbage collections */
-    double	time;			/* time spent in GC */
     int		busy;			/* Processing a GC */
+    double	time;			/* time spent in GC */
     size_t	reclaimed_triples;	/* # reclaimed triples */
   } gc;
 
@@ -397,7 +398,7 @@ typedef struct rdf_db
     simpleMutex gc;			/* DB garbage collection lock */
   } locks;
 
-  skiplist      literals;
+  skiplist      literals;		/* (shared) literals */
 } rdf_db;
 
 
