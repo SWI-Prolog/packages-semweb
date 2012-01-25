@@ -371,6 +371,7 @@ typedef struct rdf_db
 { triple_bucket by_none;		/* Plain linked list of triples */
   triple_hash   hash[INDEX_TABLES];	/* Hash-tables */
   size_t	created;		/* #triples created */
+  size_t	duplicates;		/* #duplicate triples */
   size_t	erased;			/* #triples erased */
   size_t	reindexed;		/* #triples reindexed (gc_hash_chain) */
   size_t	indexed[16];		/* Count calls */
@@ -379,12 +380,12 @@ typedef struct rdf_db
   pred_hash	predicates;		/* Predicate table */
   int		need_update;		/* We need to update */
   size_t	agenda_created;		/* #visited nodes in agenda */
-  size_t	duplicates;		/* #duplicate triples */
   graph_hash    graphs;			/* Graph table */
   graph	       *last_graph;		/* last accessed graph */
   query_admin	queries;		/* Active query administration */
 
   int		resetting;		/* We are in rdf_reset_db() */
+
   struct
   { int		count;			/* # garbage collections */
     int		busy;			/* Processing a GC */

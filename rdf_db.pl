@@ -655,9 +655,36 @@ rdf_source_location(Subject, Source) :-
 %	is called from a thread started by creating the RDF DB.
 
 rdf_gc_loop :-
+	rdf_gc_loop(0).
+
+rdf_gc_loop(CPU) :-
+	(   consider_gc(CPU)
+	->  run_gc(CPU1),
+	    rdf_gc_loop(CPU1)
+	;   sleep(0.1),
+	    rdf_gc_loop(CPU)
+	).
+
+%%	run_gc(-CPU) is det.
+%
+%	Run RDF GC one time. CPU is  the   amount  of CPU time spent. We
+%	update this in Prolog because portable access to thread specific
+%	CPU is really hard in C.
+
+run_gc(CPU) :-
+	statistics(cputime, CPU0),
 	rdf_gc,
-	sleep(1),
-	rdf_gc_loop.
+	statistics(cputime, CPU1),
+	CPU is CPU1-CPU0,
+	rdf_add_gc_time(CPU).
+
+%%	consider_gc(+CPU) is semidet.
+%
+%	@param CPU is the amount of CPU time spent in the most recent
+%	GC.
+
+consider_gc(_CPU) :-
+	sleep(1).
 
 
 		 /*******************************

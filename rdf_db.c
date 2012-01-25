@@ -2507,6 +2507,21 @@ rdf_gc(void)
 }
 
 
+static foreign_t
+rdf_add_gc_time(term_t time)
+{ double t;
+
+  if ( PL_get_float_ex(time, &t) )
+  { rdf_db *db = rdf_current_db();
+
+    db->gc.time += t;
+    return TRUE;
+  }
+
+  return FALSE;
+}
+
+
 		 /*******************************
 		 *	      GC THREAD		*
 		 *******************************/
@@ -2866,6 +2881,8 @@ link_triple(rdf_db *db, triple *t)
 
       addSubPropertyOf(db, me, super);
     }
+  } else
+  { db->duplicates++;
   }
 
   db->created++;
@@ -2894,6 +2911,8 @@ erase_triple(rdf_db *db, triple *t)
 
   unregister_graph(db, t);		/* Updates count and MD5 */
   unregister_predicate(db, t);		/* Updates count */
+  if ( t->is_duplicate )
+    db->duplicates--;
   db->erased++;
 }
 
@@ -6725,6 +6744,7 @@ install_rdf_db()
   PL_register_foreign("rdf",		4, rdf4,	    NDET);
   PL_register_foreign("rdf_has",	4, rdf_has,	    NDET);
   PL_register_foreign("rdf_gc",		0, rdf_gc,	    0);
+  PL_register_foreign("rdf_add_gc_time",1, rdf_add_gc_time, 0);
   PL_register_foreign("rdf_statistics_",1, rdf_statistics,  NDET);
   PL_register_foreign("rdf_generation", 1, rdf_generation,  0);
   PL_register_foreign("rdf_match_label",3, match_label,     0);
