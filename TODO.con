@@ -18,7 +18,7 @@
 	- Update active queries lock-free.  Atomic test to see
 	  whether GC is in progress.
 
-	  	--> Anyway, mostly same code as (1).
+		--> Anyway, mostly same code as (1).
 
       3. Alternatively
 	- Use lock-free algorithms to update chains
@@ -117,29 +117,19 @@
 		  -- also requires a lock :-(
 
 
----+ Problems
+---+ Deleting triples
 
-  * Locking in literal-DB.  Is there a B-tree with good concurrency?
+  - Merely set deleted generation
+  - GC does the remainder of the admin updates.
 
----++ Alternative:
+---+ Duplicates:
 
-  * Use a sorted array of literals with holes (like a closed hash table).
-
-    - If new hits a hole --> fill.
-    - Otherwise
-	- Plan A
-	  - Place out of order.  Search must seek for a hole before
-	    deciding.  Probably doable, but results are out of order.
-	- Plan B
-	  - Shuffle.  Means enumeration can hit twice.  Maybe acceptable?
-    - Too small: create new array.  Wait for active queries to finish
-      before deleting the old.
-
-    A bit similar to a B+-tree with unbounded node-size?
-
-	- Closed hash: distribution guaranteed.
-	- Sorted array: things may build up in certain areas, causing
-	  frequent re-sizes.
+  - Test for duplicates; set flag on all of them.
+  - Avoid duplicate answers by maintaining a table, only adding
+    triples that are flagged as duplicates.
+  - Leave resetting the duplicate flag to GC:
+    - If a triple marked as duplicate is erased, check
+      whether alternatives remain in the DB.
 
 ---+ Hash-table design
 
@@ -148,10 +138,7 @@
 	- Use lock-free dynamic arrays!
     - Lookup using K%N, K%(2N), ... (is like Cuckoo hashing)
 	- Needs to know N0.  Do not make N0 too small.
-    - Unbalance < 2L.
-    - Move things from K%N --> K%(2N)?
-	- Can only be done with copying the triple or full GC.  Most likely
-	not worth the trouble.
+    - Unbalance: optimize by copying triples [YES]
     - How to estimate complexity based on hash?
 	- Get sizes of different candidates and do the math (TBD)
 

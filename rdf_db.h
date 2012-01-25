@@ -283,7 +283,6 @@ typedef struct triple
   unsigned	atoms_locked : 1;	/* Atoms have been locked */
   unsigned	linked : 4;		/* Linked into the hash-chains */
   unsigned	reindexed : 1;		/* Remapped by optimize_triple_hash() */
-  unsigned	duplicates : 13;	/* Duplicate count */
 					/* Total: 32 */
 } triple;
 

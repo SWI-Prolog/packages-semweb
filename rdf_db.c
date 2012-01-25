@@ -230,15 +230,20 @@ static predicate_t PRED_call1;
 #define MATCH_QUAL		0x10	/* Match qualifiers too */
 #define MATCH_DUPLICATE		(MATCH_EXACT|MATCH_QUAL)
 
+typedef enum
+{ DUP_NONE,
+  DUP_DUPLICATE,
+  DUP_DISCARDED
+} dub_state;
+
 static int match_triples(triple *t, triple *p, unsigned flags);
-static int update_duplicates_add(rdf_db *db, triple *t);
-static void update_duplicates_del(rdf_db *db, triple *t);
 static void unlock_atoms(rdf_db *db, triple *t);
 static void lock_atoms(rdf_db *db, triple *t);
 static void unlock_atoms_literal(literal *lit);
 
 static size_t	triple_hash_key(triple *t, int which);
 static size_t	object_hash(triple *t);
+static dub_state mark_duplicate(rdf_db *db, triple *t);
 static void	link_triple_hash(rdf_db *db, triple *t);
 static void	init_triple_walker(triple_walker *tw, rdf_db *db,
 				   triple *t, int index);
@@ -2496,6 +2501,38 @@ rdf_gc(void)
 
 
 		 /*******************************
+		 *	      GC THREAD		*
+		 *******************************/
+
+static void *
+gc_thread(void *data)
+{ //rdf_db *db = data;
+  PL_thread_attr_t attr;
+  int tid;
+
+  memset(&attr, 0, sizeof(attr));
+  if ( (tid=PL_thread_attach_engine(&attr)) < 0 )
+  { Sdprintf("Failed to create RDF garbage collection thread\n");
+    return NULL;
+  }
+
+  PL_call_predicate(NULL, PL_Q_NORMAL,
+		    PL_predicate("gc_loop", 0, "rdf_db"), 0);
+}
+
+
+
+static int
+rdf_create_gc_thread(rdf_db *db)
+{ pthread_t tid;
+
+  pthread_create(&tid, NULL, gc_thread, (void*)db);
+
+  return TRUE;
+}
+
+
+		 /*******************************
 		 *	  OVERALL DATABASE	*
 		 *******************************/
 
@@ -2762,42 +2799,6 @@ link_triple_hash(rdf_db *db, triple *t)
 }
 
 
-typedef enum
-{ DUP_NONE,
-  DUP_DUPLICATE,
-  DUP_DISCARDED
-} dub_state;
-
-
-static dub_state
-discard_duplicate(rdf_db *db, triple *t)
-{ triple_walker tw;
-  triple *d;
-  const int indexed = BY_SPO;
-  dub_state rc = DUP_NONE;
-
-  assert(t->is_duplicate == FALSE);
-  assert(t->duplicates == 0);
-
-  init_triple_walker(&tw, db, t, indexed);
-  while((d=next_triple(&tw)) && d != t)
-  { if ( match_triples(d, t, MATCH_DUPLICATE) )
-    { if ( d->graph == t->graph &&
-	   (d->line == NO_LINE || d->line == t->line) )
-      { free_triple(db, t, FALSE);
-
-	return DUP_DISCARDED;
-      }
-
-      rc = DUP_DUPLICATE;
-    }
-  }
-  destroy_triple_walker(db, &tw);
-
-  return rc;
-}
-
-
 /* MT: Caller must be hold db->queries.write.lock
 
    Return: FALSE if nothing changed; TRUE if the database has changed
@@ -2816,7 +2817,7 @@ link_triple(rdf_db *db, triple *t)
   if ( t->linked )
     return FALSE;
 
-  if ( (dup=discard_duplicate(db, t)) == DUP_DISCARDED )
+  if ( (dup=mark_duplicate(db, t)) == DUP_DISCARDED )
     return FALSE;
 
   if ( t->object_is_literal )
@@ -2825,19 +2826,17 @@ link_triple(rdf_db *db, triple *t)
   link_triple_hash(db, t);
   consider_triple_rehash(db);
 
-  if ( dup == DUP_DUPLICATE && update_duplicates_add(db, t) )
-    goto ok;				/* is a duplicate */
+  if ( dup != DUP_DUPLICATE )
+  {					/* keep track of subPropertyOf */
+    if ( t->predicate.r->name == ATOM_subPropertyOf &&
+	 t->object_is_literal == FALSE )
+    { predicate *me    = lookup_predicate(db, t->subject);
+      predicate *super = lookup_predicate(db, t->object.resource);
 
-					/* keep track of subPropertyOf */
-  if ( t->predicate.r->name == ATOM_subPropertyOf &&
-       t->object_is_literal == FALSE )
-  { predicate *me    = lookup_predicate(db, t->subject);
-    predicate *super = lookup_predicate(db, t->object.resource);
-
-    addSubPropertyOf(db, me, super);
+      addSubPropertyOf(db, me, super);
+    }
   }
 
-ok:
   db->created++;
   register_predicate(db, t);
   register_graph(db, t);
@@ -2851,9 +2850,7 @@ ok:
 
 void
 erase_triple(rdf_db *db, triple *t)
-{ update_duplicates_del(db, t);
-
-  if ( t->predicate.r->name == ATOM_subPropertyOf &&
+{ if ( t->predicate.r->name == ATOM_subPropertyOf &&
        t->object_is_literal == FALSE )
   { predicate *me    = lookup_predicate(db, t->subject);
     predicate *super = lookup_predicate(db, t->object.resource);
@@ -4510,7 +4507,7 @@ unify_triple(term_t subject, term_t pred, term_t object,
 
 
 		 /*******************************
-		 *	DUBLICATE HANDLING	*
+		 *	DUPLICATE HANDLING	*
 		 *******************************/
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -4522,101 +4519,40 @@ duplicate as a subsequent retract  would   delete  the final triple. For
 example, after loading two  files  that   contain  the  same  triple and
 unloading one of these files the database would be left without triples.
 
-In our solution, if a triple is added as a duplicate, it is flagged such
-using  the  flag  is_duplicate.  The  `principal'  triple  has  a  count
-`duplicates',  indicating  the  number  of   duplicate  triples  in  the
-database.
+mark_duplicate() searches the DB for  a   duplicate  triple and sets the
+flag is_duplicate on both. This flag is   used by rdf/3, where duplicate
+triples are stored into a  temporary  table   to  be  filtered  from the
+results.  Duplicate marks may be removed by GC.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-
-static int
-update_duplicates_add(rdf_db *db, triple *t)
+static dub_state
+mark_duplicate(rdf_db *db, triple *t)
 { triple_walker tw;
   triple *d;
   const int indexed = BY_SPO;
+  dub_state rc = DUP_NONE;
 
   assert(t->is_duplicate == FALSE);
-  assert(t->duplicates == 0);
 
   init_triple_walker(&tw, db, t, indexed);
   while((d=next_triple(&tw)) && d != t)
   { if ( match_triples(d, t, MATCH_DUPLICATE) )
-    { t->is_duplicate = TRUE;
-      assert( !d->is_duplicate );
+    { if ( d->graph == t->graph &&
+	   (d->line == NO_LINE || d->line == t->line) )
+      { free_triple(db, t, FALSE);
 
-      d->duplicates++;
+	rc = DUP_DISCARDED;
+	break;
+      }
+      t->is_duplicate = TRUE;
+      d->is_duplicate = TRUE;
 
-      DEBUG(2,
-	    print_triple(t, PRT_SRC);
-	    Sdprintf(" %p: %d-th duplicate: ", t, d->duplicates);
-	    Sdprintf("Principal: %p at", d);
-	    print_src(d);
-	    Sdprintf("\n"));
-
-      assert(d->duplicates);		/* check overflow */
-      db->duplicates++;
-      return TRUE;
+      rc = DUP_DUPLICATE;
     }
   }
+  destroy_triple_walker(db, &tw);
 
-  return FALSE;
-}
-
-
-static void				/* t is about to be deleted */
-update_duplicates_del(rdf_db *db, triple *t)
-{ const int indexed = BY_SPO;
-
-  if ( t->duplicates )			/* I am the principal one */
-  { triple_walker tw;
-    triple *d;
-
-    DEBUG(2,
-	  print_triple(t, PRT_SRC);
-	  Sdprintf(": DEL principal %p, %d duplicates: ", t, t->duplicates));
-
-    db->duplicates--;
-    init_triple_walker(&tw, db, t, indexed);
-    while( (d=next_triple(&tw)) )
-    { if ( d != t && match_triples(d, t, MATCH_DUPLICATE) )
-      { assert(d->is_duplicate);
-	d->is_duplicate = FALSE;
-	d->duplicates = t->duplicates-1;
-	DEBUG(2,
-	      Sdprintf("New principal: %p at", d);
-	      print_src(d);
-	      Sdprintf("\n"));
-
-	return;
-      }
-    }
-    assert(0);
-  } else if ( t->is_duplicate )		/* I am a duplicate */
-  { triple_walker tw;
-    triple *d;
-
-    DEBUG(2,
-	  print_triple(t, PRT_SRC);
-	  Sdprintf(": DEL: is a duplicate: "));
-
-    db->duplicates--;
-    init_triple_walker(&tw, db, t, indexed);
-    while( (d=next_triple(&tw)) )
-    { if ( d != t && match_triples(d, t, MATCH_DUPLICATE) )
-      { if ( d->duplicates )
-	{ d->duplicates--;
-	  DEBUG(2,
-		Sdprintf("Principal %p at ", d);
-		print_src(d);
-		Sdprintf(" has %d duplicates\n", d->duplicates));
-	  return;
-	}
-      }
-    }
-    Sdprintf("FATAL\n");
-    PL_halt(1);
-    assert(0);
-  }
+  return rc;
 }
 
 
