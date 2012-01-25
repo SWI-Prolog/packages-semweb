@@ -282,7 +282,8 @@ typedef struct triple
   unsigned	allocated : 1;		/* Triple is allocated */
   unsigned	atoms_locked : 1;	/* Atoms have been locked */
   unsigned	linked : 4;		/* Linked into the hash-chains */
-  unsigned	duplicates : 14;	/* Duplicate count */
+  unsigned	reindexed : 1;		/* Remapped by optimize_triple_hash() */
+  unsigned	duplicates : 13;	/* Duplicate count */
 					/* Total: 32 */
 } triple;
 
@@ -379,7 +380,6 @@ typedef struct rdf_db
   int		need_update;		/* We need to update */
   size_t	agenda_created;		/* #visited nodes in agenda */
   size_t	duplicates;		/* #duplicate triples */
-  size_t	generation;		/* generation-id of the database */
   graph_hash    graphs;			/* Graph table */
   graph	       *last_graph;		/* last accessed graph */
   query_admin	queries;		/* Active query administration */

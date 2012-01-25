@@ -5,7 +5,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@cs.vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2002-2010, University of Amsterdam
+    Copyright (C): 2002-2012, University of Amsterdam
 			      VU University Amsterdam
 
     This library is free software; you can redistribute it and/or
@@ -1359,7 +1359,7 @@ update_predicate_counts(rdf_db *db, predicate *p, int which)
       return TRUE;
     }
   } else
-  { size_t changed = db->generation - p->distinct_updated[DISTINCT_SUB];
+  { size_t changed = db->queries.generation - p->distinct_updated[DISTINCT_SUB];
 
     if ( changed < p->distinct_count[DISTINCT_SUB] )
       return TRUE;
@@ -1399,7 +1399,7 @@ update_predicate_counts(rdf_db *db, predicate *p, int which)
     if ( which == DISTINCT_DIRECT )
       p->distinct_updated[DISTINCT_DIRECT] = total;
     else
-      p->distinct_updated[DISTINCT_SUB] = db->generation;
+      p->distinct_updated[DISTINCT_SUB] = db->queries.generation;
 
     DEBUG(1, Sdprintf("%s: distinct subjects (%s): %ld, objects: %ld\n",
 		      PL_atom_chars(p->name),
@@ -2303,7 +2303,99 @@ init_tables(rdf_db *db)
 
 
 		 /*******************************
-		 *               C		*
+		 *     INDEX OPTIMIZATION	*
+		 *******************************/
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Index optimization copies triples  that  have   been  indexed  while the
+hash-table was small to the current table.
+
+TBD: To preserve order, we must insert   the  new triples before the old
+ones. This is significantly more complex,   notably because they must be
+re-indexed in reverse order in  this  case.   Probably  the  best way to
+implement this is to collect the  triples   that  must be reindexed in a
+triple buffer and then use a version of link_triple_hash() that prepends
+the triples, calling on the triples from the buffer in reverse order. We
+will ignore this for now: triple ordering  has no semantics in the first
+place.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+static void
+reindex_triple(rdf_db *db, triple *t)
+{ triple *t2 = rdf_malloc(db, sizeof(*t));
+
+  *t2 = *t;
+  memset(&t2->tp, 0, sizeof(t2->tp));
+  simpleMutexLock(&db->queries.write.lock);
+  t2->lifespan.born = db->queries.generation+1;
+  link_triple_hash(db, t2);
+  t->lifespan.died = db->queries.generation;
+  db->queries.generation++;
+  simpleMutexUnlock(&db->queries.write.lock);
+  t->reindexed = TRUE;
+}
+
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+optimize_triple_hash() only doubles hash->bucket_count_epoch!  It may be
+necessary to call it multiple times, but   reindexing one step at a time
+is not slower than doing it all at once (is this true?)
+
+Note that there is some reason to do   only a little of the work because
+copying the triples temporarily costs memory.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+static int
+optimize_triple_hash(rdf_db *db, int icol, gen_t gen)
+{ triple_hash *hash = &db->hash[icol];
+
+  if ( hash->bucket_count_epoch < hash->bucket_count )
+  { size_t b_no = 0;
+    size_t upto = hash->bucket_count_epoch;
+    size_t copied = 0;
+
+    for( ; b_no < upto; b_no++ )
+    { triple_bucket *bucket = &hash->blocks[MSB(b_no)][b_no];
+      triple *t;
+
+      for(t=bucket->head; t; t=t->tp.next[icol])
+      { if ( t->lifespan.died >= gen &&
+	     t->reindexed == FALSE &&
+	     triple_hash_key(t, col_index[icol]) % hash->bucket_count != b_no )
+	{ reindex_triple(db, t);
+	  copied++;
+	}
+      }
+    }
+
+    hash->bucket_count_epoch = upto*2;
+    DEBUG(1, Sdprintf("Optimized hash %s (epoch=%ld; size=%ld; copied=%ld)\n",
+		      col_name[icol],
+		      (long)hash->bucket_count_epoch,
+		      (long)hash->bucket_count,
+		      (long)copied));
+
+    return 1;
+  }
+
+  return 0;
+}
+
+
+static int
+optimize_triple_hashes(rdf_db *db, gen_t gen)
+{ int icol;
+  int optimized = FALSE;
+
+  for(icol=1; icol<INDEX_TABLES; icol++)
+    optimized += optimize_triple_hash(db, icol, gen);
+
+  return optimized;			/* # hashes optimized */
+}
+
+
+		 /*******************************
+		 *	GARBAGE COLLECTION	*
 		 *******************************/
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -2311,20 +2403,7 @@ Garbage collect triples, given that the   oldest  running query reads at
 generation gen.	 There are two thing we can do:
 
   - Remove any triple that died before gen.  These triples must be left
-    to GC.  We can do this
-  - Reindex triples that are indexed before the latest hash-table
-    resize.  There are two ways:
-    - Decide based on the generation where the triple was added.
-    - See whether the triple is not optimally hashed.
-      - We could do that in match_triples()?
-        - Have a next_matching_triple()?
-	  - Problem: false info when using a 2nd best hash
-      - We could walk a hash-chain, and find the ones that are
-        incorrectly hashed.
-  - Implement as `doing a little', so we can either mix it into the
-    normal workflow or run a thread.
-
-There should be only one GC thread.
+    to GC.  See also alloc.c.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static void
@@ -2395,6 +2474,7 @@ gc_db(rdf_db *db, gen_t gen)
   DEBUG(1, Sdprintf("RDF GC; gen = %ld\n", (long)gen));
 
   db->gc.busy = TRUE;
+  optimize_triple_hashes(db, gen);
   gc_hashes(db, gen);
   db->gc.count++;
   db->gc.busy = FALSE;
@@ -2437,23 +2517,6 @@ new_triple(rdf_db *db)
   t->allocated = TRUE;
 
   return t;
-}
-
-
-/* reindex_triple() is used to add a duplicate of the triple to the table
-   using the new indexing regime. The old one will be left to GC, but it
-   can only be really deleted if no queries exist with the old indexing.
-   This will be based on the generation.
-*/
-
-static void
-reindex_triple(rdf_db *db, triple *t)
-{ triple *t2 = rdf_malloc(db, sizeof(*t));
-
-  *t2 = *t;
-  memset(&t2->tp, 0, sizeof(t2->tp));
-  link_triple_hash(db, t2);
-  t->lifespan.died = 0;			/* Died long ago */
 }
 
 
@@ -3643,8 +3706,6 @@ link_loaded_triples(rdf_db *db, ld_context *ctx)
   { sum_digest(graph->digest, ctx->digest);
     graph->md5 = TRUE;
   }
-
-  db->generation += (ctx->triples.top - ctx->triples.base);
 
   return TRUE;
 }
@@ -6414,7 +6475,7 @@ static foreign_t
 rdf_generation(term_t t)
 { rdf_db *db = DB;
 
-  return PL_unify_integer(t, db->generation);
+  return PL_unify_integer(t, db->queries.generation);
 }
 
 
@@ -6446,7 +6507,7 @@ erase_triples(rdf_db *db)
   db->rehash_count = 0;
   memset(db->indexed, 0, sizeof(db->indexed));
   db->duplicates = 0;
-  db->generation = 0;
+  db->queries.generation = 0;
 }
 
 
