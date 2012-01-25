@@ -2527,6 +2527,9 @@ gc_thread(void *data)
 
   PL_call_predicate(NULL, PL_Q_NORMAL,
 		    PL_predicate("rdf_gc_loop", 0, "rdf_db"), 0);
+
+  PL_thread_destroy_engine();
+
   return NULL;
 }
 
