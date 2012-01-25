@@ -448,12 +448,7 @@ COMMON(void *)	rdf_realloc(rdf_db *db, void *ptr, size_t old, size_t new);
 COMMON(int)	link_triple(rdf_db *db, triple *t);
 COMMON(void)	erase_triple(rdf_db *db, triple *t);
 COMMON(predicate *) lookup_predicate(rdf_db *db, atom_t name);
+COMMON(rdf_db*)	rdf_current_db(void);
 
-
-		 /*******************************
-		 *	    GLOBAL DATA		*
-		 *******************************/
-
-COMMON(rdf_db *) DB;			/* Our one and only database */
 
 #endif /*RDFDB_H_INCLUDED*/

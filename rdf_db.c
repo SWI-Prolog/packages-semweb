@@ -46,6 +46,10 @@
 #endif
 #endif
 
+#define GC_THREADS
+#define DYNAMIC_MARKS
+#include <gc/gc.h>
+
 #include "rdf_db.h"
 #include "alloc.h"
 #include <wctype.h>
@@ -270,6 +274,8 @@ INIT_LOCK(rdf_db *db)
   simpleMutexInit(&db->locks.misc);
   simpleMutexInit(&db->locks.gc);
 }
+
+static simpleMutex rdf_lock;
 
 
 		 /*******************************
@@ -1318,7 +1324,7 @@ print_reachability_cloud(predicate *p)
 static foreign_t
 rdf_print_predicate_cloud(term_t t)
 { predicate *p;
-  rdf_db *db = DB;
+  rdf_db *db = rdf_current_db();
 
   if ( !get_predicate(db, t, &p) )
     return FALSE;
@@ -1677,7 +1683,7 @@ typedef struct enum_graph
 
 static foreign_t
 rdf_graph(term_t name, control_t h)
-{ rdf_db *db = DB;
+{ rdf_db *db = rdf_current_db();
   graph *g;
   enum_graph *eg;
   atom_t a;
@@ -1734,7 +1740,7 @@ next:
 static foreign_t
 rdf_graph_source(term_t graph_name, term_t source, term_t modified)
 { atom_t gn;
-  rdf_db *db = DB;
+  rdf_db *db = rdf_current_db();
 
   if ( !get_atom_or_var_ex(graph_name, &gn) )
     return FALSE;
@@ -1773,7 +1779,7 @@ static foreign_t
 rdf_set_graph_source(term_t graph_name, term_t source, term_t modified)
 { atom_t gn, src;
   int rc = FALSE;
-  rdf_db *db = DB;
+  rdf_db *db = rdf_current_db();
   graph *s;
   double mtime;
 
@@ -1802,7 +1808,7 @@ rdf_set_graph_source(term_t graph_name, term_t source, term_t modified)
 static foreign_t
 rdf_unset_graph_source(term_t graph_name)
 { atom_t gn;
-  rdf_db *db = DB;
+  rdf_db *db = rdf_current_db();
   graph *s;
 
   if ( !PL_get_atom_ex(graph_name, &gn) )
@@ -2492,7 +2498,7 @@ gc_db(rdf_db *db, gen_t gen)
 
 static foreign_t
 rdf_gc(void)
-{ rdf_db *db = DB;
+{ rdf_db *db = rdf_current_db();
   gen_t gen = oldest_query_geneneration(db);
 
   gc_db(db, gen);
@@ -2512,13 +2518,16 @@ gc_thread(void *data)
   int tid;
 
   memset(&attr, 0, sizeof(attr));
+  attr.alias = "rdf_GC";
+
   if ( (tid=PL_thread_attach_engine(&attr)) < 0 )
   { Sdprintf("Failed to create RDF garbage collection thread\n");
     return NULL;
   }
 
   PL_call_predicate(NULL, PL_Q_NORMAL,
-		    PL_predicate("gc_loop", 0, "rdf_db"), 0);
+		    PL_predicate("rdf_gc_loop", 0, "rdf_db"), 0);
+  return NULL;
 }
 
 
@@ -2546,6 +2555,24 @@ new_db(void)
   init_tables(db);
 
   return db;
+}
+
+
+static rdf_db *RDF_DB;
+
+rdf_db *
+rdf_current_db(void)
+{ if ( RDF_DB )
+    return RDF_DB;
+
+  simpleMutexLock(&rdf_lock);
+  if ( !RDF_DB )
+  { RDF_DB = new_db();
+    rdf_create_gc_thread(RDF_DB);
+  }
+  simpleMutexUnlock(&rdf_lock);
+
+  return RDF_DB;
 }
 
 
@@ -3354,7 +3381,7 @@ save_db(query *q, IOSTREAM *out, atom_t src)
 
 static foreign_t
 rdf_save_db(term_t stream, term_t graph)
-{ rdf_db *db = DB;
+{ rdf_db *db = rdf_current_db();
   query *q;
   IOSTREAM *out;
   atom_t src;
@@ -3730,7 +3757,7 @@ append_graph_to_list(ptr_hash_node *node, void *closure)
 static foreign_t
 rdf_load_db(term_t stream, term_t id, term_t graphs)
 { ld_context ctx;
-  rdf_db *db = DB;
+  rdf_db *db = rdf_current_db();
   IOSTREAM *in;
   int rc;
 
@@ -3896,7 +3923,7 @@ static foreign_t
 rdf_md5(term_t graph_name, term_t md5)
 { atom_t src;
   int rc;
-  rdf_db *db = DB;
+  rdf_db *db = rdf_current_db();
 
   if ( !get_atom_or_var_ex(graph_name, &src) )
     return FALSE;
@@ -4577,7 +4604,7 @@ put_begin_end(term_t t, functor_t be, int level)
 static foreign_t
 rdf_transaction(term_t goal, term_t id)
 { int rc;
-  rdf_db *db = DB;
+  rdf_db *db = rdf_current_db();
   query *q;
   triple_buffer added;
   triple_buffer deleted;
@@ -4622,7 +4649,7 @@ Provides list of parent transactions in the calling thread
 
 static foreign_t
 rdf_active_transactions(term_t list)
-{ rdf_db *db = DB;
+{ rdf_db *db = rdf_current_db();
   query *q = open_query(db);
   term_t tail = PL_copy_term_ref(list);
   term_t head = PL_new_term_ref();
@@ -4644,7 +4671,7 @@ rdf_active_transactions(term_t list)
 
 static foreign_t
 rdf_assert4(term_t subject, term_t predicate, term_t object, term_t src)
-{ rdf_db *db = DB;
+{ rdf_db *db = rdf_current_db();
   triple *t = new_triple(db);
   query *q;
 
@@ -4938,7 +4965,7 @@ retry:
 static foreign_t
 rdf(term_t subject, term_t predicate, term_t object,
     term_t src, term_t realpred, control_t h, unsigned flags)
-{ rdf_db *db = DB;
+{ rdf_db *db = rdf_current_db();
   search_state *state;
 
   switch(PL_foreign_control(h))
@@ -5039,7 +5066,7 @@ rdf_estimate_complexity(term_t subject, term_t predicate, term_t object,
 		        term_t complexity)
 { triple t;
   size_t c;
-  rdf_db *db = DB;
+  rdf_db *db = rdf_current_db();
   int rc;
 
   memset(&t, 0, sizeof(t));
@@ -5084,7 +5111,7 @@ current_literal(?Literals)
 
 static foreign_t
 rdf_current_literal(term_t t, control_t h)
-{ rdf_db *db = DB;
+{ rdf_db *db = rdf_current_db();
   literal **data;
   skiplist_enum *state;
   int rc;
@@ -5234,7 +5261,7 @@ rdf_update5(term_t subject, term_t predicate, term_t object, term_t src,
 	    term_t action)
 { triple t, *p;
   int indexed = BY_SPO;
-  rdf_db *db = DB;
+  rdf_db *db = rdf_current_db();
   int rc = TRUE;
   size_t count;
   triple_walker tw;
@@ -5302,7 +5329,7 @@ rdf_update(term_t subject, term_t predicate, term_t object, term_t action)
 static foreign_t
 rdf_retractall4(term_t subject, term_t predicate, term_t object, term_t src)
 { triple t, *p;
-  rdf_db *db = DB;
+  rdf_db *db = rdf_current_db();
   triple_walker tw;
   triple_buffer buf;
   query *q;
@@ -5591,7 +5618,7 @@ rdf_monitor(term_t goal, term_t mask)
 static foreign_t
 rdf_set_predicate(term_t pred, term_t option)
 { predicate *p;
-  rdf_db *db = DB;
+  rdf_db *db = rdf_current_db();
 
   if ( !get_predicate(db, pred, &p) )
     return FALSE;
@@ -5686,7 +5713,7 @@ typedef struct enum_pred
 
 static foreign_t
 rdf_current_predicate(term_t name, control_t h)
-{ rdf_db *db = DB;
+{ rdf_db *db = rdf_current_db();
   predicate *p;
   enum_pred *ep;
   atom_t a;
@@ -5744,7 +5771,7 @@ static foreign_t
 rdf_predicate_property(term_t pred, term_t option, control_t h)
 { int n;
   predicate *p;
-  rdf_db *db = DB;
+  rdf_db *db = rdf_current_db();
 
   if ( !predicate_key[0] )
   { int i = 0;
@@ -6149,7 +6176,7 @@ static foreign_t
 rdf_reachable(term_t subj, term_t pred, term_t obj,
 	      term_t max_d, term_t d,
 	      control_t h)
-{ rdf_db *db = DB;
+{ rdf_db *db = rdf_current_db();
 
   switch(PL_foreign_control(h))
   { case PL_FIRST_CALL:
@@ -6377,7 +6404,7 @@ unify_statistics(rdf_db *db, term_t key, functor_t f)
 static foreign_t
 rdf_statistics(term_t key, control_t h)
 { int n;
-  rdf_db *db = DB;
+  rdf_db *db = rdf_current_db();
 
   switch(PL_foreign_control(h))
   { case PL_FIRST_CALL:
@@ -6413,7 +6440,7 @@ rdf_statistics(term_t key, control_t h)
 
 static foreign_t
 rdf_generation(term_t t)
-{ rdf_db *db = DB;
+{ rdf_db *db = rdf_current_db();
 
   return PL_unify_integer(t, db->queries.generation);
 }
@@ -6511,7 +6538,7 @@ reset_db(rdf_db *db)
 
 static foreign_t
 rdf_reset_db()
-{ rdf_db *db = DB;
+{ rdf_db *db = rdf_current_db();
   query *q = open_query(db);
   int rc;
 
@@ -6598,6 +6625,7 @@ install_rdf_db()
 { int i=0;
   extern install_t install_atom_map(void);
 
+  simpleMutexInit(&rdf_lock);
   init_errors();
   init_alloc();
   register_resource_predicates();
@@ -6682,9 +6710,6 @@ install_rdf_db()
   check_index_tables();
 					/* see struct triple */
   assert(sizeof(literal) <= sizeof(triple*)*INDEX_TABLES);
-
-					/* setup the database */
-  DB = new_db();
 
   PL_register_foreign("rdf_version",    1, rdf_version,     0);
   PL_register_foreign("rdf_assert",	3, rdf_assert3,	    0);

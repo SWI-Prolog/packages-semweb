@@ -646,6 +646,21 @@ rdf_source_location(Subject, Source) :-
 
 
 		 /*******************************
+		 *	 GARBAGE COLLECT	*
+		 *******************************/
+
+%%	rdf_gc_loop
+%
+%	Take care of running the RDF garbage collection.  This predicate
+%	is called from a thread started by creating the RDF DB.
+
+rdf_gc_loop :-
+	rdf_gc,
+	sleep(1),
+	rdf_gc_loop.
+
+
+		 /*******************************
 		 *	     STATISTICS		*
 		 *******************************/
 

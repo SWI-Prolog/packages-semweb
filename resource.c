@@ -241,7 +241,7 @@ typedef struct res_enum
 
 static foreign_t
 rdf_resource(term_t r, control_t h)
-{ rdf_db *db = DB;
+{ rdf_db *db = rdf_current_db();
   res_enum *state;
 
   switch( PL_foreign_control(h) )
@@ -306,7 +306,7 @@ rdf_resource(term_t r, control_t h)
 #define RDF_LOOKUP_RESOURCE
 static foreign_t
 rdf_lookup_resource(term_t r)
-{ rdf_db *db = DB;
+{ rdf_db *db = rdf_current_db();
   atom_t a;
 
   if ( !PL_get_atom_ex(r, &a) )
