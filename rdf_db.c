@@ -82,8 +82,7 @@ typedef enum
   EV_NEW_LITERAL = 0x0010,		/* literal */
   EV_OLD_LITERAL = 0x0020,		/* literal */
   EV_TRANSACTION = 0x0040,		/* id, begin/end */
-  EV_LOAD	 = 0x0080,		/* id, begin/end */
-  EV_REHASH	 = 0x0100		/* begin/end */
+  EV_LOAD	 = 0x0080		/* id, begin/end */
 } broadcast_id;
 
 static int broadcast(broadcast_id id, void *a1, void *a2);
@@ -207,7 +206,6 @@ static functor_t FUNCTOR_new_literal1;
 static functor_t FUNCTOR_old_literal1;
 static functor_t FUNCTOR_transaction2;
 static functor_t FUNCTOR_load2;
-static functor_t FUNCTOR_rehash1;
 static functor_t FUNCTOR_begin1;
 static functor_t FUNCTOR_end1;
 
@@ -2241,6 +2239,9 @@ triple_hash_quality(rdf_db *db, int index)
 
     * triple_hash_quality() is quite costly. This could use sampling and
     it migth be a good idea to sample only the latest expansion.
+
+Note that we could also leave this to   GC and/or run this in a separate
+thread!
 */
 
 static void
@@ -2404,6 +2405,32 @@ optimize_triple_hashes(rdf_db *db, gen_t gen)
 }
 
 
+static int
+optimizable_triple_hash(rdf_db *db, int icol)
+{ triple_hash *hash = &db->hash[icol];
+  int opt = 0;
+  size_t epoch;
+
+  for ( epoch=hash->bucket_count_epoch; epoch < hash->bucket_count; epoch*=2 )
+    opt++;
+
+  return opt;
+}
+
+
+static int
+optimizable_hashes(rdf_db *db)
+{ int icol;
+  int optimizable = 0;
+
+  for(icol=1; icol<INDEX_TABLES; icol++)
+    optimizable += optimizable_triple_hash(db, icol);
+
+  return optimizable;
+}
+
+
+
 		 /*******************************
 		 *	GARBAGE COLLECTION	*
 		 *******************************/
@@ -2421,7 +2448,7 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol, gen_t gen)
 { triple_bucket *bucket = &db->hash[icol].blocks[MSB(bucket_no)][bucket_no];
   triple *prev = NULL;
   triple *t = bucket->head;
-  int collected = 0;
+  size_t collected = 0;
 
   for(; t; t=t->tp.next[icol])
   { if ( t->lifespan.died < gen )
@@ -2440,10 +2467,10 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol, gen_t gen)
 			  (long)t->lifespan.died);
 	         print_triple(t, 0);
 	         Sdprintf("\n"));
-
 	if ( t->reindexed )
-	  db->reindexed--;
-	db->gc.reclaimed_triples++;
+	  db->gc.reclaimed_reindexed++;
+	else
+	  db->gc.reclaimed_triples++;
 	free_triple(db, t, TRUE);
       }
     } else
@@ -2496,16 +2523,29 @@ gc_db(rdf_db *db, gen_t gen)
 }
 
 
+/** rdf_gc_(-Done) is semidet.
+
+Run the RDF-DB garbage collector. The collector   is  typically ran in a
+seperate thread. Its execution does not  interfere with readers and only
+synchronizes with writers using short-held locks.
+
+Fails without any action if there is already a GC in progress.
+*/
+
 static foreign_t
 rdf_gc(void)
 { rdf_db *db = rdf_current_db();
   gen_t gen = oldest_query_geneneration(db);
 
-  gc_db(db, gen);
-
-  return TRUE;
+  return gc_db(db, gen);
 }
 
+
+/** rdf_add_gc_time(+Time:double) is det.
+
+Add CPU time to GC statistics.  This is left to Prolog
+
+*/
 
 static foreign_t
 rdf_add_gc_time(term_t time)
@@ -2519,6 +2559,31 @@ rdf_add_gc_time(term_t time)
   }
 
   return FALSE;
+}
+
+/** rdf_gc_info(-Info) is det.
+
+Return info to help deciding on whether or not to call rdf_gc. Info is a
+record with the following members:
+
+  1. Total number of triples in hash (dead or alive)
+  2. Total dead triples in hash (deleted or reindexed)
+  3. Total number of possible optimizations to hash-tables.
+*/
+
+#define INT_ARG(val) PL_INT64, (int64_t)(val)
+
+static foreign_t
+rdf_gc_info(term_t info)
+{ rdf_db *db     = rdf_current_db();
+  size_t life    = db->created - db->gc.reclaimed_triples;
+  size_t garbage = db->erased + db->reindexed - db->gc.reclaimed_reindexed;
+
+  return PL_unify_term(info,
+		       PL_FUNCTOR_CHARS, "gc_info", 3,
+		         INT_ARG(life),
+		         INT_ARG(garbage),
+		         INT_ARG(optimizable_hashes(db)));
 }
 
 
@@ -5567,16 +5632,6 @@ broadcast(broadcast_id id, void *a1, void *a2)
 	  return FALSE;
 	break;
       }
-      case EV_REHASH:
-      { atom_t be = (atom_t)a1;
-	term_t tmp = PL_new_term_refs(1);
-
-	if ( !(tmp = PL_new_term_refs(1)) ||
-	     !PL_put_atom(tmp+0, be) ||
-	     !PL_cons_functor_v(term, FUNCTOR_rehash1, tmp) )
-	  return FALSE;
-	break;
-      }
       default:
 	assert(0);
     }
@@ -6493,7 +6548,6 @@ erase_triples(rdf_db *db)
   db->created = 0;
   db->erased = 0;
   db->erased = 0;
-  db->rehash_count = 0;
   memset(db->indexed, 0, sizeof(db->indexed));
   db->duplicates = 0;
   db->queries.generation = 0;
@@ -6692,7 +6746,6 @@ install_rdf_db()
   MKFUNCTOR(old_literal, 1);
   MKFUNCTOR(transaction, 2);
   MKFUNCTOR(load, 2);
-  MKFUNCTOR(rehash, 1);
   MKFUNCTOR(begin, 1);
   MKFUNCTOR(end, 1);
   MKFUNCTOR(hash_quality, 1);
@@ -6743,8 +6796,9 @@ install_rdf_db()
   PL_register_foreign("rdf",		3, rdf3,	    NDET);
   PL_register_foreign("rdf",		4, rdf4,	    NDET);
   PL_register_foreign("rdf_has",	4, rdf_has,	    NDET);
-  PL_register_foreign("rdf_gc",		0, rdf_gc,	    0);
+  PL_register_foreign("rdf_gc_",	0, rdf_gc,	    0);
   PL_register_foreign("rdf_add_gc_time",1, rdf_add_gc_time, 0);
+  PL_register_foreign("rdf_gc_info_",   1, rdf_gc_info,	    0);
   PL_register_foreign("rdf_statistics_",1, rdf_statistics,  NDET);
   PL_register_foreign("rdf_generation", 1, rdf_generation,  0);
   PL_register_foreign("rdf_match_label",3, match_label,     0);

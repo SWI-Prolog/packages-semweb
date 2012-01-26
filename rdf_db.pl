@@ -659,24 +659,38 @@ rdf_gc_loop :-
 
 rdf_gc_loop(CPU) :-
 	(   consider_gc(CPU)
-	->  run_gc(CPU1),
+	->  rdf_gc(CPU1),
+	    sleep(CPU1),
 	    rdf_gc_loop(CPU1)
-	;   sleep(0.1),
+	;   garbage_collect,
+	    sleep(0.1),
 	    rdf_gc_loop(CPU)
 	).
 
-%%	run_gc(-CPU) is det.
+%%	rdf_gc(-CPU) is det.
 %
 %	Run RDF GC one time. CPU is  the   amount  of CPU time spent. We
 %	update this in Prolog because portable access to thread specific
 %	CPU is really hard in C.
 
-run_gc(CPU) :-
+rdf_gc(CPU) :-
 	statistics(cputime, CPU0),
-	rdf_gc,
-	statistics(cputime, CPU1),
-	CPU is CPU1-CPU0,
-	rdf_add_gc_time(CPU).
+	(   rdf_gc_
+	->  statistics(cputime, CPU1),
+	    CPU is CPU1-CPU0,
+	    rdf_add_gc_time(CPU)
+	;   CPU = 0.0
+	).
+
+%%	rdf_gc is det.
+%
+%	Run the RDF-DB garbage collector. The collector is typically ran
+%	in a seperate thread. Its  execution   does  not  interfere with
+%	readers and only synchronizes  with   writers  using  short-held
+%	locks.
+
+rdf_gc :-
+	rdf_gc(_).
 
 %%	consider_gc(+CPU) is semidet.
 %
@@ -684,7 +698,13 @@ run_gc(CPU) :-
 %	GC.
 
 consider_gc(_CPU) :-
-	sleep(1).
+	(   rdf_gc_info_(gc_info(Triples, Garbage, Optimizable))
+	->  (   Garbage * 5 > Triples
+	    ;	Optimizable > 4
+	    )
+	;   print_message(error, rdf(invalid_gc_info)),
+	    sleep(10)
+	), !.
 
 
 		 /*******************************
