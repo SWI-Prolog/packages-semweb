@@ -238,7 +238,7 @@ typedef enum
   DUP_DISCARDED
 } dub_state;
 
-static int match_triples(triple *t, triple *p, unsigned flags);
+static int match_triples(rdf_db *db, triple *t, triple *p, query *q, unsigned flags);
 static void unlock_atoms(rdf_db *db, triple *t);
 static void lock_atoms(rdf_db *db, triple *t);
 static void unlock_atoms_literal(literal *lit);
@@ -992,7 +992,9 @@ triples_in_predicate_cloud(predicate_cloud *cloud)
 /* Add the predicates of c2 to c1 and destroy c2.  Returns c1 */
 
 static predicate_cloud *
-append_clouds(rdf_db *db, predicate_cloud *c1, predicate_cloud *c2, int update_hash)
+append_clouds(rdf_db *db,
+	      predicate_cloud *c1, predicate_cloud *c2,
+	      int update_hash)
 { predicate **p;
   int i;
 
@@ -1123,8 +1125,11 @@ predicate_hash(predicate *p)
 
 
 static void
-addSubPropertyOf(rdf_db *db, predicate *sub, predicate *super)
-{ /*DEBUG(2, Sdprintf("addSubPropertyOf(%s, %s)\n", pname(sub), pname(super)));*/
+addSubPropertyOf(rdf_db *db, triple *t)
+{ predicate *sub   = lookup_predicate(db, t->subject);
+  predicate *super = lookup_predicate(db, t->object.resource);
+
+  DEBUG(3, Sdprintf("addSubPropertyOf(%s, %s)\n", pname(sub), pname(super)));
 
   if ( add_list(db, &sub->subPropertyOf, super) )
   { add_list(db, &super->siblings, sub);
@@ -1225,7 +1230,7 @@ label_predicate_cloud(predicate_cloud *cloud)
 
 
 static void
-fill_reachable(bitmatrix *bm, predicate *p0, predicate *p)
+fill_reachable(bitmatrix *bm, predicate *p0, predicate *p, query *q)
 { if ( !testbit(bm, p0->label, p->label) )
   { cell *c;
 
@@ -1238,8 +1243,9 @@ fill_reachable(bitmatrix *bm, predicate *p0, predicate *p)
 
 
 static void
-create_reachability_matrix(rdf_db *db, predicate_cloud *cloud)
+create_reachability_matrix(rdf_db *db, predicate_cloud *cloud, query *q)
 { bitmatrix *m = alloc_bitmatrix(db, cloud->size, cloud->size);
+  sub_p_matrix *rm = rdf_malloc(db, sizeof(*rm));
   predicate **p;
   int i;
 
@@ -1247,23 +1253,38 @@ create_reachability_matrix(rdf_db *db, predicate_cloud *cloud)
   for(i=0, p=cloud->members; i<cloud->size; i++, p++)
   { DEBUG(1, Sdprintf("Reachability for %s (%d)\n", pname(*p), (*p)->label));
 
-    fill_reachable(m, *p, *p);
+    fill_reachable(m, *p, *p, q);
   }
 
-  if ( cloud->reachable )
-    free_bitmatrix(db, cloud->reachable);
-
-  cloud->reachable = m;
+  rm->generation = gen;
+  rm->matrix = m;
+  rm->older = cloud->reachable;
+  MemoryBarrier();
+  cloud->reachable = rm;
 }
 
 
 static int
-isSubPropertyOf(predicate *sub, predicate *p)
-{ if ( sub->cloud == p->cloud )
-    return testbit(sub->cloud->reachable, sub->label, p->label);
+isSubPropertyOf(rdf_db *db, predicate *sub, predicate *p, query q)
+{ predicate_cloud *pc;
+
+  if ( (pc=sub->cloud) == p->cloud )
+  { sub_p_matrix *rm;
+
+    if ( q->rd_gen > pc->last_modified )	/* needs locking */
+    { pc->last_modified = GEN_MAX;
+      create_reachability_matrix(db, pc, q);
+    }
+
+    for(rm=sub->cloud->reachable; rm; rm=rm->older)
+    { if ( gen >= rm->generation )
+	return testbit(rm->matrix, sub->label, p->label);
+    }
+  }
 
   return FALSE;
 }
+
 
 		 /*******************************
 		 *   PRINT PREDICATE HIERARCHY	*
@@ -1387,8 +1408,10 @@ update_predicate_counts(rdf_db *db, predicate *p, int which)
     init_triple_walker(&tw, db, &t, t.indexed);
     while((byp=next_triple(&tw)))
     { if ( byp->lifespan.died == GEN_MAX && !byp->is_duplicate )
-      { if ( (which == DISTINCT_DIRECT && byp->predicate.r == p) ||
-	     (which != DISTINCT_DIRECT && isSubPropertyOf(byp->predicate.r, p)) )
+      { if ( (which == DISTINCT_DIRECT &&
+	      byp->predicate.r == p) ||
+	     (which != DISTINCT_DIRECT &&
+	      isSubPropertyOf(db, byp->predicate.r, p, db->queries.generation)) )
 	{ total++;
 	  add_atomset(&subject_set, byp->subject);
 	  add_atomset(&object_set, object_hash(byp)); /* NOTE: not exact! */
@@ -2941,10 +2964,7 @@ link_triple(rdf_db *db, triple *t)
   {					/* keep track of subPropertyOf */
     if ( t->predicate.r->name == ATOM_subPropertyOf &&
 	 t->object_is_literal == FALSE )
-    { predicate *me    = lookup_predicate(db, t->subject);
-      predicate *super = lookup_predicate(db, t->object.resource);
-
-      addSubPropertyOf(db, me, super);
+    { addSubPropertyOf(db, t);
     }
   } else
   { db->duplicates++;
@@ -3096,7 +3116,7 @@ Match triple t to pattern p.  Erased triples are always skipped.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static int
-match_triples(triple *t, triple *p, unsigned flags)
+match_triples(rdf_db *db, triple *t, triple *p, query *q, unsigned flags)
 { /* DEBUG(3, Sdprintf("match_triple(");
 	   print_triple(t, 0);
 	   Sdprintf(")\n"));
@@ -3115,7 +3135,7 @@ match_triples(triple *t, triple *p, unsigned flags)
 					/* last; may be expensive */
   if ( p->predicate.r && t->predicate.r != p->predicate.r )
   { if ( (flags & MATCH_SUBPROPERTY) )
-      return isSubPropertyOf(t->predicate.r, p->predicate.r);
+      return isSubPropertyOf(db, t->predicate.r, p->predicate.r, q);
     else
       return FALSE;
   }
@@ -4677,7 +4697,7 @@ mark_duplicate(rdf_db *db, triple *t)
 
   init_triple_walker(&tw, db, t, indexed);
   while((d=next_triple(&tw)) && d != t)
-  { if ( match_triples(d, t, MATCH_DUPLICATE) )
+  { if ( match_triples(db, d, t, MATCH_DUPLICATE, NULL) ) /* query doesn't matter */
     { if ( d->graph == t->graph &&
 	   (d->line == NO_LINE || d->line == t->line) )
       { free_triple(db, t, FALSE);
@@ -4985,7 +5005,7 @@ retry:
 	continue;
     }
 
-    if ( match_triples(t, p, state->flags) )
+    if ( match_triples(state->db, t, p, state->flags, state->query) )
     { int rc;
 
       if ( (rc=unify_triple(state->subject, retpred, state->object,
@@ -5002,7 +5022,7 @@ retry:
 	    continue;
 	}
 
-	if ( match_triples(t, p, state->flags) )
+	if ( match_triples(state->db, t, p, state->flags, state->query) )
 	{ set_next_triple(tw, t);
 
 	  return TRUE;			/* non-deterministic */
@@ -5391,7 +5411,7 @@ rdf_update5(term_t subject, term_t predicate, term_t object, term_t src,
   { if ( !alive_triple(q, p) )
       continue;
 
-    if ( match_triples(p, &t, MATCH_EXACT) )
+    if ( match_triples(db, p, &t, MATCH_EXACT, q) )
       buffer_triple(&matches, p);
   }
 
@@ -5463,7 +5483,7 @@ rdf_retractall4(term_t subject, term_t predicate, term_t object, term_t src)
   q = open_query(db);
   init_triple_walker(&tw, db, &t, t.indexed);
   while((p=next_triple(&tw)))
-  { if ( match_triples(p, &t, MATCH_EXACT|MATCH_SRC) )
+  { if ( match_triples(db, p, &t, MATCH_EXACT|MATCH_SRC, q) )
     { if ( t.object_is_literal && t.object.literal->objtype == OBJ_TERM )
       { fid_t fid = PL_open_foreign_frame();
 	int rc = unify_object(object, p);
@@ -6116,7 +6136,7 @@ append_agenda(rdf_db *db, agenda *a, atom_t res, uintptr_t d)
 
 
 static int
-can_reach_target(rdf_db *db, agenda *a)
+can_reach_target(rdf_db *db, agenda *a, query *q)
 { triple_walker tw;
   int indexed = a->pattern.indexed;
   int rc = FALSE;
@@ -6132,7 +6152,7 @@ can_reach_target(rdf_db *db, agenda *a)
 
   init_triple_walker(&tw, db, &a->pattern, indexed);
   while((p=next_triple(&tw)))
-  { if ( match_triples(p, &a->pattern, MATCH_SUBPROPERTY) )
+  { if ( match_triples(db, p, &a->pattern, MATCH_SUBPROPERTY, q) )
     { rc = TRUE;
       break;
     }
@@ -6173,7 +6193,7 @@ bf_expand(rdf_db *db, agenda *a, atom_t resource, uintptr_t d)
     { if ( !alive_triple(a->query, p) )
 	continue;
 
-      if ( match_triples(p, &pattern, MATCH_SUBPROPERTY) )
+      if ( match_triples(db, p, &pattern, MATCH_SUBPROPERTY, a->query) )
       { atom_t found;
 	visited *v;
 

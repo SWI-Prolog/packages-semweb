@@ -200,12 +200,21 @@ typedef struct pred_hash
   size_t	count;			/* Total #predicates */
 } pred_hash;
 
+
+typedef struct sub_p_matrix
+{ struct reachability_matrix *older;	/* Reachability for older gen */
+  gen_t	        generation;		/* Generation it was created for */
+  bitmatrix    *matrix;			/* Actual reachability matrix */
+} sub_p_matrix;
+
+
 typedef struct predicate_cloud
 { predicate   **members;		/* member predicates */
   unsigned int  hash;			/* hash-code */
   size_t	size;			/* size of the cloud */
   size_t	deleted;		/* See erase_predicates() */
-  bitmatrix    *reachable;		/* cloud reachability matrix */
+  sub_p_matrix *reachable;		/* cloud reachability matrices */
+  gen_t		last_modified;		/* Last generation that changed me */
   unsigned	dirty : 1;		/* predicate hash not synchronised */
 } predicate_cloud;
 

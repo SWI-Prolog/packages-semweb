@@ -4,6 +4,13 @@
 
 ---++ Dealing with predicate clouds:
 
+  * Predicate clouds represent a set of interlinked predicates, regardless
+    of the generation.
+  * A predicate-cloud has
+	- A linked list of generation+reachability-matrices
+	- A generation-id when it was last modified
+  TBD: How does all this relate to generation-based life-time?
+
   * Have the link on predicates + generation and have immutable clouds
     - Array of generation-ranges to clouds
       - Start searching this from the latest
