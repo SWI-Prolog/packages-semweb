@@ -2,16 +2,7 @@
 
 ---+ Concurrent version of RDF-DB.
 
----++ Objectives
-
-  * Provide concurrency similar to Prolog's dynamic DB, using the Prolog update
-    semantics.  Steps:
-
-    1. Avoid the _need_ for reindexing
-    2. Introduce Logical update semantics for RDF triples
-    3. Allow concurrent read and write
-
----++++ Dealing with predicate clouds:
+---++ Dealing with predicate clouds:
 
   * Have the link on predicates + generation and have immutable clouds
     - Array of generation-ranges to clouds
@@ -30,7 +21,7 @@
       2. Copy triples of smaller to hash of new cloud.
       3. Set new clouds on current generation on all predicates.
 
----+++ Transaction semantics
+---++ Transaction semantics
 
   * All goals in a transaction see the database at the generation of the
   transaction start.
@@ -56,34 +47,18 @@
     - Nested transactions need a generation > parent
     - Multiple threads may run multiple transactions concurrently.
       - Groups: max-threads, max-nested?  Ok: 1000*1000 = 1m is still
-      nothing.
+        nothing.
       - Outer transaction visible: generation of start
       - Inner transaction visible: generation of start of outer +
         generations of parent transactions.
 
----++ Non-blocking GC
-
-  * `non-blocking' GC can run in a separate thread!:
-    - Keep track of `oldest' generation
-      - open_query()
-      - close_query()
-    - Remove older triples from links without locking.  Leave
-      unlinked triples to Boehm-GC
-
 ---+ Adding triples
 
-  - LOCKED
-    1. Obtain a generation.
-    2. Add the triples.
-    3. Step the generation to the newly obtained generation.
-
-  The lock must be held as short as possible.  What about this:
-
-  - add_triples(triple *triples, size_t count)
-    1. Adds triples to the chains, setting generation to the future.
-    2. Do the above, where (2) sets the proper generation.
-		  -- also requires a lock :-(
-
+  - Consider distribution of work between link_triple() and
+    add_triples().  There is a lot of room for optimization here.
+  - Speedup atom-table handling in Prolog
+    - Atomic atom-reference update
+    - Eventually: lock-free access to existing atoms
 
 ---+ Deleting triples
 
@@ -101,13 +76,13 @@
 
 ---+ Hash-table design
 
-  * Resize
-    - Double buckets using lock-free dynamic arrays!
-    - Lookup using K%N, K%(2N), ... (is like Cuckoo hashing)
-	- Needs to know N0.  Do not make N0 too small.
-    - Unbalance: optimize by copying triples				[OK]
-    - How to estimate complexity based on hash?
-	- Get sizes of different candidates and do the math (TBD)
+  - Implement optimization (like for triples for additional tables)
+	- resource-db
+	- predicate-db
+	- graph-db
+
+  - Perform expensive tests for need to rehash in a thread.
+
 
 ---+ References
 
