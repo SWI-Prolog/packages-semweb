@@ -3190,19 +3190,9 @@ typedef struct save_context
 } save_context;
 
 
-size_t
-next_table_size(size_t s0)
-{ size_t size = 2;
-
-  while(size < s0)
-    size *= 2;
-
-  return size;
-}
-
 static void
 init_saved(rdf_db *db, save_context *ctx)
-{ size_t size = next_table_size((db->created - db->erased)/8);
+{ size_t size = 64;
   size_t bytes = size * sizeof(*ctx->saved_table);
 
   ctx->saved_table = rdf_malloc(db, bytes);
@@ -3210,6 +3200,34 @@ init_saved(rdf_db *db, save_context *ctx)
   ctx->saved_size = size;
   ctx->saved_id = 0;
 }
+
+
+static void
+resize_saved(rdf_db *db, save_context *ctx)
+{ size_t newsize = ctx->saved_size * 2;
+  size_t newbytes = sizeof(*ctx->saved_table) * newsize;
+  saved **newt = rdf_malloc(db, newbytes);
+  saved **s = ctx->saved_table;
+  int i;
+
+  memset(newt, 0, newbytes);
+  for(i=0; i<ctx->saved_size; i++, s++)
+  { saved *c, *n;
+
+    for(c=*s; c; c = n)
+    { int hash = atom_hash(c->name) % newsize;
+
+      n = c->next;
+      c->next = newt[hash];
+      newt[hash] = c;
+    }
+  }
+
+  rdf_free(db, ctx->saved_table, ctx->saved_size*sizeof(*ctx->saved_table));
+  ctx->saved_table = newt;
+  ctx->saved_size  = newsize;
+}
+
 
 static void
 destroy_saved(rdf_db *db, save_context *ctx)
@@ -3307,6 +3325,11 @@ save_atom(rdf_db *db, IOSTREAM *out, atom_t a, save_context *ctx)
 
       return TRUE;
     }
+  }
+
+  if ( ctx->saved_id/4 > ctx->saved_size )
+  { resize_saved(db, ctx);
+    hash = atom_hash(a) % ctx->saved_size;
   }
 
   s = rdf_malloc(db, sizeof(*s));
