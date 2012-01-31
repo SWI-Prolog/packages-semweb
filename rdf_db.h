@@ -202,8 +202,8 @@ typedef struct pred_hash
 
 
 typedef struct sub_p_matrix
-{ struct reachability_matrix *older;	/* Reachability for older gen */
-  gen_t	        generation;		/* Generation it was created for */
+{ struct sub_p_matrix *older;		/* Reachability for older gen */
+  lifespan      lifespan;		/* Lifespan this matrix is valid */
   bitmatrix    *matrix;			/* Actual reachability matrix */
 } sub_p_matrix;
 
@@ -214,7 +214,6 @@ typedef struct predicate_cloud
   size_t	size;			/* size of the cloud */
   size_t	deleted;		/* See erase_predicates() */
   sub_p_matrix *reachable;		/* cloud reachability matrices */
-  gen_t		last_modified;		/* Last generation that changed me */
   unsigned	dirty : 1;		/* predicate hash not synchronised */
 } predicate_cloud;
 
@@ -455,8 +454,8 @@ typedef struct search_state
 COMMON(void *)	rdf_malloc(rdf_db *db, size_t size);
 COMMON(void)	rdf_free(rdf_db *db, void *ptr, size_t size);
 COMMON(void *)	rdf_realloc(rdf_db *db, void *ptr, size_t old, size_t new);
-COMMON(int)	link_triple(rdf_db *db, triple *t);
-COMMON(void)	erase_triple(rdf_db *db, triple *t);
+COMMON(int)	link_triple(rdf_db *db, triple *t, query *q);
+COMMON(void)	erase_triple(rdf_db *db, triple *t, query *q);
 COMMON(predicate *) lookup_predicate(rdf_db *db, atom_t name);
 COMMON(rdf_db*)	rdf_current_db(void);
 

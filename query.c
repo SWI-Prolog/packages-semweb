@@ -301,34 +301,34 @@ init_query_admin(rdf_db *db)
 		 *	    GENERATIONS		*
 		 *******************************/
 
-/* alive_triple() is true if a triple is visible inside a query.
+/* lifespan() is true if a lifespan is visible inside a query.
 
-   A triple is alive if the query generation is inside the lifespan,
+   A lifespan is alive if the query generation is inside it,
    but with transactions there are two problems:
 	- If the triple is deleted by a parent transaction it is dead
 	- If the triple is created by a parent transaction it is alive
 */
 
 int
-alive_triple(query *q, triple *t)
+alive_lifespan(query *q, lifespan *lifespan)
 { query *tr;
 
-  if ( q->rd_gen >= t->lifespan.born &&
-       q->rd_gen <  t->lifespan.died )
-  { if ( t->lifespan.died != GEN_MAX &&
+  if ( q->rd_gen >= lifespan->born &&
+       q->rd_gen <  lifespan->died )
+  { if ( lifespan->died != GEN_MAX &&
 	 (tr=q->transaction) )
     { for(tr=tr->transaction; tr; tr = tr->transaction)
-      { if ( t->lifespan.died == tr->wr_gen )
+      { if ( lifespan->died == tr->wr_gen )
 	  return FALSE;
       }
     }
     return TRUE;
   }
 
-  if ( t->lifespan.born >= GEN_TBASE &&
+  if ( lifespan->born >= GEN_TBASE &&
        (tr=q->transaction) )
   { for(tr=tr->transaction; tr; tr = tr->transaction)
-    { if ( t->lifespan.born == tr->wr_gen )
+    { if ( lifespan->born == tr->wr_gen )
 	return TRUE;
     }
   }
@@ -409,7 +409,7 @@ add_triples(query *q, triple **triples, size_t count)
 
     t->lifespan.born = gen;
     t->lifespan.died = GEN_MAX;
-    link_triple(db, t);
+    link_triple(db, t, q);
     if ( q->transaction )
       buffer_triple(q->transaction->transaction_data.added, t);
   }
@@ -438,7 +438,7 @@ del_triples(query *q, triple **triples, size_t count)
   { triple *t = *tp;
 
     t->lifespan.died = gen;
-    erase_triple(db, t);
+    erase_triple(db, t, q);
     if ( q->transaction )
       buffer_triple(q->transaction->transaction_data.deleted, t);
   }
@@ -470,7 +470,7 @@ update_triples(query *q,
     { (*to)->lifespan.died = gen;
       (*tn)->lifespan.born = gen;
       (*tn)->lifespan.died = GEN_MAX;
-      link_triple(db, *tn);
+      link_triple(db, *tn, q);
       if ( !q->transaction )
       { if ( (*to)->predicate.r != (*tn)->predicate.r )
 	{ (*to)->predicate.r->triple_count--;
@@ -574,7 +574,7 @@ discard_transaction(query *q)
     if ( t->lifespan.born == q->wr_gen &&
 	 t->lifespan.died == GEN_MAX )
     { t->lifespan.born = GEN_MAX;
-      erase_triple(db, t);
+      erase_triple(db, t, q);
     }
   }
   for(tp=q->transaction_data.deleted->base;

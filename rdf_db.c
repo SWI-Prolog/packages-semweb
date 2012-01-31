@@ -238,7 +238,8 @@ typedef enum
   DUP_DISCARDED
 } dub_state;
 
-static int match_triples(rdf_db *db, triple *t, triple *p, query *q, unsigned flags);
+static int match_triples(rdf_db *db, triple *t, triple *p,
+			 query *q, unsigned flags);
 static void unlock_atoms(rdf_db *db, triple *t);
 static void lock_atoms(rdf_db *db, triple *t);
 static void unlock_atoms_literal(literal *lit);
@@ -252,9 +253,13 @@ static void	init_triple_walker(triple_walker *tw, rdf_db *db,
 static triple  *next_triple(triple_walker *tw);
 static void	free_triple(rdf_db *db, triple *t, int linger);
 
-static void	create_reachability_matrix(rdf_db *db, predicate_cloud *cloud);
+static sub_p_matrix *create_reachability_matrix(rdf_db *db,
+						predicate_cloud *cloud,
+						query *q);
 static int	get_predicate(rdf_db *db, term_t t, predicate **p);
-static predicate_cloud *new_predicate_cloud(rdf_db *db, predicate **p, size_t count);
+static predicate_cloud *new_predicate_cloud(rdf_db *db,
+					    predicate **p, size_t count,
+					    query *q);
 static int	unify_literal(term_t lit, literal *l);
 static int	check_predicate_cloud(predicate_cloud *c);
 
@@ -850,7 +855,7 @@ lookup_predicate(rdf_db *db, atom_t name)
   p = rdf_malloc(db, sizeof(*p));
   memset(p, 0, sizeof(*p));
   p->name = name;
-  cp = new_predicate_cloud(db, &p, 1);
+  cp = new_predicate_cloud(db, &p, 1, NULL);
   p->hash = cp->hash;
   PL_register_atom(name);
   if ( db->predicates.count > db->predicates.bucket_count )
@@ -944,7 +949,7 @@ unregister_predicate(rdf_db *db, triple *t)
 		 *******************************/
 
 static predicate_cloud *
-new_predicate_cloud(rdf_db *db, predicate **p, size_t count)
+new_predicate_cloud(rdf_db *db, predicate **p, size_t count, query *q)
 { predicate_cloud *cloud = rdf_malloc(db, sizeof(*cloud));
 
   memset(cloud, 0, sizeof(*cloud));
@@ -960,7 +965,7 @@ new_predicate_cloud(rdf_db *db, predicate **p, size_t count)
     for(i=0, p2=cloud->members; i<cloud->size; i++, p2++)
       (*p2)->cloud = cloud;
   }
-  create_reachability_matrix(db, cloud);
+  create_reachability_matrix(db, cloud, q);
 
   return cloud;
 }
@@ -1033,7 +1038,7 @@ append_clouds(rdf_db *db,
 */
 
 static predicate_cloud *
-merge_clouds(rdf_db *db, predicate_cloud *c1, predicate_cloud *c2)
+merge_clouds(rdf_db *db, predicate_cloud *c1, predicate_cloud *c2, query *q)
 { predicate_cloud *cloud;
 
   if ( c1 != c2 )
@@ -1054,7 +1059,7 @@ merge_clouds(rdf_db *db, predicate_cloud *c1, predicate_cloud *c2)
 	   { check_predicate_cloud(cloud);
 	   });
 
-  create_reachability_matrix(db, cloud);
+  create_reachability_matrix(db, cloud, q);
 
   return cloud;
 }
@@ -1084,7 +1089,8 @@ pred_reachable(predicate *start, char *visited, predicate **nodes, int *size)
 
 static int
 split_cloud(rdf_db *db, predicate_cloud *cloud,
-	    predicate_cloud **parts, int size)
+	    predicate_cloud **parts, int size,
+	    query *q)
 { char *done        = alloca(cloud->size*sizeof(char));
   predicate **graph = alloca(cloud->size*sizeof(predicate*));
   int found = 0;
@@ -1098,7 +1104,7 @@ split_cloud(rdf_db *db, predicate_cloud *cloud,
       int gsize = 0;
 
       pred_reachable(start, done, graph, &gsize);
-      new_cloud = new_predicate_cloud(db, graph, gsize);
+      new_cloud = new_predicate_cloud(db, graph, gsize, q);
       DEBUG(1, Sdprintf("Split cloud %d from %s --> %p with %d members\n",
 			found, pname(start), new_cloud, gsize));
       if ( found == 0 )
@@ -1125,7 +1131,7 @@ predicate_hash(predicate *p)
 
 
 static void
-addSubPropertyOf(rdf_db *db, triple *t)
+addSubPropertyOf(rdf_db *db, triple *t, query *q)
 { predicate *sub   = lookup_predicate(db, t->subject);
   predicate *super = lookup_predicate(db, t->object.resource);
 
@@ -1133,7 +1139,7 @@ addSubPropertyOf(rdf_db *db, triple *t)
 
   if ( add_list(db, &sub->subPropertyOf, super) )
   { add_list(db, &super->siblings, sub);
-    merge_clouds(db, sub->cloud, super->cloud);
+    merge_clouds(db, sub->cloud, super->cloud, q);
   }
 }
 
@@ -1147,14 +1153,14 @@ addSubPropertyOf(rdf_db *db, triple *t)
 */
 
 static void
-delSubPropertyOf(rdf_db *db, predicate *sub, predicate *super)
+delSubPropertyOf(rdf_db *db, predicate *sub, predicate *super, query *q)
 { if ( del_list(db, &sub->subPropertyOf, super) )
   { del_list(db, &super->siblings, sub);
  /* if ( not worth the trouble )
       create_reachability_matrix(db, sub->cloud);
     else */
     { predicate_cloud *parts[2];
-      split_cloud(db, sub->cloud, parts, 2);
+      split_cloud(db, sub->cloud, parts, 2, q);
     }
   }
 }
@@ -1237,12 +1243,12 @@ fill_reachable(bitmatrix *bm, predicate *p0, predicate *p, query *q)
     DEBUG(2, Sdprintf("    Reachable [%s (%d)]\n", pname(p), p->label));
     setbit(bm, p0->label, p->label);
     for(c = p->subPropertyOf.head; c; c=c->next)
-      fill_reachable(bm, p0, c->value);
+      fill_reachable(bm, p0, c->value, q);
   }
 }
 
 
-static void
+static sub_p_matrix *
 create_reachability_matrix(rdf_db *db, predicate_cloud *cloud, query *q)
 { bitmatrix *m = alloc_bitmatrix(db, cloud->size, cloud->size);
   sub_p_matrix *rm = rdf_malloc(db, sizeof(*rm));
@@ -1256,30 +1262,32 @@ create_reachability_matrix(rdf_db *db, predicate_cloud *cloud, query *q)
     fill_reachable(m, *p, *p, q);
   }
 
-  rm->generation = gen;
+  rm->lifespan.born = q->rd_gen;
   rm->matrix = m;
   rm->older = cloud->reachable;
   MemoryBarrier();
   cloud->reachable = rm;
+
+  return rm;
 }
 
 
 static int
-isSubPropertyOf(rdf_db *db, predicate *sub, predicate *p, query q)
+isSubPropertyOf(rdf_db *db, predicate *sub, predicate *p, query *q)
 { predicate_cloud *pc;
 
   if ( (pc=sub->cloud) == p->cloud )
   { sub_p_matrix *rm;
 
-    if ( q->rd_gen > pc->last_modified )	/* needs locking */
-    { pc->last_modified = GEN_MAX;
-      create_reachability_matrix(db, pc, q);
-    }
-
     for(rm=sub->cloud->reachable; rm; rm=rm->older)
-    { if ( gen >= rm->generation )
+    { if ( alive_lifespan(q, &rm->lifespan) )
 	return testbit(rm->matrix, sub->label, p->label);
     }
+
+    if ( (rm = create_reachability_matrix(db, pc, q)) )
+      return testbit(rm->matrix, sub->label, p->label);
+    else
+      assert(0);
   }
 
   return FALSE;
@@ -1319,16 +1327,17 @@ static void
 print_reachability_cloud(predicate *p)
 { int x, y;
   predicate_cloud *cloud = p->cloud;
+  sub_p_matrix *rm = cloud->reachable;
 
   check_predicate_cloud(cloud);
 
   Sdprintf("Reachability matrix:\n");
-  for(x=0; x<cloud->reachable->width; x++)
+  for(x=0; x<rm->matrix->width; x++)
     Sdprintf("%d", x%10);
   Sdprintf("\n");
-  for(y=0; y<cloud->reachable->heigth; y++)
-  { for(x=0; x<cloud->reachable->width; x++)
-    { if ( testbit(cloud->reachable, x, y) )
+  for(y=0; y<rm->matrix->heigth; y++)
+  { for(x=0; x<rm->matrix->width; x++)
+    { if ( testbit(rm->matrix, x, y) )
 	Sdprintf("X");
       else
 	Sdprintf(".");
@@ -1365,7 +1374,7 @@ the predicate. This number  is  only   recomputed  if  it  is considered
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static int
-update_predicate_counts(rdf_db *db, predicate *p, int which)
+update_predicate_counts(rdf_db *db, predicate *p, int which, query *q)
 { size_t total = 0;
 
   if ( which == DISTINCT_DIRECT )
@@ -1411,7 +1420,7 @@ update_predicate_counts(rdf_db *db, predicate *p, int which)
       { if ( (which == DISTINCT_DIRECT &&
 	      byp->predicate.r == p) ||
 	     (which != DISTINCT_DIRECT &&
-	      isSubPropertyOf(db, byp->predicate.r, p, db->queries.generation)) )
+	      isSubPropertyOf(db, byp->predicate.r, p, q)) )
 	{ total++;
 	  add_atomset(&subject_set, byp->subject);
 	  add_atomset(&object_set, object_hash(byp)); /* NOTE: not exact! */
@@ -1460,8 +1469,8 @@ invalidate_distinct_counts(rdf_db *db)
 
 
 static double
-subject_branch_factor(rdf_db *db, predicate *p, int which)
-{ if ( !update_predicate_counts(db, p, which) )
+subject_branch_factor(rdf_db *db, predicate *p, query *q, int which)
+{ if ( !update_predicate_counts(db, p, which, q) )
     return FALSE;
 
   if ( p->distinct_subjects[which] == 0 )
@@ -1473,8 +1482,8 @@ subject_branch_factor(rdf_db *db, predicate *p, int which)
 
 
 static double
-object_branch_factor(rdf_db *db, predicate *p, int which)
-{ if ( !update_predicate_counts(db, p, which) )
+object_branch_factor(rdf_db *db, predicate *p, query *q, int which)
+{ if ( !update_predicate_counts(db, p, which, q) )
     return FALSE;
 
   if ( p->distinct_objects[which] == 0 )
@@ -2945,7 +2954,7 @@ link_triple_hash(rdf_db *db, triple *t)
 */
 
 int
-link_triple(rdf_db *db, triple *t)
+link_triple(rdf_db *db, triple *t, query *q)
 { dub_state dup;
 
   if ( t->linked )
@@ -2964,7 +2973,7 @@ link_triple(rdf_db *db, triple *t)
   {					/* keep track of subPropertyOf */
     if ( t->predicate.r->name == ATOM_subPropertyOf &&
 	 t->object_is_literal == FALSE )
-    { addSubPropertyOf(db, t);
+    { addSubPropertyOf(db, t, q);
     }
   } else
   { db->duplicates++;
@@ -2985,13 +2994,13 @@ MT: Caller must be hold db->queries.write.lock
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 void
-erase_triple(rdf_db *db, triple *t)
+erase_triple(rdf_db *db, triple *t, query *q)
 { if ( t->predicate.r->name == ATOM_subPropertyOf &&
        t->object_is_literal == FALSE )
   { predicate *me    = lookup_predicate(db, t->subject);
     predicate *super = lookup_predicate(db, t->object.resource);
 
-    delSubPropertyOf(db, me, super);
+    delSubPropertyOf(db, me, super, q);
   }
 
   unregister_graph(db, t);		/* Updates count and MD5 */
@@ -4697,7 +4706,7 @@ mark_duplicate(rdf_db *db, triple *t)
 
   init_triple_walker(&tw, db, t, indexed);
   while((d=next_triple(&tw)) && d != t)
-  { if ( match_triples(db, d, t, MATCH_DUPLICATE, NULL) ) /* query doesn't matter */
+  { if ( match_triples(db, d, t, NULL, MATCH_DUPLICATE) ) /* query doesn't matter */
     { if ( d->graph == t->graph &&
 	   (d->line == NO_LINE || d->line == t->line) )
       { free_triple(db, t, FALSE);
@@ -5005,7 +5014,7 @@ retry:
 	continue;
     }
 
-    if ( match_triples(state->db, t, p, state->flags, state->query) )
+    if ( match_triples(state->db, t, p, state->query, state->flags) )
     { int rc;
 
       if ( (rc=unify_triple(state->subject, retpred, state->object,
@@ -5022,7 +5031,7 @@ retry:
 	    continue;
 	}
 
-	if ( match_triples(state->db, t, p, state->flags, state->query) )
+	if ( match_triples(state->db, t, p, state->query, state->flags) )
 	{ set_next_triple(tw, t);
 
 	  return TRUE;			/* non-deterministic */
@@ -5102,7 +5111,7 @@ rdf(term_t subject, term_t predicate, term_t object,
   { case PL_FIRST_CALL:
     { query *q = open_query(db);
 
-      state = &q->search_state;
+      state = &q->state.search;
       memset(state, 0, sizeof(*state));
       state->db	       = db;
       state->subject   = subject;
@@ -5411,7 +5420,7 @@ rdf_update5(term_t subject, term_t predicate, term_t object, term_t src,
   { if ( !alive_triple(q, p) )
       continue;
 
-    if ( match_triples(db, p, &t, MATCH_EXACT, q) )
+    if ( match_triples(db, p, &t, q, MATCH_EXACT) )
       buffer_triple(&matches, p);
   }
 
@@ -5483,7 +5492,7 @@ rdf_retractall4(term_t subject, term_t predicate, term_t object, term_t src)
   q = open_query(db);
   init_triple_walker(&tw, db, &t, t.indexed);
   while((p=next_triple(&tw)))
-  { if ( match_triples(db, p, &t, MATCH_EXACT|MATCH_SRC, q) )
+  { if ( match_triples(db, p, &t, q, MATCH_EXACT|MATCH_SRC) )
     { if ( t.object_is_literal && t.object.literal->objtype == OBJ_TERM )
       { fid_t fid = PL_open_foreign_frame();
 	int rc = unify_object(object, p);
@@ -5790,7 +5799,8 @@ rdf_set_predicate(term_t pred, term_t option)
 static functor_t predicate_key[PRED_PROPERTY_COUNT];
 
 static int
-unify_predicate_property(rdf_db *db, predicate *p, term_t option, functor_t f)
+unify_predicate_property(rdf_db *db, predicate *p, term_t option,
+			 functor_t f, query *q)
 { if ( f == FUNCTOR_symmetric1 )
     return PL_unify_term(option, PL_FUNCTOR, f,
 			 PL_BOOL, p->inverse_of == p ? TRUE : FALSE);
@@ -5808,16 +5818,16 @@ unify_predicate_property(rdf_db *db, predicate *p, term_t option, functor_t f)
 			 PL_LONG, p->triple_count);
   } else if ( f == FUNCTOR_rdf_subject_branch_factor1 )
   { return PL_unify_term(option, PL_FUNCTOR, f,
-		 PL_FLOAT, subject_branch_factor(db, p, DISTINCT_DIRECT));
+		 PL_FLOAT, subject_branch_factor(db, p, q, DISTINCT_DIRECT));
   } else if ( f == FUNCTOR_rdf_object_branch_factor1 )
   { return PL_unify_term(option, PL_FUNCTOR, f,
-		 PL_FLOAT, object_branch_factor(db, p, DISTINCT_DIRECT));
+		 PL_FLOAT, object_branch_factor(db, p, q, DISTINCT_DIRECT));
   } else if ( f == FUNCTOR_rdfs_subject_branch_factor1 )
   { return PL_unify_term(option, PL_FUNCTOR, f,
-		 PL_FLOAT, subject_branch_factor(db, p, DISTINCT_SUB));
+		 PL_FLOAT, subject_branch_factor(db, p, q, DISTINCT_SUB));
   } else if ( f == FUNCTOR_rdfs_object_branch_factor1 )
   { return PL_unify_term(option, PL_FUNCTOR, f,
-		 PL_FLOAT, object_branch_factor(db, p, DISTINCT_SUB));
+		 PL_FLOAT, object_branch_factor(db, p, q, DISTINCT_SUB));
   } else
   { assert(0);
     return FALSE;
@@ -5889,9 +5899,9 @@ next:
 
 static foreign_t
 rdf_predicate_property(term_t pred, term_t option, control_t h)
-{ int n;
-  predicate *p;
+{ predicate *p;
   rdf_db *db = rdf_current_db();
+  query *q;
 
   if ( !predicate_key[0] )
   { int i = 0;
@@ -5910,37 +5920,53 @@ rdf_predicate_property(term_t pred, term_t option, control_t h)
   switch(PL_foreign_control(h))
   { case PL_FIRST_CALL:
     { functor_t f;
+      int rc;
 
+      q = open_query(db);
       if ( PL_is_variable(option) )
-      { n = 0;
+      { q->state.predprop.prop = 0;
+	if ( !get_predicate(db, pred, &q->state.predprop.pred) )
+	{ close_query(q);
+	  return FALSE;
+	}
 	goto redo;
       } else if ( PL_get_functor(option, &f) )
-      { for(n=0; predicate_key[n]; n++)
+      { int n;
+
+	for(n=0; predicate_key[n]; n++)
 	{ if ( predicate_key[n] == f )
 	  { if ( !get_predicate(db, pred, &p) )
 	      return FALSE;
-	    return unify_predicate_property(db, p, option, f);
+	    rc = unify_predicate_property(db, p, option, f, q);
+	    goto out;
 	  }
 	}
-	return PL_domain_error("rdf_predicate_property", option);
+	rc = PL_domain_error("rdf_predicate_property", option);
       } else
-	return PL_type_error("rdf_predicate_property", option);
+	rc = PL_type_error("rdf_predicate_property", option);
+    out:
+      close_query(q);
+      return rc;
     }
     case PL_REDO:
-      n = (int)PL_foreign_context(h);
+      q = PL_foreign_context_address(h);
     redo:
-      if ( !get_predicate(db, pred, &p) )
-	return FALSE;
-      for( ; predicate_key[n]; n++ )
-      { if ( unify_predicate_property(db, p, option, predicate_key[n]) )
-	{ n++;
-	  if ( predicate_key[n] )
-	    PL_retry(n);
+      for( ; predicate_key[q->state.predprop.prop]; q->state.predprop.prop++ )
+      { if ( unify_predicate_property(db,
+				      q->state.predprop.pred,
+				      option,
+				      predicate_key[q->state.predprop.prop],
+				      q) )
+	{ q->state.predprop.prop++;
+	  if ( predicate_key[q->state.predprop.prop] )
+	    PL_retry_address(q);
 	  return TRUE;
 	}
       }
       return FALSE;
     case PL_PRUNED:
+      q = PL_foreign_context_address(h);
+      close_query(q);
       return TRUE;
     default:
       assert(0);
@@ -5952,46 +5978,6 @@ rdf_predicate_property(term_t pred, term_t option, control_t h)
 		 /*******************************
 		 *     TRANSITIVE RELATIONS	*
 		 *******************************/
-
-typedef struct visited
-{ struct visited *next;			/* next in list */
-  struct visited *hash_link;		/* next in hashed link */
-  atom_t resource;			/* visited resource */
-  uintptr_t distance;			/* Distance */
-} visited;
-
-
-#define AGENDA_LOCAL_MAGIC 742736360
-#define AGENDA_SAVED_MAGIC 742736362
-
-typedef struct agenda
-{ query   *query;			/* associated query */
-  visited *head;			/* visited list */
-  visited *tail;			/* tail of visited list */
-  visited *to_expand;			/* next to expand */
-  visited *to_return;			/* next to return */
-  visited **hash;			/* hash-table for cycle detection */
-  int	  magic;			/* AGENDA_*_MAGIC */
-  int	  hash_size;
-  int     size;				/* size of the agenda */
-  uintptr_t max_d;			/* max distance */
-  triple  pattern;			/* partial triple used as pattern */
-  atom_t  target;			/* resource we are seaching for */
-  struct chunk  *chunk;			/* node-allocation chunks */
-} agenda;
-
-#ifndef offsetof
-#define offsetof(structure, field) ((size_t) &(((structure *)NULL)->field))
-#endif
-#define CHUNK_SIZE(n) offsetof(chunk, nodes[n])
-
-typedef struct chunk
-{ struct chunk *next;
-  int	 used;				/* # used elements */
-  int	 size;				/* size of the chunk */
-  struct visited nodes[1];		/* nodes in the chunk */
-} chunk;
-
 
 static visited *
 alloc_node_agenda(rdf_db *db, agenda *a)
@@ -6021,9 +6007,6 @@ static void
 empty_agenda(rdf_db *db, agenda *a)
 { chunk *c, *n;
 
-  if ( a->query )
-    close_query(a->query);
-
   for(c=a->chunk; c; c = n)
   { n = c->next;
     rdf_free(db, c, CHUNK_SIZE(c->size));
@@ -6031,24 +6014,8 @@ empty_agenda(rdf_db *db, agenda *a)
   if ( a->hash )
     rdf_free(db, a->hash, sizeof(visited*)*a->hash_size);
 
-  if ( a->magic == AGENDA_SAVED_MAGIC )
-  {  a->magic = 0;
-     rdf_free(db, a, sizeof(*a));
-  } else
-  { a->magic = 0;
-  }
-}
-
-
-static agenda *
-save_agenda(rdf_db *db, agenda *a)
-{ agenda *r = rdf_malloc(db, sizeof(*r));
-
-  assert(a->magic == AGENDA_LOCAL_MAGIC);
-  *r = *a;
-  r->magic = AGENDA_SAVED_MAGIC;
-
-  return r;
+  if ( a->query )
+    close_query(a->query);
 }
 
 
@@ -6152,7 +6119,7 @@ can_reach_target(rdf_db *db, agenda *a, query *q)
 
   init_triple_walker(&tw, db, &a->pattern, indexed);
   while((p=next_triple(&tw)))
-  { if ( match_triples(db, p, &a->pattern, MATCH_SUBPROPERTY, q) )
+  { if ( match_triples(db, p, &a->pattern, q, MATCH_SUBPROPERTY) )
     { rc = TRUE;
       break;
     }
@@ -6170,7 +6137,7 @@ can_reach_target(rdf_db *db, agenda *a, query *q)
 
 
 static visited *
-bf_expand(rdf_db *db, agenda *a, atom_t resource, uintptr_t d)
+bf_expand(rdf_db *db, agenda *a, atom_t resource, uintptr_t d, query *q)
 { triple pattern = a->pattern;
   visited *rc = NULL;
 
@@ -6180,7 +6147,7 @@ bf_expand(rdf_db *db, agenda *a, atom_t resource, uintptr_t d)
   { pattern.object.resource = resource;
   }
 
-  if ( a->target && can_reach_target(db, a) )
+  if ( a->target && can_reach_target(db, a, q) )
     return append_agenda(db, a, a->target, d);
 
   for(;;)
@@ -6193,7 +6160,7 @@ bf_expand(rdf_db *db, agenda *a, atom_t resource, uintptr_t d)
     { if ( !alive_triple(a->query, p) )
 	continue;
 
-      if ( match_triples(db, p, &pattern, MATCH_SUBPROPERTY, a->query) )
+      if ( match_triples(db, p, &pattern, a->query, MATCH_SUBPROPERTY) )
       { atom_t found;
 	visited *v;
 
@@ -6234,7 +6201,8 @@ peek_agenda(rdf_db *db, agenda *a)
 
     a->to_return = bf_expand(db, a,
 			     a->to_expand->resource,
-			     next_d);
+			     next_d,
+			     a->query);
     a->to_expand = a->to_expand->next;
 
     if ( a->to_return )
@@ -6297,36 +6265,40 @@ rdf_reachable(term_t subj, term_t pred, term_t obj,
 	      term_t max_d, term_t d,
 	      control_t h)
 { rdf_db *db = rdf_current_db();
+  query *q;
 
   switch(PL_foreign_control(h))
   { case PL_FIRST_CALL:
-    { agenda a;
-      visited *v;
+    { visited *v;
+      agenda *a;
       term_t target_term;
       int is_det = FALSE;
 
       if ( PL_is_variable(pred) )
 	return PL_instantiation_error(pred);
 
-      memset(&a, 0, sizeof(a));
-      a.magic = AGENDA_LOCAL_MAGIC;
+      q = open_query(db);
+      a = &q->state.tr_search;
+      memset(a, 0, sizeof(*a));
+      a->query = q;
+
       if ( max_d )
       { long md;
 	atom_t inf;
 
 	if ( PL_get_atom(max_d, &inf) && inf == ATOM_infinite )
-	{ a.max_d = (uintptr_t)-1;
+	{ a->max_d = (uintptr_t)-1;
 	} else
 	{ if ( !PL_get_long_ex(max_d, &md) || md < 0 )
 	    return FALSE;
-	  a.max_d = md;
+	  a->max_d = md;
 	}
       } else
-      { a.max_d = (uintptr_t)-1;
+      { a->max_d = (uintptr_t)-1;
       }
 
       if ( !PL_is_variable(subj) )		/* subj .... obj */
-      { switch(get_partial_triple(db, subj, pred, 0, 0, &a.pattern))
+      { switch(get_partial_triple(db, subj, pred, 0, 0, &a->pattern))
 	{ case 0:
 	    return directly_attached(pred, subj, obj) &&
 		   unify_distance(d, 0);
@@ -6334,58 +6306,53 @@ rdf_reachable(term_t subj, term_t pred, term_t obj,
 	    return FALSE;
 	}
 	is_det = PL_is_ground(obj);
-	if ( a.pattern.object_is_literal )
+	if ( a->pattern.object_is_literal )
 	  return FALSE;			/* rdf_reachable(literal(...),?,?) */
 	target_term = obj;
       } else if ( !PL_is_variable(obj) )	/* obj .... subj */
-      {	switch(get_partial_triple(db, 0, pred, obj, 0, &a.pattern))
+      {	switch(get_partial_triple(db, 0, pred, obj, 0, &a->pattern))
 	{ case 0:
 	    return directly_attached(pred, obj, subj);
 	  case -1:
 	    return FALSE;
 	}
-	if ( a.pattern.object_is_literal )
+	if ( a->pattern.object_is_literal )
 	  return FALSE;			/* rdf_reachable(-,+,literal(...)) */
 	target_term = subj;
       } else
 	return PL_instantiation_error(subj);
 
-      a.query = open_query(db);
-      if ( (a.pattern.indexed & BY_S) )		/* subj ... */
-	append_agenda(db, &a, a.pattern.subject, 0);
+      a->query = open_query(db);
+      if ( (a->pattern.indexed & BY_S) )		/* subj ... */
+	append_agenda(db, a, a->pattern.subject, 0);
       else
-	append_agenda(db, &a, a.pattern.object.resource, 0);
-      a.to_return = a.head;
-      a.to_expand = a.head;
+	append_agenda(db, a, a->pattern.object.resource, 0);
+      a->to_return = a->head;
+      a->to_expand = a->head;
 
-      while( (v=next_agenda(db, &a)) )
+      while( (v=next_agenda(db, a)) )
       { if ( PL_unify_atom(target_term, v->resource) )
 	{ if ( is_det )		/* mode(+, +, +) */
 	  { int rc = unify_distance(d, v->distance);
-	    empty_agenda(db, &a);
+	    empty_agenda(db, a);
 	    return rc;
 	  } else if ( unify_distance(d, v->distance) )
 	  {				/* mode(+, +, -) or mode(-, +, +) */
-	    if ( peek_agenda(db, &a) )
-	    { agenda *ra = save_agenda(db, &a);
-	      DEBUG(9, Sdprintf("Saved agenta to %p\n", ra));
-	      PL_retry_address(ra);
-	    }
+	    if ( peek_agenda(db, a) )
+	      PL_retry_address(a);
 
-	    empty_agenda(db, &a);
+	    empty_agenda(db, a);
 	    return TRUE;
 	  }
 	}
       }
-      empty_agenda(db, &a);
+      empty_agenda(db, a);
       return FALSE;
     }
     case PL_REDO:
     { agenda *a = PL_foreign_context_address(h);
       term_t target_term;
       visited *v;
-
-      assert(a->magic == AGENDA_SAVED_MAGIC);
 
       if ( !PL_is_variable(subj) )	/* +, +, - */
 	target_term = obj;
@@ -6395,8 +6362,7 @@ rdf_reachable(term_t subj, term_t pred, term_t obj,
       while( (v=next_agenda(db, a)) )
       { if ( PL_unify_atom(target_term, v->resource) &&
 	     unify_distance(d, v->distance) )
-	{ assert(a->magic == AGENDA_SAVED_MAGIC);
-	  if ( peek_agenda(db, a) )
+	{ if ( peek_agenda(db, a) )
 	  { PL_retry_address(a);
 	  } else
 	  { empty_agenda(db, a);
@@ -6412,8 +6378,6 @@ rdf_reachable(term_t subj, term_t pred, term_t obj,
     { agenda *a = PL_foreign_context_address(h);
 
       DEBUG(9, Sdprintf("Cutted; agenda = %p\n", a));
-
-      assert(a->magic == AGENDA_SAVED_MAGIC);
 
       empty_agenda(db, a);
       return TRUE;
