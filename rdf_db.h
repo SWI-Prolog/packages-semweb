@@ -385,7 +385,6 @@ typedef struct rdf_db
   size_t	indexed[16];		/* Count calls (2**4 possible indices) */
   resource_db	resources;		/* admin of used resources */
   pred_hash	predicates;		/* Predicate table */
-  int		need_update;		/* We need to update */
   size_t	agenda_created;		/* #visited nodes in agenda */
   graph_hash    graphs;			/* Graph table */
   graph	       *last_graph;		/* last accessed graph */

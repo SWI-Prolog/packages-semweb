@@ -1040,26 +1040,40 @@ append_clouds(rdf_db *db,
 static predicate_cloud *
 merge_clouds(rdf_db *db, predicate_cloud *c1, predicate_cloud *c2, query *q)
 { predicate_cloud *cloud;
+  sub_p_matrix *rm;
 
   if ( c1 != c2 )
-  { if ( triples_in_predicate_cloud(c1) == 0 )
+  { size_t tc1, tc2;
+
+    if ( (tc1=triples_in_predicate_cloud(c1)) == 0 )
     { cloud = append_clouds(db, c2, c1, TRUE);
-    } else if ( triples_in_predicate_cloud(c2) == 0 )
+    } else if ( (tc2=triples_in_predicate_cloud(c2)) == 0 )
     { cloud = append_clouds(db, c1, c2, TRUE);
     } else
-    { cloud = append_clouds(db, c1, c2, FALSE);
-      cloud->dirty = TRUE;
-      db->need_update++;
+    { predicate_cloud *reindex;
+      size_t copy_count;
+
+      if ( tc2 < tc1 )
+      { cloud = c1;
+	reindex = c2;
+	copy_count = tc2;
+      } else
+      { cloud = c2;
+	reindex = c1;
+	copy_count = tc1;
+      }
+
+      cloud = append_clouds(db, cloud, reindex, FALSE);
+      Sdprintf("FIXME: Copy %ld triples to %p\n", (long)copy_count, reindex);
     }
   } else
   { cloud = c1;
   }
 
-  DEBUG(1, if ( !db->need_update )
-	   { check_predicate_cloud(cloud);
-	   });
-
-  create_reachability_matrix(db, cloud, q);
+  for(rm=cloud->reachable; rm; rm=rm->older)
+  { if ( rm->lifespan.died == GEN_MAX )
+      rm->lifespan.died = q->wr_gen;
+  }
 
   return cloud;
 }
@@ -1112,7 +1126,7 @@ split_cloud(rdf_db *db, predicate_cloud *cloud,
 	new_cloud->dirty = cloud->dirty;
       } else
       { new_cloud->dirty = TRUE;	/* preds come from another cloud */
-	db->need_update++;
+	//db->need_update++;		/* FIXME: need to reindex triples */
       }
       parts[found++] = new_cloud;
     }
@@ -1275,6 +1289,8 @@ create_reachability_matrix(rdf_db *db, predicate_cloud *cloud, query *q)
 static int
 isSubPropertyOf(rdf_db *db, predicate *sub, predicate *p, query *q)
 { predicate_cloud *pc;
+
+  assert(sub != p);
 
   if ( (pc=sub->cloud) == p->cloud )
   { sub_p_matrix *rm;
@@ -6596,7 +6612,6 @@ reset_db(rdf_db *db)
   erase_predicates(db);
   erase_resources(&db->resources);
   erase_graphs(db);
-  db->need_update = FALSE;
   db->agenda_created = 0;
   skiplist_destroy(&db->literals);
 
