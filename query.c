@@ -237,7 +237,9 @@ open_query(rdf_db *db)
 
 
 query *
-open_transaction(rdf_db *db, triple_buffer *added, triple_buffer *deleted)
+open_transaction(rdf_db *db,
+		 triple_buffer *added, triple_buffer *deleted,
+		 gen_t view)
 { int tid = PL_thread_self();
   thread_info *ti = rdf_thread_info(db, tid);
   query *q = alloc_query(&ti->queries);
@@ -252,6 +254,9 @@ open_transaction(rdf_db *db, triple_buffer *added, triple_buffer *deleted)
   { q->rd_gen = db->queries.generation;
     q->wr_gen = ti->queries.tr_gen_base;
   }
+
+  if ( view != GEN_UNDEF )
+    q->rd_gen = view;
 
   ti->queries.transaction = q;
 

@@ -220,7 +220,7 @@ static atom_t	ATOM_error;
 static atom_t	ATOM_begin;
 static atom_t	ATOM_end;
 static atom_t	ATOM_infinite;
-static atom_t	ATOM_generation;
+static atom_t	ATOM_snapshot;
 
 static atom_t	ATOM_subPropertyOf;
 
@@ -4791,7 +4791,7 @@ rdf_transaction(term_t goal, term_t id, term_t options)
 	return PL_type_error("option", head);
       _PL_get_arg(1, head, arg);
 
-      if ( name == ATOM_generation )
+      if ( name == ATOM_snapshot )
       { int64_t gen;
 
 	if ( !PL_get_int64_ex(arg, &gen) )
@@ -4803,7 +4803,7 @@ rdf_transaction(term_t goal, term_t id, term_t options)
       return FALSE;
   }
 
-  q = open_transaction(db, &added, &deleted);
+  q = open_transaction(db, &added, &deleted, GEN_UNDEF);
   q->transaction_data.prolog_id = id;
   rc = PL_call_predicate(NULL, PL_Q_PASS_EXCEPTION, PRED_call1, goal);
 
@@ -6589,11 +6589,21 @@ rdf_statistics(term_t key, control_t h)
 }
 
 
+/** rdf_generation(-Generation) is det.
+
+    True when Generation is the current reading generation.
+*/
+
 static foreign_t
 rdf_generation(term_t t)
 { rdf_db *db = rdf_current_db();
+  query *q = open_query(db);
+  int rc;
 
-  return PL_unify_integer(t, db->queries.generation);
+  rc = PL_unify_int64(t, q->rd_gen);
+  close_query(q);
+
+  return rc;
 }
 
 
@@ -6838,7 +6848,7 @@ install_rdf_db()
   ATOM_begin	     = PL_new_atom("begin");
   ATOM_end	     = PL_new_atom("end");
   ATOM_infinite	     = PL_new_atom("infinite");
-  ATOM_generation    = PL_new_atom("generation");
+  ATOM_snapshot      = PL_new_atom("snapshot");
 
   PRED_call1         = PL_predicate("call", 1, "user");
 

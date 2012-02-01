@@ -138,7 +138,8 @@ COMMON(gen_t)	oldest_query_geneneration(rdf_db *db);
 
 COMMON(query *)	open_transaction(rdf_dbp db,
 				 struct triple_buffer *added,
-				 struct triple_buffer *deleted);
+				 struct triple_buffer *deleted,
+				 gen_t snapshot);
 COMMON(int)	empty_transaction(query *q);
 COMMON(int)	commit_transaction(query *q);
 COMMON(void)	close_transaction(query *q);

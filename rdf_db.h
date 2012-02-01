@@ -103,6 +103,8 @@ typedef struct lifespan
 					/* Generation of a transaction */
 #define T_GEN(tid,d)	(GEN_TBASE + (tid)*GEN_TNEST + (d))
 
+#include "snapshot.h"
+
 
 		 /*******************************
 		 *	       TRIPLES		*
@@ -405,6 +407,12 @@ typedef struct rdf_db
     simpleMutex misc;			/* general DB locks */
     simpleMutex gc;			/* DB garbage collection lock */
   } locks;
+
+  struct
+  { snapshot *head;			/* head and tail of snapshot list */
+    snapshot *tail;
+    gen_t     keep;			/* generation to keep */
+  } snapshots;
 
   skiplist      literals;		/* (shared) literals */
 } rdf_db;
