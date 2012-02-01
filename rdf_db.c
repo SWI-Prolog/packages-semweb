@@ -220,6 +220,7 @@ static atom_t	ATOM_error;
 static atom_t	ATOM_begin;
 static atom_t	ATOM_end;
 static atom_t	ATOM_infinite;
+static atom_t	ATOM_generation;
 
 static atom_t	ATOM_subPropertyOf;
 
@@ -4758,13 +4759,49 @@ put_begin_end(term_t t, functor_t be, int level)
 }
 
 
+/** rdf_transaction(:Goal, +Id, +Options)
+
+Options:
+
+  * generation(+Generation)
+  Determines query generation
+*/
+
 static foreign_t
-rdf_transaction(term_t goal, term_t id)
+rdf_transaction(term_t goal, term_t id, term_t options)
 { int rc;
   rdf_db *db = rdf_current_db();
   query *q;
   triple_buffer added;
   triple_buffer deleted;
+  gen_t query_gen = GEN_UNDEF;
+
+  if ( PL_get_nil(options) )
+  {
+  } else
+  { term_t tail = PL_copy_term_ref(options);
+    term_t head = PL_new_term_ref();
+    term_t arg = PL_new_term_ref();
+
+    while( PL_get_list(tail, head, tail) )
+    { int arity;
+      atom_t name;
+
+      if ( !PL_get_name_arity(head, &name, &arity) || arity != 1 )
+	return PL_type_error("option", head);
+      _PL_get_arg(1, head, arg);
+
+      if ( name == ATOM_generation )
+      { int64_t gen;
+
+	if ( !PL_get_int64_ex(arg, &gen) )
+	  return FALSE;
+	query_gen = gen;
+      }
+    }
+    if ( !PL_get_nil_ex(tail) )
+      return FALSE;
+  }
 
   q = open_transaction(db, &added, &deleted);
   q->transaction_data.prolog_id = id;
@@ -4793,7 +4830,6 @@ rdf_transaction(term_t goal, term_t id)
 
   return rc;
 }
-
 
 		 /*******************************
 		 *	     PREDICATES		*
@@ -6802,6 +6838,7 @@ install_rdf_db()
   ATOM_begin	     = PL_new_atom("begin");
   ATOM_end	     = PL_new_atom("end");
   ATOM_infinite	     = PL_new_atom("infinite");
+  ATOM_generation    = PL_new_atom("generation");
 
   PRED_call1         = PL_predicate("call", 1, "user");
 
@@ -6858,7 +6895,7 @@ install_rdf_db()
   PL_register_foreign("rdf_graph_source_", 3, rdf_graph_source, 0);
   PL_register_foreign("rdf_estimate_complexity",
 					4, rdf_estimate_complexity, 0);
-  PL_register_foreign("rdf_transaction_",2, rdf_transaction, META);
+  PL_register_foreign("rdf_transaction",3, rdf_transaction, META);
   PL_register_foreign("rdf_active_transactions_",
 					1, rdf_active_transactions, 0);
   PL_register_foreign("rdf_monitor_",   2, rdf_monitor,     META);

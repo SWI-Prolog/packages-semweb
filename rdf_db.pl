@@ -56,6 +56,7 @@
 	    rdf_current_literal/1,	% -Literal
 	    rdf_transaction/1,		% :Goal
 	    rdf_transaction/2,		% :Goal, +Id
+	    rdf_transaction/3,		% :Goal, +Id, +Options
 	    rdf_active_transaction/1,	% ?Id
 
 	    rdf_monitor/2,		% :Goal, +Options
@@ -151,6 +152,7 @@
 :- meta_predicate
 	rdf_transaction(0),
 	rdf_transaction(0, +),
+	rdf_transaction(0, +, +),
 	rdf_monitor(1, +),
 	rdf_save(+, :),
 	rdf_load(+, :).
@@ -803,14 +805,9 @@ rdf_predicate_property(P, Prop) :-
 %	Backward compatibility
 
 rdf_transaction(Goal) :-
-	rdf_transaction_(Goal, user).
+	rdf_transaction(Goal, user, []).
 rdf_transaction(Goal, Id) :-
-	(   nonvar(Id),
-	    Id = log(_, DB)
-	->  must_be(atom, DB)
-	;   true
-	),
-	rdf_transaction_(Goal, Id).
+	rdf_transaction(Goal, Id, []).
 
 %%	rdf_active_transaction(?Id) is nondet.
 %
