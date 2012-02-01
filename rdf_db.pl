@@ -92,6 +92,7 @@
 	    rdf_source_location/2,	% +Subject, -Source
 	    rdf_statistics/1,		% -Key
 	    rdf_generation/1,		% -Generation
+	    rdf_snapshot/1,		% -Snapshot
 	    rdf_estimate_complexity/4,	% +S,+P,+O,-Count
 
 	    rdf_save_subject/3,		% +Stream, +Subject, +DB

@@ -99,7 +99,7 @@ rdf_thread_info(rdf_db *db, int tid)
 gen_t
 oldest_query_geneneration(rdf_db *db)
 { int tid;
-  gen_t gen = GEN_MAX;
+  gen_t gen = db->snapshots.keep;
   query_admin *qa = &db->queries;
   per_thread *td = &qa->query.per_thread;
 
@@ -239,7 +239,7 @@ open_query(rdf_db *db)
 query *
 open_transaction(rdf_db *db,
 		 triple_buffer *added, triple_buffer *deleted,
-		 gen_t view)
+		 snapshot *ss)
 { int tid = PL_thread_self();
   thread_info *ti = rdf_thread_info(db, tid);
   query *q = alloc_query(&ti->queries);
@@ -255,8 +255,8 @@ open_transaction(rdf_db *db,
     q->wr_gen = ti->queries.tr_gen_base;
   }
 
-  if ( view != GEN_UNDEF )
-    q->rd_gen = view;
+  if ( ss )
+    q->rd_gen = ss->generation;
 
   ti->queries.transaction = q;
 

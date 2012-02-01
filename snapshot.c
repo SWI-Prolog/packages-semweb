@@ -67,7 +67,7 @@ free_snapshot(snapshot *ss)
     db->snapshots.tail = ss->prev;
 
   if ( ss->generation == db->snapshots.keep )
-  { gen_t oldest = GEN_UNDEF;
+  { gen_t oldest = GEN_MAX;
     snapshot *s;
 
     for(s=db->snapshots.head; ss; ss=ss->next)
@@ -131,7 +131,12 @@ static PL_blob_t snap_blob =
 
 int
 unify_snapshot(term_t t, snapshot *ss)
-{ return PL_unify_blob(t, ss, sizeof(*ss), &snap_blob);
+{ int rc = PL_unify_blob(t, ss, sizeof(*ss), &snap_blob);
+
+  if ( !rc )
+    free_snapshot(ss);
+
+  return rc;
 }
 
 

@@ -2687,6 +2687,7 @@ new_db(void)
   memset(db, 0, sizeof(*db));
   INIT_LOCK(db);
   init_tables(db);
+  db->snapshots.keep = GEN_MAX;
 
   return db;
 }
@@ -4774,11 +4775,9 @@ rdf_transaction(term_t goal, term_t id, term_t options)
   query *q;
   triple_buffer added;
   triple_buffer deleted;
-  gen_t query_gen = GEN_UNDEF;
+  snapshot *ss = NULL;
 
-  if ( PL_get_nil(options) )
-  {
-  } else
+  if ( !PL_get_nil(options) )
   { term_t tail = PL_copy_term_ref(options);
     term_t head = PL_new_term_ref();
     term_t arg = PL_new_term_ref();
@@ -4792,18 +4791,15 @@ rdf_transaction(term_t goal, term_t id, term_t options)
       _PL_get_arg(1, head, arg);
 
       if ( name == ATOM_snapshot )
-      { int64_t gen;
-
-	if ( !PL_get_int64_ex(arg, &gen) )
+      { if ( !get_snapshot(arg, &ss) )
 	  return FALSE;
-	query_gen = gen;
       }
     }
     if ( !PL_get_nil_ex(tail) )
       return FALSE;
   }
 
-  q = open_transaction(db, &added, &deleted, GEN_UNDEF);
+  q = open_transaction(db, &added, &deleted, ss);
   q->transaction_data.prolog_id = id;
   rc = PL_call_predicate(NULL, PL_Q_PASS_EXCEPTION, PRED_call1, goal);
 
@@ -6607,6 +6603,15 @@ rdf_generation(term_t t)
 }
 
 
+static foreign_t
+rdf_snapshot(term_t t)
+{ rdf_db *db = rdf_current_db();
+  snapshot *s = new_snapshot(db);
+
+  return unify_snapshot(t, s);
+}
+
+
 		 /*******************************
 		 *	       RESET		*
 		 *******************************/
@@ -6780,7 +6785,7 @@ rdf_version(term_t v)
 #define META PL_FA_TRANSPARENT
 
 install_t
-install_rdf_db()
+install_rdf_db(void)
 { int i=0;
   extern install_t install_atom_map(void);
 
@@ -6885,6 +6890,7 @@ install_rdf_db()
   PL_register_foreign("rdf_gc_info_",   1, rdf_gc_info,	    0);
   PL_register_foreign("rdf_statistics_",1, rdf_statistics,  NDET);
   PL_register_foreign("rdf_generation", 1, rdf_generation,  0);
+  PL_register_foreign("rdf_snapshot",   1, rdf_snapshot,    0);
   PL_register_foreign("rdf_match_label",3, match_label,     0);
   PL_register_foreign("rdf_save_db_",   2, rdf_save_db,     0);
   PL_register_foreign("rdf_load_db_",   3, rdf_load_db,     0);
