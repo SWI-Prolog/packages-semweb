@@ -91,9 +91,7 @@ typedef struct query
   int		depth;			/* recursion depth */
   struct query *transaction;		/* Transaction of the query */
   struct
-  { gen_t	rd_gen_saved;
-    gen_t	wr_gen_saved;
-    struct triple_buffer *added;
+  { struct triple_buffer *added;
     struct triple_buffer *deleted;
     term_t	prolog_id;		/* Prolog transaction identifier */
   } transaction_data;
@@ -114,8 +112,8 @@ typedef struct query_stack
   query		preallocated[4];
   simpleMutex	lock;
   query	       *transaction;		/* Current transaction */
-  gen_t		rd_gen;			/* generation for reading */
-  gen_t		wr_gen;			/* generation for writing */
+  gen_t		tr_gen_base;		/* Base generation for transactions */
+  gen_t		tr_gen_max;		/* Max generation for transactions */
   rdf_dbp	db;			/* DB we are associated to */
   int		top;			/* Top of query stack */
 } query_stack;

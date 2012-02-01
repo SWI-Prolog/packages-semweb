@@ -147,7 +147,8 @@ preinit_query(rdf_db *db, query_stack *qs, query *q, query *parent, int depth)
 
 static void
 init_query_stack(rdf_db *db, query_stack *qs)
-{ int i;
+{ int tid = PL_thread_self();
+  int i;
   int prealloc = sizeof(qs->preallocated)/sizeof(qs->preallocated[0]);
   query *parent = NULL;
 
@@ -155,7 +156,8 @@ init_query_stack(rdf_db *db, query_stack *qs)
 
   simpleMutexInit(&qs->lock);
   qs->db = db;
-  qs->rd_gen = qs->wr_gen = GEN_UNDEF;
+  qs->tr_gen_base = GEN_TBASE + tid*GEN_TNEST;
+  qs->tr_gen_max  = qs->tr_gen_base + (GEN_TNEST-1);
 
   for(i=0; i<MSB(prealloc); i++)
     qs->blocks[i] = qs->preallocated;
@@ -217,15 +219,15 @@ open_query(rdf_db *db)
 { int tid = PL_thread_self();
   thread_info *ti = rdf_thread_info(db, tid);
   query *q = alloc_query(&ti->queries);
-  gen_t g;
 
   q->type = Q_NORMAL;
   q->transaction = ti->queries.transaction;
-  if ( (g=ti->queries.rd_gen) == GEN_UNDEF )
-  { q->rd_gen = q->wr_gen = db->queries.generation;
+  if ( q->transaction )			/* Query inside a transaction */
+  { q->rd_gen = q->transaction->wr_gen;
+    q->wr_gen = q->transaction->wr_gen;
   } else
-  { q->rd_gen = g;
-    q->wr_gen = ti->queries.wr_gen;
+  { q->rd_gen = db->queries.generation;
+    q->wr_gen = GEN_UNDEF;
   }
 
   push_query(q);
@@ -239,29 +241,24 @@ open_transaction(rdf_db *db, triple_buffer *added, triple_buffer *deleted)
 { int tid = PL_thread_self();
   thread_info *ti = rdf_thread_info(db, tid);
   query *q = alloc_query(&ti->queries);
-  gen_t g;
 
   q->type = Q_TRANSACTION;
   q->transaction = ti->queries.transaction;
 
-  if ( (g=ti->queries.rd_gen) == GEN_UNDEF )
-    q->rd_gen = db->queries.generation;
-  else
-    q->rd_gen = ti->queries.wr_gen;	/* nested transaction */
+  if ( q->transaction )			/* nested transaction */
+  { q->rd_gen = q->transaction->wr_gen;
+    q->wr_gen = q->transaction->wr_gen+1;
+  } else
+  { q->rd_gen = db->queries.generation;
+    q->wr_gen = ti->queries.tr_gen_base;
+  }
 
-  q->wr_gen = GEN_TBASE + tid*GEN_TNEST + q->depth;
-
-  q->transaction_data.rd_gen_saved = ti->queries.rd_gen;
-  q->transaction_data.wr_gen_saved = ti->queries.wr_gen;
-  ti->queries.rd_gen = q->rd_gen;
-  ti->queries.wr_gen = q->wr_gen;
   ti->queries.transaction = q;
 
   init_triple_buffer(added);
   init_triple_buffer(deleted);
   q->transaction_data.added = added;
   q->transaction_data.deleted = deleted;
-
 
   push_query(q);
 
@@ -301,37 +298,39 @@ init_query_admin(rdf_db *db)
 		 *	    GENERATIONS		*
 		 *******************************/
 
+static int
+is_wr_transaction_gen(query *q, gen_t gen)
+{ if ( gen >  q->stack->tr_gen_base &&
+       gen <= q->stack->tr_gen_max )
+    return TRUE;
+
+  return FALSE;
+}
+
+
 /* lifespan() is true if a lifespan is visible inside a query.
 
    A lifespan is alive if the query generation is inside it,
    but with transactions there are two problems:
+
 	- If the triple is deleted by a parent transaction it is dead
 	- If the triple is created by a parent transaction it is alive
 */
 
 int
 alive_lifespan(query *q, lifespan *lifespan)
-{ query *tr;
-
-  if ( q->rd_gen >= lifespan->born &&
+{ if ( q->rd_gen >= lifespan->born &&
        q->rd_gen <  lifespan->died )
-  { if ( lifespan->died != GEN_MAX &&
-	 (tr=q->transaction) )
-    { for(tr=tr->transaction; tr; tr = tr->transaction)
-      { if ( lifespan->died == tr->wr_gen )
-	  return FALSE;
-      }
-    }
+  { if ( is_wr_transaction_gen(q, lifespan->died) &&
+	 q->rd_gen >= lifespan->died )
+      return FALSE;
+
     return TRUE;
   }
 
-  if ( lifespan->born >= GEN_TBASE &&
-       (tr=q->transaction) )
-  { for(tr=tr->transaction; tr; tr = tr->transaction)
-    { if ( lifespan->born == tr->wr_gen )
-	return TRUE;
-    }
-  }
+  if ( is_wr_transaction_gen(q, lifespan->born) &&
+       q->rd_gen >= lifespan->born )
+    return TRUE;
 
   return FALSE;
 }
@@ -401,7 +400,7 @@ add_triples(query *q, triple **triples, size_t count)
 					/* locked phase */
   simpleMutexLock(&db->queries.write.lock);
   if ( q->transaction )
-    gen = q->transaction->wr_gen;
+    gen = q->transaction->wr_gen + 1;
   else
     gen = db->queries.generation + 1;
   for(tp=triples; tp < ep; tp++)
@@ -413,7 +412,9 @@ add_triples(query *q, triple **triples, size_t count)
     if ( q->transaction )
       buffer_triple(q->transaction->transaction_data.added, t);
   }
-  if ( !q->transaction )
+  if ( q->transaction )
+    q->transaction->wr_gen = gen;
+  else
     db->queries.generation = gen;
   simpleMutexUnlock(&db->queries.write.lock);
 					/* TBD: broadcast(EV_ASSERT, t, NULL) */
@@ -431,7 +432,7 @@ del_triples(query *q, triple **triples, size_t count)
 
   simpleMutexLock(&db->queries.write.lock);
   if ( q->transaction )
-    gen = q->transaction->wr_gen;
+    gen = q->transaction->wr_gen + 1;
   else
     gen = db->queries.generation + 1;
   for(tp=triples; tp < ep; tp++)
@@ -442,7 +443,9 @@ del_triples(query *q, triple **triples, size_t count)
     if ( q->transaction )
       buffer_triple(q->transaction->transaction_data.deleted, t);
   }
-  if ( !q->transaction )
+  if ( q->transaction )
+    q->transaction->wr_gen = gen;
+  else
     db->queries.generation = gen;
   simpleMutexUnlock(&db->queries.write.lock);
 				/* TBD: broadcast(EV_RETRACT, t, NULL); */
@@ -462,7 +465,7 @@ update_triples(query *q,
 
   simpleMutexLock(&db->queries.write.lock);
   if ( q->transaction )
-    gen = q->transaction->wr_gen;
+    gen = q->transaction->wr_gen + 1;
   else
     gen = db->queries.generation + 1;
   for(to=old,tn=new; to < eo; to++,tn++)
@@ -484,7 +487,9 @@ update_triples(query *q,
       updated++;
     }
   }
-  if ( !q->transaction )
+  if ( q->transaction )
+  { q->transaction->wr_gen = gen;
+  } else
   { db->created += updated;
     db->erased += updated;
     db->queries.generation = gen;
@@ -503,8 +508,6 @@ close_transaction(query *q)
   free_triple_buffer(q->transaction_data.added);
   free_triple_buffer(q->transaction_data.deleted);
 
-  q->stack->rd_gen = q->transaction_data.rd_gen_saved;
-  q->stack->wr_gen = q->transaction_data.wr_gen_saved;
   q->stack->transaction = q->transaction;
 
   close_query(q);
@@ -518,8 +521,8 @@ commit_transaction(query *q)
   gen_t gen;
 
   simpleMutexLock(&db->queries.write.lock);
-  if ( q->transaction )
-    gen = q->transaction->wr_gen;
+  if ( q->transaction )			/* nested transaction */
+    gen = q->transaction->wr_gen + 1;
   else
     gen = db->queries.generation + 1;
 					/* added triples */
@@ -528,8 +531,7 @@ commit_transaction(query *q)
       tp++)
   { triple *t = *tp;
 
-    if ( t->lifespan.born == q->wr_gen &&
-	 t->lifespan.died == GEN_MAX )
+    if ( t->lifespan.died == GEN_MAX )
     { t->lifespan.born = gen;
       if ( q->transaction )
 	buffer_triple(q->transaction->transaction_data.added, t);
@@ -547,7 +549,9 @@ commit_transaction(query *q)
 	buffer_triple(q->transaction->transaction_data.deleted, t);
     }
   }
-  if ( !q->transaction )
+  if ( q->transaction )
+    q->transaction->wr_gen = gen;
+  else
     db->queries.generation = gen;
   simpleMutexUnlock(&db->queries.write.lock);
 
