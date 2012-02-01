@@ -243,20 +243,15 @@ test t1 :-
 test t2 :-
 	r,
 	{ + a^{_},
-	  u(a),
-	  { v(a)
-	  }
+	  v(a)
 	},
 	v(a).
 test t3 :-
 	r,
 	{ + a^{_},
-	  u(a),
 	  { v(a),
 	    + b^{_},
-	    u(b),
-	    { v(b)
-	    }
+	    v(b)
 	  }
 	},
 	v(a).
@@ -269,23 +264,19 @@ test t5 :-
 	r,
 	+ a^{_},
 	{ - a,
-	  v(a)
+	  u(a)
 	}.
 test t6 :-
 	r,
 	+ a^{_},
 	{ - a,
-	  v(a),
-	  { u(a)
-	  }
+	  u(a)
 	}.
 test t7 :-
 	r,
 	+ a^{_},
 	(   { - a,
-	      v(a),
-	      { u(a)
-	      },
+	      u(a),
 	      fail
 	    }
 	;   true
