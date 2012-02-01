@@ -2648,7 +2648,7 @@ gc_thread(void *data)
   int tid;
 
   memset(&attr, 0, sizeof(attr));
-  attr.alias = "rdf_GC";
+  attr.alias = "__rdf_GC";
 
   if ( (tid=PL_thread_attach_engine(&attr)) < 0 )
   { Sdprintf("Failed to create RDF garbage collection thread\n");
