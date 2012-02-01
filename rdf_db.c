@@ -256,7 +256,8 @@ static void	free_triple(rdf_db *db, triple *t, int linger);
 static sub_p_matrix *create_reachability_matrix(rdf_db *db,
 						predicate_cloud *cloud,
 						query *q);
-static int	get_predicate(rdf_db *db, term_t t, predicate **p);
+static int	get_predicate(rdf_db *db, term_t t, predicate **p, query *q);
+static int	get_existing_predicate(rdf_db *db, term_t t, predicate **p);
 static predicate_cloud *new_predicate_cloud(rdf_db *db,
 					    predicate **p, size_t count,
 					    query *q);
@@ -838,7 +839,7 @@ existing_predicate(rdf_db *db, atom_t name)
 
 
 predicate *
-lookup_predicate(rdf_db *db, atom_t name)
+lookup_predicate(rdf_db *db, atom_t name, query *q)
 { predicate *p, **pp;
   predicate_cloud *cp;
   int entry;
@@ -855,7 +856,7 @@ lookup_predicate(rdf_db *db, atom_t name)
   p = rdf_malloc(db, sizeof(*p));
   memset(p, 0, sizeof(*p));
   p->name = name;
-  cp = new_predicate_cloud(db, &p, 1, NULL);
+  cp = new_predicate_cloud(db, &p, 1, q);
   p->hash = cp->hash;
   PL_register_atom(name);
   if ( db->predicates.count > db->predicates.bucket_count )
@@ -1146,8 +1147,8 @@ predicate_hash(predicate *p)
 
 static void
 addSubPropertyOf(rdf_db *db, triple *t, query *q)
-{ predicate *sub   = lookup_predicate(db, t->subject);
-  predicate *super = lookup_predicate(db, t->object.resource);
+{ predicate *sub   = lookup_predicate(db, t->subject, q);
+  predicate *super = lookup_predicate(db, t->object.resource, q);
 
   DEBUG(3, Sdprintf("addSubPropertyOf(%s, %s)\n", pname(sub), pname(super)));
 
@@ -1276,7 +1277,8 @@ create_reachability_matrix(rdf_db *db, predicate_cloud *cloud, query *q)
     fill_reachable(m, *p, *p, q);
   }
 
-  rm->lifespan.born = q->rd_gen;
+  rm->lifespan.born = q->wr_gen;
+  rm->lifespan.died = GEN_MAX;
   rm->matrix = m;
   rm->older = cloud->reachable;
   MemoryBarrier();
@@ -1370,8 +1372,8 @@ rdf_print_predicate_cloud(term_t t)
 { predicate *p;
   rdf_db *db = rdf_current_db();
 
-  if ( !get_predicate(db, t, &p) )
-    return FALSE;
+  if ( !get_existing_predicate(db, t, &p) )
+    return FALSE;			/* error or no predicate */
 
   print_reachability_cloud(p);
 
@@ -3013,8 +3015,8 @@ void
 erase_triple(rdf_db *db, triple *t, query *q)
 { if ( t->predicate.r->name == ATOM_subPropertyOf &&
        t->object_is_literal == FALSE )
-  { predicate *me    = lookup_predicate(db, t->subject);
-    predicate *super = lookup_predicate(db, t->object.resource);
+  { predicate *me    = lookup_predicate(db, t->subject, q);
+    predicate *super = lookup_predicate(db, t->object.resource, q);
 
     delSubPropertyOf(db, me, super, q);
   }
@@ -3718,7 +3720,7 @@ load_triple(rdf_db *db, IOSTREAM *in, ld_context *ctx)
   int c;
 
   t->subject   = load_atom(db, in, ctx);
-  t->predicate.r = lookup_predicate(db, load_atom(db, in, ctx));
+  t->predicate.r = lookup_predicate(db, load_atom(db, in, ctx), ctx->query);
   if ( (c=Sgetc(in)) == 'R' )
   { t->object.resource = load_atom(db, in, ctx);
   } else
@@ -3921,13 +3923,13 @@ rdf_load_db(term_t stream, term_t id, term_t graphs)
 
   memset(&ctx, 0, sizeof(ctx));
   init_triple_buffer(&ctx.triples);
+  ctx.query = open_query(db);
   rc = load_db(db, in, &ctx);
   PL_release_stream(in);
   if ( !rc )
   { return FALSE;			/* TBD: Discard partial load */
   }
 
-  ctx.query = open_query(db);
   broadcast(EV_LOAD, (void*)id, (void*)ATOM_begin);
 
   if ( (rc=link_loaded_triples(db, &ctx)) )
@@ -4322,13 +4324,13 @@ get_existing_predicate(rdf_db *db, term_t t, predicate **p)
 
 
 static int
-get_predicate(rdf_db *db, term_t t, predicate **p)
+get_predicate(rdf_db *db, term_t t, predicate **p, query *q)
 { atom_t name;
 
   if ( !PL_get_atom_ex(t, &name ) )
     return FALSE;
 
-  *p = lookup_predicate(db, name);
+  *p = lookup_predicate(db, name, q);
   return TRUE;
 }
 
@@ -4336,9 +4338,9 @@ get_predicate(rdf_db *db, term_t t, predicate **p)
 static int
 get_triple(rdf_db *db,
 	   term_t subject, term_t predicate, term_t object,
-	   triple *t)
+	   triple *t, query *q)
 { if ( !PL_get_atom_ex(subject, &t->subject) ||
-       !get_predicate(db, predicate, &t->predicate.r) ||
+       !get_predicate(db, predicate, &t->predicate.r, q) ||
        !get_object(db, object, t) )
     return FALSE;
 
@@ -4828,24 +4830,23 @@ static foreign_t
 rdf_assert4(term_t subject, term_t predicate, term_t object, term_t src)
 { rdf_db *db = rdf_current_db();
   triple *t = new_triple(db);
-  query *q;
+  query *q = open_query(db);
 
-  if ( !get_triple(db, subject, predicate, object, t) )
-  { free_triple(db, t, FALSE);
+  if ( !get_triple(db, subject, predicate, object, t, q) )
+  { error:
+    free_triple(db, t, FALSE);
+    close_query(q);
     return FALSE;
   }
   if ( src )
   { if ( !get_graph(src, t) )
-    { free_triple(db, t, FALSE);
-      return FALSE;
-    }
+      goto error;
   } else
   { t->graph = ATOM_user;
     t->line = NO_LINE;
   }
   lock_atoms(db, t);
 
-  q = open_query(db);
   add_triples(q, &t, 1);
   close_query(q);
 
@@ -5320,7 +5321,7 @@ choicepoints.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static int
-update_triple(rdf_db *db, term_t action, triple *t, triple **updated)
+update_triple(rdf_db *db, term_t action, triple *t, triple **updated, query *q)
 { term_t a = PL_new_term_ref();
   triple tmp, *new;
   int i;
@@ -5346,7 +5347,7 @@ update_triple(rdf_db *db, term_t action, triple *t, triple **updated)
   } else if ( PL_is_functor(action, FUNCTOR_predicate1) )
   { predicate *p;
 
-    if ( !get_predicate(db, a, &p) )
+    if ( !get_predicate(db, a, &p, q) )
       return FALSE;
     if ( tmp.predicate.r == p )
       return TRUE;			/* no change */
@@ -5421,15 +5422,16 @@ rdf_update5(term_t subject, term_t predicate, term_t object, term_t src,
   size_t count;
   triple_walker tw;
   triple_buffer matches;
-  query *q;
+  query *q = open_query(db);
 
   memset(&t, 0, sizeof(t));
 
   if ( !get_src(src, &t) ||
-       !get_triple(db, subject, predicate, object, &t) )
+       !get_triple(db, subject, predicate, object, &t, q) )
+  { close_query(q);
     return FALSE;
+  }
 
-  q = open_query(db);
   init_triple_buffer(&matches);
   init_triple_walker(&tw, db, &t, indexed);
   while((p=next_triple(&tw)))
@@ -5449,7 +5451,7 @@ rdf_update5(term_t subject, term_t predicate, term_t object, term_t src,
     init_triple_buffer(&replacements);
     for(tp=matches.base; tp<matches.top; tp++)
     { new = NULL;
-      if ( !update_triple(db, action, *tp, &new) )
+      if ( !update_triple(db, action, *tp, &new, q) )
       { rc = FALSE;
 	free_triple_buffer(&replacements);
 	goto out;
@@ -5764,21 +5766,28 @@ static foreign_t
 rdf_set_predicate(term_t pred, term_t option)
 { predicate *p;
   rdf_db *db = rdf_current_db();
+  query *q = open_query(db);
+  int rc;
 
-  if ( !get_predicate(db, pred, &p) )
-    return FALSE;
+  if ( !get_predicate(db, pred, &p, q) )
+  { rc = FALSE;
+    goto out;
+  }
 
   if ( PL_is_functor(option, FUNCTOR_symmetric1) )
   { int val;
 
     if ( !get_bool_arg_ex(1, option, &val) )
-      return FALSE;
+    { rc = FALSE;
+      goto out;
+    }
 
     if ( val )
       p->inverse_of = p;
     else
       p->inverse_of = NULL;
-    return TRUE;
+
+    rc = TRUE;
   } else if ( PL_is_functor(option, FUNCTOR_inverse_of1) )
   { term_t a = PL_new_term_ref();
     predicate *i;
@@ -5790,13 +5799,15 @@ rdf_set_predicate(term_t pred, term_t option)
 	p->inverse_of = NULL;
       }
     } else
-    { if ( !get_predicate(db, a, &i) )
-	return FALSE;
+    { if ( !get_predicate(db, a, &i, q) )
+      { rc = FALSE;
+	goto out;
+      }
 
       p->inverse_of = i;
       i->inverse_of = p;
     }
-    return TRUE;
+    rc = TRUE;
   } else if ( PL_is_functor(option, FUNCTOR_transitive1) )
   { int val;
 
@@ -5805,9 +5816,13 @@ rdf_set_predicate(term_t pred, term_t option)
 
     p->transitive = val;
 
-    return TRUE;
+    rc = TRUE;
   } else
-    return PL_type_error("predicate_option", option);
+    rc = PL_type_error("predicate_option", option);
+
+out:
+  close_query(q);
+  return rc;
 }
 
 
@@ -5941,7 +5956,7 @@ rdf_predicate_property(term_t pred, term_t option, control_t h)
       q = open_query(db);
       if ( PL_is_variable(option) )
       { q->state.predprop.prop = 0;
-	if ( !get_predicate(db, pred, &q->state.predprop.pred) )
+	if ( !get_predicate(db, pred, &q->state.predprop.pred, q) )
 	{ close_query(q);
 	  return FALSE;
 	}
@@ -5951,7 +5966,7 @@ rdf_predicate_property(term_t pred, term_t option, control_t h)
 
 	for(n=0; predicate_key[n]; n++)
 	{ if ( predicate_key[n] == f )
-	  { if ( !get_predicate(db, pred, &p) )
+	  { if ( !get_predicate(db, pred, &p, q) )
 	      return FALSE;
 	    rc = unify_predicate_property(db, p, option, f, q);
 	    goto out;

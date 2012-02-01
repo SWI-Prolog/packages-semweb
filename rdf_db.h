@@ -455,7 +455,7 @@ COMMON(void)	rdf_free(rdf_db *db, void *ptr, size_t size);
 COMMON(void *)	rdf_realloc(rdf_db *db, void *ptr, size_t old, size_t new);
 COMMON(int)	link_triple(rdf_db *db, triple *t, query *q);
 COMMON(void)	erase_triple(rdf_db *db, triple *t, query *q);
-COMMON(predicate *) lookup_predicate(rdf_db *db, atom_t name);
+COMMON(predicate *) lookup_predicate(rdf_db *db, atom_t name, query *q);
 COMMON(rdf_db*)	rdf_current_db(void);
 
 

@@ -393,7 +393,7 @@ add_triples(query *q, triple **triples, size_t count)
   { triple *t = *tp;
 
     if ( t->resolve_pred )
-    { t->predicate.r = lookup_predicate(db, t->predicate.u);
+    { t->predicate.r = lookup_predicate(db, t->predicate.u, q);
       t->resolve_pred = FALSE;
     }
   }
