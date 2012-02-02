@@ -69,7 +69,7 @@ mk(Prefix, R) :-
 - Name :-
 	ground(Name),
 	triple(Name, Triple),
-	v(Triple).
+	-(Triple).
 
 %%	v(+Id)
 %
