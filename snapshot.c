@@ -28,7 +28,8 @@ new_snapshot(rdf_db *db)
 { query *q = open_query(db);
   snapshot *ss = rdf_malloc(db, sizeof(*ss));
 
-  ss->generation = q->rd_gen;
+  ss->rd_gen = q->rd_gen;
+  ss->tr_gen = q->tr_gen;
   ss->db = db;
   ss->symbol = 0;
 
@@ -37,12 +38,12 @@ new_snapshot(rdf_db *db)
   { ss->next = db->snapshots.head;
     db->snapshots.head->prev = ss;
     db->snapshots.head = ss;
-    if ( ss->generation < db->snapshots.keep )
-      db->snapshots.keep = ss->generation;
+    if ( ss->rd_gen < db->snapshots.keep )
+      db->snapshots.keep = ss->rd_gen;
   } else
   { ss->next = ss->prev = NULL;
     db->snapshots.head = db->snapshots.tail = ss;
-    db->snapshots.keep = ss->generation;
+    db->snapshots.keep = ss->rd_gen;
   }
   simpleMutexUnlock(&db->locks.misc);
 
@@ -66,13 +67,13 @@ free_snapshot(snapshot *ss)
   if ( ss == db->snapshots.tail )
     db->snapshots.tail = ss->prev;
 
-  if ( ss->generation == db->snapshots.keep )
+  if ( ss->rd_gen == db->snapshots.keep )
   { gen_t oldest = GEN_MAX;
     snapshot *s;
 
     for(s=db->snapshots.head; ss; ss=ss->next)
-    { if ( s->generation < oldest )
-	oldest = s->generation;
+    { if ( s->rd_gen < oldest )
+	oldest = s->rd_gen;
     }
 
     db->snapshots.keep = oldest;
@@ -103,8 +104,10 @@ compare_snapshot(atom_t a, atom_t b)
 { snapshot *ssa = PL_blob_data(a, NULL, NULL);
   snapshot *ssb = PL_blob_data(b, NULL, NULL);
 
-  return ( ssa->generation > ssb->generation ? 1 :
-	   ssa->generation < ssb->generation ? -1 :
+  return ( ssa->rd_gen > ssb->rd_gen ? 1 :
+	   ssa->rd_gen < ssb->rd_gen ? -1 :
+	   ssa->tr_gen > ssb->tr_gen ? 1 :
+	   ssa->tr_gen < ssb->tr_gen ? -1 :
 	   ssa > ssb ? 1 :
 	   ssb < ssa ? -1 : 0
 	 );
@@ -114,7 +117,7 @@ static int
 write_snapshot(IOSTREAM *s, atom_t symbol, int flags)
 { snapshot *ss = PL_blob_data(symbol, NULL, NULL);
 
-  Sfprintf(s, "<rdf-snapshot>(%ld)", (long)ss->generation);
+  Sfprintf(s, "<rdf-snapshot>(%ld)", (long)ss->rd_gen);
   return TRUE;
 }
 

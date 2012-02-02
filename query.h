@@ -84,6 +84,7 @@ typedef enum q_type
 typedef struct query
 { gen_t		rd_gen;			/* generation for reading */
   gen_t		wr_gen;			/* generation for writing */
+  gen_t		tr_gen;			/* generation for transaction reading */
   rdf_dbp	db;			/* Database on which we run */
   struct query *parent;			/* Parent query */
   struct query_stack  *stack;		/* Query-stack I am part of */

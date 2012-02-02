@@ -223,10 +223,12 @@ open_query(rdf_db *db)
   q->type = Q_NORMAL;
   q->transaction = ti->queries.transaction;
   if ( q->transaction )			/* Query inside a transaction */
-  { q->rd_gen = q->transaction->wr_gen;
+  { q->rd_gen = q->transaction->rd_gen;
+    q->tr_gen = q->transaction->wr_gen;
     q->wr_gen = q->transaction->wr_gen;
   } else
   { q->rd_gen = db->queries.generation;
+    q->tr_gen = GEN_UNDEF;
     q->wr_gen = GEN_UNDEF;
   }
 
@@ -248,15 +250,19 @@ open_transaction(rdf_db *db,
   q->transaction = ti->queries.transaction;
 
   if ( q->transaction )			/* nested transaction */
-  { q->rd_gen = q->transaction->wr_gen;
-    q->wr_gen = q->transaction->wr_gen+1;
+  { q->rd_gen = q->transaction->rd_gen;
+    q->tr_gen = q->transaction->wr_gen;
+    q->wr_gen = q->transaction->wr_gen;
   } else
   { q->rd_gen = db->queries.generation;
-    q->wr_gen = ti->queries.tr_gen_base;
+    q->tr_gen = ti->queries.tr_gen_base;
+    q->wr_gen = q->tr_gen;
   }
 
   if ( ss )
-    q->rd_gen = ss->generation;
+  { q->rd_gen = ss->rd_gen;
+    q->tr_gen = ss->tr_gen;
+  }
 
   ti->queries.transaction = q;
 
@@ -322,19 +328,50 @@ is_wr_transaction_gen(query *q, gen_t gen)
 	- If the triple is created by a parent transaction it is alive
 */
 
+static char *
+gen_name(gen_t gen, char *buf)
+{ static char tmp[24];
+
+  if ( !buf )
+    buf = tmp;
+  if ( gen == GEN_UNDEF ) return "GEN_UNDEF";
+  if ( gen == GEN_MAX   ) return "GEN_MAX";
+  if ( gen > GEN_TBASE )
+  { int tid = (gen-GEN_TBASE)/GEN_TNEST;
+    gen_t r = (gen-GEN_TBASE)%GEN_TNEST;
+
+    Ssprintf(buf, "T%d+%ld", tid, (long)r);
+    return buf;
+  }
+  Ssprintf(buf, "%ld", (long)gen);
+  return buf;
+}
+
+
+
 int
 alive_lifespan(query *q, lifespan *lifespan)
-{ if ( q->rd_gen >= lifespan->born &&
+{ DEBUG(2,
+	{ char b[4][24];
+
+	  Sdprintf("q: rd_gen=%s; tr_gen=%s; t: %s..%s\n",
+		   gen_name(q->rd_gen, b[0]),
+		   gen_name(q->tr_gen, b[1]),
+		   gen_name(lifespan->born, b[2]),
+		   gen_name(lifespan->died, b[3]));
+	});
+
+  if ( q->rd_gen >= lifespan->born &&
        q->rd_gen <  lifespan->died )
   { if ( is_wr_transaction_gen(q, lifespan->died) &&
-	 q->rd_gen >= lifespan->died )
+	 q->tr_gen >= lifespan->died )
       return FALSE;
 
     return TRUE;
   }
 
   if ( is_wr_transaction_gen(q, lifespan->born) &&
-       q->rd_gen >= lifespan->born )
+       q->tr_gen >= lifespan->born )
     return TRUE;
 
   return FALSE;

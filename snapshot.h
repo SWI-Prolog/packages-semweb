@@ -28,7 +28,8 @@ typedef struct snapshot
 { struct snapshot *next;		/* Linked list of known snapshots */
   struct snapshot *prev;
   struct rdf_db	  *db;			/* Snapped database */
-  gen_t		   generation;		/* snapped generation */
+  gen_t		   rd_gen;		/* snapped generation */
+  gen_t		   tr_gen;		/* snapped transaction generation */
   atom_t	   symbol;		/* Associated Prolog handle */
 } snapshot;
 
