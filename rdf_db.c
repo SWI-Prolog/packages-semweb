@@ -2628,7 +2628,8 @@ static foreign_t
 rdf_gc_info(term_t info)
 { rdf_db *db     = rdf_current_db();
   size_t life    = db->created - db->gc.reclaimed_triples;
-  size_t garbage = db->erased + db->reindexed - db->gc.reclaimed_reindexed;
+  size_t garbage = (db->erased    - db->gc.reclaimed_triples) +
+		   (db->reindexed - db->gc.reclaimed_reindexed);
 
   return PL_unify_term(info,
 		       PL_FUNCTOR_CHARS, "gc_info", 3,
@@ -2687,7 +2688,9 @@ new_db(void)
   memset(db, 0, sizeof(*db));
   INIT_LOCK(db);
   init_tables(db);
+
   db->snapshots.keep = GEN_MAX;
+  db->queries.generation = GEN_EPOCH;
 
   return db;
 }
@@ -6668,6 +6671,11 @@ erase_predicates(rdf_db *db)
 }
 
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Reset the DB. It might be wiser to create  a new one and have a seperate
+thread deleting the old one (e.g. do this in GC).
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 static int
 reset_db(rdf_db *db)
 { int rc;
@@ -6683,6 +6691,9 @@ reset_db(rdf_db *db)
 
   rc = (init_resource_db(db, &db->resources) &&
 	init_literal_table(db));
+
+  db->snapshots.keep = GEN_MAX;
+  db->queries.generation = GEN_EPOCH;
 
   db->resetting = FALSE;
 

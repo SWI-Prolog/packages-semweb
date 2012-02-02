@@ -97,6 +97,8 @@ typedef struct lifespan
 
 #define GEN_UNDEF	0xffffffffffffffff /* no defined generation */
 #define GEN_MAX		0x7fffffffffffffff /* Max `normal' generation */
+#define GEN_PREHIST	0x0000000000000000 /* The generation epoch */
+#define GEN_EPOCH	0x0000000000000001 /* The generation epoch */
 #define GEN_TBASE	0x8000000000000000 /* Transaction generation base */
 #define GEN_TNEST	0x0000000100000000 /* Max transaction nesting */
 

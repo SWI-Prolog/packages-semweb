@@ -228,7 +228,7 @@ open_query(rdf_db *db)
     q->wr_gen = q->transaction->wr_gen;
   } else
   { q->rd_gen = db->queries.generation;
-    q->tr_gen = GEN_UNDEF;
+    q->tr_gen = GEN_TBASE;
     q->wr_gen = GEN_UNDEF;
   }
 
@@ -481,9 +481,10 @@ del_triples(query *q, triple **triples, size_t count)
   { triple *t = *tp;
 
     t->lifespan.died = gen;
-    erase_triple(db, t, q);
     if ( q->transaction )
       buffer_triple(q->transaction->transaction_data.deleted, t);
+    else
+      erase_triple(db, t, q);
   }
   if ( q->transaction )
     q->transaction->wr_gen = gen;
@@ -617,9 +618,9 @@ discard_transaction(query *q)
       tp++)
   { triple *t = *tp;
 
-    if ( t->lifespan.born == q->wr_gen &&
+    if ( is_wr_transaction_gen(q, t->lifespan.born) &&
 	 t->lifespan.died == GEN_MAX )
-    { t->lifespan.born = GEN_MAX;
+    { t->lifespan.died = GEN_PREHIST;
       erase_triple(db, t, q);
     }
   }
@@ -628,9 +629,8 @@ discard_transaction(query *q)
       tp++)
   { triple *t = *tp;
 
-    if ( t->lifespan.died == q->wr_gen )
+    if ( is_wr_transaction_gen(q, t->lifespan.died) )
     { t->lifespan.died = GEN_MAX;
-					/* TBD: re-link */
     }
   }
 
