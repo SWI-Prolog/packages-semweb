@@ -701,7 +701,11 @@ rdf_gc :-
 %	GC.
 
 consider_gc(_CPU) :-
-	(   rdf_gc_info_(gc_info(Triples, Garbage, Optimizable))
+	(   rdf_gc_info_(gc_info(Triples,	% Total #triples in DB
+				 Garbage,	% Garbage triples in DB
+				 Optimizable,	% Non-optimized tables
+				 _KeepGen,	% Oldest active generation
+				 _LastGCGen))   % Oldest active gen at last GC
 	->  (   Garbage * 5 > Triples
 	    ;	Optimizable > 4
 	    )

@@ -2568,6 +2568,7 @@ gc_db(rdf_db *db, gen_t gen)
   gc_hashes(db, gen);
   db->gc.count++;
   db->gc.busy = FALSE;
+  db->gc.last_gen = gen;
   simpleMutexUnlock(&db->locks.gc);
 
   return TRUE;
@@ -2620,6 +2621,8 @@ record with the following members:
   1. Total number of triples in hash (dead or alive)
   2. Total dead triples in hash (deleted or reindexed)
   3. Total number of possible optimizations to hash-tables.
+  4. Oldest generation we must keep
+  5. Oldest generation at last GC
 */
 
 #define INT_ARG(val) PL_INT64, (int64_t)(val)
@@ -2630,12 +2633,15 @@ rdf_gc_info(term_t info)
   size_t life    = db->created - db->gc.reclaimed_triples;
   size_t garbage = (db->erased    - db->gc.reclaimed_triples) +
 		   (db->reindexed - db->gc.reclaimed_reindexed);
+  gen_t keep_gen = oldest_query_geneneration(db);
 
   return PL_unify_term(info,
-		       PL_FUNCTOR_CHARS, "gc_info", 3,
+		       PL_FUNCTOR_CHARS, "gc_info", 5,
 		         INT_ARG(life),
 		         INT_ARG(garbage),
-		         INT_ARG(optimizable_hashes(db)));
+		         INT_ARG(optimizable_hashes(db)),
+		         INT_ARG(keep_gen),
+		         INT_ARG(db->gc.last_gen));
 }
 
 

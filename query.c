@@ -103,6 +103,9 @@ oldest_query_geneneration(rdf_db *db)
   query_admin *qa = &db->queries;
   per_thread *td = &qa->query.per_thread;
 
+  DEBUG(1, if ( db->snapshots.keep != GEN_MAX )
+	     Sdprintf("Oldest snapshot gen = %ld\n", (long)db->snapshots.keep));
+
   for(tid=1; tid <= qa->query.thread_max; tid++)
   { thread_info **tis;
     thread_info *ti;
@@ -110,8 +113,6 @@ oldest_query_geneneration(rdf_db *db)
     if ( (tis=td->blocks[MSB(tid)]) &&
 	 (ti=tis[tid]) )
     { query_stack *qs = &ti->queries;
-
-      DEBUG(1, Sdprintf("Thread %d: %d queries\n", tid));
 
       if ( qs->top > 0 )
       { query *q = &qs->preallocated[0];
