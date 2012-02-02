@@ -14,7 +14,8 @@
 	    a/0,			% Run all tests
 	    op(200, xfx, @)
 	  ]).
-:- use_module(rdf_db).
+:- use_module(library(semweb/rdf_db)).
+:- use_module(library(aggregate)).
 
 /** <module> RDF test language
 */
@@ -232,16 +233,16 @@ term_expansion((test Head :- Body),
 		 (Head :- Body)
 	       ]).
 
-test t1 :-
-	r,
+test t1 :-				% asserted triple in failed
+	r,				% transaction disappears
 	(  { + a^{_},
 	     fail
 	   }
 	;  true
 	),
 	u(a).
-test t2 :-
-	r,
+test t2 :-				% asserted triple in transaction
+	r,				% is visible inside and outside
 	{ + a^{_},
 	  v(a)
 	},
@@ -252,7 +253,8 @@ test t3 :-
 	  { v(a),
 	    + b^{_},
 	    v(b)
-	  }
+	  },
+	  v(b)
 	},
 	v(a).
 test t4 :-
@@ -265,13 +267,15 @@ test t5 :-
 	+ a^{_},
 	{ - a,
 	  u(a)
-	}.
+	},
+	u(a).
 test t6 :-
 	r,
 	+ a^{_},
 	{ - a,
 	  u(a)
-	}.
+	},
+	u(a).
 test t7 :-
 	r,
 	+ a^{_},
@@ -296,6 +300,7 @@ test p2 :-
 	rdf(s,p,O),
 	{- B} @ H,
 	{u(B)} @ H,
+	u(B),
 	o(B, O).
 test p3 :-
 	r,
@@ -304,7 +309,8 @@ test p3 :-
 	u(B).
 
 :- dynamic
-	passed/1.
+	passed/1,
+	failed/1.
 
 %%	a
 %
@@ -312,11 +318,15 @@ test p3 :-
 
 a :-
 	retractall(passed(_)),
+	retractall(failed(_)),
 	forall(test(Head),
 	       run(Head)),
-	aggregate_all(count, passed(_), Count),
-	format('~N~D tests passed~n', [Count]).
-
+	aggregate_all(count, passed(_), Passed),
+	aggregate_all(count, failed(_), Failed),
+	(   Failed =:= 0
+	->  format('~NAll ~D tests passed~n', [Passed])
+	;   format('~N~D tests passed; ~D failed~n', [Passed, Failed])
+	).
 
 run(Head) :-
 	catch(Head, E, true), !,
@@ -324,8 +334,10 @@ run(Head) :-
 	(   var(E)
 	->  assert(passed(Head)),
 	    write(user_error, '.')
-	;   format(user_error, '~NTEST FAILED: ~q~n', [Head])
+	;   assert(failed(Head)),
+	    format(user_error, '~NTEST FAILED: ~q~n', [Head])
 	).
 run(Head) :-
 	k,
+	assert(failed(Head)),
 	format(user_error, '~NTEST FAILED: ~q~n', [Head]).
