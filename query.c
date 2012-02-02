@@ -300,7 +300,6 @@ init_query_admin(rdf_db *db)
 { query_admin *qa = &db->queries;
 
   memset(qa, 0, sizeof(*qa));
-  qa->generation = 0;
   simpleMutexInit(&qa->query.lock);
   simpleMutexInit(&qa->write.lock);
 }
