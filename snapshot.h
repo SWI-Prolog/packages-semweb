@@ -33,6 +33,7 @@ typedef struct snapshot
   atom_t	   symbol;		/* Associated Prolog handle */
 } snapshot;
 
+#define SNAPSHOT_ANONYMOUS (snapshot*)1
 
 COMMON(snapshot *)	new_snapshot(struct rdf_db *db);
 COMMON(int)		unify_snapshot(term_t t, snapshot *ss);

@@ -221,6 +221,7 @@ static atom_t	ATOM_begin;
 static atom_t	ATOM_end;
 static atom_t	ATOM_infinite;
 static atom_t	ATOM_snapshot;
+static atom_t	ATOM_true;
 
 static atom_t	ATOM_subPropertyOf;
 
@@ -4801,7 +4802,13 @@ rdf_transaction(term_t goal, term_t id, term_t options)
 
       if ( name == ATOM_snapshot )
       { if ( !get_snapshot(arg, &ss) )
-	  return FALSE;
+	{  atom_t a;
+
+	   if ( PL_get_atom(arg, &a) && a == ATOM_true )
+	     ss = SNAPSHOT_ANONYMOUS;
+	   else
+	     return PL_type_error("rdf_snapshot", arg);
+	}
       }
     }
     if ( !PL_get_nil_ex(tail) )
@@ -4814,18 +4821,22 @@ rdf_transaction(term_t goal, term_t id, term_t options)
 
   if ( rc )
   { if ( !empty_transaction(q) )
-    { term_t be;
+    { if ( ss )
+      { discard_transaction(q);
+      } else
+      { term_t be;
 
-      if ( !(be=PL_new_term_ref()) ||
-	   !put_begin_end(be, FUNCTOR_begin1, 0) ||
-	   !broadcast(EV_TRANSACTION, (void*)id, (void*)be) ||
-	   !put_begin_end(be, FUNCTOR_end1, 0) )
-	return FALSE;
+	if ( !(be=PL_new_term_ref()) ||
+	     !put_begin_end(be, FUNCTOR_begin1, 0) ||
+	     !broadcast(EV_TRANSACTION, (void*)id, (void*)be) ||
+	     !put_begin_end(be, FUNCTOR_end1, 0) )
+	  return FALSE;
 
-      commit_transaction(q);
+	commit_transaction(q);
 
-      if ( !broadcast(EV_TRANSACTION, (void*)id, (void*)be) )
-	return FALSE;
+	if ( !broadcast(EV_TRANSACTION, (void*)id, (void*)be) )
+	  return FALSE;
+      }
     } else
     { close_transaction(q);
     }
@@ -6871,6 +6882,7 @@ install_rdf_db(void)
   ATOM_end	     = PL_new_atom("end");
   ATOM_infinite	     = PL_new_atom("infinite");
   ATOM_snapshot      = PL_new_atom("snapshot");
+  ATOM_true          = PL_new_atom("true");
 
   PRED_call1         = PL_predicate("call", 1, "user");
 

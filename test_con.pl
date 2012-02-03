@@ -9,11 +9,13 @@
 	    l/0,			% List
 	    r/0,			% reset
 	    {}/1,			% transaction
-	    (@)/2,			% Action @ Thread (Synchronous)
+	    (@)/2,			% Action @ Context (Synchronous)
+	    (@@)/1,			% Action in snapshot
 	    k/0,			% Kill helper threads
 	    a/0,			% Run all tests
 	    snap/1,
-	    op(200, xfx, @)
+	    op(200, xfx, @),
+	    op(200, xf, @@)
 	  ]).
 :- use_module(library(semweb/rdf_db)).
 :- use_module(library(aggregate)).
@@ -25,7 +27,8 @@
 	true(0),
 	false(0),
 	{}(0),
-	@(:,?).
+	@(:,?),
+	@@(:).
 
 :- thread_local
 	triple/2.
@@ -183,6 +186,13 @@ snap(X) :-
 	->  throw(E)
 	).
 
+%%	{G}@@
+%
+%	Run G in s snapshot
+
+(M:{}(G)) @@ :-
+	rdf_transaction(M:G, _Id, [snapshot(true)]).
+
 %%	k
 %
 %	Kill all helper threads.
@@ -328,6 +338,26 @@ test s1 :-
 	snap(S),
 	+ b^{_},
 	{ u(b) }@S.
+test s2 :-
+	r,
+	+ a^{_},
+	snap(S),
+	{ + b^{_}
+	}@S,
+	u(b).
+test s3 :-
+	r,
+	+ a^{_},
+	snap(S),
+	{ - a
+	}@S,
+	v(a).
+test s4 :-
+	r,
+	+ a^{_},
+	{ - a
+	}@@,
+	v(a).
 
 
 :- dynamic

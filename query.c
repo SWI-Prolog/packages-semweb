@@ -260,7 +260,7 @@ open_transaction(rdf_db *db,
     q->wr_gen = q->tr_gen;
   }
 
-  if ( ss )
+  if ( ss && ss != SNAPSHOT_ANONYMOUS )
   { q->rd_gen = ss->rd_gen;
     q->tr_gen = ss->tr_gen;
   }
