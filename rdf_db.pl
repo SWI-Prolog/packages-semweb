@@ -93,6 +93,7 @@
 	    rdf_statistics/1,		% -Key
 	    rdf_generation/1,		% -Generation
 	    rdf_snapshot/1,		% -Snapshot
+	    rdf_current_snapshot/1,	% +Snapshot
 	    rdf_estimate_complexity/4,	% +S,+P,+O,-Count
 
 	    rdf_save_subject/3,		% +Stream, +Subject, +DB
@@ -798,6 +799,20 @@ rdf_predicate_property(P, Prop) :-
 	rdf_predicate_property_(P, Prop).
 rdf_predicate_property(P, Prop) :-
 	rdf_predicate_property_(P, Prop).
+
+
+		 /*******************************
+		 *	      SNAPSHOTS		*
+		 *******************************/
+
+%%	rdf_current_snapshot(?Term) is nondet.
+%
+%	True when Term is a currently known snapshot.
+%
+%	@bug	Enumeration of snapshots is slow.
+
+rdf_current_snapshot(Term) :-
+	current_blob(Term, rdf_snapshot).
 
 
 		 /*******************************

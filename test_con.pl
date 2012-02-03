@@ -12,6 +12,7 @@
 	    (@)/2,			% Action @ Thread (Synchronous)
 	    k/0,			% Kill helper threads
 	    a/0,			% Run all tests
+	    snap/1,
 	    op(200, xfx, @)
 	  ]).
 :- use_module(library(semweb/rdf_db)).
@@ -147,14 +148,26 @@ false(_).
 {}(G) :-
 	rdf_transaction(G).
 
-%%	{G}@T
+%%	snap(-Snapshot) is det.
 %
-%	Run G (as once/1)  in  a  seperate   thread  and  wait  for  its
-%	completion (synchronous execution).
+%	Create a snapshot.
+
+snap(X) :-
+	rdf_snapshot(X).
+
+%%	{G}@Context
+%
+%	Run G (as once/1) in Context. Context  is either a snapshot or a
+%	seperate thread. If Context is a thread, wait for its completion
+%	(synchronous execution).
 
 :- dynamic
 	helper/1.
 
+(M:{}(G)) @ Snapshot :-
+	nonvar(Snapshot),
+	rdf_current_snapshot(Snapshot), !,
+	rdf_transaction(M:G, _Id, [snapshot(Snapshot)]).
 (M:{}(G)) @ T :-
 	(   var(T)
 	->  thread_create(helper, T, []),
@@ -286,6 +299,7 @@ test t7 :-
 	;   true
 	),
 	v(a).
+						% property handling tests
 test p1 :-
 	r,
 	+ {s,p,_},
@@ -307,6 +321,14 @@ test p3 :-
 	+ B^{s,p,_},
 	{-B}@_,
 	u(B).
+						% snapshot tests
+test s1 :-
+	r,
+	+ a^{_},
+	snap(S),
+	+ b^{_},
+	{ u(b) }@S.
+
 
 :- dynamic
 	passed/1,
