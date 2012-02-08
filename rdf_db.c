@@ -6729,7 +6729,7 @@ reset_db(rdf_db *db)
 */
 
 static foreign_t
-rdf_reset_db()
+rdf_reset_db(void)
 { rdf_db *db = rdf_current_db();
   query *q = open_query(db);
   int rc;

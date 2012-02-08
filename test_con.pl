@@ -15,7 +15,8 @@
 	    a/0,			% Run all tests
 	    snap/1,
 	    op(200, xfx, @),
-	    op(200, xf, @@)
+	    op(200, xf,  @@),
+	    op(200, xfy, <=)
 	  ]).
 :- use_module(library(semweb/rdf_db)).
 :- use_module(library(aggregate)).
@@ -44,9 +45,13 @@
 	->  Name = rdf(S,P,O)
 	;   assert(triple(Name, rdf(S,P,O)))
 	).
-+ {S,P,O} :-
++ {S,P,O} :- !,
 	mk_spo(S,P,O),
 	rdf_assert(S,P,O).
++ Sub<=Super :-
+	mk(p,Sub),
+	mk(p,Super),
+	rdf_assert(Sub, rdfs:subPropertyOf, Super).
 
 mk_spo(S,P,O) :-
 	mk(s, S),
@@ -80,6 +85,10 @@ mk(Prefix, R) :-
 %
 %	True if triple Id is visible.
 
+v({S,P,O}) :- !,
+	v(rdf(S,P,O)).
+v(+{S,P,O}) :- !,
+	v(rdf_has(S,P,O)).
 v(rdf(S,P,O)) :- !,
 	true((rdf(S,P,O))),
 	true((rdf(S,P,O2), O == O2)),
@@ -89,6 +98,11 @@ v(rdf(S,P,O)) :- !,
 	true((rdf(S2,P,O2), S2 == S, O == O2)),
 	true((rdf(S2,P2,O), S2 == S, P == P2)),
 	true((rdf(S2,P2,O2), S2 == S, P == P2, O == O2)).
+v(rdf_has(S,P,O)) :- !,
+	true((rdf_has(S,P,O))),
+	true((rdf_has(S,P,O2), O == O2)),
+	true((rdf_has(S2,P,O), S2 == S)),
+	true((rdf_has(S2,P,O2), S2 == S, O == O2)).
 v(Name) :-
 	ground(Name),
 	triple(Name, Triple),
@@ -359,6 +373,18 @@ test s4 :-
 	}@@,
 	v(a).
 
+/* subProperty tests */
+
+test sp1 :-
+	r,
+	+ {S1,P1,O1},
+	+ P1<=P2,
+	v(+{S1,P2,O1}).
+
+
+		 /*******************************
+		 *	    TEST DRIVER		*
+		 *******************************/
 
 :- dynamic
 	passed/1,
