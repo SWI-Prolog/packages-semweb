@@ -188,7 +188,7 @@ snap(X) :-
 
 %%	{G}@@
 %
-%	Run G in s snapshot
+%	Run G in a snapshot.
 
 (M:{}(G)) @@ :-
 	rdf_transaction(M:G, _Id, [snapshot(true)]).
@@ -387,7 +387,8 @@ run(Head) :-
 	->  assert(passed(Head)),
 	    write(user_error, '.')
 	;   assert(failed(Head)),
-	    format(user_error, '~NTEST FAILED: ~q~n', [Head])
+	    message_to_string(E, Msg),
+	    format(user_error, '~NTEST FAILED: ~q: ~w~n', [Head, Msg])
 	).
 run(Head) :-
 	k,
