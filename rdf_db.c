@@ -997,7 +997,16 @@ triples_in_predicate_cloud(predicate_cloud *cloud)
 }
 
 
-/* Add the predicates of c2 to c1 and destroy c2.  Returns c1 */
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Append the predicates from cloud C2 to those of cloud C1.  There are two
+scenarios:
+
+  - C2 has no triples.  We are in a writer lock.  As there are no
+    triples for C2, queries cannot go wrong.
+  - C2 has triples.  It is possible that queries with the predicate
+    hash of C2 are in progress.  These must return their valid answer.
+    FIXME: how to do that?
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static predicate_cloud *
 append_clouds(rdf_db *db,
@@ -1152,7 +1161,8 @@ addSubPropertyOf(rdf_db *db, triple *t, query *q)
 { predicate *sub   = lookup_predicate(db, t->subject, q);
   predicate *super = lookup_predicate(db, t->object.resource, q);
 
-  DEBUG(3, Sdprintf("addSubPropertyOf(%s, %s)\n", pname(sub), pname(super)));
+  DEBUG(3, Sdprintf("addSubPropertyOf(%s, %s)\n",
+		    pname(sub), pname(super)));
 
   if ( add_list(db, &sub->subPropertyOf, super) )
   { add_list(db, &super->siblings, sub);
