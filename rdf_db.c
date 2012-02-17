@@ -1166,7 +1166,7 @@ addSubPropertyOf(rdf_db *db, triple *t, query *q)
 
   if ( add_list(db, &sub->subPropertyOf, super) )
   { add_list(db, &super->siblings, sub);
-    merge_clouds(db, sub->cloud, super->cloud, q);
+    //merge_clouds(db, sub->cloud, super->cloud, q);
   }
 }
 
@@ -1186,8 +1186,8 @@ delSubPropertyOf(rdf_db *db, predicate *sub, predicate *super, query *q)
  /* if ( not worth the trouble )
       create_reachability_matrix(db, sub->cloud);
     else */
-    { predicate_cloud *parts[2];
-      split_cloud(db, sub->cloud, parts, 2, q);
+    { //predicate_cloud *parts[2];
+      //split_cloud(db, sub->cloud, parts, 2, q);
     }
   }
 }
@@ -2949,7 +2949,7 @@ static int by_inverse[8] =
   BY_S,					/* BY_O    = 4 */
   BY_SO,				/* BY_SO   = 5 */
   BY_SP,				/* BY_PO   = 6 */
-  BY_SP,				/* BY_SPO  = 7 */
+  BY_SPO,				/* BY_SPO  = 7 */
 };
 
 
@@ -5074,12 +5074,46 @@ is_candidate(search_state *state, triple *t)
 }
 
 
+static int
+next_sub_property(search_state *state)
+{ triple *p = &state->pattern;
+
+retry:
+  if ( state->next_predicate )
+  { triple_walker *tw = &state->cursor;
+
+    tw->unbounded_hash ^= predicate_hash(p->predicate.r);
+    p->predicate.r = state->next_predicate->value;
+    tw->unbounded_hash ^= predicate_hash(p->predicate.r);
+    state->next_predicate = state->next_predicate->next;
+    tw->bcount  = tw->hash->bucket_count_epoch;
+    tw->current = NULL;
+
+    return TRUE;
+  }
+
+  if ( (state->flags & MATCH_SUBPROPERTY) &&
+       p->predicate.r &&
+       p->predicate.r->siblings.head )
+  { state->flags &= ~MATCH_SUBPROPERTY;	/* Bit of a hack */
+    state->next_predicate = p->predicate.r->siblings.head;
+    goto retry;
+  }
+
+  return FALSE;
+}
+
 /* next_pattern() advances the pattern for the next query.  This is done
    for matches that deal with matching inverse properties and matches
    that deal with literal ranges (prefix, between, etc.)
 
    Note that inverse and literal enumeration are mutually exclusive (as
    long as we do not have literal subjects).
+
+   If we enumerate (sub)properties, we must enumerate the carthesian
+   product of the sub properties and the inverse/literal search.
+
+   FIXME: The inverse hash is always (?) the same as the plain one?
 */
 
 static int
@@ -5087,7 +5121,7 @@ next_pattern(search_state *state)
 { triple_walker *tw = &state->cursor;
   triple *p = &state->pattern;
 
-  if ( state->flags & MATCH_INVERSE && inverse_partial_triple(p) )
+  if ( (state->flags&MATCH_INVERSE) && inverse_partial_triple(p) )
   { init_triple_walker(tw, state->db, p, p->indexed);
 
     return TRUE;
@@ -5135,6 +5169,9 @@ next_pattern(search_state *state)
       return TRUE;
     }
   }
+
+  if ( next_sub_property(state) )
+    return TRUE;
 
   return FALSE;
 }

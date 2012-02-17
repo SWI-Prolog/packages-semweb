@@ -452,6 +452,8 @@ typedef struct search_state
   literal_ex    lit_ex;			/* extended literal for fast compare */
   triple_walker cursor;			/* Pointer in triple DB */
   struct query *query;			/* Associated query */
+  predicate	p_start;		/* Initial predicate */
+  cell	       *next_predicate;		/* Next predicate to try */
   triple	pattern;		/* Pattern triple */
 } search_state;
 
