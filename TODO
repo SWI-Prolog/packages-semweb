@@ -13,6 +13,17 @@
 	- Create new predicates as clones from the old predicates
 	- Clone triples to the new predicates.
 
+Measurements using old subPropetyOf indexing and none (repeated queries):
+
+  - Using bench.pl, create(1000000) (1M), 100,000 subjects, 10 preds.
+  - All preds linked to p_root
+  - rdf(+,+,-) (first) all (non-root) predicates: 10.7 --> 2.3 sec. (old-->new)
+  - rdf_has(+,+,+) (failing) on root 1.5 --> 7.5.
+    Could implement as rdf(+,-,+).  Would yield about 2.4 sec.
+
+
+
+
 
   TBD: How does all this relate to generation-based life-time?
 
