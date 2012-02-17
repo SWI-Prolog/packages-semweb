@@ -5056,6 +5056,24 @@ allow_retry_state(search_state *state)
 }
 
 
+static int
+is_candidate(search_state *state, triple *t)
+{ if ( t->is_duplicate && !state->src )
+    return FALSE;			/* TBD: Table of returned */
+
+  if ( !alive_triple(state->query, t) )
+    return FALSE;
+					/* hash-collision, skip */
+  if ( state->has_literal_state )
+  { if ( !(t->object_is_literal &&
+	   t->object.literal == state->literal_cursor) )
+      return FALSE;
+  }
+
+  return match_triples(state->db, t, &state->pattern, state->query, state->flags);
+}
+
+
 /* TBD: simplify.   Maybe split for resource and literal search, as
    both involve mutual exclusive complications to this routine,
 */
@@ -5081,19 +5099,7 @@ next_search_state(search_state *state)
 
 retry:
   while( (t = next_triple(tw)) )
-  { if ( t->is_duplicate && !state->src )
-      continue;				/* TBD: Table of returned */
-    if ( !alive_triple(state->query, t) )
-      continue;
-
-					/* hash-collision, skip */
-    if ( state->has_literal_state )
-    { if ( !(t->object_is_literal &&
-	     t->object.literal == state->literal_cursor) )
-	continue;
-    }
-
-    if ( match_triples(state->db, t, p, state->query, state->flags) )
+  { if ( is_candidate(state, t) )
     { int rc;
 
       if ( (rc=unify_triple(state->subject, retpred, state->object,
@@ -5104,13 +5110,7 @@ retry:
 
     inv_alt:
       while( (t = next_triple(tw)) )
-      { if ( state->has_literal_state )
-	{ if ( !(t->object_is_literal &&
-		 t->object.literal == state->literal_cursor) )
-	    continue;
-	}
-
-	if ( match_triples(state->db, t, p, state->query, state->flags) )
+      { if ( is_candidate(state, t) )
 	{ set_next_triple(tw, t);
 
 	  return TRUE;			/* non-deterministic */
