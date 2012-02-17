@@ -7,8 +7,13 @@
   * Predicate clouds represent a set of interlinked predicates, regardless
     of the generation.
   * A predicate-cloud has
-	- A linked list of generation+reachability-matrices
-	- A generation-id when it was last modified
+	- A linked list of lifespan+reachability-matrices
+  * If two predicate clouds, both having predicates needs merging:
+	- Identify the smallest cloud
+	- Create new predicates as clones from the old predicates
+	- Clone triples to the new predicates.
+
+
   TBD: How does all this relate to generation-based life-time?
 
   * Have the link on predicates + generation and have immutable clouds
