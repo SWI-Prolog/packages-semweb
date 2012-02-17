@@ -5074,61 +5074,23 @@ is_candidate(search_state *state, triple *t)
 }
 
 
-/* TBD: simplify.   Maybe split for resource and literal search, as
-   both involve mutual exclusive complications to this routine,
+/* next_pattern() advances the pattern for the next query.  This is done
+   for matches that deal with matching inverse properties and matches
+   that deal with literal ranges (prefix, between, etc.)
+
+   Note that inverse and literal enumeration are mutually exclusive (as
+   long as we do not have literal subjects).
 */
 
 static int
-next_search_state(search_state *state)
-{ triple *t;
-  triple_walker *tw = &state->cursor;
+next_pattern(search_state *state)
+{ triple_walker *tw = &state->cursor;
   triple *p = &state->pattern;
-  term_t retpred;
-  int unify_pred;
 
-  if ( state->realpred )
-  { retpred = state->realpred;
-    if ( PL_is_variable(state->predicate) )
-    { if ( !PL_unify(state->predicate, retpred) )
-	return FALSE;
-    }
-  } else
-  { retpred = state->predicate;
-    unify_pred = FALSE;
-  }
-
-retry:
-  while( (t = next_triple(tw)) )
-  { if ( is_candidate(state, t) )
-    { int rc;
-
-      if ( (rc=unify_triple(state->subject, retpred, state->object,
-			    state->src, t, p->inversed)) == FALSE )
-	continue;
-      if ( rc == ERROR )
-	return FALSE;				/* makes rdf/3 return FALSE */
-
-    inv_alt:
-      while( (t = next_triple(tw)) )
-      { if ( is_candidate(state, t) )
-	{ set_next_triple(tw, t);
-
-	  return TRUE;			/* non-deterministic */
-	}
-      }
-
-      if ( (state->flags & MATCH_INVERSE) && inverse_partial_triple(p) )
-      { init_triple_walker(tw, state->db, p, p->indexed);
-	goto inv_alt;
-      }
-
-      return TRUE;			/* deterministic */
-    }
-  }
-
-  if ( (state->flags & MATCH_INVERSE) && inverse_partial_triple(p) )
+  if ( state->flags & MATCH_INVERSE && inverse_partial_triple(p) )
   { init_triple_walker(tw, state->db, p, p->indexed);
-    goto retry;
+
+    return TRUE;
   }
 
   if ( state->has_literal_state )
@@ -5170,10 +5132,58 @@ retry:
       }
 
       init_cursor_from_literal(state, lit);
-
-      goto retry;
+      return TRUE;
     }
   }
+
+  return FALSE;
+}
+
+
+static int
+next_search_state(search_state *state)
+{ triple *t;
+  triple_walker *tw = &state->cursor;
+  triple *p = &state->pattern;
+  term_t retpred;
+  int unify_pred;
+
+  if ( state->realpred )
+  { retpred = state->realpred;
+    if ( PL_is_variable(state->predicate) )
+    { if ( !PL_unify(state->predicate, retpred) )
+	return FALSE;
+    }
+  } else
+  { retpred = state->predicate;
+    unify_pred = FALSE;
+  }
+
+  do
+  { while( (t = next_triple(tw)) )
+    { if ( is_candidate(state, t) )
+      { int rc;
+
+	if ( (rc=unify_triple(state->subject, retpred, state->object,
+			      state->src, t, p->inversed)) == FALSE )
+	  continue;
+	if ( rc == ERROR )
+	  return FALSE;			/* makes rdf/3 return FALSE */
+
+	do
+	{ while( (t = next_triple(tw)) )
+	  { if ( is_candidate(state, t) )
+	    { set_next_triple(tw, t);
+
+	      return TRUE;		/* non-deterministic */
+	    }
+	  }
+	} while(next_pattern(state));
+
+	return TRUE;			/* deterministic */
+      }
+    }
+  } while(next_pattern(state));
 
   return FALSE;
 }
