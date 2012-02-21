@@ -213,12 +213,13 @@ typedef struct sub_p_matrix
 
 
 typedef struct predicate_cloud
-{ predicate   **members;		/* member predicates */
-  unsigned int  hash;			/* hash-code */
+{ struct predicate_cloud *merged_into;	/* Cloud was merged into target */
+  sub_p_matrix *reachable;		/* cloud reachability matrices */
+  predicate   **members;		/* member predicates */
   size_t	size;			/* size of the cloud */
   size_t	deleted;		/* See erase_predicates() */
-  sub_p_matrix *reachable;		/* cloud reachability matrices */
-  unsigned	dirty : 1;		/* predicate hash not synchronised */
+  unsigned int  hash;			/* hash-code */
+  unsigned	multi_hash : 1;		/* Has predicates with different hashes */
 } predicate_cloud;
 
 

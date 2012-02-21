@@ -21,8 +21,30 @@ Measurements using old subPropetyOf indexing and none (repeated queries):
   - rdf_has(+,+,+) (failing) on root 1.5 --> 7.5.
     Could implement as rdf(+,-,+).  Would yield about 2.4 sec.
 
+Alternatives
 
+  - Join predicates in a cloud, but each predicate keeps its own hash
+    - If it has no triples, give it the cloud hash immediately.
+    - At search-state, keep reference to the cloud and the used
+      predicate-hash.
+      - This guarantees that all relevant triples are found
+    - Repeat the search with all predicate-hashes of sub-predicates.
 
+Steps:
+
+  - Merge clouds on creating a subPropertyOf
+  - Have a function that finds hashes that need to be queried for a
+    super property query.
+
+  - Problem: update predicate->cloud from multiple predicates must
+    appear as one.  isSubPropertyOf():
+
+    - Have cloud->merged_into			[OK]
+      - Set cloud->merged_into to new one
+      - Update labels in merged predicates to reflect new cloud.
+        - While cloud->merged is used; do not trust labels
+      - Then move predicate->cloud to new one
+      - Query follows merged_into until success
 
 
   TBD: How does all this relate to generation-based life-time?

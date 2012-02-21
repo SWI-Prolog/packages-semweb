@@ -898,39 +898,6 @@ pname(predicate *p)
 }
 
 
-static int
-organise_predicates(rdf_db *db)		/* TBD: rename&move */
-{ int i;
-  int changed = 0;
-
-  DEBUG(2, Sdprintf("rdf_db: fixing predicate clouds\n"));
-
-  for(i=0; i<db->predicates.bucket_count; i++)
-  { predicate *p = db->predicates.blocks[MSB(i)][i];
-
-    for( ; p; p = p->next )
-    { predicate_cloud *cloud = p->cloud;
-
-      if ( cloud->dirty )
-      { predicate **cp;
-	int i2;
-
-	for(i2=0, cp = cloud->members; i2 < cloud->size; i2++, cp++)
-	{ if ( (*cp)->hash != cloud->hash )
-	  { (*cp)->hash = cloud->hash;
-	    if ( (*cp)->triple_count > 0 )
-	      changed++;
-	  }
-	}
-	cloud->dirty = FALSE;
-      }
-    }
-  }
-
-  return changed;
-}
-
-
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 Keep track of the triple count.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -1113,6 +1080,15 @@ pred_reachable(predicate *start, char *visited, predicate **nodes, int *size)
 }
 
 
+#if 0
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Splitting a predicate cloud is rather hard in RDF-DB 3.0.
+
+It makes sense if the cloud falls  apart into pieces that either already
+have a consistent hash or have no triples.   This may not be an unlikely
+scenario though. Consider a snapshot that temporarily linked two clouds.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 static int
 split_cloud(rdf_db *db, predicate_cloud *cloud,
 	    predicate_cloud **parts, int size,
@@ -1138,7 +1114,6 @@ split_cloud(rdf_db *db, predicate_cloud *cloud,
 	new_cloud->dirty = cloud->dirty;
       } else
       { new_cloud->dirty = TRUE;	/* preds come from another cloud */
-	//db->need_update++;		/* FIXME: need to reindex triples */
       }
       parts[found++] = new_cloud;
     }
@@ -1148,6 +1123,7 @@ split_cloud(rdf_db *db, predicate_cloud *cloud,
 
   return found;
 }
+#endif /*0*/
 
 
 static size_t
@@ -1166,7 +1142,7 @@ addSubPropertyOf(rdf_db *db, triple *t, query *q)
 
   if ( add_list(db, &sub->subPropertyOf, super) )
   { add_list(db, &super->siblings, sub);
-    //merge_clouds(db, sub->cloud, super->cloud, q);
+    merge_clouds(db, sub->cloud, super->cloud, q);
   }
 }
 
@@ -1180,15 +1156,23 @@ addSubPropertyOf(rdf_db *db, triple *t, query *q)
 */
 
 static void
-delSubPropertyOf(rdf_db *db, predicate *sub, predicate *super, query *q)
-{ if ( del_list(db, &sub->subPropertyOf, super) )
+delSubPropertyOf(rdf_db *db, triple *t, query *q)
+{ predicate *sub   = lookup_predicate(db, t->subject, q);
+  predicate *super = lookup_predicate(db, t->object.resource, q);
+
+  DEBUG(3, Sdprintf("delSubPropertyOf(%s, %s)\n",
+		    pname(sub), pname(super)));
+
+  if ( del_list(db, &sub->subPropertyOf, super) )
   { del_list(db, &super->siblings, sub);
- /* if ( not worth the trouble )
-      create_reachability_matrix(db, sub->cloud);
-    else */
-    { //predicate_cloud *parts[2];
-      //split_cloud(db, sub->cloud, parts, 2, q);
+#if 0
+    if ( not worth the trouble )
+    { create_reachability_matrix(db, sub->cloud);
+    } else
+    { predicate_cloud *parts[2];
+      split_cloud(db, sub->cloud, parts, 2, q);
     }
+#endif
   }
 }
 
@@ -1300,22 +1284,84 @@ create_reachability_matrix(rdf_db *db, predicate_cloud *cloud, query *q)
 }
 
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+isSubPropertyOf() is true if sub is an rdfs:subPropertyOf p (transitive)
+for  the  given  query  q.  If  two  predicates  are  connected  through
+rdfs:subPropertyOf, they belong to the same `cloud'. The cloud keeps one
+or more bitmatrices  with  the   entailment  of  all  rdfs:subPropertyOf
+triples. Each bitmatrix is  valid  during   a  certain  lifespan (set of
+generations).
+
+isSubPropertyOf() runs concurrently with updates and  must be careful in
+its  processing  to   deal   with    the   modifications   realised   by
+addSubPropertyOf() and delSubPropertyOf().  The  critical   path  is  if
+addSubPropertyOf() connects two clouds, both  having multiple predicates
+and both clouds have triples.
+
+It is solved as follows. Suppose cloud C2   is  merged into cloud C1, we
+take the following steps:
+
+  - The predicates from C2 are added at the end of the ->members of C1.
+    C1->size is updated.
+    - This has no consequences for subPropertyOf()
+  - The cloud C2 gets a ->merged_into = C1
+    - The cloud of a predicate is reached by following the ->merged_into
+      chain. If such a link is followed, predicate->label is invalid and
+      we must compute it.
+  - For each member of C2
+    - update <-label to the label in C1
+      update <-cloud to C1
+    - Leave C2 to Boehm-GC
+  - Set C2->multi_hash. Queries on predicates may involve multiple
+    queries with different hash keys. We should also set a
+    sub_multi_hash on the predicates that need this.  Whether this
+    is really needed depends on whether the predicate has subs with
+    different hashes in the sub-entailment at the generation of the
+    query.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+static predicate_cloud *
+cloud_of(predicate *p, int *labelp)
+{ predicate_cloud *pc = p->cloud;
+  int i;
+
+  if ( !pc->merged_into )
+  { *labelp = p->label;
+    return pc;
+  }
+
+  while(!pc->merged_into)
+    pc = pc->merged_into;
+
+  for(i=0; i<pc->size; i++)
+  { if ( pc->members[i] == p )
+      *labelp = i;
+    return pc;
+  }
+
+  assert(0);
+  return 0;
+}
+
+
 static int
 isSubPropertyOf(rdf_db *db, predicate *sub, predicate *p, query *q)
 { predicate_cloud *pc;
+  int sub_label, p_label;
 
   assert(sub != p);
 
-  if ( (pc=sub->cloud) == p->cloud )
+  pc = cloud_of(sub, &sub_label);
+  if ( pc == cloud_of(p, &p_label) )
   { sub_p_matrix *rm;
 
-    for(rm=sub->cloud->reachable; rm; rm=rm->older)
+    for(rm=pc->reachable; rm; rm=rm->older)
     { if ( alive_lifespan(q, &rm->lifespan) )
-	return testbit(rm->matrix, sub->label, p->label);
+	return testbit(rm->matrix, sub_label, p_label);
     }
 
     if ( (rm = create_reachability_matrix(db, pc, q)) )
-      return testbit(rm->matrix, sub->label, p->label);
+      return testbit(rm->matrix, sub_label, p_label);
     else
       assert(0);
   }
@@ -1330,21 +1376,19 @@ isSubPropertyOf(rdf_db *db, predicate *sub, predicate *p, query *q)
 
 static int
 check_predicate_cloud(predicate_cloud *c)
-{ predicate **p;
+{ predicate **pp;
   int errors = 0;
   int i;
 
-  DEBUG(1, if ( c->dirty ) Sdprintf("Cloud is dirty\n"));
+  for(i=0, pp=c->members; i<c->size; i++, pp++)
+  { predicate *p = *pp;
 
-  for(i=0, p=c->members; i<c->size; i++, p++)
-  { if ( !c->dirty )
-    { if ( (*p)->hash != c->hash )
-      { Sdprintf("Hash of %s doesn't match cloud hash\n", pname(*p));
-	errors++;
-      }
+    if ( p->hash != c->hash )
+    { Sdprintf("Hash of %s doesn't match cloud hash\n", pname(p));
+      errors++;				/* this is now normal! */
     }
-    if ( (*p)->cloud != c )
-    { Sdprintf("Wrong cloud of %s\n", pname(*p));
+    if ( p->cloud != c )
+    { Sdprintf("Wrong cloud of %s\n", pname(p));
       errors++;
     }
   }
@@ -3037,11 +3081,7 @@ void
 erase_triple(rdf_db *db, triple *t, query *q)
 { if ( t->predicate.r->name == ATOM_subPropertyOf &&
        t->object_is_literal == FALSE )
-  { predicate *me    = lookup_predicate(db, t->subject, q);
-    predicate *super = lookup_predicate(db, t->object.resource, q);
-
-    delSubPropertyOf(db, me, super, q);
-  }
+    delSubPropertyOf(db, t, q);
 
   unregister_graph(db, t);		/* Updates count and MD5 */
   unregister_predicate(db, t);		/* Updates count */
