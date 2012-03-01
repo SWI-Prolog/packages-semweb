@@ -2490,11 +2490,12 @@ rehash_triples(rdf_db *db)
 	break;
       case BY_P:
 	ocount = db->pred_count;
-        factor = 5;
+        factor = 1;
 	break;
       case BY_PG:
-	ocount = db->pred_count * db->graph_count;
-        factor = 100;
+	ocount = db->pred_count > db->graph_count ? db->pred_count
+						  : db->graph_count;
+        factor = 1;
 	break;
       case BY_O:
       case BY_SP:
