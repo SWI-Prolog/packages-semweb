@@ -257,15 +257,15 @@ rdf_register_ns(Alias, URI) :-
 rdf_register_ns(Alias, URI, _) :-
 	ns(Alias, URI), !.
 rdf_register_ns(Alias, URI, Options) :-
-	forall(ns(Alias, _),
-	       (   option(force(true), Options, false)
-	       ->  retractall(ns(Alias, _)),
-		   assert(ns(Alias, URI))
-	       ;   option(keep(true), Options, false)
-	       ->  true
-	       ;   throw(error(permission_error(register, namespace, Alias),
-			       context(_, 'Already defined')))
-	       )).
+	ns(Alias, _), !,
+	(   option(force(true), Options, false)
+	->  retractall(ns(Alias, _)),
+	    assert(ns(Alias, URI))
+	;   option(keep(true), Options, false)
+	->  true
+	;   throw(error(permission_error(register, namespace, Alias),
+			context(_, 'Already defined')))
+	).
 rdf_register_ns(Alias, URI, _) :-
 	assert(ns(Alias, URI)).
 
