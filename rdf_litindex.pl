@@ -232,23 +232,35 @@ expand_fuzzy(Var, _) :-
 	var(Var), !,
 	throw(error(instantiation_error, _)).
 expand_fuzzy(sounds(Like), Or) :- !,
-	metaphone_index(Map),
-	double_metaphone(Like, Key),
-	rdf_find_literal_map(Map, [Key], Tokens),
-	list_to_or(Tokens, sounds(Like), Or).
+	(   atom(Like)
+	->  metaphone_index(Map),
+	    double_metaphone(Like, Key),
+	    rdf_find_literal_map(Map, [Key], Tokens),
+	    list_to_or(Tokens, sounds(Like), Or)
+	;   expand_fuzzy(Like, Or)
+	).
 expand_fuzzy(stem(Like), Or) :- !,
-	porter_index(Map),
-	porter_stem(Like, Key),
-	rdf_find_literal_map(Map, [Key], Tokens),
-	list_to_or(Tokens, stem(Like), Or).
+	(   atom(Like)
+	->  porter_index(Map),
+	    porter_stem(Like, Key),
+	    rdf_find_literal_map(Map, [Key], Tokens),
+	    list_to_or(Tokens, stem(Like), Or)
+	;   expand_fuzzy(Like, Or)
+	).
 expand_fuzzy(prefix(Prefix), Or) :- !,
-	token_index(Map),
-	rdf_keys_in_literal_map(Map, prefix(Prefix), Tokens),
-	list_to_or(Tokens, prefix(Prefix), Or).
+	(   atom(Prefix)
+	->  token_index(Map),
+	    rdf_keys_in_literal_map(Map, prefix(Prefix), Tokens),
+	    list_to_or(Tokens, prefix(Prefix), Or)
+	;   expand_fuzzy(Prefix, Or)
+	).
 expand_fuzzy(case(String), Or) :- !,
-	token_index(Map),
-	rdf_keys_in_literal_map(Map, case(String), Tokens),
-	list_to_or(Tokens, case(String), Or).
+	(   atom(String)
+	->  token_index(Map),
+	    rdf_keys_in_literal_map(Map, case(String), Tokens),
+	    list_to_or(Tokens, case(String), Or)
+	;   expand_fuzzy(String, Or)
+	).
 expand_fuzzy(or(A0, B0), E) :- !,
 	expand_fuzzy(A0, A),
 	expand_fuzzy(B0, B),
