@@ -5114,6 +5114,20 @@ is_candidate(search_state *state, triple *t)
 }
 
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+next_sub_property() advances the triple-walker to walk  over the hash of
+a sub-predicate. This relates to   isSubPropertyOf(),  in particular the
+remarks about merging two clouds and setting ->multi_hash of the cloud.
+
+  - If the cloud doesn't have ->multi_hash, all related predicates have
+    the same hash, and we are done.
+  - If the cloud does have ->multi_hash, we can walk over the predicates
+    in the cloud, test they are actually a subPropertyOf().  TBD: How to
+    remember no submitting the same hash?
+
+FIXME: The implementation doesn't follow this comment!
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 static int
 next_sub_property(search_state *state)
 { triple *p = &state->pattern;
