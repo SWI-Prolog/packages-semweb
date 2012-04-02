@@ -263,13 +263,11 @@ rdf_register_ns(Alias, URI) :-
 rdf_register_ns(Alias, URI, _) :-
 	ns(Alias, URI), !.
 rdf_register_ns(Alias, URI, Options) :-
-	ns(Alias, _),
-	(   option(force(Force), Options, false),
-	    Force == true
+	ns(Alias, _), !,
+	(   option(force(true), Options, false)
 	->  retractall(ns(Alias, _)),
 	    assert(ns(Alias, URI))
-	;   option(keep(Keep), Options, false),
-	    Keep == true
+	;   option(keep(true), Options, false)
 	->  true
 	;   throw(error(permission_error(register, namespace, Alias),
 			context(_, 'Already defined')))

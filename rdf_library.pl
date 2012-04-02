@@ -492,7 +492,8 @@ existing_url_source(url(http, URL)) :- !,
 
 rdf_list_library :-
 	rdf_update_library_index,
-	(   rdf_library_index(Id, title(Title)),
+	(   rdf_library_index(Id, title(TitleLiteral)),
+	    plain_string(TitleLiteral, Title),
 	    format('~w ~t~20|~w', [Id, Title]),
 	    (	rdf_library_index(Id, version(Version))
 	    ->	format(' (version ~w)', [Version])
@@ -503,6 +504,10 @@ rdf_list_library :-
 	;   true
 	).
 
+plain_string(String, String) :-
+	atomic(String), !.
+plain_string(lang(en, String), String) :- !.
+plain_string(lang(_, String), String) :- !.
 
 %%	rdf_library_index(?Id, ?Facet) is nondet.
 %
