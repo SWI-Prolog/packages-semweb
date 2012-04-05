@@ -4557,6 +4557,18 @@ get_partial_triple(rdf_db *db,
 }
 
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+inverse_partial_triple(triple *t, triple *save)  inverses   a  triple by
+swapping object and  subject  and  replacing   the  predicate  with  its
+inverse.
+
+TBD: In many cases we can  compute   the  hash  more efficiently than by
+simply recomputing it:
+
+  - Change predicate: x-or with old and new predicate hash
+  - swap S<->O if the other is known is a no-op wrt the hash.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 static int
 inverse_partial_triple(triple *t, triple *save)
 { predicate *i;
@@ -5192,8 +5204,6 @@ next_sub_property(search_state *state)
 
    If we enumerate (sub)properties, we must enumerate the carthesian
    product of the sub properties and the inverse/literal search.
-
-   FIXME: The inverse hash is always (?) the same as the plain one?
 */
 
 static int
