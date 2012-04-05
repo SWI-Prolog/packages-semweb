@@ -977,30 +977,26 @@ static predicate_cloud *
 append_clouds(rdf_db *db,
 	      predicate_cloud *c1, predicate_cloud *c2,
 	      int update_hash)
-{ predicate **p;
-  int i;
+{ int i;
 
-  for(i=0, p=c2->members; i<c2->size; i++, p++)
-  { (*p)->cloud = c1;
+  assert(c1->size > 0);
+  assert(c2->size > 0);
+
+  c1->members = rdf_realloc(db, c1->members,
+			    c1->size*sizeof(predicate*),
+			    (c1->size+c2->size)*sizeof(predicate*));
+  memcpy(&c1->members[c1->size], c2->members, c2->size*sizeof(predicate*));
+					/* re-label the new ones */
+  for(i=c1->size; i<c1->size+c2->size; i++)
+  { predicate *p = c1->members[i];
+
+    p->cloud = c1;
+    p->label = i;
     if ( update_hash )
-      (*p)->hash = c1->hash;
+      p->hash = c1->hash;
   }
 
-  if ( c1->size > 0 && c2->size > 0 )
-  { c1->members = rdf_realloc(db, c1->members,
-			      c1->size*sizeof(predicate*),
-			      (c1->size+c2->size)*sizeof(predicate*));
-    memcpy(&c1->members[c1->size], c2->members, c2->size*sizeof(predicate*));
-    c1->size += c2->size;
-    free_predicate_cloud(db, c2);
-  } else if ( c2->size > 0 )
-  { c1->members = c2->members;
-    c1->size = c2->size;
-    c2->members = NULL;
-    free_predicate_cloud(db, c2);
-  } else
-  { free_predicate_cloud(db, c2);
-  }
+  free_predicate_cloud(db, c2);		/* FIXME: Leave to GC */
 
   if ( !update_hash )
   { size_t newc = c1->alt_hash_count + c2->alt_hash_count + 1;
@@ -1170,7 +1166,19 @@ delSubPropertyOf(rdf_db *db, triple *t, query *q)
 		    pname(sub), pname(super)));
 
   if ( del_list(db, &sub->subPropertyOf, super) )
-  { del_list(db, &super->siblings, sub);
+  { predicate_cloud *cloud;
+    sub_p_matrix *rm;
+
+    del_list(db, &super->siblings, sub);
+
+    cloud = super->cloud;
+    assert(cloud == sub->cloud);
+
+    for(rm=cloud->reachable; rm; rm=rm->older)
+    { if ( rm->lifespan.died == GEN_MAX )
+	rm->lifespan.died = q->wr_gen;
+    }
+
 #if 0
     if ( not worth the trouble )
     { create_reachability_matrix(db, sub->cloud);

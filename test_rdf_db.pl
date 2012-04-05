@@ -680,6 +680,9 @@ subproperty(1) :-
 %	Property hierarchy handling for rdf_has/3. The routines maintain
 %	clouds of connected properties and for   each  cloud a bitmatrix
 %	filled with the closure of the rdfs:subPropertyOf relation.
+%
+%	@tbd: improve tests by trying all permutations of the order in
+%	      which the graph is built.
 
 ptree(1) :-
 	rdf_assert(a, rdfs:subPropertyOf, b),
