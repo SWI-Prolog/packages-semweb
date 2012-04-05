@@ -452,7 +452,8 @@ typedef struct search_state
   skiplist_enum literal_state;		/* Literal search state */
   literal      *literal_cursor;		/* pointer in current literal */
   literal_ex    lit_ex;			/* extended literal for fast compare */
-  literal      *lit_start;		/* for restarting literal search */
+  literal      *restart_lit;		/* for restarting literal search */
+  skiplist_enum restart_lit_state;	/* for restarting literal search */
   triple_walker cursor;			/* Pointer in triple DB */
   struct query *query;			/* Associated query */
   predicate_cloud *p_cloud;		/* Searched predicate cloud */

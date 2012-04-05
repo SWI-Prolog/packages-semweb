@@ -1,9 +1,7 @@
-/*  $Id$
-
-    Part of SWI-Prolog
+/*  Part of SWI-Prolog
 
     Author:        Jan Wielemaker
-    E-mail:        J.Wielemaker@cs.vu.nl
+    E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
     Copyright (C): 2002-2012, University of Amsterdam
 			      VU University Amsterdam
@@ -5078,7 +5076,9 @@ init_search_state(search_state *state, query *query)
 				&state->lit_ex, &state->literal_state);
     if ( rlitp )
     { if ( init_cursor_from_literal(state, *rlitp) )
-	state->lit_start = *rlitp;	/* FIXME: needs restart state */
+      { state->restart_lit = *rlitp;
+	state->restart_lit_state = state->literal_state;
+      }
     } else
     { free_search_state(state);
       return FALSE;
@@ -5110,7 +5110,9 @@ init_search_state(search_state *state, query *query)
 
     if ( rlitp )
     { if ( init_cursor_from_literal(state, *rlitp) )
-	state->lit_start = *rlitp;
+      {	state->restart_lit = *rlitp;
+	state->restart_lit_state = state->literal_state;
+      }
     } else
     { free_search_state(state);
       return FALSE;
@@ -5277,10 +5279,9 @@ next_pattern(search_state *state)
   { if ( p->inversed )
     { *p = state->saved_pattern;
       init_triple_walker(tw, state->db, p, p->indexed);
-    } else if ( state->lit_start )
-    { /* FIXME: Must also restart the skiplist search (or, we must
-         remember that */
-      init_cursor_from_literal(state, state->lit_start);
+    } else if ( state->restart_lit )
+    { state->literal_state = state->restart_lit_state;
+      init_cursor_from_literal(state, state->restart_lit);
     }
 
     return TRUE;
