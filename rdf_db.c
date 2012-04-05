@@ -971,8 +971,8 @@ scenarios:
   - C2 has no triples.  We are in a writer lock.  As there are no
     triples for C2, queries cannot go wrong.
   - C2 has triples.  It is possible that queries with the predicate
-    hash of C2 are in progress.  These must return their valid answer.
-    FIXME: how to do that?
+    hash of C2 are in progress.  See comment at merge_clouds() for
+    how this is handled.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static predicate_cloud *
@@ -1002,6 +1002,18 @@ append_clouds(rdf_db *db,
     free_predicate_cloud(db, c2);
   } else
   { free_predicate_cloud(db, c2);
+  }
+
+  if ( !update_hash )
+  { size_t newc = c1->alt_hash_count + c2->alt_hash_count + 1;
+
+    c1->alt_hashes = rdf_realloc(db, c1->alt_hashes,
+				 c1->alt_hash_count*sizeof(unsigned int),
+				 newc*sizeof(unsigned int));
+    memcpy(&c1->alt_hashes[c1->alt_hash_count],
+	   c2->alt_hashes, c2->alt_hash_count*sizeof(unsigned int));
+    c1->alt_hashes[newc-1] = c2->hash;
+    c1->alt_hash_count = newc;
   }
 
   return c1;
@@ -1303,21 +1315,21 @@ take the following steps:
 
   - The predicates from C2 are added at the end of the ->members of C1.
     C1->size is updated.
-    - This has no consequences for subPropertyOf()
-  - The cloud C2 gets a ->merged_into = C1
+    - This has no consequences for running queries that need the old
+      entailment of the subPropertyOf anyway.
+  - The cloud C2 gets ->merged_into set to C1
     - The cloud of a predicate is reached by following the ->merged_into
-      chain. If such a link is followed, predicate->label is invalid and
-      we must compute it.
+      chain. If such a link is followed, predicate->label (the index in
+      the predicate cloud) is invalid and we must compute it.
   - For each member of C2
     - update <-label to the label in C1
       update <-cloud to C1
     - Leave C2 to Boehm-GC
-  - Set C2->multi_hash. Queries on predicates may involve multiple
-    queries with different hash keys. We should also set a
-    sub_multi_hash on the predicates that need this.  Whether this
-    is really needed depends on whether the predicate has subs with
-    different hashes in the sub-entailment at the generation of the
-    query.
+  - Add the hash-key of C2 to the alt-hashes of C1.  Queries that
+    involve sub-property on C1 must re-run the query with each
+    alt-hash for that has a predicate that is a sub-property of
+    the target.  TBD: find a good compromise between computing and
+    storing yet additional closures.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static predicate_cloud *
@@ -2922,6 +2934,13 @@ init_triple_walker(triple_walker *tw, rdf_db *db, triple *pattern, int which)
   tw->hash	     = &db->hash[tw->icol];
   tw->bcount	     = tw->hash->bucket_count_epoch;
   tw->current	     = NULL;
+}
+
+
+static void
+rewind_triple_walker(triple_walker *tw)
+{ tw->bcount  = tw->hash->bucket_count_epoch;
+  tw->current = NULL;
 }
 
 
@@ -5115,54 +5134,55 @@ is_candidate(search_state *state, triple *t)
 
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-next_sub_property() advances the triple-walker to walk  over the hash of
-a sub-predicate. This relates to   isSubPropertyOf(),  in particular the
-remarks about merging two clouds and setting ->multi_hash of the cloud.
+next_sub_property() advances the triple-walker to walk over an alternate
+hash of the cloud.
 
-  - If the cloud doesn't have ->multi_hash, all related predicates have
+  - If the cloud doesn't have ->alt_hashes, all related predicates have
     the same hash, and we are done.
-  - If the cloud does have ->multi_hash, we can walk over the predicates
-    in the cloud, test they are actually a subPropertyOf().  TBD: How to
-    remember no submitting the same hash?
+  - If the cloud does have ->alt_hashes, we must walk all the
+    alt-hashes.
 
-FIXME: The implementation doesn't follow this comment!
+TBD: Actually, we do not need to walk the hash if none of the predicates
+that belong to the hash is a subPropertyOf the target.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static int
 next_sub_property(search_state *state)
-{ triple *p = &state->pattern;
+{ if ( (state->flags & MATCH_SUBPROPERTY) )
+  { triple *p = &state->pattern;
+    triple_walker *tw = &state->cursor;
 
-retry:
-  if ( state->next_predicate )
-  { triple_walker *tw = &state->cursor;
+    if ( !state->p_cloud )
+    { if ( p->predicate.r->cloud->alt_hash_count )
+      { state->p_cloud = p->predicate.r->cloud;
 
-    tw->unbounded_hash ^= predicate_hash(p->predicate.r);
-    p->predicate.r = state->next_predicate->value;
-    tw->unbounded_hash ^= predicate_hash(p->predicate.r);
-    state->next_predicate = state->next_predicate->next;
-    tw->bcount  = tw->hash->bucket_count_epoch;
-    tw->current = NULL;
+	tw->unbounded_hash ^= predicate_hash(p->predicate.r);
+	tw->unbounded_hash ^= state->p_cloud->alt_hashes[0];
+	rewind_triple_walker(tw);
+	state->alt_hash_cursor = 0;
+
+	return TRUE;
+      } else
+	return FALSE;			/* Cloud has only one hash */
+    }
+
+    tw->unbounded_hash ^= state->p_cloud->alt_hashes[state->alt_hash_cursor];
+    tw->unbounded_hash ^= state->p_cloud->alt_hashes[++state->alt_hash_cursor];
+    rewind_triple_walker(tw);
 
     return TRUE;
   }
 
-  if ( (state->flags & MATCH_SUBPROPERTY) &&
-       p->predicate.r &&
-       p->predicate.r->siblings.head )
-  { state->flags &= ~MATCH_SUBPROPERTY;	/* Bit of a hack */
-    state->next_predicate = p->predicate.r->siblings.head;
-    goto retry;
-  }
-
   return FALSE;
 }
+
 
 /* next_pattern() advances the pattern for the next query.  This is done
    for matches that deal with matching inverse properties and matches
    that deal with literal ranges (prefix, between, etc.)
 
    Note that inverse and literal enumeration are mutually exclusive (as
-   long as we do not have literal subjects).
+   long as we do not have literal subjects ...).
 
    If we enumerate (sub)properties, we must enumerate the carthesian
    product of the sub properties and the inverse/literal search.

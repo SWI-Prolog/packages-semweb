@@ -218,8 +218,9 @@ typedef struct predicate_cloud
   predicate   **members;		/* member predicates */
   size_t	size;			/* size of the cloud */
   size_t	deleted;		/* See erase_predicates() */
+  size_t	alt_hash_count;		/* Alternative hashes */
+  unsigned int *alt_hashes;
   unsigned int  hash;			/* hash-code */
-  unsigned	multi_hash : 1;		/* Has predicates with different hashes */
 } predicate_cloud;
 
 
@@ -453,8 +454,8 @@ typedef struct search_state
   literal_ex    lit_ex;			/* extended literal for fast compare */
   triple_walker cursor;			/* Pointer in triple DB */
   struct query *query;			/* Associated query */
-  predicate	p_start;		/* Initial predicate */
-  cell	       *next_predicate;		/* Next predicate to try */
+  predicate_cloud *p_cloud;		/* Searched predicate cloud */
+  int		alt_hash_cursor;	/* Index in alternative hashes */
   triple	pattern;		/* Pattern triple */
 } search_state;
 
