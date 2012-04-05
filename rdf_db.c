@@ -2934,6 +2934,17 @@ init_triple_walker(triple_walker *tw, rdf_db *db, triple *pattern, int which)
 
 
 static void
+init_triple_literal_walker(triple_walker *tw, rdf_db *db,
+			   triple *pattern, int which, unsigned int hash)
+{ tw->unbounded_hash = hash;
+  tw->icol	     = ICOL(which);
+  tw->hash	     = &db->hash[tw->icol];
+  tw->bcount	     = tw->hash->bucket_count_epoch;
+  tw->current	     = NULL;
+}
+
+
+static void
 rewind_triple_walker(triple_walker *tw)
 { tw->bcount  = tw->hash->bucket_count_epoch;
   tw->current = NULL;
@@ -4995,7 +5006,7 @@ rdf_assert3(term_t subject, term_t predicate, term_t object)
 
 static void	free_search_state(search_state *state);
 
-static void
+static int
 init_cursor_from_literal(search_state *state, literal *cursor)
 { triple *p = &state->pattern;
   size_t iv;
@@ -5008,8 +5019,10 @@ init_cursor_from_literal(search_state *state, literal *cursor)
   p->indexed |= BY_O;
   p->indexed &= ~BY_G;			/* No graph indexing supported */
   if ( p->indexed == BY_SO )
-    p->indexed = BY_S;			/* we do not have index BY_SO */
-					/* FIXME: Not handled below */
+  { p->indexed = BY_S;			/* we do not have index BY_SO */
+    init_triple_walker(&state->cursor, state->db, p, p->indexed);
+    return FALSE;
+  }
 
   switch(p->indexed)			/* keep in sync with triple_hash_key() */
   { case BY_O:
@@ -5028,10 +5041,11 @@ init_cursor_from_literal(search_state *state, literal *cursor)
       assert(0);
   }
 
-  /* FIXME: we need to use iv!! */
-
-  init_triple_walker(&state->cursor, state->db, p, p->indexed);
+  init_triple_literal_walker(&state->cursor, state->db, p, p->indexed, iv);
+  state->has_literal_state = TRUE;
   state->literal_cursor = cursor;
+
+  return TRUE;
 }
 
 
@@ -5065,9 +5079,8 @@ init_search_state(search_state *state, query *query)
     rlitp = skiplist_find_first(&state->db->literals,
 				&state->lit_ex, &state->literal_state);
     if ( rlitp )
-    { init_cursor_from_literal(state, *rlitp);
-      state->lit_start = *rlitp;
-      state->has_literal_state = TRUE;
+    { if ( init_cursor_from_literal(state, *rlitp) )
+	state->lit_start = *rlitp;	/* FIXME: needs restart state */
     } else
     { free_search_state(state);
       return FALSE;
@@ -5098,9 +5111,8 @@ init_search_state(search_state *state, query *query)
     }
 
     if ( rlitp )
-    { init_cursor_from_literal(state, *rlitp);
-      state->lit_start = *rlitp;
-      state->has_literal_state = TRUE;
+    { if ( init_cursor_from_literal(state, *rlitp) )
+	state->lit_start = *rlitp;
     } else
     { free_search_state(state);
       return FALSE;
@@ -5268,7 +5280,9 @@ next_pattern(search_state *state)
     { *p = state->saved_pattern;
       init_triple_walker(tw, state->db, p, p->indexed);
     } else if ( state->lit_start )
-    { init_cursor_from_literal(state, state->lit_start);
+    { /* FIXME: Must also restart the skiplist search (or, we must
+         remember that */
+      init_cursor_from_literal(state, state->lit_start);
     }
 
     return TRUE;
