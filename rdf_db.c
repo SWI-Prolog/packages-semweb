@@ -5064,8 +5064,6 @@ init_search_state(search_state *state, query *query)
     return FALSE;
   }
 
-  state->query = query;
-
   if ( (p->match == STR_MATCH_PREFIX ||	p->match == STR_MATCH_LIKE) &&
        p->indexed != BY_SP &&
        (state->prefix = first_atom(p->object.literal->value.string, p->match)))
@@ -5354,6 +5352,7 @@ rdf(term_t subject, term_t predicate, term_t object,
 
       state = &q->state.search;
       memset(state, 0, sizeof(*state));
+      state->query     = q;
       state->db	       = db;
       state->subject   = subject;
       state->object    = object;
