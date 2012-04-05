@@ -6547,7 +6547,9 @@ rdf_reachable(term_t subj, term_t pred, term_t obj,
 	{ a->max_d = (uintptr_t)-1;
 	} else
 	{ if ( !PL_get_long_ex(max_d, &md) || md < 0 )
+	  { close_query(q);
 	    return FALSE;
+	  }
 	  a->max_d = md;
 	}
       } else
@@ -6557,29 +6559,42 @@ rdf_reachable(term_t subj, term_t pred, term_t obj,
       if ( !PL_is_variable(subj) )		/* subj .... obj */
       { switch(get_partial_triple(db, subj, pred, 0, 0, &a->pattern))
 	{ case 0:
+	  { close_query(q);
 	    return directly_attached(pred, subj, obj) &&
 		   unify_distance(d, 0);
+	  }
 	  case -1:
+	  { close_query(q);
 	    return FALSE;
+	  }
 	}
 	is_det = PL_is_ground(obj);
 	if ( a->pattern.object_is_literal )
+	{ close_query(q);
 	  return FALSE;			/* rdf_reachable(literal(...),?,?) */
+	}
 	target_term = obj;
       } else if ( !PL_is_variable(obj) )	/* obj .... subj */
       {	switch(get_partial_triple(db, 0, pred, obj, 0, &a->pattern))
 	{ case 0:
+	  { close_query(q);
 	    return directly_attached(pred, obj, subj);
+	  }
 	  case -1:
+	  { close_query(q);
 	    return FALSE;
+	  }
 	}
 	if ( a->pattern.object_is_literal )
+	{ close_query(q);
 	  return FALSE;			/* rdf_reachable(-,+,literal(...)) */
+	}
 	target_term = subj;
       } else
+      { close_query(q);
 	return PL_instantiation_error(subj);
+      }
 
-      a->query = open_query(db);
       if ( (a->pattern.indexed & BY_S) )		/* subj ... */
 	append_agenda(db, a, a->pattern.subject, 0);
       else
