@@ -1055,7 +1055,6 @@ merge_clouds(rdf_db *db, predicate_cloud *c1, predicate_cloud *c2, query *q)
       }
 
       cloud = append_clouds(db, cloud, reindex, FALSE);
-      Sdprintf("FIXME: Copy %ld triples to %p\n", (long)copy_count, reindex);
     }
   } else
   { cloud = c1;
@@ -5184,11 +5183,13 @@ next_sub_property(search_state *state)
 	return FALSE;			/* Cloud has only one hash */
     }
 
-    tw->unbounded_hash ^= state->p_cloud->alt_hashes[state->alt_hash_cursor];
-    tw->unbounded_hash ^= state->p_cloud->alt_hashes[++state->alt_hash_cursor];
-    rewind_triple_walker(tw);
+    if ( state->alt_hash_cursor < state->p_cloud->alt_hash_count )
+    { tw->unbounded_hash ^= state->p_cloud->alt_hashes[state->alt_hash_cursor];
+      tw->unbounded_hash ^= state->p_cloud->alt_hashes[++state->alt_hash_cursor];
+      rewind_triple_walker(tw);
 
-    return TRUE;
+      return TRUE;
+    }
   }
 
   return FALSE;
