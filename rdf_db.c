@@ -1042,16 +1042,13 @@ merge_clouds(rdf_db *db, predicate_cloud *c1, predicate_cloud *c2, query *q)
     { cloud = append_clouds(db, c1, c2, TRUE);
     } else
     { predicate_cloud *reindex;
-      size_t copy_count;
 
       if ( tc2 < tc1 )
       { cloud = c1;
 	reindex = c2;
-	copy_count = tc2;
       } else
       { cloud = c2;
 	reindex = c1;
-	copy_count = tc1;
       }
 
       cloud = append_clouds(db, cloud, reindex, FALSE);
@@ -3891,6 +3888,7 @@ load_db(rdf_db *db, IOSTREAM *in, ld_context *ctx)
   if ( !load_magic(in) )
     return FALSE;
   version = (int)load_int(in);
+  (void)version;
 
   while((c=Sgetc(in)) != EOF)
   { switch(c)
@@ -5011,6 +5009,7 @@ init_cursor_from_literal(search_state *state, literal *cursor)
   p->indexed &= ~BY_G;			/* No graph indexing supported */
   if ( p->indexed == BY_SO )
     p->indexed = BY_S;			/* we do not have index BY_SO */
+					/* FIXME: Not handled below */
 
   switch(p->indexed)			/* keep in sync with triple_hash_key() */
   { case BY_O:
@@ -5028,6 +5027,8 @@ init_cursor_from_literal(search_state *state, literal *cursor)
       iv = 0;				/* make compiler silent */
       assert(0);
   }
+
+  /* FIXME: we need to use iv!! */
 
   init_triple_walker(&state->cursor, state->db, p, p->indexed);
   state->literal_cursor = cursor;
@@ -5348,7 +5349,9 @@ rdf(term_t subject, term_t predicate, term_t object,
       state->flags     = flags;
 
       if ( !init_search_state(state, q) )
+      { free_search_state(state);
 	return FALSE;
+      }
 
       goto search;
     }
