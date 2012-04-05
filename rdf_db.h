@@ -452,11 +452,13 @@ typedef struct search_state
   skiplist_enum literal_state;		/* Literal search state */
   literal      *literal_cursor;		/* pointer in current literal */
   literal_ex    lit_ex;			/* extended literal for fast compare */
+  literal      *lit_start;		/* for restarting literal search */
   triple_walker cursor;			/* Pointer in triple DB */
   struct query *query;			/* Associated query */
   predicate_cloud *p_cloud;		/* Searched predicate cloud */
   int		alt_hash_cursor;	/* Index in alternative hashes */
   triple	pattern;		/* Pattern triple */
+  triple	saved_pattern;		/* For inverse */
 } search_state;
 
 #include "query.h"

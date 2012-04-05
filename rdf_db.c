@@ -4558,13 +4558,16 @@ get_partial_triple(rdf_db *db,
 
 
 static int
-inverse_partial_triple(triple *t)
-{ predicate *i = 0;
+inverse_partial_triple(triple *t, triple *save)
+{ predicate *i;
 
   if ( !t->inversed &&
-       (!t->predicate.r || (i=t->predicate.r->inverse_of)) &&
+       (!(i=t->predicate.r) || (i=t->predicate.r->inverse_of)) &&
        !t->object_is_literal )
-  { atom_t o = t->object.resource;
+  { if ( save )
+      *save = *t;
+
+    atom_t o = t->object.resource;
 
     t->object.resource = t->subject;
     t->subject = o;
@@ -5051,6 +5054,7 @@ init_search_state(search_state *state, query *query)
 				&state->lit_ex, &state->literal_state);
     if ( rlitp )
     { init_cursor_from_literal(state, *rlitp);
+      state->lit_start = *rlitp;
       state->has_literal_state = TRUE;
     } else
     { free_search_state(state);
@@ -5083,6 +5087,8 @@ init_search_state(search_state *state, query *query)
 
     if ( rlitp )
     { init_cursor_from_literal(state, *rlitp);
+      state->lit_start = *rlitp;
+      state->has_literal_state = TRUE;
     } else
     { free_search_state(state);
       return FALSE;
@@ -5195,7 +5201,8 @@ next_pattern(search_state *state)
 { triple_walker *tw = &state->cursor;
   triple *p = &state->pattern;
 
-  if ( (state->flags&MATCH_INVERSE) && inverse_partial_triple(p) )
+  if ( (state->flags&MATCH_INVERSE) &&
+       inverse_partial_triple(p, &state->saved_pattern) )
   { init_triple_walker(tw, state->db, p, p->indexed);
 
     return TRUE;
@@ -5244,8 +5251,16 @@ next_pattern(search_state *state)
     }
   }
 
-  if ( next_sub_property(state) )
+  if ( next_sub_property(state) )	/* redo search with alternative hash */
+  { if ( p->inversed )
+    { *p = state->saved_pattern;
+      init_triple_walker(tw, state->db, p, p->indexed);
+    } else if ( state->lit_start )
+    { init_cursor_from_literal(state, state->lit_start);
+    }
+
     return TRUE;
+  }
 
   return FALSE;
 }
@@ -6393,7 +6408,7 @@ bf_expand(rdf_db *db, agenda *a, atom_t resource, uintptr_t d, query *q)
 	  return rc;
       }
     }
-    if ( inverse_partial_triple(&pattern) )
+    if ( inverse_partial_triple(&pattern, NULL) )
       continue;
     break;
   }
