@@ -50,6 +50,8 @@ loop(I) :-
 
 :- listen(graph(Action), update_graph(Action)).
 
+update_graph(Action) :-
+	debug(subprop, '~p', [Action]).
 update_graph(reset) :-
 	cleanup.
 update_graph(add_node(I)) :-
