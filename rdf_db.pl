@@ -686,13 +686,30 @@ rdf_gc(CPU) :-
 
 %%	rdf_gc is det.
 %
-%	Run the RDF-DB garbage collector. The collector is typically ran
-%	in a seperate thread. Its  execution   does  not  interfere with
-%	readers and only synchronizes  with   writers  using  short-held
-%	locks.
+%	Run the RDF-DB garbage collector until   no  garbage is left and
+%	all  tables  are  fully  optimized.  Under  normal  operation  a
+%	seperate thread with  identifier   =__rdf_GC=  performs  garbage
+%	collection as long as it is considered `useful'.
+%
+%	Using rdf_gc/0 should only be  needed   to  ensure a fully clean
+%	database for analysis purposes such as leak detection.
 
 rdf_gc :-
-	rdf_gc(_).
+	has_garbage, !,
+	rdf_gc(_),
+	rdf_gc.
+rdf_gc.
+
+%%	has_garbage is semidet.
+%
+%	True if there is something to gain using GC.
+
+has_garbage :-
+	rdf_gc_info_(Info),
+	(   arg(2, Info, Garbage), Garbage > 0
+	->  true
+	;   arg(3, Info, Optimizable), Optimizable > 0
+	).
 
 %%	consider_gc(+CPU) is semidet.
 %
