@@ -328,8 +328,9 @@ lshare(1) :-
 lshare(2) :-
 	rdf_assert(a,b,literal(aap)),
 	rdf_retractall(a,b,literal(aap)),
+	rdf_gc,
 	rdf_statistics(literals(X)),
-	X == 0.
+	expect(X == 0).
 lshare(3) :-
 	rdf_assert(a,b,literal(aap)),
 	rdf_assert(a,c,literal(aap)),	% shared
@@ -339,14 +340,23 @@ lshare(4) :-
 	rdf_assert(a,c,literal(aap)),
 	rdf_retractall(a,b,literal(aap)),
 	rdf_retractall(a,c,literal(aap)),
+	rdf_gc,
 	rdf_statistics(literals(X)),
-	X == 0.
+	expect(X == 0).
 lshare(5) :-
-	rdf_assert(a,b,literal(aap)),
-	rdf_assert(a,b,literal(aap)),
+	rdf_assert(a,b,literal(aap), g1),
+	rdf_assert(a,b,literal(aap), g2),
+	rdf_statistics(literals(X1)),
+	expect(X1 == 1),
 	rdf_retractall(a,b,literal(aap)),
+	rdf_gc,
 	rdf_statistics(literals(X)),
-	X == 0.
+	expect(X == 0).
+
+expect(Goal) :-
+	Goal, !.
+expect(Goal) :-
+	print_message(error, format('FALSE: ~q', [Goal])).
 
 
 		 /*******************************
