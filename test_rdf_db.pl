@@ -356,7 +356,8 @@ lshare(5) :-
 expect(Goal) :-
 	Goal, !.
 expect(Goal) :-
-	print_message(error, format('FALSE: ~q', [Goal])).
+	print_message(error, format('FALSE: ~q', [Goal])),
+	fail.
 
 
 		 /*******************************
@@ -805,8 +806,8 @@ unload(1) :-
 	rdf_statistics(triples(T1)),
 	rdf_load(dc),
 	rdf_statistics(triples(T2)),
-	T0 == T2,
-	T1 == 0.
+	expect(T0 == T2),
+	expect(T1 == 0).
 
 		 /*******************************
 		 *	      SCRIPTS		*
