@@ -8,10 +8,12 @@
 	    u/1,			% InVisible
 	    l/0,			% List
 	    r/0,			% reset
+	    run/1,			% +Test
 	    {}/1,			% transaction
-	    (@)/2,			% Action @ Context (Synchronous)
+	    (@@)/2,			% Action @ Context (Synchronous)
 	    (@@)/1,			% Action in snapshot
 	    k/0,			% Kill helper threads
+	    k/1,			% Kill a specific helper
 	    a/0,			% Run all tests
 	    snap/1,
 	    op(200, xfx, @@),
@@ -43,7 +45,7 @@
 	rdf_assert(S,P,O),
 	(   var(Name)
 	->  Name = rdf(S,P,O)
-	;   assert(triple(Name, rdf(S,P,O)))
+	;   assertz(triple(Name, rdf(S,P,O)))
 	).
 + rdf(S,P,O) :- !,
 	mk_spo(S,P,O),
@@ -70,7 +72,7 @@ mk(Prefix, R) :-
 	rdf_retractall(S,P,O),
 	(   var(Name)
 	->  Name = rdf(S,P,O)
-	;   assert(triple(Name, rdf(S,P,O)))
+	;   assertz(triple(Name, rdf(S,P,O)))
 	).
 - rdf(S,P,O) :- !,
 	rdf_retractall(S,P,O).
@@ -112,6 +114,8 @@ v(Name) :-
 
 u(rdf(S,P,O)) :- !,
 	false((rdf(S,P,O))).
+u(+rdf(S,P,O)) :- !,
+	false((rdf_has(S,P,O))).
 u(Name) :-
 	ground(Name),
 	triple(Name, Triple),
@@ -145,13 +149,13 @@ o(Name, T) :-
 true(G) :-
 	G, !.
 true(G) :-
-	format(user_error, 'FALSE: ~q~n', [G]),
+	print_message(error, false(G)),
 	backtrace(5),
 	throw(test_failed).
 
 false(G) :-
 	G, !,
-	format(user_error, 'TRUE: ~q~n', [G]),
+	print_message(error, true(G)),
 	backtrace(5),
 	throw(test_failed).
 false(_).
@@ -174,7 +178,11 @@ snap(X) :-
 %
 %	Run G (as once/1) in Context. Context  is either a snapshot or a
 %	seperate thread. If Context is a thread, wait for its completion
-%	(synchronous execution).
+%	(synchronous execution).  The construct
+%
+%		{G} @@ {T}
+%
+%	runs the helper thread as a transaction.
 
 :- dynamic
 	helper/1.
@@ -186,11 +194,18 @@ snap(X) :-
 (M:{}(G)) @@ T :-
 	(   var(T)
 	->  thread_create(helper, T, []),
-	    assert(helper(T))
-	;   true
+	    assert(helper(T)),
+	    Helper = T
+	;   T = {Helper}
+	->  (   var(Helper)
+	    ->	thread_create(rdf_transaction(helper), Helper, []),
+		assert(helper(Helper))
+	    ;	true
+	    )
+	;   Helper = T
 	),
 	thread_self(Me),
-	thread_send_message(T, run(M:G, Me)),
+	thread_send_message(Helper, run(M:G, Me)),
 	thread_get_message(Reply),
 	(   Reply = true(X)
 	->  X = M:G
@@ -214,6 +229,11 @@ k :-
 	       (   thread_send_message(Id, done),
 		   thread_join(Id, true)
 	       )).
+
+k(Id) :-
+	retract(helper(Id)), !,
+	thread_send_message(Id, done),
+	thread_join(Id, true).
 
 helper :-
 	thread_get_message(M),
@@ -379,6 +399,19 @@ test sp1 :-
 	+ P1<=P2,
 	v(+rdf(S1,P2,O1)).
 
+test sp2 :-
+	r,
+	+ rdf(S1,P1,O1),
+	{ + P1<=P2 } @@ _,
+	v(+rdf(S1,P2,O1)).
+
+test sp3 :-
+	r,
+	+ rdf(S1,P1,O1),
+	{ + P1<=P2 } @@ {_T},
+	u(+rdf(S1,P2,O1)).
+
+
 
 		 /*******************************
 		 *	    TEST DRIVER		*
@@ -404,6 +437,10 @@ a :-
 	;   format('~N~D tests passed; ~D failed~n', [Passed, Failed])
 	).
 
+%%	run(+Test)
+%
+%	Run one individual test.
+
 run(Head) :-
 	catch(Head, E, true), !,
 	k,
@@ -411,10 +448,29 @@ run(Head) :-
 	->  assert(passed(Head)),
 	    write(user_error, '.')
 	;   assert(failed(Head)),
-	    message_to_string(E, Msg),
-	    format(user_error, '~NTEST FAILED: ~q: ~w~n', [Head, Msg])
+	    (	E == test_failed
+	    ->	print_message(error, test_failed(Head))
+	    ;	print_message(error, test_failed(Head, E))
+	    )
 	).
 run(Head) :-
 	k,
 	assert(failed(Head)),
-	format(user_error, '~NTEST FAILED: ~q~n', [Head]).
+	print_message(error, test_failed(Head)).
+
+
+		 /*******************************
+		 *	      MESSAGES		*
+		 *******************************/
+
+prolog:message(test_failed) -->
+	[ 'Test failed' ].
+prolog:message(test_failed(Head)) -->
+	[ 'Test failed: ~q'-[Head] ].
+prolog:message(test_failed(Head, Error)) -->
+	[ 'Test failed: ~q: '-[Head] ],
+	'$messages':translate_message(Error).
+prolog:message(false(Goal)) -->
+	[ 'Unexpected failure: ~q'-[Goal] ].
+prolog:message(true(Goal)) -->
+	[ 'Unexpected success: ~q'-[Goal] ].
