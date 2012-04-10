@@ -328,7 +328,7 @@ is_wr_transaction_gen(query *q, gen_t gen)
 	- If the triple is created by a parent transaction it is alive
 */
 
-static char *
+char *
 gen_name(gen_t gen, char *buf)
 { static char tmp[24];
 
@@ -454,7 +454,7 @@ add_triples(query *q, triple **triples, size_t count)
     { if ( q->transaction )
 	buffer_triple(q->transaction->transaction_data.added, t);
     } else
-    { t->lifespan.born = GEN_MAX;
+    { *tp = NULL;			/* duplicate is deleted */
     }
   }
   if ( q->transaction )
@@ -467,8 +467,10 @@ add_triples(query *q, triple **triples, size_t count)
   { for(tp=triples; tp < ep; tp++)
     { triple *t = *tp;
 
-      if ( !rdf_broadcast(EV_ASSERT, t, NULL) )
-	return FALSE;
+      if ( t )
+      { if ( !rdf_broadcast(EV_ASSERT, t, NULL) )
+	  return FALSE;
+      }
     }
   }
 

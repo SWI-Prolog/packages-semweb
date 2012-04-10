@@ -1443,28 +1443,39 @@ check_predicate_cloud(predicate_cloud *c)
 
 
 static void
-print_reachability_cloud(predicate *p)
+print_reachability_cloud(rdf_db *db, predicate *p)
 { int x, y;
   predicate_cloud *cloud = p->cloud;
-  sub_p_matrix *rm = cloud->reachable;
+  sub_p_matrix *rm;
+  query *q;
 
   check_predicate_cloud(cloud);
 
-  Sdprintf("Reachability matrix:\n");
-  for(x=0; x<rm->matrix->width; x++)
-    Sdprintf("%d", x%10);
-  Sdprintf("\n");
-  for(y=0; y<rm->matrix->heigth; y++)
-  { for(x=0; x<rm->matrix->width; x++)
-    { if ( testbit(rm->matrix, x, y) )
-	Sdprintf("X");
-      else
-	Sdprintf(".");
-    }
+  q = open_query(db);
+  for(rm=cloud->reachable; rm; rm=rm->older)
+  { char b[2][24];
 
-    Sdprintf(" %2d %s\n", y, PL_atom_chars(cloud->members[y]->name));
-    assert(cloud->members[y]->label == y);
+    Sdprintf("Reachability matrix: %s..%s (%s)\n",
+	     gen_name(rm->lifespan.born, b[0]),
+	     gen_name(rm->lifespan.died, b[1]),
+	     alive_lifespan(q, &rm->lifespan) ? "alive" : "dead");
+
+    for(x=0; x<rm->matrix->width; x++)
+      Sdprintf("%d", x%10);
+    Sdprintf("\n");
+    for(y=0; y<rm->matrix->heigth; y++)
+    { for(x=0; x<rm->matrix->width; x++)
+      { if ( testbit(rm->matrix, x, y) )
+	  Sdprintf("X");
+	else
+	  Sdprintf(".");
+      }
+
+      Sdprintf(" %2d %s\n", y, PL_atom_chars(cloud->members[y]->name));
+      assert(cloud->members[y]->label == y);
+    }
   }
+  close_query(q);
 }
 
 
@@ -1476,7 +1487,7 @@ rdf_print_predicate_cloud(term_t t)
   if ( !get_existing_predicate(db, t, &p) )
     return FALSE;			/* error or no predicate */
 
-  print_reachability_cloud(p);
+  print_reachability_cloud(db, p);
 
   return TRUE;
 }
