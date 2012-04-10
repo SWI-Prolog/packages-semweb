@@ -1251,14 +1251,32 @@ check_labels_predicate_cloud(predicate_cloud *cloud)
 
 
 static void
-fill_reachable(bitmatrix *bm, predicate *p0, predicate *p, query *q)
+fill_reachable(rdf_db *db,
+	       predicate_cloud *cloud,
+	       bitmatrix *bm,
+	       predicate *p0, predicate *p,
+	       query *q)
 { if ( !testbit(bm, p0->label, p->label) )
-  { cell *c;
+  { triple pattern = {0};
+    triple *t;
+    triple_walker tw;
 
     DEBUG(2, Sdprintf("    Reachable [%s (%d)]\n", pname(p), p->label));
     setbit(bm, p0->label, p->label);
-    for(c = p->subPropertyOf.head; c; c=c->next)
-      fill_reachable(bm, p0, c->value, q);
+    pattern.subject = p0->name;
+    pattern.predicate.r = existing_predicate(db, ATOM_subPropertyOf);
+    init_triple_walker(&tw, db, &pattern, BY_SP);
+    while((t=next_triple(&tw)))
+    { predicate *super;
+
+      if ( !alive_triple(q, t) )
+	continue;
+      if ( t->object_is_literal )
+	continue;
+      super = lookup_predicate(db, t->object.resource, q);
+      assert(super->cloud == cloud);
+      fill_reachable(db, cloud, bm, p0, super, q);
+    }
   }
 }
 
@@ -1274,7 +1292,7 @@ create_reachability_matrix(rdf_db *db, predicate_cloud *cloud, query *q)
   for(i=0, p=cloud->members; i<cloud->size; i++, p++)
   { DEBUG(1, Sdprintf("Reachability for %s (%d)\n", pname(*p), (*p)->label));
 
-    fill_reachable(m, *p, *p, q);
+    fill_reachable(db, cloud, m, *p, *p, q);
   }
 
   rm->lifespan.born = q->rd_gen;
@@ -4865,7 +4883,7 @@ mark_duplicate(rdf_db *db, triple *t, query *q)
 
   init_triple_walker(&tw, db, t, indexed);
   while((d=next_triple(&tw)) && d != t)
-  { if ( !alive_triple(q, t) )
+  { if ( !alive_triple(q, d) )
       continue;
 
     if ( match_triples(db, d, t, q, MATCH_DUPLICATE) )
