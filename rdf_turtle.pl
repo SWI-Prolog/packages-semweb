@@ -37,7 +37,7 @@
 	  ]).
 :- use_module(library(assoc)).
 :- use_module(library(option)).
-:- use_module(library('semweb/rdf_db')).
+:- use_module(library(semweb/rdf_db)).
 :- use_module(library(debug)).
 :- use_module(library(uri)).
 :- use_module(library(record)).
