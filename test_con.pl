@@ -408,8 +408,10 @@ test sp2 :-
 test sp3 :-
 	r,
 	+ rdf(S1,P1,O1),
-	{ + P1<=P2 } @@ {_T},
-	u(+rdf(S1,P2,O1)).
+	{ + P1<=P2 } @@ {T},
+	u(+rdf(S1,P2,O1)),
+	k(T),
+	v(+rdf(S1,P2,O1)).
 
 
 
