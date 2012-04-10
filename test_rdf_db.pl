@@ -357,6 +357,7 @@ expect(Goal) :-
 	Goal, !.
 expect(Goal) :-
 	print_message(error, format('FALSE: ~q', [Goal])),
+	backtrace(3),
 	fail.
 
 
@@ -796,6 +797,28 @@ source(1) :-
 	X == 'test.rdf'.
 
 		 /*******************************
+		 *	       RETRACT		*
+		 *******************************/
+
+delete(1) :-
+	rdf_assert(s,p,o),
+	rdf_retractall(s,p,o),
+	rdf_statistics(triples(Count)),
+	expect(Count == 0).
+delete(2) :-
+	rdf_assert(s,p,o),
+	rdf_transaction(rdf_retractall(s,p,o)),
+	rdf_statistics(triples(Count)),
+	expect(Count == 0).
+delete(3) :-
+	rdf_transaction(rdf_assert(s,p,o)),
+	rdf_transaction(rdf_retractall(s,p,o)),
+	rdf_transaction(rdf_assert(s,p,o)),
+	rdf_statistics(triples(Count)),
+	expect(Count == 1).
+
+
+		 /*******************************
 		 *	        UNLOAD		*
 		 *******************************/
 
@@ -901,6 +924,7 @@ testset(ptree).
 testset(reachable).
 testset(duplicates).
 testset(source).
+testset(delete).
 testset(unload).
 
 %	testdir(Dir)

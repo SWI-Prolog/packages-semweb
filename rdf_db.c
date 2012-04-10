@@ -246,7 +246,7 @@ static void unlock_atoms_literal(literal *lit);
 
 static size_t	triple_hash_key(triple *t, int which);
 static size_t	object_hash(triple *t);
-static dub_state mark_duplicate(rdf_db *db, triple *t);
+static dub_state mark_duplicate(rdf_db *db, triple *t, query *q);
 static void	link_triple_hash(rdf_db *db, triple *t);
 static void	init_triple_walker(triple_walker *tw, rdf_db *db,
 				   triple *t, int index);
@@ -989,7 +989,7 @@ append_clouds(rdf_db *db,
 	      int update_hash)
 { int i;
 
-					/* assumes realloc(NULL, size) works */
+				/* assumes realloc(NULL, size) works */
   c1->members = rdf_realloc(db, c1->members,
 			    c1->size*sizeof(predicate*),
 			    (c1->size+c2->size)*sizeof(predicate*));
@@ -1856,7 +1856,8 @@ rdf_graph(term_t name, control_t h)
 
 next:
   if ( !(g=eg->g) )
-  { while (!(g = db->graphs.blocks[MSB(eg->i)][eg->i]) )
+  { while ( !(g = db->graphs.blocks[MSB(eg->i)][eg->i]) ||
+	    g->triple_count == 0 )
     { if ( ++eg->i >= db->graphs.bucket_count )
 	goto fail;
     }
@@ -3097,7 +3098,7 @@ link_triple(rdf_db *db, triple *t, query *q)
   if ( t->linked )
     return FALSE;
 
-  if ( (dup=mark_duplicate(db, t)) == DUP_DISCARDED )
+  if ( (dup=mark_duplicate(db, t, q)) == DUP_DISCARDED )
     return FALSE;
 
   if ( t->object_is_literal )
@@ -3131,12 +3132,16 @@ MT: Caller must be hold db->queries.write.lock
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 void
-erase_triple(rdf_db *db, triple *t, query *q)
+del_triple_consequences(rdf_db *db, triple *t, query *q)
 { if ( t->predicate.r->name == ATOM_subPropertyOf &&
        t->object_is_literal == FALSE )
     delSubPropertyOf(db, t, q);
+}
 
-  unregister_graph(db, t);		/* Updates count and MD5 */
+
+void
+erase_triple(rdf_db *db, triple *t, query *q)
+{ unregister_graph(db, t);		/* Updates count and MD5 */
   unregister_predicate(db, t);		/* Updates count */
   if ( t->is_duplicate )
     db->duplicates--;
@@ -4845,7 +4850,7 @@ results.  Duplicate marks may be removed by GC.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static dub_state
-mark_duplicate(rdf_db *db, triple *t)
+mark_duplicate(rdf_db *db, triple *t, query *q)
 { triple_walker tw;
   triple *d;
   const int indexed = BY_SPO;
@@ -4855,7 +4860,10 @@ mark_duplicate(rdf_db *db, triple *t)
 
   init_triple_walker(&tw, db, t, indexed);
   while((d=next_triple(&tw)) && d != t)
-  { if ( match_triples(db, d, t, NULL, MATCH_DUPLICATE) ) /* query doesn't matter */
+  { if ( !alive_triple(q, t) )
+      continue;
+
+    if ( match_triples(db, d, t, q, MATCH_DUPLICATE) )
     { if ( d->graph == t->graph &&
 	   (d->line == NO_LINE || d->line == t->line) )
       { free_triple(db, t, FALSE);

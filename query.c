@@ -465,6 +465,16 @@ add_triples(query *q, triple **triples, size_t count)
 }
 
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+del_triples() deletes triples from the database.  There are two actions:
+
+  - del_triple_consequences() deletes (entailment) consequences of
+    erasing the triple.  Currently this is handling subPropertyOf
+    entailment.  This doesn't remove the triple, but merely invalidates
+    the subPropertyOf reachability matrix for subsequent generations.
+  - erase_triple() is called on the final commit and updates statistics.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 int
 del_triples(query *q, triple **triples, size_t count)
 { rdf_db *db = q->db;
@@ -482,9 +492,12 @@ del_triples(query *q, triple **triples, size_t count)
 
     t->lifespan.died = gen;
     if ( q->transaction )
+    { del_triple_consequences(db, t, q);
       buffer_triple(q->transaction->transaction_data.deleted, t);
-    else
+    } else
+    { del_triple_consequences(db, t, q);
       erase_triple(db, t, q);
+    }
   }
   if ( q->transaction )
     q->transaction->wr_gen = gen;
@@ -589,7 +602,10 @@ commit_transaction(query *q)
     if ( t->lifespan.died == q->wr_gen )
     { t->lifespan.died = gen;
       if ( q->transaction )
-	buffer_triple(q->transaction->transaction_data.deleted, t);
+      { buffer_triple(q->transaction->transaction_data.deleted, t);
+      } else
+      { erase_triple(db, t, q);
+      }
     }
   }
   if ( q->transaction )
