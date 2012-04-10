@@ -256,6 +256,7 @@ static void	free_triple(rdf_db *db, triple *t, int linger);
 static sub_p_matrix *create_reachability_matrix(rdf_db *db,
 						predicate_cloud *cloud,
 						query *q);
+static void	free_reachability_matrix(rdf_db *db, sub_p_matrix *rm);
 static int	get_predicate(rdf_db *db, term_t t, predicate **p, query *q);
 static int	get_existing_predicate(rdf_db *db, term_t t, predicate **p);
 static predicate_cloud *new_predicate_cloud(rdf_db *db,
@@ -931,9 +932,10 @@ new_predicate_cloud(rdf_db *db, predicate **p, size_t count, query *q)
     memcpy(cloud->members, p, sizeof(predicate*)*count);
 
     for(i=0, p2=cloud->members; i<cloud->size; i++, p2++)
-      (*p2)->cloud = cloud;
+    { (*p2)->cloud = cloud;
+      (*p2)->label = i;
+    }
   }
-  create_reachability_matrix(db, cloud, q);
 
   return cloud;
 }
@@ -941,9 +943,17 @@ new_predicate_cloud(rdf_db *db, predicate **p, size_t count, query *q)
 
 static void
 free_predicate_cloud(rdf_db *db, predicate_cloud *cloud)
-{ if ( cloud->members )
-  { rdf_free(db, cloud->members, sizeof(predicate*)*cloud->size);
+{ sub_p_matrix *rm, *rm2;
+
+  if ( cloud->members )
+    rdf_free(db, cloud->members, sizeof(predicate*)*cloud->size);
+
+  for(rm=cloud->reachable; rm; rm=rm2)
+  { rm2 = rm->older;
+
+    free_reachability_matrix(db, rm);
   }
+
 
   rdf_free(db, cloud, sizeof(*cloud));
 }
@@ -979,9 +989,7 @@ append_clouds(rdf_db *db,
 	      int update_hash)
 { int i;
 
-  assert(c1->size > 0);
-  assert(c2->size > 0);
-
+					/* assumes realloc(NULL, size) works */
   c1->members = rdf_realloc(db, c1->members,
 			    c1->size*sizeof(predicate*),
 			    (c1->size+c2->size)*sizeof(predicate*));
@@ -995,6 +1003,7 @@ append_clouds(rdf_db *db,
     if ( update_hash )
       p->hash = c1->hash;
   }
+  c1->size += c2->size;
 
   free_predicate_cloud(db, c2);		/* FIXME: Leave to GC */
 
@@ -1249,12 +1258,12 @@ testbit(bitmatrix *m, int i, int j)
 
 
 static int
-label_predicate_cloud(predicate_cloud *cloud)
+check_labels_predicate_cloud(predicate_cloud *cloud)
 { predicate **p;
   int i;
 
   for(i=0, p=cloud->members; i<cloud->size; i++, p++)
-    (*p)->label = i;
+    assert((*p)->label == i);
 
   return i;
 }
@@ -1280,14 +1289,14 @@ create_reachability_matrix(rdf_db *db, predicate_cloud *cloud, query *q)
   predicate **p;
   int i;
 
-  label_predicate_cloud(cloud);
+  check_labels_predicate_cloud(cloud);
   for(i=0, p=cloud->members; i<cloud->size; i++, p++)
   { DEBUG(1, Sdprintf("Reachability for %s (%d)\n", pname(*p), (*p)->label));
 
     fill_reachable(m, *p, *p, q);
   }
 
-  rm->lifespan.born = q->wr_gen;
+  rm->lifespan.born = q->rd_gen;
   rm->lifespan.died = GEN_MAX;
   rm->matrix = m;
   rm->older = cloud->reachable;
@@ -1295,6 +1304,18 @@ create_reachability_matrix(rdf_db *db, predicate_cloud *cloud, query *q)
   cloud->reachable = rm;
 
   return rm;
+}
+
+
+/* FIXME: we probably cannot guarantee these are not being
+   accessed.  I.e., we must use GC lingering on them
+*/
+
+static void
+free_reachability_matrix(rdf_db *db, sub_p_matrix *rm)
+{ free_bitmatrix(db, rm->matrix);
+
+  rdf_free(db, rm, sizeof(*rm));
 }
 
 
