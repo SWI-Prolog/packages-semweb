@@ -301,39 +301,6 @@ typedef struct triple
 } triple;
 
 
-typedef enum
-{ TR_MARK,				/* mark start for nesting */
-  TR_SUB_START,				/* start nested transaction */
-  TR_SUB_END,				/* end nested transaction */
-  TR_ASSERT,				/* rdf_assert */
-  TR_RETRACT,				/* rdf_retractall */
-  TR_UPDATE,				/* rdf_update */
-  TR_UPDATE_MD5,			/* update md5 src */
-  TR_RESET,				/* rdf_reset_db */
-  TR_VOID				/* no-op */
-} tr_type;
-
-
-typedef struct transaction_record
-{ struct transaction_record    *previous;
-  struct transaction_record    *next;
-  tr_type			type;
-  triple		       *triple;		/* new/deleted triple */
-  union
-  { triple		       *triple;		/* used for update */
-    struct
-    { atom_t			atom;
-      unsigned long		line;
-    } src;
-    struct
-    { graph		       *graph;
-      md5_byte_t	       *digest;
-    } md5;
-    record_t		       transaction_id;
-  } update;
-} transaction_record;
-
-
 typedef struct active_transaction
 { struct active_transaction *parent;
   term_t id;
