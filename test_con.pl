@@ -38,14 +38,14 @@
 %
 %	Assert a triple, optionally giving it a name.
 
-+ Name^{S,P,O} :- !,
++ Name^rdf(S,P,O) :- !,
 	mk_spo(S,P,O),
 	rdf_assert(S,P,O),
 	(   var(Name)
 	->  Name = rdf(S,P,O)
 	;   assert(triple(Name, rdf(S,P,O)))
 	).
-+ {S,P,O} :- !,
++ rdf(S,P,O) :- !,
 	mk_spo(S,P,O),
 	rdf_assert(S,P,O).
 + Sub<=Super :-
@@ -66,13 +66,13 @@ mk(Prefix, R) :-
 %
 %	Retract a triple, normally referenced by name.
 
-- Name^{S,P,O} :- !,
+- Name^rdf(S,P,O) :- !,
 	rdf_retractall(S,P,O),
 	(   var(Name)
 	->  Name = rdf(S,P,O)
 	;   assert(triple(Name, rdf(S,P,O)))
 	).
-- {S,P,O} :- !,
+- rdf(S,P,O) :- !,
 	rdf_retractall(S,P,O).
 - rdf(S,P,O) :- !,
 	rdf_retractall(S,P,O).
@@ -85,9 +85,7 @@ mk(Prefix, R) :-
 %
 %	True if triple Id is visible.
 
-v({S,P,O}) :- !,
-	v(rdf(S,P,O)).
-v(+{S,P,O}) :- !,
+v(+rdf(S,P,O)) :- !,
 	v(rdf_has(S,P,O)).
 v(rdf(S,P,O)) :- !,
 	true((rdf(S,P,O))),
@@ -250,7 +248,7 @@ r :-
 
 l :-
 	forall(rdf(S,P,O),
-	       format('{~q, ~q, ~q}~n', [S,P,O])).
+	       format('<~q, ~q, ~q>~n', [S,P,O])).
 
 
 db(RDF) :-
@@ -272,7 +270,7 @@ term_expansion((test Head :- Body),
 
 test t1 :-				% asserted triple in failed
 	r,				% transaction disappears
-	(  { + a^{_},
+	(  { + a^_,
 	     fail
 	   }
 	;  true
@@ -280,15 +278,15 @@ test t1 :-				% asserted triple in failed
 	u(a).
 test t2 :-				% asserted triple in transaction
 	r,				% is visible inside and outside
-	{ + a^{_},
+	{ + a^_,
 	  v(a)
 	},
 	v(a).
 test t3 :-
 	r,
-	{ + a^{_},
+	{ + a^_,
 	  { v(a),
-	    + b^{_},
+	    + b^_,
 	    v(b)
 	  },
 	  v(b)
@@ -296,26 +294,26 @@ test t3 :-
 	v(a).
 test t4 :-
 	r,
-	+ a^{_},
+	+ a^_,
 	{ v(a)
 	}.
 test t5 :-
 	r,
-	+ a^{_},
+	+ a^_,
 	{ - a,
 	  u(a)
 	},
 	u(a).
 test t6 :-
 	r,
-	+ a^{_},
+	+ a^_,
 	{ - a,
 	  u(a)
 	},
 	u(a).
 test t7 :-
 	r,
-	+ a^{_},
+	+ a^_,
 	(   { - a,
 	      u(a),
 	      fail
@@ -326,15 +324,15 @@ test t7 :-
 						% property handling tests
 test p1 :-
 	r,
-	+ {s,p,_},
-	+ B^{s,p,_},
+	+ rdf(s,p,_),
+	+ B^rdf(s,p,_),
 	rdf(s,p,O),
 	- B,
 	o(B, O).
 test p2 :-
 	r,
-	+ {s,p,_},
-	+ B^{s,p,_},
+	+ rdf(s,p,_),
+	+ B^rdf(s,p,_),
 	rdf(s,p,O),
 	{- B} @@ H,
 	{u(B)} @@ H,
@@ -342,33 +340,33 @@ test p2 :-
 	o(B, O).
 test p3 :-
 	r,
-	+ B^{s,p,_},
+	+ B^rdf(s,p,_),
 	{-B}@@_,
 	u(B).
 						% snapshot tests
 test s1 :-
 	r,
-	+ a^{_},
+	+ a^_,
 	snap(S),
-	+ b^{_},
+	+ b^_,
 	{ u(b) }@@S.
 test s2 :-
 	r,
-	+ a^{_},
+	+ a^_,
 	snap(S),
-	{ + b^{_}
+	{ + b^_
 	}@@S,
 	u(b).
 test s3 :-
 	r,
-	+ a^{_},
+	+ a^_,
 	snap(S),
 	{ - a
 	}@@S,
 	v(a).
 test s4 :-
 	r,
-	+ a^{_},
+	+ a^_,
 	{ - a
 	}@@,
 	v(a).
@@ -377,9 +375,9 @@ test s4 :-
 
 test sp1 :-
 	r,
-	+ {S1,P1,O1},
+	+ rdf(S1,P1,O1),
 	+ P1<=P2,
-	v(+{S1,P2,O1}).
+	v(+rdf(S1,P2,O1)).
 
 
 		 /*******************************
