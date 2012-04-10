@@ -14,7 +14,7 @@
 	    k/0,			% Kill helper threads
 	    a/0,			% Run all tests
 	    snap/1,
-	    op(200, xfx, @),
+	    op(200, xfx, @@),
 	    op(200, xf,  @@),
 	    op(200, xfy, <=)
 	  ]).
@@ -28,7 +28,7 @@
 	true(0),
 	false(0),
 	{}(0),
-	@(:,?),
+	@@(:,?),
 	@@(:).
 
 :- thread_local
@@ -172,7 +172,7 @@ false(_).
 snap(X) :-
 	rdf_snapshot(X).
 
-%%	{G}@Context
+%%	{G}@@Context
 %
 %	Run G (as once/1) in Context. Context  is either a snapshot or a
 %	seperate thread. If Context is a thread, wait for its completion
@@ -181,11 +181,11 @@ snap(X) :-
 :- dynamic
 	helper/1.
 
-(M:{}(G)) @ Snapshot :-
+(M:{}(G)) @@ Snapshot :-
 	nonvar(Snapshot),
 	rdf_current_snapshot(Snapshot), !,
 	rdf_transaction(M:G, _Id, [snapshot(Snapshot)]).
-(M:{}(G)) @ T :-
+(M:{}(G)) @@ T :-
 	(   var(T)
 	->  thread_create(helper, T, []),
 	    assert(helper(T))
@@ -204,7 +204,7 @@ snap(X) :-
 %
 %	Run G in a snapshot.
 
-(M:{}(G)) @@ :-
+((M:{}(G)) @@) :-
 	rdf_transaction(M:G, _Id, [snapshot(true)]).
 
 %%	k
@@ -336,14 +336,14 @@ test p2 :-
 	+ {s,p,_},
 	+ B^{s,p,_},
 	rdf(s,p,O),
-	{- B} @ H,
-	{u(B)} @ H,
+	{- B} @@ H,
+	{u(B)} @@ H,
 	u(B),
 	o(B, O).
 test p3 :-
 	r,
 	+ B^{s,p,_},
-	{-B}@_,
+	{-B}@@_,
 	u(B).
 						% snapshot tests
 test s1 :-
@@ -351,20 +351,20 @@ test s1 :-
 	+ a^{_},
 	snap(S),
 	+ b^{_},
-	{ u(b) }@S.
+	{ u(b) }@@S.
 test s2 :-
 	r,
 	+ a^{_},
 	snap(S),
 	{ + b^{_}
-	}@S,
+	}@@S,
 	u(b).
 test s3 :-
 	r,
 	+ a^{_},
 	snap(S),
 	{ - a
-	}@S,
+	}@@S,
 	v(a).
 test s4 :-
 	r,
