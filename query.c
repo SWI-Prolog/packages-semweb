@@ -512,7 +512,16 @@ del_triples(query *q, triple **triples, size_t count)
   else
     db->queries.generation = gen;
   simpleMutexUnlock(&db->queries.write.lock);
-				/* TBD: broadcast(EV_RETRACT, t, NULL); */
+
+  if ( !q->transaction )
+  { for(tp=triples; tp < ep; tp++)
+    { triple *t = *tp;
+
+      if ( !rdf_broadcast(EV_RETRACT, t, NULL) )
+	return FALSE;
+    }
+  }
+
   return TRUE;
 }
 
@@ -627,12 +636,23 @@ commit_transaction(query *q)
 					/* Broadcast new triples */
   if ( !q->transaction )
   { for(tp=q->transaction_data.added->base;
-      tp<q->transaction_data.added->top;
-      tp++)
+	tp<q->transaction_data.added->top;
+	tp++)
     { triple *t = *tp;
 
       if ( t->lifespan.born == gen )
       { if ( !rdf_broadcast(EV_ASSERT, t, NULL) )
+	  return FALSE;
+      }
+    }
+
+    for(tp=q->transaction_data.deleted->base;
+	tp<q->transaction_data.deleted->top;
+	tp++)
+    { triple *t = *tp;
+
+      if ( t->lifespan.died == gen )
+      { if ( !rdf_broadcast(EV_RETRACT, t, NULL) )
 	  return FALSE;
       }
     }

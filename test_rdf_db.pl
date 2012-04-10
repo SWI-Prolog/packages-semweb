@@ -640,6 +640,8 @@ rdf_retractall(term) :-
 		 *	       MONITOR		*
 		 *******************************/
 
+%do_monitor(Event) :-
+%	writeln(Event), fail.
 do_monitor(assert(S, P, O, DB)) :-
 	atom(O),
 	ip(P, IP),
@@ -660,7 +662,12 @@ monitor(transaction-1) :-
 	findall(rdf(S,P,O), rdf(S,P,O), DB),
 	expect(DB == [ rdf(x, a, y),
 		       rdf(y, ia, x)
-		     ]).
+		     ]),
+	rdf_monitor(do_monitor, []),
+	rdf_transaction(rdf_retractall(x, a, y, db)),
+	rdf_monitor(do_monitor, [-all]),
+	expect(\+rdf(_,_,_)).
+
 
 
 		 /*******************************
