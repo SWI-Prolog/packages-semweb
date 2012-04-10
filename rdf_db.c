@@ -1274,7 +1274,7 @@ fill_reachable(rdf_db *db,
 
     DEBUG(2, Sdprintf("    Reachable [%s (%d)]\n", pname(p), p->label));
     setbit(bm, p0->label, p->label);
-    pattern.subject = p0->name;
+    pattern.subject = p->name;
     pattern.predicate.r = existing_predicate(db, ATOM_subPropertyOf);
     init_triple_walker(&tw, db, &pattern, BY_SP);
     while((t=next_triple(&tw)))
