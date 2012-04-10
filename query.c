@@ -336,14 +336,14 @@ gen_name(gen_t gen, char *buf)
     buf = tmp;
   if ( gen == GEN_UNDEF ) return "GEN_UNDEF";
   if ( gen == GEN_MAX   ) return "GEN_MAX";
-  if ( gen > GEN_TBASE )
+  if ( gen >= GEN_TBASE )
   { int tid = (gen-GEN_TBASE)/GEN_TNEST;
     gen_t r = (gen-GEN_TBASE)%GEN_TNEST;
 
-    Ssprintf(buf, "T%d+%ld", tid, (long)r);
+    Ssprintf(buf, "T%d+%lld", tid, (int64_t)r);
     return buf;
   }
-  Ssprintf(buf, "%ld", (long)gen);
+  Ssprintf(buf, "%lld", (int64_t)gen);
   return buf;
 }
 
