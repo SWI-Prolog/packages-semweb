@@ -464,6 +464,28 @@ typedef struct search_state
 
 #include "query.h"
 
+
+		 /*******************************
+		 *	      BROADCASTS	*
+		 *******************************/
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+The ids form a mask. This must be kept consistent with monitor_mask/2 in
+rdf_db.pl!
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+typedef enum
+{ EV_ASSERT      = 0x0001,		/* triple */
+  EV_ASSERT_LOAD = 0x0002,		/* triple */
+  EV_RETRACT     = 0x0004,		/* triple */
+  EV_UPDATE      = 0x0008,		/* old, new */
+  EV_NEW_LITERAL = 0x0010,		/* literal */
+  EV_OLD_LITERAL = 0x0020,		/* literal */
+  EV_TRANSACTION = 0x0040,		/* id, begin/end */
+  EV_LOAD	 = 0x0080		/* id, begin/end */
+} broadcast_id;
+
+
 		 /*******************************
 		 *	      FUNCTIONS		*
 		 *******************************/
@@ -476,6 +498,9 @@ COMMON(void)	erase_triple(rdf_db *db, triple *t, query *q);
 COMMON(void)	del_triple_consequences(rdf_db *db, triple *t, query *q);
 COMMON(predicate *) lookup_predicate(rdf_db *db, atom_t name, query *q);
 COMMON(rdf_db*)	rdf_current_db(void);
+COMMON(int)	rdf_broadcast(broadcast_id id, void *a1, void *a2);
+
+
 
 
 #endif /*RDFDB_H_INCLUDED*/

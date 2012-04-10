@@ -658,9 +658,9 @@ monitor(transaction-1) :-
 	rdf_transaction(rdf_assert(x, a, y, db)),
 	rdf_monitor(do_monitor, [-all]),
 	findall(rdf(S,P,O), rdf(S,P,O), DB),
-	DB == [ rdf(x, a, y),
-		rdf(y, ia, x)
-	      ].
+	expect(DB == [ rdf(x, a, y),
+		       rdf(y, ia, x)
+		     ]).
 
 
 		 /*******************************

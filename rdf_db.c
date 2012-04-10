@@ -68,25 +68,6 @@ static void dec_digest(md5_byte_t *digest, md5_byte_t *add);
 
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-The ids form a mask. This must be kept consistent with monitor_mask/2 in
-rdf_db.pl!
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-typedef enum
-{ EV_ASSERT      = 0x0001,		/* triple */
-  EV_ASSERT_LOAD = 0x0002,		/* triple */
-  EV_RETRACT     = 0x0004,		/* triple */
-  EV_UPDATE      = 0x0008,		/* old, new */
-  EV_NEW_LITERAL = 0x0010,		/* literal */
-  EV_OLD_LITERAL = 0x0020,		/* literal */
-  EV_TRANSACTION = 0x0040,		/* id, begin/end */
-  EV_LOAD	 = 0x0080		/* id, begin/end */
-} broadcast_id;
-
-static int broadcast(broadcast_id id, void *a1, void *a2);
-
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 We now use malloc/free/realloc  calls  with   explicit  sizes  to  allow
 maintaining statistics as well as to   prepare  for dealing with special
 memory  pools  associated  with  databases.  Using  -DDIRECT_MALLOC  the
@@ -2004,7 +1985,7 @@ free_literal_value(rdf_db *db, literal *lit)
     literal **data;
 
     lit->shared = FALSE;
-    rc = broadcast(EV_OLD_LITERAL, lit, NULL);
+    rc = rdf_broadcast(EV_OLD_LITERAL, lit, NULL);
     DEBUG(2,
 	  Sdprintf("Delete %p from literal table: ", lit);
 	  print_literal(lit);
@@ -2269,7 +2250,7 @@ share_literal(rdf_db *db, literal *from)
 
     assert(from->references==1);
     from->shared = TRUE;
-    broadcast(EV_NEW_LITERAL, from, NULL);
+    rdf_broadcast(EV_NEW_LITERAL, from, NULL);
     return from;
   }
 }
@@ -4026,7 +4007,7 @@ link_loaded_triples(rdf_db *db, ld_context *ctx)
   { graph = NULL;
   }
 
-					/* TBD: broadcast(EV_ASSERT_LOAD, ...) */
+				/* TBD: rdf_broadcast(EV_ASSERT_LOAD, ...) */
   for(t=ctx->triples.base; t<ctx->triples.top; t++)
     lock_atoms(db, *t);
   add_triples(ctx->query, ctx->triples.base, ctx->triples.top-ctx->triples.base);
@@ -4075,7 +4056,7 @@ rdf_load_db(term_t stream, term_t id, term_t graphs)
   { return FALSE;			/* TBD: Discard partial load */
   }
 
-  broadcast(EV_LOAD, (void*)id, (void*)ATOM_begin);
+  rdf_broadcast(EV_LOAD, (void*)id, (void*)ATOM_begin);
 
   if ( (rc=link_loaded_triples(db, &ctx)) )
   { if ( ctx.graph_table )
@@ -4090,7 +4071,7 @@ rdf_load_db(term_t stream, term_t id, term_t graphs)
     }
   }
 
-  broadcast(EV_LOAD, (void*)id, (void*)ATOM_end);
+  rdf_broadcast(EV_LOAD, (void*)id, (void*)ATOM_end);
   close_query(ctx.query);
 
   if ( ctx.loaded_atoms )
@@ -4979,13 +4960,13 @@ rdf_transaction(term_t goal, term_t id, term_t options)
 
 	if ( !(be=PL_new_term_ref()) ||
 	     !put_begin_end(be, FUNCTOR_begin1, 0) ||
-	     !broadcast(EV_TRANSACTION, (void*)id, (void*)be) ||
+	     !rdf_broadcast(EV_TRANSACTION, (void*)id, (void*)be) ||
 	     !put_begin_end(be, FUNCTOR_end1, 0) )
 	  return FALSE;
 
 	commit_transaction(q);
 
-	if ( !broadcast(EV_TRANSACTION, (void*)id, (void*)be) )
+	if ( !rdf_broadcast(EV_TRANSACTION, (void*)id, (void*)be) )
 	  return FALSE;
       }
     } else
@@ -5875,8 +5856,8 @@ do_broadcast(term_t term, long mask)
 }
 
 
-static int
-broadcast(broadcast_id id, void *a1, void *a2)
+int
+rdf_broadcast(broadcast_id id, void *a1, void *a2)
 { int rc = TRUE;
 
   if ( (joined_mask & id) )

@@ -459,7 +459,15 @@ add_triples(query *q, triple **triples, size_t count)
   else
     db->queries.generation = gen;
   simpleMutexUnlock(&db->queries.write.lock);
-					/* TBD: broadcast(EV_ASSERT, t, NULL) */
+
+  if ( !q->transaction )
+  { for(tp=triples; tp < ep; tp++)
+    { triple *t = *tp;
+
+      if ( !rdf_broadcast(EV_ASSERT, t, NULL) )
+	return FALSE;
+    }
+  }
 
   return TRUE;
 }
@@ -615,6 +623,20 @@ commit_transaction(query *q)
   simpleMutexUnlock(&db->queries.write.lock);
 
   close_transaction(q);
+
+					/* Broadcast new triples */
+  if ( !q->transaction )
+  { for(tp=q->transaction_data.added->base;
+      tp<q->transaction_data.added->top;
+      tp++)
+    { triple *t = *tp;
+
+      if ( t->lifespan.born == gen )
+      { if ( !rdf_broadcast(EV_ASSERT, t, NULL) )
+	  return FALSE;
+      }
+    }
+  }
 
   return TRUE;
 }
