@@ -5857,6 +5857,12 @@ do_broadcast(term_t term, long mask)
 
 
 int
+rdf_is_broadcasting(broadcast_id id)
+{ return (joined_mask & id) != 0;
+}
+
+
+int
 rdf_broadcast(broadcast_id id, void *a1, void *a2)
 { int rc = TRUE;
 

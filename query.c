@@ -631,32 +631,39 @@ commit_transaction(query *q)
     db->queries.generation = gen;
   simpleMutexUnlock(&db->queries.write.lock);
 
-  close_transaction(q);
+  q->stack->transaction = q->transaction; /* do not nest monitor calls */
+					  /* inside the transaction */
 
 					/* Broadcast new triples */
   if ( !q->transaction )
-  { for(tp=q->transaction_data.added->base;
-	tp<q->transaction_data.added->top;
-	tp++)
-    { triple *t = *tp;
+  { if ( rdf_is_broadcasting(EV_ASSERT) )
+    { for(tp=q->transaction_data.added->base;
+	  tp<q->transaction_data.added->top;
+	  tp++)
+      { triple *t = *tp;
 
-      if ( t->lifespan.born == gen )
-      { if ( !rdf_broadcast(EV_ASSERT, t, NULL) )
-	  return FALSE;
+	if ( t->lifespan.born == gen )
+	{ if ( !rdf_broadcast(EV_ASSERT, t, NULL) )
+	    return FALSE;
+	}
       }
     }
 
-    for(tp=q->transaction_data.deleted->base;
-	tp<q->transaction_data.deleted->top;
-	tp++)
-    { triple *t = *tp;
+    if ( rdf_is_broadcasting(EV_RETRACT) )
+    { for(tp=q->transaction_data.deleted->base;
+	  tp<q->transaction_data.deleted->top;
+	  tp++)
+      { triple *t = *tp;
 
-      if ( t->lifespan.died == gen )
-      { if ( !rdf_broadcast(EV_RETRACT, t, NULL) )
-	  return FALSE;
+	if ( t->lifespan.died == gen )
+	{ if ( !rdf_broadcast(EV_RETRACT, t, NULL) )
+	    return FALSE;
+	}
       }
     }
   }
+
+  close_transaction(q);
 
   return TRUE;
 }
