@@ -2666,6 +2666,30 @@ gc_db(rdf_db *db, gen_t gen)
 }
 
 
+static int
+reset_gc(rdf_db *db)
+{ simpleMutexLock(&db->locks.gc);
+  if ( db->gc.busy )
+  { simpleMutexUnlock(&db->locks.gc);
+    assert(0);
+    return FALSE;			/* in progress!? wait? */
+  }
+
+  db->gc.busy		     = TRUE;
+  db->gc.count		     = 0;
+  db->gc.time		     = 0.0;
+  db->gc.reclaimed_triples   = 0;
+  db->gc.reclaimed_reindexed = 0;
+  db->gc.last_gen	     = 0;
+  db->gc.busy		     = FALSE;
+
+  simpleMutexUnlock(&db->locks.gc);
+
+  return TRUE;
+}
+
+
+
 /** rdf_gc_(-Done) is semidet.
 
 Run the RDF-DB garbage collector. The collector   is  typically ran in a
@@ -6931,6 +6955,7 @@ reset_db(rdf_db *db)
   erase_graphs(db);
   db->agenda_created = 0;
   skiplist_destroy(&db->literals);
+  reset_gc(db);
 
   rc = (init_resource_db(db, &db->resources) &&
 	init_literal_table(db));
