@@ -1135,6 +1135,17 @@ addSubPropertyOf(rdf_db *db, triple *t, query *q)
   if ( add_list(db, &sub->subPropertyOf, super) )
   { add_list(db, &super->siblings, sub);
     merge_clouds(db, sub->cloud, super->cloud, q);
+  } else
+  { predicate_cloud *cloud;
+    sub_p_matrix *rm;
+
+    cloud = super->cloud;
+    assert(cloud == sub->cloud);
+
+    for(rm=cloud->reachable; rm; rm=rm->older)
+    { if ( rm->lifespan.died == GEN_MAX )
+	rm->lifespan.died = q->wr_gen;
+    }
   }
 }
 
@@ -3114,31 +3125,37 @@ link_triple_hash(rdf_db *db, triple *t)
 	- subProperty admin
 */
 
+void
+add_triple_consequences(rdf_db *db, triple *t, query *q)
+{ if ( t->predicate.r->name == ATOM_subPropertyOf &&
+       t->object_is_literal == FALSE )
+  { addSubPropertyOf(db, t, q);
+  }
+}
+
+
 int
 link_triple(rdf_db *db, triple *t, query *q)
-{ dub_state dup;
+{ if ( t->linked )
+  { add_triple_consequences(db, t, q);
+    return TRUE;			/* already done */
+  }
 
-  if ( t->linked )
-    return FALSE;
-
-  if ( (dup=mark_duplicate(db, t, q)) == DUP_DISCARDED )
-    return FALSE;
+  switch(mark_duplicate(db, t, q))
+  { case DUP_DUPLICATE:
+      db->duplicates++;			/* FIXME: atomic */
+    case DUP_NONE:
+      break;
+    case DUP_DISCARDED:
+      return FALSE;
+  }
 
   if ( t->object_is_literal )
     t->object.literal = share_literal(db, t->object.literal);
 
   link_triple_hash(db, t);
   consider_triple_rehash(db);
-
-  if ( dup != DUP_DUPLICATE )
-  {					/* keep track of subPropertyOf */
-    if ( t->predicate.r->name == ATOM_subPropertyOf &&
-	 t->object_is_literal == FALSE )
-    { addSubPropertyOf(db, t, q);
-    }
-  } else
-  { db->duplicates++;
-  }
+  add_triple_consequences(db, t, q);
 
   db->created++;
   register_predicate(db, t);

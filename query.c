@@ -450,9 +450,12 @@ add_triples(query *q, triple **triples, size_t count)
 
     t->lifespan.born = gen;
     t->lifespan.died = GEN_MAX;
-    link_triple(db, t, q);
-    if ( q->transaction )
-      buffer_triple(q->transaction->transaction_data.added, t);
+    if ( link_triple(db, t, q) )
+    { if ( q->transaction )
+	buffer_triple(q->transaction->transaction_data.added, t);
+    } else
+    { t->lifespan.born = GEN_MAX;
+    }
   }
   if ( q->transaction )
     q->transaction->wr_gen = gen;
@@ -606,6 +609,7 @@ commit_transaction(query *q)
 
     if ( t->lifespan.died == GEN_MAX )
     { t->lifespan.born = gen;
+      add_triple_consequences(db, t, q);
       if ( q->transaction )
 	buffer_triple(q->transaction->transaction_data.added, t);
     }
@@ -619,7 +623,8 @@ commit_transaction(query *q)
     if ( t->lifespan.died == q->wr_gen )
     { t->lifespan.died = gen;
       if ( q->transaction )
-      { buffer_triple(q->transaction->transaction_data.deleted, t);
+      { del_triple_consequences(db, t, q);
+	buffer_triple(q->transaction->transaction_data.deleted, t);
       } else
       { erase_triple(db, t, q);
       }
