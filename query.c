@@ -241,7 +241,9 @@ open_query(rdf_db *db)
 
 query *
 open_transaction(rdf_db *db,
-		 triple_buffer *added, triple_buffer *deleted,
+		 triple_buffer *added,
+		 triple_buffer *deleted,
+		 triple_buffer *updated,
 		 snapshot *ss)
 { int tid = PL_thread_self();
   thread_info *ti = rdf_thread_info(db, tid);
@@ -269,8 +271,10 @@ open_transaction(rdf_db *db,
 
   init_triple_buffer(added);
   init_triple_buffer(deleted);
+  init_triple_buffer(updated);
   q->transaction_data.added = added;
   q->transaction_data.deleted = deleted;
+  q->transaction_data.updated = updated;
 
   push_query(q);
 
@@ -498,13 +502,12 @@ del_triples(query *q, triple **triples, size_t count)
   { triple *t = *tp;
 
     t->lifespan.died = gen;
+    del_triple_consequences(db, t, q);
+
     if ( q->transaction )
-    { del_triple_consequences(db, t, q);
       buffer_triple(q->transaction->transaction_data.deleted, t);
-    } else
-    { del_triple_consequences(db, t, q);
+    else
       erase_triple(db, t, q);
-    }
   }
 
   setWriteGen(q, gen);
@@ -523,6 +526,10 @@ del_triples(query *q, triple **triples, size_t count)
 }
 
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+update_triples() updates an array of triples.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 int
 update_triples(query *q,
 	       triple **old, triple **new,
@@ -534,40 +541,37 @@ update_triples(query *q,
   size_t updated = 0;
 
   simpleMutexLock(&db->queries.write.lock);
-  if ( q->transaction )
-    gen = q->transaction->wr_gen + 1;
-  else
-    gen = db->queries.generation + 1;
+  gen = queryWriteGen(q) + 1;
+
   for(to=old,tn=new; to < eo; to++,tn++)
   { if ( *tn )
     { (*to)->lifespan.died = gen;
       (*tn)->lifespan.born = gen;
       (*tn)->lifespan.died = GEN_MAX;
       link_triple(db, *tn, q);
-      if ( !q->transaction )
-      { if ( (*to)->predicate.r != (*tn)->predicate.r )
-	{ (*to)->predicate.r->triple_count--;
-	  (*tn)->predicate.r->triple_count++;
-	}
+      del_triple_consequences(db, *to, q);
+      if ( q->transaction )
+      { buffer_triple(q->transaction->transaction_data.updated, *to);
+	buffer_triple(q->transaction->transaction_data.updated, *tn);
       } else
-      { buffer_triple(q->transaction->transaction_data.deleted, *to);
-	buffer_triple(q->transaction->transaction_data.added, *tn);
+      { erase_triple(db, *to, q);
       }
 
       updated++;
     }
   }
-  if ( q->transaction )
-  { q->transaction->wr_gen = gen;
-  } else
-  { db->created += updated;
-    db->erased += updated;
-    db->queries.generation = gen;
-  }
+
+  setWriteGen(q, gen);
   simpleMutexUnlock(&db->queries.write.lock);
 
+  if ( !q->transaction && rdf_is_broadcasting(EV_UPDATE) )
+  { for(to=old,tn=new; to < eo; to++,tn++)
+    { if ( !rdf_broadcast(EV_UPDATE, *to, *tn) )
+	return FALSE;
+    }
+  }
+
   return TRUE;
-				/* TBD: broadcast(EV_UPDATE, old, new) */
 }
 
 
@@ -584,6 +588,31 @@ close_transaction(query *q)
 }
 
 
+static void
+commit_add(query *q, gen_t gen, triple *t)
+{ if ( t->lifespan.died == GEN_MAX )
+  { t->lifespan.born = gen;
+    add_triple_consequences(q->db, t, q);
+    if ( q->transaction )
+      buffer_triple(q->transaction->transaction_data.added, t);
+  }
+}
+
+
+static void
+commit_del(query *q, gen_t gen, triple *t)
+{ if ( t->lifespan.died == q->wr_gen )
+  { t->lifespan.died = gen;
+    if ( q->transaction )
+    { del_triple_consequences(q->db, t, q);
+      buffer_triple(q->transaction->transaction_data.deleted, t);
+    } else
+    { erase_triple(q->db, t, q);
+    }
+  }
+}
+
+
 int
 commit_transaction(query *q)
 { rdf_db *db = q->db;
@@ -596,31 +625,25 @@ commit_transaction(query *q)
   for(tp=q->transaction_data.added->base;
       tp<q->transaction_data.added->top;
       tp++)
-  { triple *t = *tp;
-
-    if ( t->lifespan.died == GEN_MAX )
-    { t->lifespan.born = gen;
-      add_triple_consequences(db, t, q);
-      if ( q->transaction )
-	buffer_triple(q->transaction->transaction_data.added, t);
-    }
+  { commit_add(q, gen, *tp);
   }
 					/* deleted triples */
   for(tp=q->transaction_data.deleted->base;
       tp<q->transaction_data.deleted->top;
       tp++)
-  { triple *t = *tp;
-
-    if ( t->lifespan.died == q->wr_gen )
-    { t->lifespan.died = gen;
-      if ( q->transaction )
-      { del_triple_consequences(db, t, q);
-	buffer_triple(q->transaction->transaction_data.deleted, t);
-      } else
-      { erase_triple(db, t, q);
-      }
-    }
+  { commit_del(q, gen, *tp);
   }
+
+  for(tp=q->transaction_data.updated->base;
+      tp<q->transaction_data.updated->top;
+      tp += 2)
+  { triple *to = tp[0];
+    triple *tn = tp[1];
+
+    commit_del(q, gen, to);
+    commit_add(q, gen, tn);
+  }
+
   setWriteGen(q, gen);
   simpleMutexUnlock(&db->queries.write.lock);
 
@@ -629,7 +652,20 @@ commit_transaction(query *q)
 
 					/* Broadcast new triples */
   if ( !q->transaction )
-  { if ( rdf_is_broadcasting(EV_ASSERT) )
+  { if ( rdf_is_broadcasting(EV_RETRACT) )
+    { for(tp=q->transaction_data.deleted->base;
+	  tp<q->transaction_data.deleted->top;
+	  tp++)
+      { triple *t = *tp;
+
+	if ( t->lifespan.died == gen )
+	{ if ( !rdf_broadcast(EV_RETRACT, t, NULL) )
+	    return FALSE;
+	}
+      }
+    }
+
+    if ( rdf_is_broadcasting(EV_ASSERT) )
     { for(tp=q->transaction_data.added->base;
 	  tp<q->transaction_data.added->top;
 	  tp++)
@@ -642,14 +678,16 @@ commit_transaction(query *q)
       }
     }
 
-    if ( rdf_is_broadcasting(EV_RETRACT) )
-    { for(tp=q->transaction_data.deleted->base;
-	  tp<q->transaction_data.deleted->top;
-	  tp++)
-      { triple *t = *tp;
+    if ( rdf_is_broadcasting(EV_UPDATE) )
+    { for(tp=q->transaction_data.updated->base;
+	  tp<q->transaction_data.updated->top;
+	  tp += 2)
+      { triple *to = tp[0];
+	triple *tn = tp[1];
 
-	if ( t->lifespan.died == gen )
-	{ if ( !rdf_broadcast(EV_RETRACT, t, NULL) )
+	if ( to->lifespan.died == gen &&
+	     tn->lifespan.born == gen )
+	{ if ( !rdf_broadcast(EV_UPDATE, to, tn) )
 	    return FALSE;
 	}
       }
@@ -676,19 +714,40 @@ discard_transaction(query *q)
       tp++)
   { triple *t = *tp;
 
+					/* revert creation of new */
     if ( is_wr_transaction_gen(q, t->lifespan.born) &&
 	 t->lifespan.died == GEN_MAX )
     { t->lifespan.died = GEN_PREHIST;
       erase_triple(db, t, q);
     }
   }
+
   for(tp=q->transaction_data.deleted->base;
       tp<q->transaction_data.deleted->top;
       tp++)
   { triple *t = *tp;
 
+					/* revert deletion of old */
     if ( is_wr_transaction_gen(q, t->lifespan.died) )
     { t->lifespan.died = GEN_MAX;
+    }
+  }
+
+  for(tp=q->transaction_data.updated->base;
+      tp<q->transaction_data.updated->top;
+      tp += 2)
+  { triple *to = tp[0];
+    triple *tn = tp[1];
+
+					/* revert deletion of old */
+    if ( is_wr_transaction_gen(q, to->lifespan.died) )
+    { to->lifespan.died = GEN_MAX;
+    }
+					/* revert creation of new */
+    if ( is_wr_transaction_gen(q, tn->lifespan.born) &&
+	 tn->lifespan.died == GEN_MAX )
+    { tn->lifespan.died = GEN_PREHIST;
+      erase_triple(db, tn, q);
     }
   }
 

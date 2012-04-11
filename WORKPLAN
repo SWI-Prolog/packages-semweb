@@ -17,7 +17,7 @@
     them if their lifespan has passed.  Except for concurrency issues,
     we do not have to be cautious because they will be recreated anyway.
 
-  * Deal with rdf_update/4,5.
+  * Deal with rdf_update/4,5.					[OK]
 
   * Test framework
     - Controlled concurrency (test_con.pl).  How to generate a comprehensive

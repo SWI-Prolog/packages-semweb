@@ -94,6 +94,7 @@ typedef struct query
   struct
   { struct triple_buffer *added;
     struct triple_buffer *deleted;
+    struct triple_buffer *updated;
     term_t	prolog_id;		/* Prolog transaction identifier */
   } transaction_data;
   union query_state
@@ -140,6 +141,7 @@ COMMON(gen_t)	oldest_query_geneneration(rdf_db *db);
 COMMON(query *)	open_transaction(rdf_dbp db,
 				 struct triple_buffer *added,
 				 struct triple_buffer *deleted,
+				 struct triple_buffer *updated,
 				 snapshot *ss);
 COMMON(int)	empty_transaction(query *q);
 COMMON(int)	commit_transaction(query *q);

@@ -4916,6 +4916,7 @@ rdf_transaction(term_t goal, term_t id, term_t options)
   query *q;
   triple_buffer added;
   triple_buffer deleted;
+  triple_buffer updated;
   snapshot *ss = NULL;
 
   if ( !PL_get_nil(options) )
@@ -4946,7 +4947,7 @@ rdf_transaction(term_t goal, term_t id, term_t options)
       return FALSE;
   }
 
-  q = open_transaction(db, &added, &deleted, ss);
+  q = open_transaction(db, &added, &deleted, &updated, ss);
   q->transaction_data.prolog_id = id;
   rc = PL_call_predicate(NULL, PL_Q_PASS_EXCEPTION, PRED_call1, goal);
 
@@ -5613,15 +5614,6 @@ rdf_current_literal(term_t t, control_t h)
 }
 
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-rdf_update(+Subject, +Predicate, +Object, +Action)
-
-Update a triple. Please note this is actually erase+assert as the triple
-needs to be updated in  the  linked   lists  while  erase simply flags a
-triple as `erases' without deleting it   to support queries which active
-choicepoints.
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
 static int
 update_triple(rdf_db *db, term_t action, triple *t, triple **updated, query *q)
 { term_t a = PL_new_term_ref();
@@ -5713,6 +5705,11 @@ update_triple(rdf_db *db, term_t action, triple *t, triple **updated, query *q)
   return TRUE;
 }
 
+
+/** rdf_update(+Subject, +Predicate, +Object, +Action) is det.
+
+Update a triple. Please note this is actually erase+assert
+*/
 
 static foreign_t
 rdf_update5(term_t subject, term_t predicate, term_t object, term_t src,
