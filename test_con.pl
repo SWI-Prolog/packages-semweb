@@ -426,6 +426,17 @@ test sp4 :-
 	jf(T),
 	u(+rdf(S1,P2,O1)).
 
+test sp5 :-				% join two non-empty clouds
+	+ rdf(S1,P1,O1),
+	+ P1 <= SP1,
+	v(+rdf(S1,SP1,O1)),
+	+ rdf(S2,P2,O2),
+	+ P2 <= SP2,
+	v(+rdf(S2,SP2,O2)),
+	+ SP1 <= Root,
+	+ SP2 <= Root,
+	v(+rdf(S1,Root,O1)),
+	v(+rdf(S2,Root,O2)).
 
 
 		 /*******************************
