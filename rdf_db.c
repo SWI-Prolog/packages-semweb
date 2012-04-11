@@ -3944,6 +3944,7 @@ load_db(rdf_db *db, IOSTREAM *in, ld_context *ctx)
 
 	if ( !(t=load_triple(db, in, ctx)) )
 	  return FALSE;
+	t->loaded = TRUE;
 	buffer_triple(&ctx->triples, t);
         break;
       }
@@ -4006,7 +4007,6 @@ link_loaded_triples(rdf_db *db, ld_context *ctx)
   { graph = NULL;
   }
 
-				/* TBD: rdf_broadcast(EV_ASSERT_LOAD, ...) */
   for(t=ctx->triples.base; t<ctx->triples.top; t++)
     lock_atoms(db, *t);
   add_triples(ctx->query, ctx->triples.base, ctx->triples.top-ctx->triples.base);

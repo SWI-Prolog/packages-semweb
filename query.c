@@ -463,12 +463,14 @@ add_triples(query *q, triple **triples, size_t count)
   setWriteGen(q, gen);
   simpleMutexUnlock(&db->queries.write.lock);
 
-  if ( !q->transaction && rdf_is_broadcasting(EV_ASSERT) )
+  if ( !q->transaction && rdf_is_broadcasting(EV_ASSERT|EV_ASSERT_LOAD) )
   { for(tp=triples; tp < ep; tp++)
     { triple *t = *tp;
 
       if ( t )
-      { if ( !rdf_broadcast(EV_ASSERT, t, NULL) )
+      { broadcast_id id = t->loaded ? EV_ASSERT_LOAD : EV_ASSERT;
+
+	if ( !rdf_broadcast(id, t, NULL) )
 	  return FALSE;
       }
     }
@@ -665,14 +667,16 @@ commit_transaction(query *q)
       }
     }
 
-    if ( rdf_is_broadcasting(EV_ASSERT) )
+    if ( rdf_is_broadcasting(EV_ASSERT|EV_ASSERT_LOAD) )
     { for(tp=q->transaction_data.added->base;
 	  tp<q->transaction_data.added->top;
 	  tp++)
       { triple *t = *tp;
 
 	if ( t->lifespan.born == gen )
-	{ if ( !rdf_broadcast(EV_ASSERT, t, NULL) )
+	{ broadcast_id id = t->loaded ? EV_ASSERT_LOAD : EV_ASSERT;
+
+	  if ( !rdf_broadcast(id, t, NULL) )
 	    return FALSE;
 	}
       }

@@ -6,7 +6,7 @@
 
   * Remove old locking code.					[OK]
 
-  * Establish compatible broadcasting
+  * Establish compatible broadcasting				[OK]
 
   * Duplicate suppression by maintaining a table of duplicate
     answers.							[OK]
