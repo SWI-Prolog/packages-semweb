@@ -29,26 +29,7 @@
     the GNU General Public License.
 */
 
-:- asserta(file_search_path(foreign, '../sgml')).
-:- asserta(file_search_path(foreign, '../clib')).
-:- asserta(file_search_path(foreign, '../zlib')).
-:- asserta(file_search_path(library, '../sgml')).
-:- asserta(file_search_path(library, '../clib')).
-:- asserta(file_search_path(library, '../zlib')).
-:- asserta(file_search_path(library, '../RDF')).
-:- asserta(user:file_search_path(library, '../plunit')).
-:- asserta(user:file_search_path(library, '..')).
-:- asserta(user:file_search_path(foreign, '.')).
-
-fix_load_path :-
-	prolog_load_context(directory, Dir),
-	file_base_name(Dir, LocalDir),
-	LocalDir \== semweb, !,
-	asserta(system:term_expansion((:- use_module(library(semweb/X))),
-				      (:- use_module(library(LocalDir/X))))).
-fix_load_path.
-
-:- fix_load_path.
+:- include(local_test).
 
 :- use_module(library(plunit)).
 :- use_module(library(uri)).

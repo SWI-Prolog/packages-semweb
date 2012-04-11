@@ -22,7 +22,9 @@
 	    op(200, xf,  @@),
 	    op(200, xfy, <=)
 	  ]).
-:- use_module(library(semweb/rdf_db)).
+:- include(local_test).
+
+:- use_module(rdf_db).
 :- use_module(library(aggregate)).
 
 /** <module> RDF test language
@@ -478,7 +480,8 @@ run :-
 	aggregate_all(count, failed(_), Failed),
 	(   Failed =:= 0
 	->  format('~NAll ~D tests passed~n', [Passed])
-	;   format('~N~D tests passed; ~D failed~n', [Passed, Failed])
+	;   format('~N~D tests passed; ~D failed~n', [Passed, Failed]),
+	    fail
 	).
 
 %%	run(+Test)
