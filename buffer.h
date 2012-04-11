@@ -87,7 +87,7 @@ buffer_triple(triple_buffer *b, triple *t)
 
 static inline void
 free_triple_buffer(triple_buffer *b)
-{ if ( b->base != b->fast )
+{ if ( b->base && b->base != b->fast )
     free(b->base);
 }
 

@@ -5148,11 +5148,14 @@ free_search_state(search_state *state)
     close_query(state->query);
 
   free_triple(state->db, &state->pattern, FALSE);
+  destroy_triple_walker(state->db, &state->cursor);
+  free_triple_buffer(&state->dup_answers);
+
   if ( state->prefix )
     PL_unregister_atom(state->prefix);
+
   if ( state->allocated )		/* also means redo! */
     rdf_free(state->db, state, sizeof(*state));
-  destroy_triple_walker(state->db, &state->cursor);
 }
 
 
@@ -5163,11 +5166,29 @@ allow_retry_state(search_state *state)
 
 
 static int
-is_candidate(search_state *state, triple *t)
-{ if ( t->is_duplicate && !state->src )
-    return FALSE;			/* TBD: Table of returned */
+new_answer(search_state *state, triple *t)
+{ triple **tp;
 
-  if ( !alive_triple(state->query, t) )
+  for(tp=state->dup_answers.base;
+      tp<state->dup_answers.top;
+      tp++)
+  { triple *old = *tp;
+
+    if ( match_triples(state->db, t, old, state->query, MATCH_DUPLICATE) )
+      return FALSE;
+  }
+
+  if ( !state->dup_answers.base )	/* not initialized */
+    init_triple_buffer(&state->dup_answers);
+  buffer_triple(&state->dup_answers, t);
+
+  return TRUE;
+}
+
+
+static int
+is_candidate(search_state *state, triple *t)
+{ if ( !alive_triple(state->query, t) )
     return FALSE;
 					/* hash-collision, skip */
   if ( state->has_literal_state )
@@ -5176,7 +5197,15 @@ is_candidate(search_state *state, triple *t)
       return FALSE;
   }
 
-  return match_triples(state->db, t, &state->pattern, state->query, state->flags);
+  if ( !match_triples(state->db, t, &state->pattern, state->query, state->flags) )
+    return FALSE;
+
+  if ( t->is_duplicate && !state->src )
+  { if ( !new_answer(state, t) )
+      return FALSE;
+  }
+
+  return TRUE;
 }
 
 

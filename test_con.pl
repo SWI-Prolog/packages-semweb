@@ -438,6 +438,13 @@ test sp5 :-				% join two non-empty clouds
 	v(+rdf(S1,Root,O1)),
 	v(+rdf(S2,Root,O2)).
 
+/* duplicate handling */
+
+test dup1 :-
+	+ X,
+	+ X,
+	findall(x, rdf(_,_,_), [x]).
+
 
 		 /*******************************
 		 *	    TEST DRIVER		*

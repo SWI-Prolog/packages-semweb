@@ -8,24 +8,8 @@
 
   * Establish compatible broadcasting
 
-  * Reconsider handling of duplicate triples.  The problem:
-    We have a set of triples with different life-span.  We must return
-    one triple as long as the set is not empty for our query
-    generation.
-
-    - Old solution: assign a leader.  This is now unfeasible (I think)
-    - New solution:
-      - Maintain duplicate status, indicating that a predicate MAY have
-        duplicates.  This means, set a duplicate flag on a triple if we
-	added a duplicate triple.
-      - When producing answers, put duplicate-marked triples in a
-        (hash-)table and filter new duplicate triples according to
-	this table.
-
-    - When is a triple a duplicate that we can discard?  Currently
-      if it is the same quadruple.  I think we must also check that
-      the triple is in the same transaction, so they either both get
-      committed or discarded.
+  * Duplicate suppression by maintaining a table of duplicate
+    answers.							[OK]
 
   * Deal with subPropertyOf predicate clouds			[OK]
 

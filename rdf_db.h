@@ -394,6 +394,8 @@ typedef struct rdf_db
 		 *	    QUERY TYPES		*
 		 *******************************/
 
+#include "buffer.h"
+
 #define LITERAL_EX_MAGIC 0x2b97e881
 
 typedef struct literal_ex
@@ -427,6 +429,7 @@ typedef struct search_state
   int		alt_hash_cursor;	/* Index in alternative hashes */
   triple	pattern;		/* Pattern triple */
   triple	saved_pattern;		/* For inverse */
+  triple_buffer	dup_answers;		/* possible duplicate answers */
 } search_state;
 
 #include "query.h"
