@@ -997,10 +997,10 @@ append_clouds(rdf_db *db,
   }
   c1->size += c2->size;
 
-  free_predicate_cloud(db, c2);		/* FIXME: Leave to GC */
-
   if ( !update_hash )
   { size_t newc = c1->alt_hash_count + c2->alt_hash_count + 1;
+
+    DEBUG(1, Sdprintf("Cloud %p: %d alt-hashes\n", c1, newc));
 
     c1->alt_hashes = rdf_realloc(db, c1->alt_hashes,
 				 c1->alt_hash_count*sizeof(unsigned int),
@@ -1010,6 +1010,8 @@ append_clouds(rdf_db *db,
     c1->alt_hashes[newc-1] = c2->hash;
     c1->alt_hash_count = newc;
   }
+
+  free_predicate_cloud(db, c2);		/* FIXME: Leave to GC */
 
   return c1;
 }
@@ -5272,6 +5274,9 @@ next_sub_property(search_state *state)
     { if ( p->predicate.r->cloud->alt_hash_count )
       { state->p_cloud = p->predicate.r->cloud;
 
+	DEBUG(1, Sdprintf("Retrying with alt-hash 0 (0x%x)\n",
+			  state->p_cloud->alt_hashes[0]));
+
 	tw->unbounded_hash ^= predicate_hash(p->predicate.r);
 	tw->unbounded_hash ^= state->p_cloud->alt_hashes[0];
 	rewind_triple_walker(tw);
@@ -5283,7 +5288,10 @@ next_sub_property(search_state *state)
     }
 
     if ( state->alt_hash_cursor < state->p_cloud->alt_hash_count )
-    { tw->unbounded_hash ^= state->p_cloud->alt_hashes[state->alt_hash_cursor];
+    { DEBUG(1, Sdprintf("Retrying with alt-hash %d (0x%x)\n",
+			state->alt_hash_cursor+1,
+			state->p_cloud->alt_hashes[state->alt_hash_cursor+1]));
+      tw->unbounded_hash ^= state->p_cloud->alt_hashes[state->alt_hash_cursor];
       tw->unbounded_hash ^= state->p_cloud->alt_hashes[++state->alt_hash_cursor];
       rewind_triple_walker(tw);
 
