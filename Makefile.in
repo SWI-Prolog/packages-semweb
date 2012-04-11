@@ -21,6 +21,10 @@ CFLAGS+= -I.
 LIBDIR=$(PLBASE)/library/semweb
 PKGDOC=$(PKGDOCDIR)/semweb
 
+# Useful alternatives for debugging
+# COFLAGS+=-gdwarf-2 -g3 -fno-inline
+# COFLAGS=-gdwarf-2 -g3
+
 TARGETS=	rdf_db.@SO@ turtle.@SO@
 
 RDFDBOBJ=	rdf_db.o atom.o md5.o atom_map.o debug.o alloc.o \
