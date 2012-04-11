@@ -5387,7 +5387,6 @@ next_search_state(search_state *state)
   triple_walker *tw = &state->cursor;
   triple *p = &state->pattern;
   term_t retpred;
-  int unify_pred;
 
   if ( state->realpred )
   { retpred = state->realpred;
@@ -5397,7 +5396,6 @@ next_search_state(search_state *state)
     }
   } else
   { retpred = state->predicate;
-    unify_pred = FALSE;
   }
 
   do
