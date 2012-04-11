@@ -2343,6 +2343,7 @@ static void
 consider_triple_rehash(rdf_db *db)
 { if ( db->created - db->erased > db->hash[ICOL(BY_SPO)].bucket_count )
   { int i;
+    int resized = 0;
 
     for(i=1; i<INDEX_TABLES; i++)
     { int resize = FALSE;
@@ -2381,8 +2382,13 @@ consider_triple_rehash(rdf_db *db)
       }
 
       if ( resize )
+      { resized++;
 	resize_triple_hash(db, i);
+      }
     }
+
+    if ( resized )
+      invalidate_distinct_counts(db);
   }
 }
 
