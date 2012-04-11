@@ -158,4 +158,20 @@ alive_triple(query *q, triple *t)
 { return alive_lifespan(q, &t->lifespan);
 }
 
+static inline gen_t
+queryWriteGen(query *q)
+{ if ( q->transaction )
+    return q->transaction->wr_gen;
+  else
+    return q->db->queries.generation;
+}
+
+static inline void
+setWriteGen(query *q, gen_t gen)
+{ if ( q->transaction )
+    q->transaction->wr_gen = gen;
+  else
+    q->db->queries.generation = gen;
+}
+
 #endif /*RDF_QUERY_H_INCLUDED*/

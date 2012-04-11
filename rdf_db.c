@@ -1125,6 +1125,17 @@ predicate_hash(predicate *p)
 
 
 static void
+invalidateReachability(predicate_cloud *cloud, query *q)
+{ sub_p_matrix *rm;
+
+  for(rm=cloud->reachable; rm; rm=rm->older)
+  { if ( rm->lifespan.died == GEN_MAX )			/* dubious */
+      rm->lifespan.died = queryWriteGen(q);
+  }
+}
+
+
+static void
 addSubPropertyOf(rdf_db *db, triple *t, query *q)
 { predicate *sub   = lookup_predicate(db, t->subject, q);
   predicate *super = lookup_predicate(db, t->object.resource, q);
@@ -1137,15 +1148,11 @@ addSubPropertyOf(rdf_db *db, triple *t, query *q)
     merge_clouds(db, sub->cloud, super->cloud, q);
   } else
   { predicate_cloud *cloud;
-    sub_p_matrix *rm;
 
     cloud = super->cloud;
     assert(cloud == sub->cloud);
 
-    for(rm=cloud->reachable; rm; rm=rm->older)
-    { if ( rm->lifespan.died == GEN_MAX )
-	rm->lifespan.died = q->wr_gen;
-    }
+    invalidateReachability(cloud, q);
   }
 }
 
@@ -1153,42 +1160,29 @@ addSubPropertyOf(rdf_db *db, triple *t, query *q)
 /* deleting an rdfs:subPropertyOf.  This is a bit naughty.  If the
    cloud is still connected we only need to refresh the reachability
    matrix.  Otherwise the cloud breaks in maximum two clusters.  We
-   can decide to leave it as is, which saves a re-hash of the triples
-   but harms indexing.  Alternative we can create a new cloud for one
-   of the clusters and re-hash.
+   can decide to leave it as is, which is simpler to implement
+   but harms indexing.
+
+   TBD: If the cloud becomes disconnected, it may be split.
 */
 
 static void
 delSubPropertyOf(rdf_db *db, triple *t, query *q)
 { predicate *sub   = lookup_predicate(db, t->subject, q);
   predicate *super = lookup_predicate(db, t->object.resource, q);
+  predicate_cloud *cloud;
 
   DEBUG(3, Sdprintf("delSubPropertyOf(%s, %s)\n",
 		    pname(sub), pname(super)));
 
   if ( del_list(db, &sub->subPropertyOf, super) )
-  { predicate_cloud *cloud;
-    sub_p_matrix *rm;
-
-    del_list(db, &super->siblings, sub);
-
-    cloud = super->cloud;
-    assert(cloud == sub->cloud);
-
-    for(rm=cloud->reachable; rm; rm=rm->older)
-    { if ( rm->lifespan.died == GEN_MAX )
-	rm->lifespan.died = q->wr_gen;
-    }
-
-#if 0
-    if ( not worth the trouble )
-    { create_reachability_matrix(db, sub->cloud);
-    } else
-    { predicate_cloud *parts[2];
-      split_cloud(db, sub->cloud, parts, 2, q);
-    }
-#endif
+  { del_list(db, &super->siblings, sub);
   }
+
+  cloud = super->cloud;
+  assert(cloud == sub->cloud);
+
+  invalidateReachability(cloud, q);
 }
 
 

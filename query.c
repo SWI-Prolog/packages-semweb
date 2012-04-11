@@ -441,10 +441,8 @@ add_triples(query *q, triple **triples, size_t count)
 
 					/* locked phase */
   simpleMutexLock(&db->queries.write.lock);
-  if ( q->transaction )
-    gen = q->transaction->wr_gen + 1;
-  else
-    gen = db->queries.generation + 1;
+  gen = queryWriteGen(q)+1;
+
   for(tp=triples; tp < ep; tp++)
   { triple *t = *tp;
 
@@ -457,13 +455,11 @@ add_triples(query *q, triple **triples, size_t count)
     { *tp = NULL;			/* duplicate is deleted */
     }
   }
-  if ( q->transaction )
-    q->transaction->wr_gen = gen;
-  else
-    db->queries.generation = gen;
+
+  setWriteGen(q, gen);
   simpleMutexUnlock(&db->queries.write.lock);
 
-  if ( !q->transaction )
+  if ( !q->transaction && rdf_is_broadcasting(EV_ASSERT) )
   { for(tp=triples; tp < ep; tp++)
     { triple *t = *tp;
 
@@ -496,10 +492,8 @@ del_triples(query *q, triple **triples, size_t count)
   triple **tp;
 
   simpleMutexLock(&db->queries.write.lock);
-  if ( q->transaction )
-    gen = q->transaction->wr_gen + 1;
-  else
-    gen = db->queries.generation + 1;
+  gen = queryWriteGen(q) + 1;
+
   for(tp=triples; tp < ep; tp++)
   { triple *t = *tp;
 
@@ -512,13 +506,11 @@ del_triples(query *q, triple **triples, size_t count)
       erase_triple(db, t, q);
     }
   }
-  if ( q->transaction )
-    q->transaction->wr_gen = gen;
-  else
-    db->queries.generation = gen;
+
+  setWriteGen(q, gen);
   simpleMutexUnlock(&db->queries.write.lock);
 
-  if ( !q->transaction )
+  if ( !q->transaction && rdf_is_broadcasting(EV_RETRACT) )
   { for(tp=triples; tp < ep; tp++)
     { triple *t = *tp;
 
@@ -599,10 +591,7 @@ commit_transaction(query *q)
   gen_t gen;
 
   simpleMutexLock(&db->queries.write.lock);
-  if ( q->transaction )			/* nested transaction */
-    gen = q->transaction->wr_gen + 1;
-  else
-    gen = db->queries.generation + 1;
+  gen = queryWriteGen(q) + 1;
 					/* added triples */
   for(tp=q->transaction_data.added->base;
       tp<q->transaction_data.added->top;
@@ -632,10 +621,7 @@ commit_transaction(query *q)
       }
     }
   }
-  if ( q->transaction )
-    q->transaction->wr_gen = gen;
-  else
-    db->queries.generation = gen;
+  setWriteGen(q, gen);
   simpleMutexUnlock(&db->queries.write.lock);
 
   q->stack->transaction = q->transaction; /* do not nest monitor calls */
