@@ -215,8 +215,7 @@ static predicate_t PRED_call1;
 
 typedef enum
 { DUP_NONE,
-  DUP_DUPLICATE,
-  DUP_DISCARDED
+  DUP_DUPLICATE
 } dub_state;
 
 static int match_triples(rdf_db *db, triple *t, triple *p,
@@ -3090,18 +3089,10 @@ link_triple(rdf_db *db, triple *t, query *q)
     return TRUE;			/* already done */
   }
 
-  switch(mark_duplicate(db, t, q))
-  { case DUP_DUPLICATE:
-      db->duplicates++;			/* FIXME: atomic */
-    case DUP_NONE:
-      break;
-    case DUP_DISCARDED:
-      return FALSE;
-  }
-
   if ( t->object_is_literal )
     t->object.literal = share_literal(db, t->object.literal);
 
+  mark_duplicate(db, t, q);
   link_triple_hash(db, t);
   consider_triple_rehash(db);
   add_triple_consequences(db, t, q);
@@ -4835,7 +4826,10 @@ unloading one of these files the database would be left without triples.
 mark_duplicate() searches the DB for  a   duplicate  triple and sets the
 flag is_duplicate on both. This flag is   used by rdf/3, where duplicate
 triples are stored into a  temporary  table   to  be  filtered  from the
-results.  Duplicate marks may be removed by GC.
+results.
+
+TBD: Duplicate marks may be removed by   GC:  walk over all triples that
+are marked as duplicates and try to find the duplicate.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static dub_state
@@ -4845,23 +4839,20 @@ mark_duplicate(rdf_db *db, triple *t, query *q)
   const int indexed = BY_SPO;
   dub_state rc = DUP_NONE;
 
-  assert(t->is_duplicate == FALSE);
-
   init_triple_walker(&tw, db, t, indexed);
   while((d=next_triple(&tw)) && d != t)
   { if ( !alive_triple(q, d) )
       continue;
 
     if ( match_triples(db, d, t, q, MATCH_DUPLICATE) )
-    { if ( d->graph == t->graph &&
-	   (d->line == NO_LINE || d->line == t->line) )
-      { free_triple(db, t, FALSE);
-
-	rc = DUP_DISCARDED;
-	break;
+    { if ( !t->is_duplicate )
+      { t->is_duplicate = TRUE;
+	db->duplicates++;
       }
-      t->is_duplicate = TRUE;
-      d->is_duplicate = TRUE;
+      if ( !d->is_duplicate )
+      { d->is_duplicate = TRUE;
+	db->duplicates++;
+      }
 
       rc = DUP_DUPLICATE;
     }
