@@ -4052,7 +4052,20 @@ rdf_load_db(term_t stream, term_t id, term_t graphs)
   rc = load_db(db, in, &ctx);
   PL_release_stream(in);
   if ( !rc )
-  { return FALSE;			/* TBD: Discard partial load */
+  { triple **tp;
+
+					/* discard partial loaded stuff */
+    for(tp=ctx.triples.base;
+	tp<ctx.triples.top;
+	tp++)
+    { triple *t = *tp;
+
+      free_triple(db, t, FALSE);
+    }
+
+    free_triple_buffer(&ctx.triples);
+
+    return FALSE;
   }
 
   rdf_broadcast(EV_LOAD, (void*)id, (void*)ATOM_begin);
