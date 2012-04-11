@@ -12,8 +12,9 @@
 	    {}/1,			% transaction
 	    (@@)/2,			% Action @ Context (Synchronous)
 	    (@@)/1,			% Action in snapshot
-	    k/0,			% Kill helper threads
-	    k/1,			% Kill a specific helper
+	    j/0,			% Join helper threads
+	    j/1,			% Join a specific helper
+	    jf/1,			% Join a specific helper, failing
 	    a/0,			% Run all tests
 	    snap/1,
 	    op(200, xfx, @@),
@@ -220,20 +221,30 @@ snap(X) :-
 ((M:{}(G)) @@) :-
 	rdf_transaction(M:G, _Id, [snapshot(true)]).
 
-%%	k
+%%	j
 %
-%	Kill all helper threads.
+%	Join all helper threads.
 
-k :-
+j :-
 	forall(retract(helper(Id)),
 	       (   thread_send_message(Id, done),
 		   thread_join(Id, true)
 	       )).
 
-k(Id) :-
+%%	j(+Id)
+%
+%	Join the specific helper thread, terminating its transaction
+%	with success.
+
+j(Id) :-
 	retract(helper(Id)), !,
 	thread_send_message(Id, done),
 	thread_join(Id, true).
+
+jf(Id) :-
+	retract(helper(Id)), !,
+	thread_send_message(Id, fail),
+	thread_join(Id, false).
 
 helper :-
 	thread_get_message(M),
@@ -241,7 +252,7 @@ helper :-
 	->  run(G,Result),
 	    thread_send_message(Sender, Result),
 	    helper
-	;   true
+	;   M == done
 	).
 
 run(G, Result) :-
@@ -258,7 +269,7 @@ run(_, false).
 %	Reset the RDF database, helper threads, etc.
 
 r :-
-	k,
+	j,
 	retractall(triple(_,_)),
 	rdf_reset_db.
 
@@ -410,8 +421,16 @@ test sp3 :-
 	+ rdf(S1,P1,O1),
 	{ + P1<=P2 } @@ {T},
 	u(+rdf(S1,P2,O1)),
-	k(T),
+	j(T),
 	v(+rdf(S1,P2,O1)).
+
+test sp4 :-
+	r,
+	+ rdf(S1,P1,O1),
+	{ + P1<=P2 } @@ {T},
+	u(+rdf(S1,P2,O1)),
+	jf(T),
+	u(+rdf(S1,P2,O1)).
 
 
 
@@ -445,7 +464,7 @@ a :-
 
 run(Head) :-
 	catch(Head, E, true), !,
-	k,
+	j,
 	(   var(E)
 	->  assert(passed(Head)),
 	    write(user_error, '.')
@@ -456,7 +475,7 @@ run(Head) :-
 	    )
 	).
 run(Head) :-
-	k,
+	j,
 	assert(failed(Head)),
 	print_message(error, test_failed(Head)).
 
