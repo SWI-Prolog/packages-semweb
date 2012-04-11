@@ -1448,14 +1448,14 @@ print_reachability_cloud(rdf_db *db, predicate *p)
   for(rm=cloud->reachable; rm; rm=rm->older)
   { char b[2][24];
 
-    Sdprintf("Reachability matrix: %s..%s (%s)\n",
+    Sdprintf("\nReachability matrix: %s..%s (%s)\n  ",
 	     gen_name(rm->lifespan.born, b[0]),
 	     gen_name(rm->lifespan.died, b[1]),
 	     alive_lifespan(q, &rm->lifespan) ? "alive" : "dead");
 
     for(x=0; x<rm->matrix->width; x++)
       Sdprintf("%d", x%10);
-    Sdprintf("\n");
+    Sdprintf("\n  ");
     for(y=0; y<rm->matrix->heigth; y++)
     { predicate *yp = cloud->members[y];
 
@@ -1467,9 +1467,9 @@ print_reachability_cloud(rdf_db *db, predicate *p)
       }
 
       if ( predicate_hash(yp) == cloud->hash )
-	Sdprintf(" %2d %s\n", y, pname(yp));
+	Sdprintf(" %2d %s\n  ", y, pname(yp));
       else
-	Sdprintf(" %2d %s (hash=0x%x)\n", y, pname(yp), predicate_hash(yp));
+	Sdprintf(" %2d %s (hash=0x%x)\n  ", y, pname(yp), predicate_hash(yp));
       assert(cloud->members[y]->label == y);
     }
   }
