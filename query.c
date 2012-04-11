@@ -696,14 +696,3 @@ discard_transaction(query *q)
 
   return TRUE;
 }
-
-
-/* copy_triples() copies triples whose indexing is out-of-date to the
-   new index.  This must happen after an rdfs:subPropertyOf addition
-   has joined two non-empty predicate clouds.
-*/
-
-int
-copy_triples(query *q, predicate **p, size_t count)
-{ return TRUE;
-}
