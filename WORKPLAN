@@ -19,6 +19,10 @@
 
   * Deal with rdf_update/4,5.					[OK]
 
+  * Concurrent load: not that we are already loading some graph
+    and make a concurrent load wait for completion by the other
+    thread.  This is the same as Prolog loading files concurrently.
+
   * Test framework
     - Controlled concurrency (test_con.pl).  How to generate a comprehensive
       set of test-cases?
