@@ -1181,13 +1181,31 @@ check_labels_predicate_cloud(predicate_cloud *cloud)
   return i;
 }
 
+static void
+update_valid(gen_t *valid_until, gen_t change)
+{ if ( change < *valid_until )
+    *valid_until = change;
+}
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+fill_reachable()   computes   that    transitive     closure    of   the
+rdfs:subPropertyOf relation. In addition, it   maintains  the generation
+valid_until, which expresses  the  maximum   generation  until  when the
+reachability  matrix  is  valid.  This  is    needed  if  we  compute  a
+reachability matrix for an older generation.
+
+TBD: The code below probably doesn't  work properly inside a transaction
+due  to  the  complicated  generation  reasoning  there.  This  must  be
+clarified and cleaned.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static void
 fill_reachable(rdf_db *db,
 	       predicate_cloud *cloud,
 	       bitmatrix *bm,
 	       predicate *p0, predicate *p,
-	       query *q)
+	       query *q,
+	       gen_t *valid_until)
 { if ( !testbit(bm, p0->label, p->label) )
   { triple pattern = {0};
     triple *t;
@@ -1201,13 +1219,18 @@ fill_reachable(rdf_db *db,
     while((t=next_triple(&tw)))
     { predicate *super;
 
+      if ( q->rd_gen < t->lifespan.born )		/* not yet born */
+      { update_valid(valid_until, t->lifespan.born);
+	continue;
+      }
       if ( !alive_triple(q, t) )
 	continue;
       if ( t->object_is_literal )
 	continue;
+      update_valid(valid_until, t->lifespan.died);
       super = lookup_predicate(db, t->object.resource, q);
       assert(super->cloud == cloud);
-      fill_reachable(db, cloud, bm, p0, super, q);
+      fill_reachable(db, cloud, bm, p0, super, q, valid_until);
     }
   }
 }
@@ -1218,17 +1241,18 @@ create_reachability_matrix(rdf_db *db, predicate_cloud *cloud, query *q)
 { bitmatrix *m = alloc_bitmatrix(db, cloud->size, cloud->size);
   sub_p_matrix *rm = rdf_malloc(db, sizeof(*rm));
   predicate **p;
+  gen_t valid_until = GEN_MAX;
   int i;
 
   check_labels_predicate_cloud(cloud);
   for(i=0, p=cloud->members; i<cloud->size; i++, p++)
   { DEBUG(1, Sdprintf("Reachability for %s (%d)\n", pname(*p), (*p)->label));
 
-    fill_reachable(db, cloud, m, *p, *p, q);
+    fill_reachable(db, cloud, m, *p, *p, q, &valid_until);
   }
 
   rm->lifespan.born = q->rd_gen;
-  rm->lifespan.died = GEN_MAX;
+  rm->lifespan.died = valid_until;
   rm->matrix = m;
   rm->older = cloud->reachable;
   MemoryBarrier();

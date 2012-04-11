@@ -17,9 +17,7 @@
     them if their lifespan has passed.  Except for concurrency issues,
     we do not have to be cautious because they will be recreated anyway.
 
-    - When creating a matrix (for an older generation?), it must invalidate
-      at the right time!  This should be the nearest born/died
-      generation of the predicates in the cloud.
+  * Deal with rdf_update/4,5.
 
   * Test framework
     - Controlled concurrency (test_con.pl).  How to generate a comprehensive
