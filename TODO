@@ -7,11 +7,9 @@
   * Predicate clouds represent a set of interlinked predicates, regardless
     of the generation.
   * A predicate-cloud has
-	- A linked list of lifespan+reachability-matrices
+    - A linked list of lifespan+reachability-matrices
   * If two predicate clouds, both having predicates needs merging:
-	- Identify the smallest cloud
-	- Create new predicates as clones from the old predicates
-	- Clone triples to the new predicates.
+    - Register that repeated querying is needed with alternate hashes.
 
 Measurements using old subPropetyOf indexing and none (repeated queries):
 
@@ -21,58 +19,18 @@ Measurements using old subPropetyOf indexing and none (repeated queries):
   - rdf_has(+,+,+) (failing) on root 1.5 --> 7.5.
     Could implement as rdf(+,-,+).  Would yield about 2.4 sec.
 
-Alternatives
-
-  - Join predicates in a cloud, but each predicate keeps its own hash
-    - If it has no triples, give it the cloud hash immediately.
-    - At search-state, keep reference to the cloud and the used
-      predicate-hash.
-      - This guarantees that all relevant triples are found
-    - Repeat the search with all predicate-hashes of sub-predicates.
-
-Steps:
-
-  - Merge clouds on creating a subPropertyOf
-  - Have a function that finds hashes that need to be queried for a
-    super property query.
-
-  - Problem: update predicate->cloud from multiple predicates must
-    appear as one.  isSubPropertyOf():
-
-    - Have cloud->merged_into			[OK]
-      - Set cloud->merged_into to new one
-      - Update labels in merged predicates to reflect new cloud.
-        - While cloud->merged is used; do not trust labels
-      - Then move predicate->cloud to new one
-      - Query follows merged_into until success
-
-
-  TBD: How does all this relate to generation-based life-time?
-
-  * Have the link on predicates + generation and have immutable clouds
-    - Array of generation-ranges to clouds
-      - Start searching this from the latest
-      - Remove on GC
-      - If predicate-hash must change at generation X, copy triples
-    - Adding/deleting a triple inside a cloud:
-      1. Create a copy
-      2. Set new one from current generation on all predicates
-    - Adding a triples that joins two clouds
-      2. Create new cloud with all triples and hash of `largest'
-      3. Copy triples to new hash
-      4. Set new one from current generation on all predicates.
-    - Delete a triples that splits a cloud
-      1. Create two new clouds.  Largest takes hash of old.
-      2. Copy triples of smaller to hash of new cloud.
-      3. Set new clouds on current generation on all predicates.
-
 ---++ Transaction semantics
 
-  * All goals in a transaction see the database at the generation of the
-  transaction start.
-  * All goals in a _nested_ transaction see changes done by the parent
-  transaction upto the start of the nested transaction.
-  * Update semantics
+  * All goals in a transaction see the common database at the
+    generation of the transaction start and all modifications inside
+    the transaction.
+
+  * All goals in a _nested_ transaction see
+	- Common DB until start of outer transaction
+        - Changes made by the parent
+	- Changes inside the nested transaction
+
+  * Update semantics (TBD: Check with implementation)
     - A transaction maintains a list of affected triples.
     - A transaction is assigned a transaction generation, which count
       from near the maximum generation.
@@ -115,9 +73,6 @@ Steps:
   - Test for duplicates; set flag on all of them.			[OK]
   - Avoid duplicate answers by maintaining a table, only adding
     triples that are flagged as duplicates.
-  - Leave resetting the duplicate flag to GC:
-    - If a triple marked as duplicate is erased, check
-      whether alternatives remain in the DB.
 
 ---+ Hash-table design
 
@@ -127,7 +82,6 @@ Steps:
 	- graph-db
 
   - Perform expensive tests for need to rehash in a thread.
-
 
 ---+ References
 

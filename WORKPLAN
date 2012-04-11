@@ -19,6 +19,12 @@
 
   * Deal with rdf_update/4,5.					[OK]
 
+  * Optimize the following tables in GC (i.e., by cloning older
+    objects into new ones):
+	- resource-db
+	- predicate-db
+	- graph-db
+
   * Concurrent load: not that we are already loading some graph
     and make a concurrent load wait for completion by the other
     thread.  This is the same as Prolog loading files concurrently.
