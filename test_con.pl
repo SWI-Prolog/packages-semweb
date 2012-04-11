@@ -411,6 +411,14 @@ test sp3 :-
 	j(T),
 	v(+rdf(S1,P2,O1)).
 
+test sp3b :-
+	+ rdf(S1,P1,O1),
+	{ { + P1<=P2 }
+	} @@ {T},
+	u(+rdf(S1,P2,O1)),
+	j(T),
+	v(+rdf(S1,P2,O1)).
+
 test sp4 :-
 	+ rdf(S1,P1,O1),
 	{ + P1<=P2 } @@ {T},

@@ -1,10 +1,10 @@
 ---+ Concurrent RDF workplan
 
-  * Establish triple-GC
+  * Establish triple-GC						[OK]
 
-  * Establish expansion of triple hash-tables [OK]
+  * Establish expansion of triple hash-tables			[OK]
 
-  * Remove old locking code.
+  * Remove old locking code.					[OK]
 
   * Establish compatible broadcasting
 
@@ -22,8 +22,28 @@
         (hash-)table and filter new duplicate triples according to
 	this table.
 
-  * Deal with subPropertyOf predicate clouds
+    - When is a triple a duplicate that we can discard?  Currently
+      if it is the same quadruple.  I think we must also check that
+      the triple is in the same transaction, so they either both get
+      committed or discarded.
+
+  * Deal with subPropertyOf predicate clouds			[OK]
+
+  * Cleanup reachability matrices in GC.  Fairly trivial: just delete
+    them if their lifespan has passed.  Except for concurrency issues,
+    we do not have to be cautious because they will be recreated anyway.
+
+    - When creating a matrix (for an older generation?), it must invalidate
+      at the right time!  This should be the nearest born/died
+      generation of the predicates in the cloud.
 
   * Test framework
-    - Controlled concurrency
+    - Controlled concurrency (test_con.pl).  How to generate a comprehensive
+      set of test-cases?
+
+      - Action grammar to generate sequences?
+      - Keep shadow admin in Prolog
+      - Formalise transaction/snapshot isolation
+
     - Stress testing
+      - Run controlled tests concurrently in transactions?
