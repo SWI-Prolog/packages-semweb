@@ -71,6 +71,9 @@ uninstall::
 		(cd $(PLBASE)/library && rm -f $(LIBPL))
 		$(MKINDEX)
 
+tags::
+		etags *.[ch]
+
 rdf_db.o:	unicode_map.c buffer.h error.h
 query.o:	buffer.h
 
