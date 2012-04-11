@@ -1,5 +1,7 @@
 :- module(rdf_test,
-	  [ (+)/1,			% Assert
+	  [ run/0,			% Run all tests
+	    run/1,			% +Test
+	    (+)/1,			% Assert
 	    (-)/1,			% Retract
 	    v/1,			% Visible
 	    s/2,			% +Id, ?Subject
@@ -8,15 +10,14 @@
 	    u/1,			% InVisible
 	    l/0,			% List
 	    r/0,			% reset
-	    run/1,			% +Test
 	    {}/1,			% transaction
 	    (@@)/2,			% Action @ Context (Synchronous)
 	    (@@)/1,			% Action in snapshot
 	    j/0,			% Join helper threads
 	    j/1,			% Join a specific helper
 	    jf/1,			% Join a specific helper, failing
-	    a/0,			% Run all tests
-	    snap/1,
+	    snap/1,			% -Snapshot
+
 	    op(200, xfx, @@),
 	    op(200, xf,  @@),
 	    op(200, xfy, <=)
@@ -300,21 +301,18 @@ term_expansion((test Head :- Body),
 	       ]).
 
 test t1 :-				% asserted triple in failed
-	r,				% transaction disappears
-	(  { + a^_,
+	(  { + a^_,			% transaction disappears
 	     fail
 	   }
 	;  true
 	),
 	u(a).
 test t2 :-				% asserted triple in transaction
-	r,				% is visible inside and outside
-	{ + a^_,
+	{ + a^_,			% is visible inside and outside
 	  v(a)
 	},
 	v(a).
 test t3 :-
-	r,
 	{ + a^_,
 	  { v(a),
 	    + b^_,
@@ -324,26 +322,22 @@ test t3 :-
 	},
 	v(a).
 test t4 :-
-	r,
 	+ a^_,
 	{ v(a)
 	}.
 test t5 :-
-	r,
 	+ a^_,
 	{ - a,
 	  u(a)
 	},
 	u(a).
 test t6 :-
-	r,
 	+ a^_,
 	{ - a,
 	  u(a)
 	},
 	u(a).
 test t7 :-
-	r,
 	+ a^_,
 	(   { - a,
 	      u(a),
@@ -354,14 +348,12 @@ test t7 :-
 	v(a).
 						% property handling tests
 test p1 :-
-	r,
 	+ rdf(s,p,_),
 	+ B^rdf(s,p,_),
 	rdf(s,p,O),
 	- B,
 	o(B, O).
 test p2 :-
-	r,
 	+ rdf(s,p,_),
 	+ B^rdf(s,p,_),
 	rdf(s,p,O),
@@ -370,33 +362,31 @@ test p2 :-
 	u(B),
 	o(B, O).
 test p3 :-
-	r,
 	+ B^rdf(s,p,_),
 	{-B}@@_,
 	u(B).
 						% snapshot tests
 test s1 :-
-	r,
 	+ a^_,
 	snap(S),
 	+ b^_,
 	{ u(b) }@@S.
+
 test s2 :-
-	r,
 	+ a^_,
 	snap(S),
 	{ + b^_
 	}@@S,
 	u(b).
+
 test s3 :-
-	r,
 	+ a^_,
 	snap(S),
 	{ - a
 	}@@S,
 	v(a).
+
 test s4 :-
-	r,
 	+ a^_,
 	{ - a
 	}@@,
@@ -405,19 +395,16 @@ test s4 :-
 /* subProperty tests */
 
 test sp1 :-
-	r,
 	+ rdf(S1,P1,O1),
 	+ P1<=P2,
 	v(+rdf(S1,P2,O1)).
 
 test sp2 :-
-	r,
 	+ rdf(S1,P1,O1),
 	{ + P1<=P2 } @@ _,
 	v(+rdf(S1,P2,O1)).
 
 test sp3 :-
-	r,
 	+ rdf(S1,P1,O1),
 	{ + P1<=P2 } @@ {T},
 	u(+rdf(S1,P2,O1)),
@@ -425,7 +412,6 @@ test sp3 :-
 	v(+rdf(S1,P2,O1)).
 
 test sp4 :-
-	r,
 	+ rdf(S1,P1,O1),
 	{ + P1<=P2 } @@ {T},
 	u(+rdf(S1,P2,O1)),
@@ -442,11 +428,11 @@ test sp4 :-
 	passed/1,
 	failed/1.
 
-%%	a
+%%	run
 %
 %	Run all tests
 
-a :-
+run :-
 	retractall(passed(_)),
 	retractall(failed(_)),
 	forall(test(Head),
@@ -463,6 +449,7 @@ a :-
 %	Run one individual test.
 
 run(Head) :-
+	r,
 	catch(Head, E, true), !,
 	j,
 	(   var(E)
