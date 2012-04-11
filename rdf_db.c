@@ -953,6 +953,17 @@ triples_in_predicate_cloud(predicate_cloud *cloud)
 }
 
 
+static void
+invalidateReachability(predicate_cloud *cloud, query *q)
+{ sub_p_matrix *rm;
+
+  for(rm=cloud->reachable; rm; rm=rm->older)
+  { if ( rm->lifespan.died == GEN_MAX )			/* dubious */
+      rm->lifespan.died = queryWriteGen(q);
+  }
+}
+
+
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 Append the predicates from cloud C2 to those of cloud C1.  There are two
 scenarios:
@@ -1004,18 +1015,15 @@ append_clouds(rdf_db *db,
 }
 
 
-/* merge two predicate clouds.  If either of them has no triples we
-   can do the merge without rehashing the database.  Note that this
-   code is only called from addSubPropertyOf().  If c1==c2, we added
-   an rdfs:subPropertyOf between two predicates in the same cloud.
-   we must still update the matrix, though we could do it a bit more
-   efficient.  I doubt this is worth the trouble though.
+/* merge two predicate clouds. Note that this code is only called
+   from addSubPropertyOf().  If c1==c2, we added an rdfs:subPropertyOf
+   between two predicates in the same cloud. we must still invalidate
+   the matrix.
 */
 
 static predicate_cloud *
 merge_clouds(rdf_db *db, predicate_cloud *c1, predicate_cloud *c2, query *q)
 { predicate_cloud *cloud;
-  sub_p_matrix *rm;
 
   if ( c1 != c2 )
   { size_t tc1, tc2;
@@ -1041,10 +1049,7 @@ merge_clouds(rdf_db *db, predicate_cloud *c1, predicate_cloud *c2, query *q)
   { cloud = c1;
   }
 
-  for(rm=cloud->reachable; rm; rm=rm->older)
-  { if ( rm->lifespan.died == GEN_MAX )
-      rm->lifespan.died = q->wr_gen;
-  }
+  invalidateReachability(cloud, q);
 
   return cloud;
 }
@@ -1121,17 +1126,6 @@ split_cloud(rdf_db *db, predicate_cloud *cloud,
 static size_t
 predicate_hash(predicate *p)
 { return p->hash;
-}
-
-
-static void
-invalidateReachability(predicate_cloud *cloud, query *q)
-{ sub_p_matrix *rm;
-
-  for(rm=cloud->reachable; rm; rm=rm->older)
-  { if ( rm->lifespan.died == GEN_MAX )			/* dubious */
-      rm->lifespan.died = queryWriteGen(q);
-  }
 }
 
 
@@ -1422,6 +1416,10 @@ check_predicate_cloud(predicate_cloud *c)
   for(i=0, pp=c->members; i<c->size; i++, pp++)
   { predicate *p = *pp;
 
+    if ( p->label != i )
+    { Sdprintf("Wrong label for %s (%d != %d\n", pname(p), i, p->label);
+      errors++;
+    }
     if ( p->hash != c->hash )
     { Sdprintf("Hash of %s doesn't match cloud hash\n", pname(p));
       errors++;				/* this is now normal! */
@@ -1443,6 +1441,7 @@ print_reachability_cloud(rdf_db *db, predicate *p)
   sub_p_matrix *rm;
   query *q;
 
+  Sdprintf("Cloud has %d members, hash = 0x%x\n", cloud->size, cloud->hash);
   check_predicate_cloud(cloud);
 
   q = open_query(db);
@@ -1458,14 +1457,19 @@ print_reachability_cloud(rdf_db *db, predicate *p)
       Sdprintf("%d", x%10);
     Sdprintf("\n");
     for(y=0; y<rm->matrix->heigth; y++)
-    { for(x=0; x<rm->matrix->width; x++)
+    { predicate *yp = cloud->members[y];
+
+      for(x=0; x<rm->matrix->width; x++)
       { if ( testbit(rm->matrix, x, y) )
 	  Sdprintf("X");
 	else
 	  Sdprintf(".");
       }
 
-      Sdprintf(" %2d %s\n", y, PL_atom_chars(cloud->members[y]->name));
+      if ( predicate_hash(yp) == cloud->hash )
+	Sdprintf(" %2d %s\n", y, pname(yp));
+      else
+	Sdprintf(" %2d %s (hash=0x%x)\n", y, pname(yp), predicate_hash(yp));
       assert(cloud->members[y]->label == y);
     }
   }
