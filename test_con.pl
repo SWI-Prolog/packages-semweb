@@ -440,6 +440,26 @@ test sp5 :-				% join two non-empty clouds
 	v(+rdf(S1,Root,O1)),
 	v(+rdf(S2,Root,O2)).
 
+/* Logical updates */
+
+r2(R, R2) :-
+	atom_concat(R, '^', R2).
+
+test lu1 :-
+	+ _,
+	findall(x, (rdf(S,P,O), r2(O, O2), rdf_assert(S,P,O2)), [x]),
+	findall(x, (rdf(S,P,O), r2(S, S2), rdf_assert(S2,P,O)), [x,x]).
+
+test lu2 :-
+	+ rdf(S1,P1,_),
+	+ rdf(S2,P2,_),
+	+ P1<=Root,
+	findall(x, ( rdf_has(_,Root,_),
+		     + P2<=Root
+		   ), [x]),
+	findall(S, rdf_has(S, Root, _), [S1,S2]).
+
+
 /* duplicate handling */
 
 test dup1 :-
