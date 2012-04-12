@@ -816,17 +816,6 @@ read_triples(File, Triples) :-
 	file_name_extension(_, ttl, File), !,
 	rdf_load_turtle(File, Triples, []).
 
-%%	is_manifest_file(+Path) is semidet.
-%
-%	True if Path is the name of a manifest file.
-
-is_manifest_file(Path) :-
-	file_base_name(Path, File),
-	downcase_atom(File, Lwr),
-	file_name_extension(Base, Ext, Lwr),
-	manifest_file(Base),
-	rdf_extension(Ext), !.
-
 manifest_file('void').			% make order optional?
 manifest_file('Manifest').
 manifest_file('manifest').
