@@ -1,9 +1,8 @@
 :- module(test_subprop,
-	  [ test/0
+	  [ test/1
 	  ]).
 :- use_module(library(semweb/rdf_db)).
 :- use_module(library(record)).
-:- use_module(library(settings)).
 :- use_module(library(debug)).
 :- use_module(library(broadcast)).
 :- use_module(random_graph).
@@ -35,23 +34,25 @@ cleanup :-
 	retractall(died(_,_)),
 	rdf_reset_db.
 
-test :-
-	show,
-	reset,
-	loop(1).
+test(N) :-
+	show_graph(g1),
+	reset_graph(g1),
+	loop(1, N).
 
-loop(I) :-
-	step,
+loop(I, I) :- !.
+loop(I, N) :-
+	graph_steps(g1,1),
 	check_all,
 	succ(I, I2),
 	format(user_error, '\r~t~D~6|', [I]),
-	loop(I2).
+	loop(I2, N).
 
 
-:- listen(graph(Action), update_graph(Action)).
+:- listen(graph(g1, Action), update_graph(Action)).
 
 update_graph(Action) :-
-	debug(subprop, '~p', [Action]).
+	debug(subprop, '~p', [Action]),
+	fail.
 update_graph(reset) :-
 	cleanup.
 update_graph(add_node(I)) :-
