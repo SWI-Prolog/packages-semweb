@@ -1,5 +1,7 @@
 :- module(test_subprop,
-	  [ test/1
+	  [ test/1,			% +Times
+	    replay/0,
+	    replay/1			% +File
 	  ]).
 :- use_module(library(semweb/rdf_db)).
 :- use_module(library(record)).
@@ -35,6 +37,7 @@ cleanup :-
 	rdf_reset_db.
 
 test(N) :-
+	record_in('g1.rec'),
 	show_graph(g1),
 	reset_graph(g1),
 	loop(1, N).
@@ -117,3 +120,45 @@ subPropertyOf(Sub, Super, Gen) :-
 subPropertyOf(Sub, Super, Gen) :-
 	nonvar(Super), !,
 	bf_expand(superPropertyOf_1(Gen), Super, [Sub|_]).
+
+
+		 /*******************************
+		 *	       RECORD		*
+		 *******************************/
+
+:- dynamic
+	record_stream/1.
+
+record_in(File) :-
+	open(File, write, Out),
+	asserta(record_stream(Out)),
+	listen(record, graph(G, Action), save(G, Action)),
+	at_halt(close_recording).
+
+close_recording :-
+	forall(retract(record_stream(Out)),
+	       close(Out)).
+
+save(Graph, Action) :-
+	record_stream(Out),
+	format(Out, 'action(~q, ~q).~n', [Graph, Action]),
+	flush_output(Out).
+
+%%	replay
+%
+%	Replay the last randomly generated suite
+
+replay :-
+	replay('g1.rec').
+
+replay(File) :-
+	open(File, read, In),
+	repeat,
+	    read(In, Term),
+	    (	Term == end_of_file
+	    ->	!, close(In)
+	    ;	Term = action(Graph,Action),
+		broadcast(graph(Graph, Action)),
+		check_all,
+		fail
+	    ).
