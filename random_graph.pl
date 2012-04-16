@@ -271,6 +271,9 @@ edge_count(Graph, Count) :-
 %	broadcasts messages, updating if the graph changes.
 
 show_graph(Graph) :-
+	in_pce_thread_sync(pce_show_graph(Graph)).
+
+pce_show_graph(Graph) :-
 	context_module(Here),
 	new(GV, graph_viewer(Graph)),
 	send(GV, open),
