@@ -5285,7 +5285,7 @@ next_sub_property(search_state *state)
 	return FALSE;			/* Cloud has only one hash */
     }
 
-    if ( state->alt_hash_cursor < state->p_cloud->alt_hash_count )
+    if ( state->alt_hash_cursor+1 < state->p_cloud->alt_hash_count )
     { DEBUG(1, Sdprintf("Retrying with alt-hash %d (0x%x)\n",
 			state->alt_hash_cursor+1,
 			state->p_cloud->alt_hashes[state->alt_hash_cursor+1]));
