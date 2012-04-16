@@ -995,16 +995,37 @@ append_clouds(rdf_db *db,
   c1->size += c2->size;
 
   if ( !update_hash )
-  { size_t newc = c1->alt_hash_count + c2->alt_hash_count + 1;
+  { size_t newc = 0;
+
+    if ( c1->alt_hash_count )
+      newc += c1->alt_hash_count;
+    else
+      newc++;
+
+    if ( c2->alt_hash_count )
+      newc += c2->alt_hash_count;
+    else
+      newc++;
 
     DEBUG(1, Sdprintf("Cloud %p: %d alt-hashes\n", c1, newc));
 
-    c1->alt_hashes = rdf_realloc(db, c1->alt_hashes,
-				 c1->alt_hash_count*sizeof(unsigned int),
-				 newc*sizeof(unsigned int));
-    memcpy(&c1->alt_hashes[c1->alt_hash_count],
-	   c2->alt_hashes, c2->alt_hash_count*sizeof(unsigned int));
-    c1->alt_hashes[newc-1] = c2->hash;
+    if ( c1->alt_hashes )
+    { c1->alt_hashes = rdf_realloc(db, c1->alt_hashes,
+				   c1->alt_hash_count*sizeof(unsigned int),
+				   newc*sizeof(unsigned int));
+    } else
+    { c1->alt_hashes = rdf_malloc(db, newc*sizeof(unsigned int));
+      c1->alt_hashes[0] = c1->hash;
+      c1->alt_hash_count = 1;
+    }
+
+    if ( c2->alt_hash_count )
+    { memcpy(&c1->alt_hashes[c1->alt_hash_count],
+	     c2->alt_hashes, c2->alt_hash_count*sizeof(unsigned int));
+    } else
+    { c1->alt_hashes[c1->alt_hash_count] = c2->hash;
+    }
+    MemoryBarrier();
     c1->alt_hash_count = newc;
   }
 
@@ -5270,25 +5291,28 @@ next_sub_property(search_state *state)
     { if ( p->predicate.r->cloud->alt_hash_count )
       { state->p_cloud = p->predicate.r->cloud;
 
-	DEBUG(1, Sdprintf("Retrying with alt-hash 0 (0x%x)\n",
-			  state->p_cloud->alt_hashes[0]));
-
+	DEBUG(1, Sdprintf("%d alt hashes; first was 0x%x\n",
+			  p->predicate.r->cloud->alt_hash_count,
+			  predicate_hash(p->predicate.r)));
 	tw->unbounded_hash ^= predicate_hash(p->predicate.r);
-	tw->unbounded_hash ^= state->p_cloud->alt_hashes[0];
-	rewind_triple_walker(tw);
 	state->alt_hash_cursor = 0;
-
-	return TRUE;
       } else
 	return FALSE;			/* Cloud has only one hash */
+    } else
+    { tw->unbounded_hash ^= state->p_cloud->alt_hashes[state->alt_hash_cursor];
+      state->alt_hash_cursor++;
     }
 
-    if ( state->alt_hash_cursor+1 < state->p_cloud->alt_hash_count )
+    while( state->alt_hash_cursor < state->p_cloud->alt_hash_count &&
+	   state->p_cloud->alt_hashes[state->alt_hash_cursor] ==
+	   predicate_hash(p->predicate.r) )
+      state->alt_hash_cursor++;
+
+    if ( state->alt_hash_cursor < state->p_cloud->alt_hash_count )
     { DEBUG(1, Sdprintf("Retrying with alt-hash %d (0x%x)\n",
-			state->alt_hash_cursor+1,
-			state->p_cloud->alt_hashes[state->alt_hash_cursor+1]));
+			state->alt_hash_cursor,
+			state->p_cloud->alt_hashes[state->alt_hash_cursor]));
       tw->unbounded_hash ^= state->p_cloud->alt_hashes[state->alt_hash_cursor];
-      tw->unbounded_hash ^= state->p_cloud->alt_hashes[++state->alt_hash_cursor];
       rewind_triple_walker(tw);
 
       return TRUE;
