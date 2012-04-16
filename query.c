@@ -117,13 +117,13 @@ oldest_query_geneneration(rdf_db *db)
       if ( qs->top > 0 )
       { query *q = &qs->preallocated[0];
 
-	DEBUG(1, Sdprintf("Thread %d: %d queries; oldest gen %ld\n",
+	DEBUG(10, Sdprintf("Thread %d: %d queries; oldest gen %ld\n",
 			  tid, qs->top, (long)q->rd_gen));
 
 	if ( q->rd_gen < gen )
 	  gen = q->rd_gen;
       } else
-      { DEBUG(2, Sdprintf("Thread %d: no queries\n", tid));
+      { DEBUG(11, Sdprintf("Thread %d: no queries\n", tid));
       }
     }
   }

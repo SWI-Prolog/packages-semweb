@@ -2634,7 +2634,7 @@ gc_db(rdf_db *db, gen_t gen)
     return FALSE;			/* in progress */
   }
 
-  DEBUG(1, Sdprintf("RDF GC; gen = %ld\n", (long)gen));
+  DEBUG(10, Sdprintf("RDF GC; gen = %ld\n", (long)gen));
 
   db->gc.busy = TRUE;
   optimize_triple_hashes(db, gen);
