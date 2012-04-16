@@ -1219,6 +1219,8 @@ fill_reachable(rdf_db *db,
     while((t=next_triple(&tw)))
     { predicate *super;
 
+      if ( !match_triples(db, t, &pattern, q, 0) )
+	continue;
       if ( q->rd_gen < t->lifespan.born )		/* not yet born */
       { update_valid(valid_until, t->lifespan.born);
 	continue;
