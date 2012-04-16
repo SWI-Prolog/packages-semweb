@@ -1,6 +1,4 @@
-/*  $Id$
-
-    Part of XPCE --- The SWI-Prolog GUI toolkit
+/*  Part of XPCE --- The SWI-Prolog GUI toolkit
 
     Author:        Jan Wielemaker and Anjo Anjewierden
     E-mail:        jan@swi.psy.uva.nl
@@ -32,6 +30,7 @@
 :- module(pce_graph,
 	  [			% From, To
 	  ]).
+:- use_module(library(broadcast)).
 
 :- use_module(library(pce)).
 :- require([ forall/2
@@ -44,12 +43,27 @@
 :- pce_begin_class(graph_viewer, frame).
 
 
-initialise(GV) :->
+initialise(GV, Id:[any]) :->
 	"Create graph-viewer"::
-	send(GV, send_super, initialise, 'Graph Viewer'),
+	send_super(GV, initialise, 'Graph Viewer'),
 	send(GV, append, new(P, picture)),
 	send(new(D, dialog), below, P),
-	fill_dialog(D).
+	fill_dialog(D),
+	listen(GV, graph(Id, Action),
+	       in_pce_thread(action(Action, GV))).
+
+unlink(GV) :->
+	unlisten(GV),
+	send_super(GV, unlink).
+
+action(add_node(N), GV) :-
+	get(GV, node, N, _Node).
+action(add_edge(C,P), GV) :-
+	send(GV, display_arc, C, P).
+action(del_edge(C,P), GV) :-
+	send(GV, delete_arc, C, P).
+action(reset, GV) :-
+	send(GV, clear).
 
 fill_dialog(D) :-
 	new(Frame, D?frame),
