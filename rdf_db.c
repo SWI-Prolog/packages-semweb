@@ -5847,7 +5847,10 @@ rdf_retractall4(term_t subject, term_t predicate, term_t object, term_t src)
   q = open_query(db);
   init_triple_walker(&tw, db, &t, t.indexed);
   while((p=next_triple(&tw)))
-  { if ( match_triples(db, p, &t, q, MATCH_EXACT|MATCH_SRC) )
+  { if ( !alive_triple(q, p) )
+      continue;
+
+    if ( match_triples(db, p, &t, q, MATCH_EXACT|MATCH_SRC) )
     { if ( t.object_is_literal && t.object.literal->objtype == OBJ_TERM )
       { fid_t fid = PL_open_foreign_frame();
 	int rc = unify_object(object, p);
