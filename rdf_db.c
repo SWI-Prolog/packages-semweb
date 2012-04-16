@@ -369,14 +369,12 @@ triple_status_flags(triple *t, char *buf)
 
 static void
 print_gen(triple *t)
-{ char buf[16];
+{ char buf[3][24];
 
-  if ( t->lifespan.died == GEN_MAX )
-    Sdprintf("%ld..%s", t->lifespan.born,
-	     triple_status_flags(t, buf));
-  else
-    Sdprintf("%ld..%ld%s", t->lifespan.born, t->lifespan.died,
-	     triple_status_flags(t, buf));
+  Sdprintf(" (%s..%s%s)",
+	   gen_name(t->lifespan.born, buf[0]),
+	   gen_name(t->lifespan.died, buf[1]),
+	   triple_status_flags(t, buf[2]));
 }
 
 
@@ -5402,7 +5400,10 @@ next_search_state(search_state *state)
 
   do
   { while( (t = next_triple(tw)) )
-    { if ( is_candidate(state, t) )
+    { DEBUG(3, Sdprintf("Search: ");
+	       print_triple(t, PRT_SRC|PRT_GEN|PRT_NL));
+
+      if ( is_candidate(state, t) )
       { int rc;
 
 	if ( (rc=unify_triple(state->subject, retpred, state->object,
