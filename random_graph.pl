@@ -20,7 +20,8 @@ This library creates randomly changing graphs.
 :- dynamic
 	node/2,				% Id, Graph
 	edge/3,				% Child, Parent, Graph
-	node_id/2.			% Id, Graph
+	node_id/2,			% Id, Graph
+	probability/3.			% Graph, Action, Prob
 
 %%	reset_graph(+Graph)
 %
@@ -43,7 +44,7 @@ graph_steps(Graph, N) :-
 graph_steps(_, _).
 
 step(Graph) :-
-	findall(A-P, probability(Graph,A,P), Pairs),
+	findall(A-P, action_probability(Graph,A,P), Pairs),
 	pairs_values(Pairs, Probs),
 	sum_list(Probs, TotProb),
 	repeat,
@@ -71,18 +72,30 @@ select_action(P, [_-PA|T], A) :-
 	P2 is P-PA,
 	select_action(P2, T, A).
 
+action_probability(Graph, Action, P) :-
+	(   var(Action)
+	->  action(Action)
+	;   true
+	),
+	(   probability(Graph, Action, P)
+	->  true
+	;   default_probability(Graph, Action, P)
+	).
 
-probability(Graph, create_node, P) :-
+action(Action) :-
+	clause(graph_action(_, Action), _).
+
+default_probability(Graph, create_node, P) :-
 	node_count(Graph, Nodes),
 	edge_count(Graph, Edges),
 	P is max(Edges,1)/max(10*Nodes,1).
-probability(_, add_leaf,		 0.1).
-probability(_, disconnect_leaf,		 0.1).
-probability(_, connect_clouds,		 0.1).
-probability(_, add_non_cyclic_edge,	 0.1).
-probability(_, add_cyclic_edge,		 0.03).
-probability(_, remove_non_breaking_edge, 0.1).
-probability(_, remove_edge,		 0.1).
+default_probability(_, add_leaf,		 0.1).
+default_probability(_, disconnect_leaf,		 0.1).
+default_probability(_, connect_clouds,		 0.1).
+default_probability(_, add_non_cyclic_edge,	 0.1).
+default_probability(_, add_cyclic_edge,		 0.03).
+default_probability(_, remove_non_breaking_edge, 0.1).
+default_probability(_, remove_edge,		 0.1).
 
 
 %%	graph_action(+Graph, +Action) is det.
