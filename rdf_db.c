@@ -1365,9 +1365,11 @@ isSubPropertyOf(rdf_db *db, predicate *sub, predicate *p, query *q)
   pc = cloud_of(sub, &sub_label);
   if ( pc == cloud_of(p, &p_label) )
   { sub_p_matrix *rm;
+    int max_label = (sub_label > p_label ? sub_label : p_label);
 
     for(rm=pc->reachable; rm; rm=rm->older)
-    { if ( alive_lifespan(q, &rm->lifespan) )
+    { if ( alive_lifespan(q, &rm->lifespan) &&
+	   max_label < rm->matrix->width )
 	return testbit(rm->matrix, sub_label, p_label);
     }
 
