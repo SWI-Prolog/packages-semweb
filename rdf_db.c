@@ -3166,11 +3166,17 @@ del_triple_consequences(rdf_db *db, triple *t, query *q)
 
 void
 erase_triple(rdf_db *db, triple *t, query *q)
-{ unregister_graph(db, t);		/* Updates count and MD5 */
-  unregister_predicate(db, t);		/* Updates count */
-  if ( t->is_duplicate )
-    db->duplicates--;
-  db->erased++;
+{ if ( !t->erased )
+  { t->erased = TRUE;
+
+    unregister_graph(db, t);		/* Updates count and MD5 */
+    unregister_predicate(db, t);	/* Updates count */
+    if ( t->is_duplicate )
+      db->duplicates--;
+    db->erased++;
+  } else
+  { assert(0);				/* not sure this cannot happen */
+  }
 }
 
 
@@ -6964,7 +6970,6 @@ erase_triples(rdf_db *db)
   }
 
   db->created = 0;
-  db->erased = 0;
   db->erased = 0;
   memset(db->indexed, 0, sizeof(db->indexed));
   db->duplicates = 0;

@@ -36,6 +36,7 @@ cleanup :-
 	retractall(sub_of(_,_,_)),
 	retractall(died(_,_)),
 	retractall(snap(_,_,_)),
+	rdf_gc,
 	rdf_reset_db.
 
 test(N) :-
@@ -80,7 +81,10 @@ update_graph(verify_snap(SnapId)) :-
 	rdf_transaction(check_all(Gen), _Id, [snapshot(Snap)]).
 update_graph(add_node(I)) :-
 	atom_concat(p, I, P),
+	rdf_statistics(triples(T0)),
 	rdf_assert(P,P,P),
+	rdf_statistics(triples(T1)),
+	assertion(T0+1 =:= T1),
 	rdf_generation(Gen),
 	assertz(predicate(P, Gen)).
 update_graph(add_edge(SubI,SuperI)) :-

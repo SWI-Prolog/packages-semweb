@@ -298,6 +298,7 @@ typedef struct triple
   unsigned	linked : 4;		/* Linked into the hash-chains */
   unsigned	reindexed : 1;		/* Remapped by optimize_triple_hash() */
   unsigned	loaded : 1;		/* for EV_ASSERT_LOAD */
+  unsigned	erased : 1;		/* Consistency of erased */
 					/* Total: 32 */
 } triple;
 
