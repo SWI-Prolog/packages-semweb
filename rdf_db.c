@@ -7044,7 +7044,7 @@ rdf_reset_db(void)
   query *q = open_query(db);
   int rc;
 
-  if ( q->depth > 0 )
+  if ( q->depth > 0 || q->transaction )
   { close_query(q);
     return permission_error("reset", "rdf_db", "default",
 			    "Active queries");

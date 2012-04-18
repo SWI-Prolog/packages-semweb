@@ -57,7 +57,12 @@ loop(I, N) :-
 	loop(I2, N).
 
 
-:- listen(graph(g1, Action), update_graph(Action)).
+:- listen(graph(g1, Action), update_graph_true(Action)).
+
+update_graph_true(Action) :-
+	update_graph(Action), !.
+update_graph_true(_Action) :-
+	assertion(false).
 
 update_graph(Action) :-
 	debug(subprop, '~p', [Action]),
@@ -98,8 +103,8 @@ check_all :-
 	check_all(Gen).
 
 check_all(Gen) :-
-	forall(predicate(P1,_),
-	       forall(predicate(P2,_),
+	forall(visible_predicate(Gen, P1),
+	       forall(visible_predicate(Gen, P2),
 		      check_all(Gen, P1, P2))).
 
 check_all(Gen, Sub, Super) :-
@@ -109,6 +114,13 @@ check_all(Gen, Sub, Super) :-
 	).
 
 
+
+visible_predicate(Gen, P) :-
+	predicate(P, Born),
+	Gen >= Born,
+	\+ (  died(Born, Died),
+	      Gen >= Died
+	   ).
 
 subPropertyOf_1(Gen, Sub, Super) :-
 	sub_of(Sub, Super, Born),

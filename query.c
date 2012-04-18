@@ -103,8 +103,8 @@ oldest_query_geneneration(rdf_db *db)
   query_admin *qa = &db->queries;
   per_thread *td = &qa->query.per_thread;
 
-  DEBUG(2, if ( db->snapshots.keep != GEN_MAX )
-	     Sdprintf("Oldest snapshot gen = %ld\n", (long)db->snapshots.keep));
+  DEBUG(20, if ( db->snapshots.keep != GEN_MAX )
+	      Sdprintf("Oldest snapshot gen = %ld\n", (long)db->snapshots.keep));
 
   for(tid=1; tid <= qa->query.thread_max; tid++)
   { thread_info **tis;
