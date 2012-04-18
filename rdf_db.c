@@ -2660,21 +2660,39 @@ gc_hashes(rdf_db *db, gen_t gen)
 
 
 static int
+gc_set_busy(rdf_db *db)
+{ int busy;
+
+  simpleMutexLock(&db->locks.misc);
+  if ( !(busy = db->gc.busy) )
+    db->gc.busy = TRUE;
+  simpleMutexUnlock(&db->locks.misc);
+
+  return !busy;
+}
+
+
+static void
+gc_clear_busy(rdf_db *db)
+{ simpleMutexLock(&db->locks.misc);
+  db->gc.busy = FALSE;
+  simpleMutexUnlock(&db->locks.misc);
+}
+
+
+static int
 gc_db(rdf_db *db, gen_t gen)
-{ simpleMutexLock(&db->locks.gc);
-  if ( db->gc.busy )
-  { simpleMutexUnlock(&db->locks.gc);
-    return FALSE;			/* in progress */
-  }
+{ char buf[64];
 
-  DEBUG(10, Sdprintf("RDF GC; gen = %ld\n", (long)gen));
-
-  db->gc.busy = TRUE;
+  if ( !gc_set_busy(db) )
+    return FALSE;
+  simpleMutexLock(&db->locks.gc);
+  DEBUG(10, Sdprintf("RDF GC; gen = %s\n", gen_name(gen, buf)));
   optimize_triple_hashes(db, gen);
   gc_hashes(db, gen);
   db->gc.count++;
-  db->gc.busy = FALSE;
   db->gc.last_gen = gen;
+  gc_clear_busy(db);
   simpleMutexUnlock(&db->locks.gc);
 
   return TRUE;
@@ -2683,13 +2701,14 @@ gc_db(rdf_db *db, gen_t gen)
 
 static int
 reset_gc(rdf_db *db)
-{ simpleMutexLock(&db->locks.gc);
-  if ( db->gc.busy )
-  { simpleMutexUnlock(&db->locks.gc);
-    assert(0);
-    return FALSE;			/* in progress!? wait? */
-  }
+{ int was_busy = db->gc.busy;
 
+  DEBUG(2, if ( was_busy )
+	     Sdprintf("Reset: GC in progress, waiting ...\n"));
+
+  simpleMutexLock(&db->locks.gc);
+  DEBUG(2, if ( was_busy )
+	     Sdprintf("Reset: GC finished\n"));
   db->gc.busy		     = TRUE;
   db->gc.count		     = 0;
   db->gc.time		     = 0.0;
@@ -2698,7 +2717,6 @@ reset_gc(rdf_db *db)
   db->gc.uncollectable	     = 0;
   db->gc.last_gen	     = 0;
   db->gc.busy		     = FALSE;
-
   simpleMutexUnlock(&db->locks.gc);
 
   return TRUE;
@@ -7031,13 +7049,13 @@ reset_db(rdf_db *db)
 
   db->resetting = TRUE;
 
+  reset_gc(db);
   erase_triples(db);
   erase_predicates(db);
   erase_resources(&db->resources);
   erase_graphs(db);
   db->agenda_created = 0;
   skiplist_destroy(&db->literals);
-  reset_gc(db);
 
   rc = (init_resource_db(db, &db->resources) &&
 	init_literal_table(db));

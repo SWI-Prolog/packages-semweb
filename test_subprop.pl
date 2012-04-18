@@ -36,7 +36,7 @@ cleanup :-
 	retractall(sub_of(_,_,_)),
 	retractall(died(_,_)),
 	retractall(snap(_,_,_)),
-	rdf_gc,
+%	rdf_gc,
 	rdf_reset_db.
 
 test(N) :-
