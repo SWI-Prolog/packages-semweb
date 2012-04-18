@@ -21,7 +21,8 @@ This library creates randomly changing graphs.
 :- dynamic
 	node/2,				% Id, Graph
 	edge/3,				% Child, Parent, Graph
-	node_id/2,			% Id, Graph
+	snap/2,				% Graph, Id
+	id/3,				% Id, Type, Graph
 	probability/3.			% Graph, Action, Prob
 
 %%	reset_graph(+Graph)
@@ -31,7 +32,8 @@ This library creates randomly changing graphs.
 reset_graph(Graph) :-
 	retractall(node(_, Graph)),
 	retractall(edge(_,_, Graph)),
-	retractall(node_id(_, Graph)),
+	retractall(snap(Graph, _)),
+	retractall(id(Graph, _, _)),
 	show(Graph, reset).
 
 %%	graph_steps(+Graph, +Steps) is det.
@@ -121,7 +123,7 @@ default_probability(_, remove_edge,		 0.1).
 %	Perform Action on Graph.
 
 graph_action(Graph, create_node) :-
-	next_node_id(Graph, Id),
+	next_id(Graph, node, Id),
 	assert_node(Graph, Id).
 graph_action(Graph, add_leaf) :-
 	unconnected_node(Graph, Node),
@@ -163,8 +165,16 @@ graph_action(Graph, remove_non_breaking_edge) :-
 graph_action(Graph, remove_edge) :-
 	edge(Child, Parent, Graph), !,
 	retract_edge(Graph, Child, Parent).
-graph_action(Graph, check) :-
-	show(Graph, check).
+graph_action(Graph, verify) :-
+	show(Graph, verify).
+graph_action(Graph, create_snap) :-
+	next_id(Graph, snap, SnapID),
+	assertz(snap(Graph, SnapID)),
+	show(Graph, create_snap(SnapID)).
+graph_action(Graph, verify_snap) :-
+	findall(SnapID, snap(Graph, SnapID), Candidates),
+	random_member(VerifyID, Candidates),
+	show(Graph, verify_snap(VerifyID)).
 
 
 %%	assert_node(+Graph, +Id) is det.
@@ -273,16 +283,16 @@ revert_dir(backward,	     forward).
 creates_cycle(Graph, Child, Parent) :-
 	connected(Graph, Parent, forward, Child).
 
-%%	next_node_id(+Graph, -Id) is det.
+%%	next_id(+Graph, +Type, -Id) is det.
 %
 %	Create a new unique node Id.
 
-next_node_id(Graph, Id) :-
-	retract(node_id(Id0, Graph)), !,
+next_id(Graph, Type, Id) :-
+	retract(id(Graph, Type, Id0)), !,
 	Id is Id0+1,
-	assertz(node_id(Id, Graph)).
-next_node_id(Graph, 1) :-
-	assertz(node_id(1, Graph)).
+	assertz(id(Graph, Type, Id)).
+next_id(Graph, Type, 1) :-
+	assertz(id(Graph, Type, 1)).
 
 
 node_count(Graph, Count) :-

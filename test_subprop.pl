@@ -28,18 +28,24 @@ are named p1, p2, ... pN.
 :- dynamic
 	predicate/2,			% Predicate, Gen
 	sub_of/3,			% P1, P2, Born
+	snap/3,				% SnapID, Gen, Snap
 	died/2.				% Born, Died
 
 cleanup :-
 	retractall(predicate(_,_)),
 	retractall(sub_of(_,_,_)),
 	retractall(died(_,_)),
+	retractall(snap(_,_,_)),
 	rdf_reset_db.
 
 test(N) :-
 	record_in('g1.rec'),
 	show_graph(g1),
-	graph_settings(g1, [check(0.1)]),
+	graph_settings(g1,
+		       [ verify(0.01),
+			 create_snap(0.1),
+			 verify_snap(0.01)
+		       ]),
 	reset_graph(g1),
 	loop(1, N).
 
@@ -58,8 +64,15 @@ update_graph(Action) :-
 	fail.
 update_graph(reset) :-
 	cleanup.
-update_graph(check) :-
+update_graph(verify) :-
 	check_all.
+update_graph(create_snap(SnapId)) :-
+	rdf_snapshot(Snap),
+	rdf_generation(Gen),
+	assertz(snap(SnapId, Gen, Snap)).
+update_graph(verify_snap(SnapId)) :-
+	snap(SnapId, Gen, Snap),
+	rdf_transaction(check_all(Gen), _Id, [snapshot(Snap)]).
 update_graph(add_node(I)) :-
 	atom_concat(p, I, P),
 	rdf_assert(P,P,P),
