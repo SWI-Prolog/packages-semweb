@@ -39,3 +39,8 @@
 
     - Stress testing
       - Run controlled tests concurrently in transactions?
+
+  * rdf_gc
+    - Erased triples that cannot really be deleted because a transaction/snapshot
+      blocks this.
+      - Nothing will change if oldest generation doesn't change.

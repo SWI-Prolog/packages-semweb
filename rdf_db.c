@@ -2594,6 +2594,7 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol, gen_t gen)
   triple *prev = NULL;
   triple *t = bucket->head;
   size_t collected = 0;
+  size_t uncollectable = 0;
 
   for(; t; t=t->tp.next[icol])
   { if ( t->lifespan.died < gen )
@@ -2618,6 +2619,8 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol, gen_t gen)
 	  db->gc.reclaimed_triples++;
 	free_triple(db, t, TRUE);
       }
+    } else if ( t->erased )
+    { uncollectable++;
     } else
     { prev=t;
     }
@@ -2625,6 +2628,15 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol, gen_t gen)
 
   if ( collected )			/* concurrent with hashing new ones */
     ATOMIC_SUB(&bucket->count, collected);
+
+  if ( icol == 0 )
+  { char buf[64];
+
+    DEBUG(4, Sdprintf("At %s: %lld uncollectable\n",
+		      gen_name(gen, buf),
+		      uncollectable));
+    db->gc.uncollectable = uncollectable;
+  }
 }
 
 
@@ -2683,6 +2695,7 @@ reset_gc(rdf_db *db)
   db->gc.time		     = 0.0;
   db->gc.reclaimed_triples   = 0;
   db->gc.reclaimed_reindexed = 0;
+  db->gc.uncollectable	     = 0;
   db->gc.last_gen	     = 0;
   db->gc.busy		     = FALSE;
 
@@ -2752,6 +2765,11 @@ rdf_gc_info(term_t info)
   size_t garbage = (db->erased    - db->gc.reclaimed_triples) +
 		   (db->reindexed - db->gc.reclaimed_reindexed);
   gen_t keep_gen = oldest_query_geneneration(db);
+
+  if ( keep_gen == db->gc.last_gen )
+  { garbage -= db->gc.uncollectable;
+    assert((int64_t)garbage >= 0);
+  }
 
   return PL_unify_term(info,
 		       PL_FUNCTOR_CHARS, "gc_info", 5,
