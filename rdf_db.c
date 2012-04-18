@@ -5011,7 +5011,7 @@ rdf_transaction(term_t goal, term_t id, term_t options)
       _PL_get_arg(1, head, arg);
 
       if ( name == ATOM_snapshot )
-      { if ( !get_snapshot(arg, &ss) )
+      { if ( get_snapshot(arg, &ss) != TRUE )
 	{  atom_t a;
 
 	   if ( PL_get_atom(arg, &a) && a == ATOM_true )
@@ -7052,6 +7052,7 @@ reset_db(rdf_db *db)
   db->resetting = TRUE;
 
   reset_gc(db);
+  erase_snapshots(db);
   erase_triples(db);
   erase_predicates(db);
   erase_resources(&db->resources);
@@ -7098,6 +7099,25 @@ rdf_reset_db(void)
 
   return rc;
 }
+
+
+static foreign_t
+rdf_delete_snapshot(term_t t)
+{ snapshot *ss;
+  int rc;
+
+  if ( (rc=get_snapshot(t, &ss)) == TRUE )
+  { if ( free_snapshot(ss) )
+      return TRUE;
+    rc = -1;
+  }
+
+  if ( rc == -1 )
+    return PL_existence_error("rdf_snapshot", t);
+
+  return PL_type_error("rdf_snapshot", t);
+}
+
 
 
 		 /*******************************
@@ -7273,6 +7293,7 @@ install_rdf_db(void)
   PL_register_foreign("rdf_statistics_",1, rdf_statistics,  NDET);
   PL_register_foreign("rdf_generation", 1, rdf_generation,  0);
   PL_register_foreign("rdf_snapshot",   1, rdf_snapshot,    0);
+  PL_register_foreign("rdf_delete_snapshot", 1, rdf_delete_snapshot, 0);
   PL_register_foreign("rdf_match_label",3, match_label,     0);
   PL_register_foreign("rdf_save_db_",   2, rdf_save_db,     0);
   PL_register_foreign("rdf_load_db_",   3, rdf_load_db,     0);

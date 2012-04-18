@@ -93,6 +93,7 @@
 	    rdf_statistics/1,		% -Key
 	    rdf_generation/1,		% -Generation
 	    rdf_snapshot/1,		% -Snapshot
+	    rdf_delete_snapshot/1,	% +Snapshot
 	    rdf_current_snapshot/1,	% +Snapshot
 	    rdf_estimate_complexity/4,	% +S,+P,+O,-Count
 

@@ -54,10 +54,9 @@ new_snapshot(rdf_db *db)
 
 
 static void
-free_snapshot(snapshot *ss)
+unlink_snapshot(snapshot *ss)
 { rdf_db *db = ss->db;
 
-  simpleMutexLock(&db->locks.misc);
   if ( ss->next )
     ss->next->prev = ss->prev;
   if ( ss->prev )
@@ -66,6 +65,12 @@ free_snapshot(snapshot *ss)
     db->snapshots.head = ss->next;
   if ( ss == db->snapshots.tail )
     db->snapshots.tail = ss->prev;
+}
+
+
+static void
+update_keep_snapshot(snapshot *ss)
+{ rdf_db *db = ss->db;
 
   if ( ss->rd_gen == db->snapshots.keep )
   { gen_t oldest = GEN_MAX;
@@ -78,9 +83,37 @@ free_snapshot(snapshot *ss)
 
     db->snapshots.keep = oldest;
   }
+}
+
+
+int
+free_snapshot(snapshot *ss)
+{ rdf_db *db = ss->db;
+  int rc;
+
+  simpleMutexLock(&db->locks.misc);
+  if ( (rc=(ss->symbol != 0)) )
+  { unlink_snapshot(ss);
+    update_keep_snapshot(ss);
+    ss->symbol = 0;
+  }
   simpleMutexUnlock(&db->locks.misc);
 
-  rdf_free(db, ss, sizeof(*ss));
+  return rc;
+}
+
+
+void
+erase_snapshots(rdf_db *db)
+{ snapshot *ss;
+
+  simpleMutexLock(&db->locks.misc);
+  while( (ss=db->snapshots.head) )
+  { unlink_snapshot(ss);
+    ss->symbol = 0;
+  }
+
+  simpleMutexUnlock(&db->locks.misc);
 }
 
 
@@ -95,6 +128,7 @@ release_snapshot(atom_t symbol)
 { snapshot *ss = PL_blob_data(symbol, NULL, NULL);
 
   free_snapshot(ss);
+  rdf_free(ss->db, ss, sizeof(*ss));
 
   return TRUE;
 }
@@ -104,11 +138,11 @@ compare_snapshot(atom_t a, atom_t b)
 { snapshot *ssa = PL_blob_data(a, NULL, NULL);
   snapshot *ssb = PL_blob_data(b, NULL, NULL);
 
-  return ( ssa->rd_gen > ssb->rd_gen ? 1 :
+  return ( ssa->rd_gen > ssb->rd_gen ?  1 :
 	   ssa->rd_gen < ssb->rd_gen ? -1 :
-	   ssa->tr_gen > ssb->tr_gen ? 1 :
+	   ssa->tr_gen > ssb->tr_gen ?  1 :
 	   ssa->tr_gen < ssb->tr_gen ? -1 :
-	   ssa > ssb ? 1 :
+	   ssa > ssb ?  1 :
 	   ssb < ssa ? -1 : 0
 	 );
 }
@@ -144,14 +178,20 @@ unify_snapshot(term_t t, snapshot *ss)
 
 
 int
-get_snapshot(term_t t, snapshot **ss)
+get_snapshot(term_t t, snapshot **ssp)
 { PL_blob_t *type;
   void *data;
 
   if ( PL_get_blob(t, &data, NULL, &type) && type == &snap_blob)
-  { *ss = data;
+  { snapshot *ss = data;
 
-    return TRUE;
+    if ( ss->symbol )
+    { *ssp = ss;
+
+      return TRUE;
+    }
+
+    return -1;
   }
 
   return FALSE;

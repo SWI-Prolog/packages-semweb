@@ -175,6 +175,17 @@ graph_action(Graph, verify_snap) :-
 	findall(SnapID, snap(Graph, SnapID), Candidates),
 	random_member(VerifyID, Candidates),
 	show(Graph, verify_snap(VerifyID)).
+graph_action(Graph, delete_snap) :-	% delete snap, preferably an old one
+	(   snap(_,_)
+	->  (   repeat,
+	        clause(snap(Graph, SnapID), true, Ref),
+		maybe,
+		erase(Ref)
+	    ->	show(Graph, delete_snap(SnapID))
+	    ;	true
+	    )
+	;   true
+	).
 
 
 %%	assert_node(+Graph, +Id) is det.

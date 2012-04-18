@@ -38,5 +38,7 @@ typedef struct snapshot
 COMMON(snapshot *)	new_snapshot(struct rdf_db *db);
 COMMON(int)		unify_snapshot(term_t t, snapshot *ss);
 COMMON(int)		get_snapshot(term_t t, snapshot **ss);
+COMMON(int)		free_snapshot(snapshot *ss);
+COMMON(void)		erase_snapshots(struct rdf_db *db);
 
 #endif /*SNAPSHOT_H_INCLUDED*/
