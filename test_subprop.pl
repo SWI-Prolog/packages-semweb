@@ -39,13 +39,13 @@ cleanup :-
 test(N) :-
 	record_in('g1.rec'),
 	show_graph(g1),
+	graph_settings(g1, [check(0.1)]),
 	reset_graph(g1),
 	loop(1, N).
 
 loop(I, I) :- !.
 loop(I, N) :-
 	graph_steps(g1,1),
-	check_all,
 	succ(I, I2),
 	format(user_error, '\r~t~D~6|', [I]),
 	loop(I2, N).
@@ -58,6 +58,8 @@ update_graph(Action) :-
 	fail.
 update_graph(reset) :-
 	cleanup.
+update_graph(check) :-
+	check_all.
 update_graph(add_node(I)) :-
 	atom_concat(p, I, P),
 	rdf_assert(P,P,P),

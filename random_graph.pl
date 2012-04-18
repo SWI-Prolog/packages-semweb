@@ -1,5 +1,6 @@
 :- module(random_graph,
 	  [ graph_steps/2,		% +Graph, +Steps
+	    graph_settings/2,		% +Graph, +List
 	    graph_action/2,		% +Graph, +Action
 	    show_graph/1,		% +Graph
 	    reset_graph/1,		% +Graph
@@ -71,6 +72,23 @@ select_action(P, [A-PA|_], A) :-
 select_action(P, [_-PA|T], A) :-
 	P2 is P-PA,
 	select_action(P2, T, A).
+
+%%	graph_settings(+Graph, +List) is det.
+%
+%	Add settings for the graph.
+
+graph_settings(Graph, List) :-
+	must_be(list, List),
+	maplist(graph_setting(Graph), List).
+
+graph_setting(Graph, Prop) :-
+	Prop =.. [Action,Prob],
+	(   action(Action)
+	->  retractall(probability(Graph, Action, _)),
+	    asserta(probability(Graph, Action, Prob))
+	;   existence_error(action, Prob)
+	).
+
 
 action_probability(Graph, Action, P) :-
 	(   var(Action)
@@ -145,6 +163,8 @@ graph_action(Graph, remove_non_breaking_edge) :-
 graph_action(Graph, remove_edge) :-
 	edge(Child, Parent, Graph), !,
 	retract_edge(Graph, Child, Parent).
+graph_action(Graph, check) :-
+	show(Graph, check).
 
 
 %%	assert_node(+Graph, +Id) is det.
@@ -283,6 +303,8 @@ edge_count(Graph, Count) :-
 %	Create a graphics window for Graph.  The window listens for
 %	broadcasts messages, updating if the graph changes.
 
+show_graph(Graph) :-
+	in_pce_thread_sync(broadcast_request(graph(Graph))), !.
 show_graph(Graph) :-
 	in_pce_thread_sync(pce_show_graph(Graph)).
 

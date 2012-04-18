@@ -42,6 +42,7 @@
 
 :- pce_begin_class(graph_viewer, frame).
 
+variable(graph,  any*, get, "Associated graph").
 
 initialise(GV, Id:[any]) :->
 	"Create graph-viewer"::
@@ -49,12 +50,18 @@ initialise(GV, Id:[any]) :->
 	send(GV, append, new(P, picture)),
 	send(new(D, dialog), below, P),
 	fill_dialog(D),
+	send(GV, slot, graph, Id),
+	listen(GV, graph(Id),
+	       in_pce_thread(identify(graph(Id), GV))),
 	listen(GV, graph(Id, Action),
 	       in_pce_thread(action(Action, GV))).
 
 unlink(GV) :->
 	unlisten(GV),
 	send_super(GV, unlink).
+
+identify(graph(Graph), GV) :-		% See whether the graph is monitored
+	get(GV, graph, Graph).
 
 action(add_node(N), GV) :-
 	get(GV, node, N, _Node).
