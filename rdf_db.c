@@ -1415,7 +1415,7 @@ check_predicate_cloud(predicate_cloud *c)
 
 
 static void
-print_reachability_cloud(rdf_db *db, predicate *p)
+print_reachability_cloud(rdf_db *db, predicate *p, int all)
 { int x, y;
   predicate_cloud *cloud = p->cloud;
   sub_p_matrix *rm;
@@ -1427,6 +1427,9 @@ print_reachability_cloud(rdf_db *db, predicate *p)
   q = open_query(db);
   for(rm=cloud->reachable; rm; rm=rm->older)
   { char b[2][24];
+
+    if ( !all && !alive_lifespan(q, &rm->lifespan) )
+      continue;
 
     Sdprintf("\nReachability matrix: %s..%s (%s)\n  ",
 	     gen_name(rm->lifespan.born, b[0]),
@@ -1458,14 +1461,16 @@ print_reachability_cloud(rdf_db *db, predicate *p)
 
 
 static foreign_t
-rdf_print_predicate_cloud(term_t t)
+rdf_print_predicate_cloud(term_t t, term_t all)
 { predicate *p;
   rdf_db *db = rdf_current_db();
+  int print_all;
 
-  if ( !get_existing_predicate(db, t, &p) )
+  if ( !get_existing_predicate(db, t, &p) ||
+       !PL_get_bool_ex(all, &print_all) )
     return FALSE;			/* error or no predicate */
 
-  print_reachability_cloud(db, p);
+  print_reachability_cloud(db, p, print_all);
 
   return TRUE;
 }
@@ -7329,7 +7334,7 @@ install_rdf_db(void)
 
 #ifdef O_DEBUG
   PL_register_foreign("rdf_debug",      1, rdf_debug,       0);
-  PL_register_foreign("rdf_print_predicate_cloud", 1, rdf_print_predicate_cloud, 0);
+  PL_register_foreign("rdf_print_predicate_cloud", 2, rdf_print_predicate_cloud, 0);
 #endif
 #ifdef O_SECURE
   PL_register_foreign("rdf_dump_literals", 0, dump_literals, 0);
