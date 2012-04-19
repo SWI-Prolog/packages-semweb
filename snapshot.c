@@ -122,7 +122,7 @@ erase_snapshots(rdf_db *db)
   { unlink_snapshot(ss);
     ss->symbol = 0;
   }
-
+  db->snapshots.keep = GEN_MAX;
   simpleMutexUnlock(&db->locks.misc);
 }
 
