@@ -2610,11 +2610,14 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol, gen_t gen)
       collected++;
 
       if ( --t->linked == 0 )
-      { DEBUG(2, Sdprintf("GC at gen=%ld..%ld: ",
-			  (long)t->lifespan.born,
-			  (long)t->lifespan.died);
-	         print_triple(t, 0);
-	         Sdprintf("\n"));
+      { DEBUG(2, { char buf[2][64];
+		   Sdprintf("GC at gen=%s..%s: ",
+			    gen_name(t->lifespan.born, buf[0]),
+			    gen_name(t->lifespan.died, buf[1]));
+		   print_triple(t, 0);
+		   Sdprintf("\n");
+		 });
+
 	if ( t->reindexed )
 	  db->gc.reclaimed_reindexed++;
 	else
