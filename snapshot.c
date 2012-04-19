@@ -23,6 +23,11 @@
 
 #include "rdf_db.h"
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Create a new snapshot, adding it  as   the  _start_ of the DB's snapshot
+list.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 snapshot *
 new_snapshot(rdf_db *db)
 { query *q = open_query(db);
@@ -36,6 +41,7 @@ new_snapshot(rdf_db *db)
   simpleMutexLock(&db->locks.misc);
   if ( db->snapshots.head )
   { ss->next = db->snapshots.head;
+    ss->prev = NULL;
     db->snapshots.head->prev = ss;
     db->snapshots.head = ss;
     if ( ss->rd_gen < db->snapshots.keep )
@@ -76,12 +82,16 @@ update_keep_snapshot(snapshot *ss)
   { gen_t oldest = GEN_MAX;
     snapshot *s;
 
-    for(s=db->snapshots.head; ss; ss=ss->next)
+    for(s=db->snapshots.head; s; s=s->next)
     { if ( s->rd_gen < oldest )
 	oldest = s->rd_gen;
     }
 
     db->snapshots.keep = oldest;
+    DEBUG(1, { char buf[64];
+	       Sdprintf("Deleted oldest snapshot; set keep gen to %s\n",
+			gen_name(oldest, buf));
+	     });
   }
 }
 
