@@ -45,7 +45,8 @@ test(N) :-
 	graph_settings(g1,
 		       [ verify(0.01),
 			 create_snap(0.1),
-			 verify_snap(0.01)
+			 verify_snap(0.01),
+			 delete_snap(0.05)
 		       ]),
 	reset_graph(g1),
 	loop(1, N).
@@ -79,6 +80,9 @@ update_graph(create_snap(SnapId)) :-
 update_graph(verify_snap(SnapId)) :-
 	snap(SnapId, Gen, Snap),
 	rdf_transaction(check_all(Gen), _Id, [snapshot(Snap)]).
+update_graph(delete_snap(SnapId)) :-
+	retract(snap(SnapId, _Gen, Snap)),
+	rdf_delete_snapshot(Snap).
 update_graph(add_node(I)) :-
 	atom_concat(p, I, P),
 	rdf_statistics(triples(T0)),
