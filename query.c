@@ -320,16 +320,6 @@ init_query_admin(rdf_db *db)
 		 *	    GENERATIONS		*
 		 *******************************/
 
-static int
-is_wr_transaction_gen(query *q, gen_t gen)
-{ if ( gen >  q->stack->tr_gen_base &&
-       gen <= q->stack->tr_gen_max )
-    return TRUE;
-
-  return FALSE;
-}
-
-
 /* lifespan() is true if a lifespan is visible inside a query.
 
    A lifespan is alive if the query generation is inside it,

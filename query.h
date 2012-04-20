@@ -176,4 +176,13 @@ setWriteGen(query *q, gen_t gen)
     q->db->queries.generation = gen;
 }
 
+static inline int
+is_wr_transaction_gen(query *q, gen_t gen)
+{ if ( gen >  q->stack->tr_gen_base &&
+       gen <= q->stack->tr_gen_max )
+    return TRUE;
+
+  return FALSE;
+}
+
 #endif /*RDF_QUERY_H_INCLUDED*/

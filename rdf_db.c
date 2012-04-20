@@ -1239,16 +1239,20 @@ fill_reachable(rdf_db *db,
     while((t=next_triple(&tw)))
     { predicate *super;
 
-      if ( !match_triples(db, t, &pattern, q, 0) )
+      if ( !match_triples(db, t, &pattern, q, 0) ||
+	   t->object_is_literal )
 	continue;
-      if ( q->rd_gen < t->lifespan.born )		/* not yet born */
+
+      if ( q->rd_gen < t->lifespan.born &&
+	   !(is_wr_transaction_gen(q, t->lifespan.born) &&
+	     q->tr_gen >= t->lifespan.born) )
       { update_valid(valid_until, t->lifespan.born);
-	continue;
+	continue;			/* not yet born */
       }
+
       if ( !alive_triple(q, t) )
 	continue;
-      if ( t->object_is_literal )
-	continue;
+
       update_valid(valid_until, t->lifespan.died);
       super = lookup_predicate(db, t->object.resource, q);
       assert(super->cloud == cloud);
@@ -1263,8 +1267,16 @@ create_reachability_matrix(rdf_db *db, predicate_cloud *cloud, query *q)
 { bitmatrix *m = alloc_bitmatrix(db, cloud->size, cloud->size);
   sub_p_matrix *rm = rdf_malloc(db, sizeof(*rm));
   predicate **p;
-  gen_t valid_until = GEN_MAX;
+  gen_t valid_until, valid_from;
   int i;
+
+  if ( q->tr_gen > GEN_TBASE )
+  { valid_until = q->stack->tr_gen_max;
+    valid_from  = q->tr_gen;
+  } else
+  { valid_until = GEN_MAX;
+    valid_from  = q->rd_gen;
+  }
 
   check_labels_predicate_cloud(cloud);
   for(i=0, p=cloud->members; i<cloud->size; i++, p++)
@@ -1273,7 +1285,7 @@ create_reachability_matrix(rdf_db *db, predicate_cloud *cloud, query *q)
     fill_reachable(db, cloud, m, *p, *p, q, &valid_until);
   }
 
-  rm->lifespan.born = q->rd_gen;
+  rm->lifespan.born = valid_from;
   rm->lifespan.died = valid_until;
   rm->matrix = m;
   rm->older = cloud->reachable;
