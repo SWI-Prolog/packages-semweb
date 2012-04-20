@@ -634,6 +634,7 @@ commit_transaction(query *q)
   { commit_del(q, gen, *tp);
   }
 
+					/* updated triples */
   for(tp=q->transaction_data.updated->base;
       tp<q->transaction_data.updated->top;
       tp += 2)
