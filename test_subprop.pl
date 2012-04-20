@@ -32,7 +32,7 @@ are named p1, p2, ... pN.
 	snap/4,				% SnapID, Gen, Snap, Graph
 	died/3.				% Born, Died, Graph
 
-:- setting(rdf:reset, boolean, true,
+:- setting(rdf:reset, boolean, false,
 	   'Cleanup between runs using rdf_reset_db/0').
 
 cleanup(G) :-
