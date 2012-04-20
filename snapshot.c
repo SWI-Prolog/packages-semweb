@@ -160,8 +160,17 @@ compare_snapshot(atom_t a, atom_t b)
 static int
 write_snapshot(IOSTREAM *s, atom_t symbol, int flags)
 { snapshot *ss = PL_blob_data(symbol, NULL, NULL);
+  char buf[64];
 
-  Sfprintf(s, "<rdf-snapshot>(%ld)", (long)ss->rd_gen);
+  if ( ss->tr_gen > GEN_TBASE )
+  { char buf2[64];
+    Sfprintf(s, "<rdf-snapshot>(%s+%s)",
+	     gen_name(ss->rd_gen, buf),
+	     gen_name(ss->tr_gen, buf2));
+  } else
+  { Sfprintf(s, "<rdf-snapshot>(%s)", gen_name(ss->rd_gen, buf));
+  }
+
   return TRUE;
 }
 
@@ -205,4 +214,18 @@ get_snapshot(term_t t, snapshot **ssp)
   }
 
   return FALSE;
+}
+
+
+/* snapshot_thread() is the id of the thread that created the snapshot
+   if the snapshot is created inside a modified transaction.
+*/
+
+int
+snapshot_thread(snapshot *ss)
+{ if ( ss->tr_gen > GEN_TBASE &&
+       ((ss->tr_gen-GEN_TBASE)%GEN_TNEST) != 0 )
+    return (ss->tr_gen-GEN_TBASE)/GEN_TNEST;
+
+  return 0;
 }

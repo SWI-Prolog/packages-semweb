@@ -394,6 +394,13 @@ test s4 :-
 	}@@,
 	v(a).
 
+test s5 :-				% snap inside a transaction
+	{ + a^_,
+	  snap(S),
+	  + b^_,
+	  { u(b) }@@S
+	}.
+
 /* subProperty tests */
 
 test sp1 :-

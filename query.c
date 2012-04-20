@@ -259,21 +259,21 @@ open_transaction(rdf_db *db,
   q->type = Q_TRANSACTION;
   q->transaction = ti->queries.transaction;
 
-  if ( q->transaction )			/* nested transaction */
+  if ( ss && ss != SNAPSHOT_ANONYMOUS )
+  { int ss_tid = snapshot_thread(ss);
+    assert(!ss_tid || ss_tid == tid);
+
+    q->rd_gen = ss->rd_gen;
+    q->tr_gen = ss->tr_gen;
+  } else if ( q->transaction )		/* nested transaction */
   { q->rd_gen = q->transaction->rd_gen;
     q->tr_gen = q->transaction->wr_gen;
-    q->wr_gen = q->transaction->wr_gen;
   } else
   { q->rd_gen = db->queries.generation;
     q->tr_gen = ti->queries.tr_gen_base;
-    q->wr_gen = q->tr_gen;
   }
 
-  if ( ss && ss != SNAPSHOT_ANONYMOUS )
-  { q->rd_gen = ss->rd_gen;
-    q->tr_gen = ss->tr_gen;
-  }
-
+  q->wr_gen = q->tr_gen;
   ti->queries.transaction = q;
 
   init_triple_buffer(added);

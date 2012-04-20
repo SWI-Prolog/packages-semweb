@@ -40,5 +40,6 @@ COMMON(int)		unify_snapshot(term_t t, snapshot *ss);
 COMMON(int)		get_snapshot(term_t t, snapshot **ss);
 COMMON(int)		free_snapshot(snapshot *ss);
 COMMON(void)		erase_snapshots(struct rdf_db *db);
+COMMON(int)		snapshot_thread(snapshot *ss);
 
 #endif /*SNAPSHOT_H_INCLUDED*/

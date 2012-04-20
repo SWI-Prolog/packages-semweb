@@ -5029,13 +5029,18 @@ rdf_transaction(term_t goal, term_t id, term_t options)
       _PL_get_arg(1, head, arg);
 
       if ( name == ATOM_snapshot )
-      { if ( get_snapshot(arg, &ss) != TRUE )
-	{  atom_t a;
+      { if ( get_snapshot(arg, &ss) )
+	{ int ss_tid = snapshot_thread(ss);
 
-	   if ( PL_get_atom(arg, &a) && a == ATOM_true )
-	     ss = SNAPSHOT_ANONYMOUS;
-	   else
-	     return PL_type_error("rdf_snapshot", arg);
+	  if ( ss_tid && ss_tid != PL_thread_self() )
+	    PL_permission_error("access", "rdf-snapshot", arg);
+	} else
+	{ atom_t a;
+
+	  if ( PL_get_atom(arg, &a) && a == ATOM_true )
+	    ss = SNAPSHOT_ANONYMOUS;
+	  else
+	    return PL_type_error("rdf_snapshot", arg);
 	}
       }
     }
