@@ -1244,15 +1244,13 @@ fill_reachable(rdf_db *db,
 	   t->object_is_literal )
 	continue;
 
-      if ( q->rd_gen < t->lifespan.born &&
-	   !(is_wr_transaction_gen(q, t->lifespan.born) &&
-	     q->tr_gen >= t->lifespan.born) )
-      { update_valid(valid_until, t->lifespan.born);
-	continue;			/* not yet born */
-      }
-
       if ( !alive_triple(q, t) )
+      { if ( q->rd_gen < t->lifespan.born &&
+	     !(is_wr_transaction_gen(q, t->lifespan.born) &&
+	       q->tr_gen < t->lifespan.born) )
+	  update_valid(valid_until, t->lifespan.born);
 	continue;
+      }
 
       update_valid(valid_until, t->lifespan.died);
       super = lookup_predicate(db, t->object.resource, q);
