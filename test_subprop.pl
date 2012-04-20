@@ -57,10 +57,11 @@ run_test(G, N) :-
 			 verify_snap(0.01),
 			 delete_snap(0.05)
 		       ]),
-	reset_graph(G),
 	setup_call_cleanup(
 	    listen(G, graph(G,Action), update_graph_true(G, Action)),
-	    loop(1, N, G),
+	    ( reset_graph(G),
+	      loop(1, N, G)
+	    ),
 	    unlisten(G)).
 
 loop(I, I, _) :- !.
@@ -197,13 +198,20 @@ replay :-
 
 replay(Graph) :-
 	file_name_extension(Graph, rec, File),
-	open(File, read, In),
+	setup_call_cleanup(
+	    open(File, read, In),
+	    setup_call_cleanup(
+		listen(G, graph(G,Action), update_graph_true(G, Action)),
+		replay_stream(Graph, In),
+		unlisten(G)),
+	    close(In)).
+
+replay_stream(Graph, In) :-
 	repeat,
 	    read(In, Term),
 	    (	Term == end_of_file
 	    ->	!, close(In)
 	    ;	Term = action(Graph,Action),
 		broadcast(graph(Graph, Action)),
-		check_all(Graph),
 		fail
 	    ).
