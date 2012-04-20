@@ -2609,14 +2609,18 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol, gen_t gen)
 
   for(; t; t=t->tp.next[icol])
   { if ( t->lifespan.died < gen )
-    { simpleMutexLock(&db->queries.write.lock);		/* (*) */
+    { int lock = (t->tp.next[icol] == NULL);
+
+      if ( lock )
+	simpleMutexLock(&db->queries.write.lock); /* (*) */
       if ( prev )
 	prev->tp.next[icol] = t->tp.next[icol];
       else
 	bucket->head = t->tp.next[icol];
       if ( t == bucket->tail )
 	bucket->tail = prev;
-      simpleMutexUnlock(&db->queries.write.lock);
+      if ( lock )
+	simpleMutexUnlock(&db->queries.write.lock);
 
       collected++;
 
@@ -2634,11 +2638,10 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol, gen_t gen)
 	  db->gc.reclaimed_triples++;
 	free_triple(db, t, TRUE);
       }
-    } else if ( t->erased )
-    { uncollectable++;
-      prev=t;
     } else
     { prev=t;
+      if ( t->erased )
+	uncollectable++;
     }
   }
 
