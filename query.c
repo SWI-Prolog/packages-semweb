@@ -342,7 +342,10 @@ gen_name(gen_t gen, char *buf)
   { int tid = (gen-GEN_TBASE)/GEN_TNEST;
     gen_t r = (gen-GEN_TBASE)%GEN_TNEST;
 
-    Ssprintf(buf, "T%d+%lld", tid, (int64_t)r);
+    if ( r == GEN_TNEST-1 )
+      Ssprintf(buf, "T%d+GEN_TNEST", tid);
+    else
+      Ssprintf(buf, "T%d+%lld", tid, (int64_t)r);
     return buf;
   }
   Ssprintf(buf, "%lld", (int64_t)gen);
