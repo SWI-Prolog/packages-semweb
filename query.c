@@ -370,11 +370,13 @@ alive_lifespan(query *q, lifespan *lifespan)
       return FALSE;
 
     return TRUE;
+  } else				/* created/died in transaction */
+  { if ( is_wr_transaction_gen(q, lifespan->born) )
+    { if ( q->tr_gen >= lifespan->born &&
+	   q->tr_gen <  lifespan->died )
+	return TRUE;
+    }
   }
-
-  if ( is_wr_transaction_gen(q, lifespan->born) &&
-       q->tr_gen >= lifespan->born )
-    return TRUE;
 
   return FALSE;
 }
