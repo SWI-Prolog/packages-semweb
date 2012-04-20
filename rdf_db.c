@@ -139,6 +139,7 @@ rdf_realloc(rdf_db *db, void *ptr, size_t old, size_t new)
 static functor_t FUNCTOR_literal1;
 static functor_t FUNCTOR_literal2;
 static functor_t FUNCTOR_colon2;
+static functor_t FUNCTOR_plus2;
 
 static functor_t FUNCTOR_triples1;
 static functor_t FUNCTOR_triples2;
@@ -6984,7 +6985,9 @@ rdf_statistics(term_t key, control_t h)
 
 /** rdf_generation(-Generation) is det.
 
-    True when Generation is the current reading generation.
+    True when Generation is the current reading generation.  If we are
+    inside a modified transaction, Generation has the format Base+TrGen,
+    where TrGen expresses the generation inside the transaction.
 */
 
 static foreign_t
@@ -6993,12 +6996,26 @@ rdf_generation(term_t t)
   query *q = open_query(db);
   int rc;
 
-  rc = PL_unify_int64(t, q->rd_gen);
+  if ( q->tr_gen > q->stack->tr_gen_base )
+  { assert(q->tr_gen < q->stack->tr_gen_max);
+
+    rc = PL_unify_term(t, PL_FUNCTOR, FUNCTOR_plus2,
+		            PL_INT64, q->rd_gen,
+		            PL_INT64, q->tr_gen - q->stack->tr_gen_base);
+  } else
+  { rc = PL_unify_int64(t, q->rd_gen);
+  }
+
   close_query(q);
 
   return rc;
 }
 
+
+/** rdf_snapshot(-Snapshot) is det.
+
+    True when Snapshot is a handle to the current state of the database.
+*/
 
 static foreign_t
 rdf_snapshot(term_t t)
@@ -7265,6 +7282,7 @@ install_rdf_db(void)
   MKFUNCTOR(hash, 3);
 
   FUNCTOR_colon2 = PL_new_functor(PL_new_atom(":"), 2);
+  FUNCTOR_plus2  = PL_new_functor(PL_new_atom("+"), 2);
 
   ATOM_user	     = PL_new_atom("user");
   ATOM_exact	     = PL_new_atom("exact");
