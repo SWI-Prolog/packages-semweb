@@ -150,7 +150,7 @@
 :- use_module(rdf_cache).
 
 :- use_foreign_library(foreign(rdf_db)).
-:- public rdf_print_predicate_cloud/1.	% print matrix of reachable predicates
+:- public rdf_print_predicate_cloud/2.	% print matrix of reachable predicates
 
 :- meta_predicate
 	rdf_transaction(0),
@@ -195,6 +195,9 @@
 		       base_uri(atom),
 		       convert_typed_literal(callable),
 		       document_language(atom)
+		     ]).
+:- predicate_options(rdf_transaction/3, 3,
+		     [ snapshot(any)
 		     ]).
 
 :- multifile
