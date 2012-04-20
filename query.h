@@ -176,6 +176,19 @@ setWriteGen(query *q, gen_t gen)
     q->db->queries.generation = gen;
 }
 
+static inline gen_t
+query_max_gen(query *q)
+{ if ( q->transaction )
+    return q->stack->tr_gen_max;
+  else
+    return GEN_MAX;
+}
+
+static inline gen_t
+transaction_max_gen(query *q)
+{ return q->stack->tr_gen_max;
+}
+
 static inline int
 is_wr_transaction_gen(query *q, gen_t gen)
 { if ( gen >  q->stack->tr_gen_base &&

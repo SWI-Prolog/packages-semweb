@@ -954,9 +954,10 @@ triples_in_predicate_cloud(predicate_cloud *cloud)
 static void
 invalidateReachability(predicate_cloud *cloud, query *q)
 { sub_p_matrix *rm;
+  gen_t gen_max = query_max_gen(q);
 
   for(rm=cloud->reachable; rm; rm=rm->older)
-  { if ( rm->lifespan.died == GEN_MAX )			/* dubious */
+  { if ( rm->lifespan.died == gen_max )			/* dubious */
       rm->lifespan.died = queryWriteGen(q);
   }
 }
@@ -1267,15 +1268,14 @@ create_reachability_matrix(rdf_db *db, predicate_cloud *cloud, query *q)
 { bitmatrix *m = alloc_bitmatrix(db, cloud->size, cloud->size);
   sub_p_matrix *rm = rdf_malloc(db, sizeof(*rm));
   predicate **p;
-  gen_t valid_until, valid_from;
+  gen_t valid_until = query_max_gen(q);
+  gen_t valid_from;
   int i;
 
   if ( q->tr_gen > GEN_TBASE )
-  { valid_until = q->stack->tr_gen_max;
-    valid_from  = q->tr_gen;
+  { valid_from  = q->tr_gen;
   } else
-  { valid_until = GEN_MAX;
-    valid_from  = q->rd_gen;
+  { valid_from  = q->rd_gen;
   }
 
   check_labels_predicate_cloud(cloud);

@@ -427,7 +427,7 @@ What should we do when writing inside a transaction?
 int
 add_triples(query *q, triple **triples, size_t count)
 { rdf_db *db = q->db;
-  gen_t gen;
+  gen_t gen, gen_max;
   triple **ep = triples+count;
   triple **tp;
 
@@ -444,12 +444,13 @@ add_triples(query *q, triple **triples, size_t count)
 					/* locked phase */
   simpleMutexLock(&db->queries.write.lock);
   gen = queryWriteGen(q)+1;
+  gen_max = query_max_gen(q);
 
   for(tp=triples; tp < ep; tp++)
   { triple *t = *tp;
 
     t->lifespan.born = gen;
-    t->lifespan.died = GEN_MAX;
+    t->lifespan.died = gen_max;
     if ( link_triple(db, t, q) )
     { if ( q->transaction )
 	buffer_triple(q->transaction->transaction_data.added, t);
@@ -535,19 +536,20 @@ update_triples(query *q,
 	       triple **old, triple **new,
 	       size_t count)
 { rdf_db *db = q->db;
-  gen_t gen;
+  gen_t gen, gen_max;
   triple **eo = old+count;
   triple **to, **tn;
   size_t updated = 0;
 
   simpleMutexLock(&db->queries.write.lock);
   gen = queryWriteGen(q) + 1;
+  gen_max = query_max_gen(q);
 
   for(to=old,tn=new; to < eo; to++,tn++)
   { if ( *tn )
     { (*to)->lifespan.died = gen;
       (*tn)->lifespan.born = gen;
-      (*tn)->lifespan.died = GEN_MAX;
+      (*tn)->lifespan.died = gen_max;
       link_triple(db, *tn, q);
       del_triple_consequences(db, *to, q);
       if ( q->transaction )
@@ -589,12 +591,14 @@ close_transaction(query *q)
 
 
 static void
-commit_add(query *q, gen_t gen, triple *t)
-{ if ( t->lifespan.died == GEN_MAX )
+commit_add(query *q, gen_t gen_max, gen_t gen, triple *t)
+{ if ( t->lifespan.died == gen_max )
   { t->lifespan.born = gen;
     add_triple_consequences(q->db, t, q);
     if ( q->transaction )
       buffer_triple(q->transaction->transaction_data.added, t);
+    else
+      t->lifespan.died = GEN_MAX;
   }
 }
 
@@ -617,15 +621,16 @@ int
 commit_transaction(query *q)
 { rdf_db *db = q->db;
   triple **tp;
-  gen_t gen;
+  gen_t gen, gen_max;
 
   simpleMutexLock(&db->queries.write.lock);
   gen = queryWriteGen(q) + 1;
+  gen_max = transaction_max_gen(q);
 					/* added triples */
   for(tp=q->transaction_data.added->base;
       tp<q->transaction_data.added->top;
       tp++)
-  { commit_add(q, gen, *tp);
+  { commit_add(q, gen_max, gen, *tp);
   }
 					/* deleted triples */
   for(tp=q->transaction_data.deleted->base;
@@ -642,7 +647,7 @@ commit_transaction(query *q)
     triple *tn = tp[1];
 
     commit_del(q, gen, to);
-    commit_add(q, gen, tn);
+    commit_add(q, gen_max, gen, tn);
   }
 
   setWriteGen(q, gen);
@@ -711,6 +716,7 @@ int
 discard_transaction(query *q)
 { rdf_db *db = q->db;
   triple **tp;
+  gen_t gen_max = transaction_max_gen(q);
 
   for(tp=q->transaction_data.added->base;
       tp<q->transaction_data.added->top;
@@ -719,7 +725,7 @@ discard_transaction(query *q)
 
 					/* revert creation of new */
     if ( is_wr_transaction_gen(q, t->lifespan.born) &&
-	 t->lifespan.died == GEN_MAX )
+	 t->lifespan.died == gen_max )
     { t->lifespan.died = GEN_PREHIST;
       erase_triple(db, t, q);
     }
@@ -748,7 +754,7 @@ discard_transaction(query *q)
     }
 					/* revert creation of new */
     if ( is_wr_transaction_gen(q, tn->lifespan.born) &&
-	 tn->lifespan.died == GEN_MAX )
+	 tn->lifespan.died == gen_max )
     { tn->lifespan.died = GEN_PREHIST;
       erase_triple(db, tn, q);
     }
