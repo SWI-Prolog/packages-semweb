@@ -7,6 +7,7 @@
 :- use_module(library(record)).
 :- use_module(library(debug)).
 :- use_module(library(broadcast)).
+:- use_module(library(settings)).
 :- use_module(random_graph).
 :- use_module(search).
 
@@ -31,13 +32,18 @@ are named p1, p2, ... pN.
 	snap/4,				% SnapID, Gen, Snap, Graph
 	died/3.				% Born, Died, Graph
 
+:- setting(rdf:reset, boolean, true,
+	   'Cleanup between runs using rdf_reset_db/0').
+
 cleanup(G) :-
 	retractall(predicate(_,_,G)),
 	retractall(sub_of(_,_,_,G)),
 	retractall(died(_,_,G)),
 	retractall(snap(_,_,_,G)),
-%	rdf_gc,
-	rdf_reset_db.
+	(   setting(rdf:reset, true)
+	->  rdf_reset_db
+	;   true
+	).
 
 test(N) :-
 	test(g1, N).
@@ -59,10 +65,21 @@ run_test(G, N) :-
 		       ]),
 	setup_call_cleanup(
 	    listen(G, graph(G,Action), update_graph_true(G, Action)),
-	    ( reset_graph(G),
-	      loop(1, N, G)
-	    ),
+	    reset_and_loop(N, G),
 	    unlisten(G)).
+
+%%	reset_and_loop(N, G)
+%
+%	Run N test steps on graph   G.  If restart_using(reset) is true,
+%	first reset the RDF DB. Otherwise run the tests in a snapshot.
+
+reset_and_loop(N, G) :-
+	setting(rdf:reset, true), !,
+	reset_graph(G),
+	loop(1, N, G).
+reset_and_loop(N, G) :-
+	reset_graph(G),
+	rdf_transaction(loop(1,N,G), _, [snapshot(true)]).
 
 loop(I, I, _) :- !.
 loop(I, N, G) :-
