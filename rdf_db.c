@@ -5286,11 +5286,15 @@ new_answer(search_state *state, triple *t)
   { triple *old = *tp;
 
     if ( match_triples(state->db, t, old, state->query, MATCH_DUPLICATE) )
+    { DEBUG(5, Sdprintf("Rejected duplicate answer\n"));
       return FALSE;
+    }
   }
 
   if ( !state->dup_answers.base )	/* not initialized */
+  { DEBUG(5, Sdprintf("Init duplicate admin\n"));
     init_triple_buffer(&state->dup_answers);
+  }
   buffer_triple(&state->dup_answers, t);
 
   return TRUE;
@@ -5490,7 +5494,10 @@ next_search_state(search_state *state)
 
 	do
 	{ while( (t = next_triple(tw)) )
-	  { if ( is_candidate(state, t) )
+	  { DEBUG(3, Sdprintf("Search (prefetch): ");
+	       print_triple(t, PRT_SRC|PRT_GEN|PRT_NL));
+
+	    if ( is_candidate(state, t) )
 	    { set_next_triple(tw, t);
 
 	      return TRUE;		/* non-deterministic */
