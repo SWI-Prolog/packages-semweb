@@ -44,3 +44,11 @@
     - Erased triples that cannot really be deleted because a transaction/snapshot
       blocks this.
       - Nothing will change if oldest generation doesn't change.
+
+  * Reachability matrices
+    - Transaction-specific matrices must be invalidated after completion
+      of the transaction.
+      - Just flag them as inivalid?
+    - We need matrix-GC.
+      - Reclaim invalided?
+      - DB: linked lists of clouds?

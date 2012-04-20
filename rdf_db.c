@@ -957,7 +957,7 @@ invalidateReachability(predicate_cloud *cloud, query *q)
   gen_t gen_max = query_max_gen(q);
 
   for(rm=cloud->reachable; rm; rm=rm->older)
-  { if ( rm->lifespan.died == gen_max )			/* dubious */
+  { if ( rm->lifespan.died == gen_max )
       rm->lifespan.died = queryWriteGen(q);
   }
 }
@@ -1272,8 +1272,9 @@ create_reachability_matrix(rdf_db *db, predicate_cloud *cloud, query *q)
   gen_t valid_from;
   int i;
 
-  if ( q->tr_gen > GEN_TBASE )
+  if ( q->transaction )
   { valid_from  = q->tr_gen;
+    add_list(db, &q->transaction->transaction_data.r_matrices, rm);
   } else
   { valid_from  = q->rd_gen;
   }

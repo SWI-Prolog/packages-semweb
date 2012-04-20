@@ -579,12 +579,31 @@ update_triples(query *q,
 }
 
 
+static void
+invalidate_matrices_transaction(query *q)
+{ cell *c, *next;
+
+  for(c=q->transaction_data.r_matrices.head; c; c=next)
+  { sub_p_matrix *rm = c->value;
+
+    next = c->next;
+    rm->lifespan.died = GEN_PREHIST;
+    rdf_free(q->db, c, sizeof(*c));
+  }
+
+  q->transaction_data.r_matrices.head = NULL;
+  q->transaction_data.r_matrices.tail = NULL;
+}
+
+
 void
 close_transaction(query *q)
 { assert(q->type == Q_TRANSACTION);
 
   free_triple_buffer(q->transaction_data.added);
   free_triple_buffer(q->transaction_data.deleted);
+  free_triple_buffer(q->transaction_data.updated);
+  invalidate_matrices_transaction(q);
 
   q->stack->transaction = q->transaction;
 

@@ -96,6 +96,7 @@ typedef struct query
     struct triple_buffer *deleted;
     struct triple_buffer *updated;
     term_t	prolog_id;		/* Prolog transaction identifier */
+    list	r_matrices;		/* Reachability matrices created */
   } transaction_data;
   union query_state
   { search_state	search;		/* State for normal searches */

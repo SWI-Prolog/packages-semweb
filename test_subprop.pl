@@ -58,9 +58,9 @@ test(G, N) :-
 run_test(G, N) :-
 	show_graph(G),
 	graph_settings(G,
-		       [ verify(0.01),
+		       [ verify(0.5),
 			 create_snap(0.1),
-			 verify_snap(0.01),
+			 verify_snap(0.03),
 			 delete_snap(0.05)
 		       ]),
 	setup_call_cleanup(
