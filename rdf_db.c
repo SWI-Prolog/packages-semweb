@@ -2593,6 +2593,10 @@ generation gen.	 There are two thing we can do:
 
   - Remove any triple that died before gen.  These triples must be left
     to GC.  See also alloc.c.
+
+(*) We must lock, to avoid a   conflict with link_triple_hash(), but the
+latter only puts things at the end of the chain, so we only need to lock
+if we remove a triple near the end.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static void
@@ -2605,12 +2609,14 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol, gen_t gen)
 
   for(; t; t=t->tp.next[icol])
   { if ( t->lifespan.died < gen )
-    { if ( prev )
+    { simpleMutexLock(&db->queries.write.lock);		/* (*) */
+      if ( prev )
 	prev->tp.next[icol] = t->tp.next[icol];
       else
 	bucket->head = t->tp.next[icol];
       if ( t == bucket->tail )
 	bucket->tail = prev;
+      simpleMutexUnlock(&db->queries.write.lock);
 
       collected++;
 
@@ -2619,8 +2625,7 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol, gen_t gen)
 		   Sdprintf("GC at gen=%s..%s: ",
 			    gen_name(t->lifespan.born, buf[0]),
 			    gen_name(t->lifespan.died, buf[1]));
-		   print_triple(t, 0);
-		   Sdprintf("\n");
+		   print_triple(t, PRT_NL);
 		 });
 
 	if ( t->reindexed )
@@ -2631,6 +2636,7 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol, gen_t gen)
       }
     } else if ( t->erased )
     { uncollectable++;
+      prev=t;
     } else
     { prev=t;
     }
