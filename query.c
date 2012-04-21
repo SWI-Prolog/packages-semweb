@@ -188,10 +188,11 @@ query *
 alloc_query(query_stack *qs)
 { int depth = qs->top;
   int b = MSB(depth);
-  query *q;
 
-  if ( (q=qs->blocks[b]) )
-  { assert(q->stack);
+  if ( qs->blocks[b] )
+  { query *q = &qs->blocks[b][depth];
+
+    assert(q->stack);
 
     return q;
   }
