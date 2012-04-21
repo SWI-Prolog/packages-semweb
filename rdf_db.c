@@ -5974,7 +5974,6 @@ rdf_update5(term_t subject, term_t predicate, term_t object, term_t src,
   if ( !is_empty_buffer(&matches) )
   { triple_buffer replacements;
     triple *new, **tp;
-    size_t updated = 0;
 
     count = matches.top-matches.base;
     init_triple_buffer(&replacements);
@@ -5986,12 +5985,10 @@ rdf_update5(term_t subject, term_t predicate, term_t object, term_t src,
 	goto out;
       }
 
-      updated++;
       buffer_triple(&replacements, new);
     }
 
-    if ( updated )
-      update_triples(q, matches.base, replacements.base, count);
+    update_triples(q, matches.base, replacements.base, count);
     free_triple_buffer(&replacements);
   } else
   { count = 0;
