@@ -2550,6 +2550,15 @@ init_tables(rdf_db *db)
 Index optimization copies triples  that  have   been  indexed  while the
 hash-table was small to the current table.
 
+There are two cases: (1) if the triple is not involved in a transaction,
+life is simple: simply make the new triple   born and the old triple die
+in a new generation and (2), if the triple is either created or had died
+inside a transaction. Now, life  gets   more  complicated.  The modified
+triple must become part  of  the   delete/added  triple  buffers  of the
+transaction  and  we  must  step  the  generation  of  the  transaction.
+Alternatively,  we  could  delay  reindexing    the   triple  until  the
+transaction finsihes.
+
 TBD: To preserve order, we must insert   the  new triples before the old
 ones. This is significantly more complex,   notably because they must be
 re-indexed in reverse order in  this  case.   Probably  the  best way to
