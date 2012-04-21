@@ -188,9 +188,13 @@ query *
 alloc_query(query_stack *qs)
 { int depth = qs->top;
   int b = MSB(depth);
+  query *q;
 
-  if ( qs->blocks[b] )
-    return &qs->blocks[b][depth];
+  if ( (q=qs->blocks[b]) )
+  { assert(q->stack);
+
+    return q;
+  }
 
   simpleMutexLock(&qs->lock);
   if ( !qs->blocks[b] )
