@@ -2548,26 +2548,16 @@ init_tables(rdf_db *db)
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 Index optimization copies triples  that  have   been  indexed  while the
-hash-table was small to the current table.
+hash-table was small to the  current  table.   This  adds  a copy of the
+triple to the index (at the new place).   The  old triple gets a pointer
+->reindexed pointing to the new version.   deref_triple() finds the real
+triple.
 
-There are two cases: (1) if the triple is not involved in a transaction,
-life is simple: simply make the new triple   born and the old triple die
-in a new generation and (2), if the triple is either created or had died
-inside a transaction. Now, life  gets   more  complicated.  The modified
-triple must become part  of  the   delete/added  triple  buffers  of the
-transaction  and  we  must  step  the  generation  of  the  transaction.
-Alternatively,  we  could  delay  reindexing    the   triple  until  the
-transaction finsihes.
-
-An alternative approach is to have a   pointer  from the original to the
-optimized triple, copying all info. If search   reveals  a triple with a
-reindexed pointer, it returns the reindexed   one.  Running searches may
-find the old triple; new searches will find the new one.
-
-  - We still need to know when the triple was reindexed.   Using the
-    generation is attractive, but also dubious.
-    - Need some num to a query.  Can be global (no transaction stuff)
-    - Need this num in the triple.
+The next thing we need to do is   reclaim this in gc_hash_chain(). To to
+that, we replace old->lifespan.died with db->reindexed++. The logic that
+finds old queries  also  finds  the   query  with  the  oldest reindexed
+counter. Triples that have yet older   old->lifespan.died  can safely be
+removed.
 
 TBD: To preserve order, we must insert   the  new triples before the old
 ones. This is significantly more complex,   notably because they must be
