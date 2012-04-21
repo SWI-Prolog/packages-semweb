@@ -638,7 +638,7 @@ static void
 commit_del(query *q, gen_t gen, triple *t)
 { t = deref_triple(t);
 
-  if ( t->lifespan.died == q->wr_gen )
+  if ( is_wr_transaction_gen(q, t->lifespan.died) )
   { t->lifespan.died = gen;
     if ( q->transaction )
     { del_triple_consequences(q->db, t, q);
@@ -757,8 +757,7 @@ discard_transaction(query *q)
   { triple *t = *tp;
 
 					/* revert creation of new */
-    if ( is_wr_transaction_gen(q, t->lifespan.born) &&
-	 t->lifespan.died == gen_max )
+    if ( is_wr_transaction_gen(q, t->lifespan.born) )
     { t->lifespan.died = GEN_PREHIST;
       erase_triple(db, t, q);
     }
