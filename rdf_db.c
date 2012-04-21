@@ -3360,8 +3360,6 @@ erase_triple(rdf_db *db, triple *t, query *q)
     if ( t->is_duplicate )
       db->duplicates--;
     db->erased++;
-  } else
-  { assert(0);				/* not sure this cannot happen */
   }
 }
 
