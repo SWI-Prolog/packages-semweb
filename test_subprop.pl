@@ -132,9 +132,12 @@ update_graph(G, delete_snap(SnapId)) :-
 	rdf_delete_snapshot(Snap).
 update_graph(G, add_node(I)) :-
 	atom_concat(p, I, P),
-	rdf_statistics(triples(T0)),
-	rdf_assert(P,P,P),
-	rdf_statistics(triples(T1)),
+	(   rdf_statistics(triples_by_graph(G,T0))
+	->  true
+	;   T0 = 0
+	),
+	rdf_assert(P,P,P,G),
+	rdf_statistics(triples_by_graph(G,T1)),
 	assertion(T0+1 =:= T1),
 	rdf_generation(Gen),
 	assertz(predicate(P, Gen, G)).
@@ -209,21 +212,22 @@ subPropertyOf(Graph, Sub, Super, Gen) :-
 		 *******************************/
 
 :- dynamic
-	record_stream/1.
+	record_stream/2.			% Graph, Out
 
-record_in(File, Out) :-
+record_in(Graph, Out) :-
+	file_name_extension(Graph, rec, File),
 	open(File, write, Out),
-	asserta(record_stream(Out)),
+	asserta(record_stream(Graph, Out)),
 	listen(record, graph(G, Action), save(G, Action)).
 
 :- at_halt(close_recording(_)).
 
 close_recording(Out) :-
-	forall(retract(record_stream(Out)),
+	forall(retract(record_stream(_Graph, Out)),
 	       close(Out)).
 
 save(Graph, Action) :-
-	record_stream(Out),
+	record_stream(Graph, Out),
 	format(Out, 'action(~q, ~q).~n', [Graph, Action]),
 	flush_output(Out).
 

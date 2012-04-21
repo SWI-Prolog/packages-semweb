@@ -773,11 +773,11 @@ rdf_statistics(searched_nodes(Count)) :-
 	rdf_statistics_(searched_nodes(Count)).
 rdf_statistics(literals(Count)) :-
 	rdf_statistics_(literals(Count)).
-rdf_statistics(triples_by_file(File, Count)) :-
-	(   var(File)
-	->  rdf_graph(File),
-	    rdf_statistics_(triples(File, Count))
-	;   rdf_statistics_(triples(File, Count))
+rdf_statistics(triples_by_graph(Graph, Count)) :-
+	(   var(Graph)
+	->  rdf_graph(Graph),
+	    rdf_statistics_(triples(Graph, Count))
+	;   rdf_statistics_(triples(Graph, Count))
 	).
 rdf_statistics(duplicates(Count)) :-
 	rdf_statistics_(duplicates(Count)).

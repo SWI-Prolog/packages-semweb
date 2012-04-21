@@ -1265,7 +1265,7 @@ Total number of unique literal values in the database.  See also
 	\termitem{triples}{-Count}
 Total number of triples in the database.
 
-	\termitem{triples_by_file}{?File, -Count}
+	\termitem{triples_by_graph}{?File, -Count}
 Enumerate the number of triples associated to each file.
 
 	\termitem{searched_nodes}{-Count}
@@ -2300,6 +2300,20 @@ home]{http://gollem.science.uva.nl/twiki/pl/bin/view/Library/SeRQL}.
 The SWI-Prolog Semantic Web library provides no direct support for OWL.
 OWL(-2) support is provided through Thea, an OWL library for SWI-Prolog
 See \url{http://www.semanticweb.gr/TheaOWLLib/}.
+
+
+		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		 %	    VERSION 3		%
+		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Version 3 release notes}
+
+\begin{description}
+    \item [rdf_statistics/2]
+The information \const{triples_by_file} is renamed into
+\const{triples_by_graph}.
+
+\end{description}
 
 
 \section*{Acknowledgements}
