@@ -2075,6 +2075,11 @@ new_literal(rdf_db *db)
 }
 
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+FIXME: rdf_broadcast(EV_OLD_LITERAL,...) may happen with a write-lock on
+the RDF DB.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 static int
 free_literal_value(rdf_db *db, literal *lit)
 { int rc = TRUE;
@@ -2317,6 +2322,12 @@ share_literal() takes a literal  and  replaces   it  with  one  from the
 literal database if there is a match.   On a match, the argument literal
 is destroyed. Without a match it adds   the  literal to the database and
 returns it.
+
+Called from link_triple(), which implies we hold write.lock.
+
+(*) Typically, the from literal  is   a  new literal. rdf_update/4,5 and
+triple reindexing however may cause link_triple()   to be called with an
+already shared literal.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static literal *
@@ -2324,6 +2335,9 @@ share_literal(rdf_db *db, literal *from)
 { literal **data;
   literal_ex lex;
   int is_new;
+
+  if ( from->shared )				/* See (*) */
+    return from;
 
   lex.literal = from;
   prepare_literal_ex(&lex);
