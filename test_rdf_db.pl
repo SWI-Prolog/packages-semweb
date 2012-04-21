@@ -452,6 +452,11 @@ update(object-7) :-			% transaction update
 	rdf_transaction(rdf_update(x, a, literal(lang(en, hallo)),
 				   object(literal(hallo)))),
 	rdf(x, a, literal(hallo)).
+update(literal) :-
+	rdf_assert(s1, p, literal(xxx)),
+	rdf_assert(s2, p, literal(xxx)),
+	rdf_update(s1, p, literal(xxx), subject(s3)),
+	rdf(s3, p, literal(xxx)).
 
 
 		 /*******************************
