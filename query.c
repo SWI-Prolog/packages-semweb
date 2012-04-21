@@ -401,7 +401,7 @@ We have three basic triple manipulations:
 
   - Add triples
   - Delete triples
-  - Copy triples to a new indexing schema (due to cloud split/merge)
+  - Updated triples (expressed as deleting and adding)
 
 add_triples() adds an array of  triples   to  the database, stepping the
 database generation by 1. Calls to add triples must be synchronized with
@@ -426,14 +426,6 @@ Or, hand them to a separate thread?
   + Only this thread manages the chains: no need for locking.
   - If a thread adds triples, it has to wait.  This means two-way
     communication.  --> probably too high overhead.
-
-What should we do when writing inside a transaction?
-
-	- As long as there is no nested transaction using the new
-	  triple, there is little point doing anything.
-
-
-
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 int

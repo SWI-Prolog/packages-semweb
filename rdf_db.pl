@@ -710,10 +710,11 @@ rdf_gc.
 
 has_garbage :-
 	rdf_gc_info_(Info),
-	(   arg(2, Info, Garbage), Garbage > 0
-	->  true
-	;   arg(3, Info, Optimizable), Optimizable > 0
-	).
+	has_garbage(Info), !.
+
+has_garbage(Info) :- arg(2, Info, Garbage),     Garbage > 0.
+has_garbage(Info) :- arg(3, Info, Reindexed),   Reindexed > 0.
+has_garbage(Info) :- arg(4, Info, Optimizable), Optimizable > 0.
 
 %%	consider_gc(+CPU) is semidet.
 %
@@ -723,12 +724,13 @@ has_garbage :-
 consider_gc(_CPU) :-
 	(   rdf_gc_info_(gc_info(Triples,	% Total #triples in DB
 				 Garbage,	% Garbage triples in DB
+				 Reindexed,	% Reindexed & not reclaimed
 				 Optimizable,	% Non-optimized tables
 				 _KeepGen,	% Oldest active generation
 				 _LastGCGen,    % Oldest active gen at last GC
 				 _ReindexGen,
 				 _LastGCReindexGen))
-	->  (   Garbage * 5 > Triples
+	->  (   (Garbage+Reindexed) * 5 > Triples
 	    ;	Optimizable > 4
 	    )
 	;   print_message(error, rdf(invalid_gc_info)),

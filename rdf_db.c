@@ -2884,11 +2884,12 @@ record with the following members:
 
   1. Total number of triples in hash (dead or alive)
   2. Total dead triples in hash (deleted or reindexed)
-  3. Total number of possible optimizations to hash-tables.
-  4. Oldest generation we must keep
-  5. Oldest generation at last GC
-  6. Oldest reindexed triple we must keep
-  7. Oldest reindexed at last GC
+  3. Total reindexed but not reclaimed triples
+  4. Total number of possible optimizations to hash-tables.
+  5. Oldest generation we must keep
+  6. Oldest generation at last GC
+  7. Oldest reindexed triple we must keep
+  8. Oldest reindexed at last GC
 */
 
 #define INT_ARG(val) PL_INT64, (int64_t)(val)
@@ -2897,8 +2898,8 @@ static foreign_t
 rdf_gc_info(term_t info)
 { rdf_db *db     = rdf_current_db();
   size_t life    = db->created - db->gc.reclaimed_triples;
-  size_t garbage = (db->erased    - db->gc.reclaimed_triples) +
-		   (db->reindexed - db->gc.reclaimed_reindexed);
+  size_t garbage = db->erased    - db->gc.reclaimed_triples;
+  size_t reindex = db->reindexed - db->gc.reclaimed_reindexed;
   gen_t keep_reindex;
   gen_t keep_gen = oldest_query_geneneration(db, &keep_reindex);
 
@@ -2908,9 +2909,10 @@ rdf_gc_info(term_t info)
   }
 
   return PL_unify_term(info,
-		       PL_FUNCTOR_CHARS, "gc_info", 7,
+		       PL_FUNCTOR_CHARS, "gc_info", 8,
 		         INT_ARG(life),
 		         INT_ARG(garbage),
+		         INT_ARG(reindex),
 		         INT_ARG(optimizable_hashes(db)),
 		         INT_ARG(keep_gen),
 		         INT_ARG(db->gc.last_gen),
