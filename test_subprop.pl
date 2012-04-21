@@ -1,5 +1,6 @@
 :- module(test_subprop,
 	  [ test/1,			% +Times
+	    test/2,			% +Graph, +Times
 	    replay/0,
 	    replay/1			% +File
 	  ]).
@@ -45,8 +46,25 @@ cleanup(G) :-
 	;   true
 	).
 
+%%	test(+Count) is det.
+%%	test(+Graph, +Count) is det.
+%
+%	Make Count random iteration on Graph. Count   can be a term N*M,
+%	cousing N iterations of M random iteration on Graph. E.g.
+%
+%	   ==
+%	   ?- test(g2, 100*200).
+%	   ==
+%
+%	Runs 100 times test(g2, 200), which  in turn performs 200 random
+%	modifications on g2 (in a snapshot).
+
 test(N) :-
 	test(g1, N).
+
+test(G, N*M) :- !,
+	forall(between(1, N, _),
+	       test(G, M)).
 
 test(G, N) :-
 	atom_concat(G, '.rec', LogFile),

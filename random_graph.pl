@@ -176,7 +176,7 @@ graph_action(Graph, verify_snap) :-
 	random_member(VerifyID, Candidates),
 	show(Graph, verify_snap(VerifyID)).
 graph_action(Graph, delete_snap) :-	% delete snap, preferably an old one
-	(   snap(_,_)
+	(   snap(Graph,_)
 	->  (   repeat,
 	        clause(snap(Graph, SnapID), true, Ref),
 		maybe,
