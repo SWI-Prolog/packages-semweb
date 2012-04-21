@@ -2578,6 +2578,8 @@ reindex_triple(rdf_db *db, triple *t)
   link_triple_hash(db, t2);
   t->reindexed = t2;
   t->lifespan.died = db->reindexed++;
+  if ( t2->object_is_literal )
+    t2->object.literal->references++;
   simpleMutexUnlock(&db->queries.write.lock);
 }
 
