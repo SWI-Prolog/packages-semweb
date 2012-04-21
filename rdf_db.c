@@ -2559,14 +2559,23 @@ transaction  and  we  must  step  the  generation  of  the  transaction.
 Alternatively,  we  could  delay  reindexing    the   triple  until  the
 transaction finsihes.
 
+An alternative approach is to have a   pointer  from the original to the
+optimized triple, copying all info. If search   reveals  a triple with a
+reindexed pointer, it returns the reindexed   one.  Running searches may
+find the old triple; new searches will find the new one.
+
+  - We still need to know when the triple was reindexed.   Using the
+    generation is attractive, but also dubious.
+    - Need some num to a query.  Can be global (no transaction stuff)
+    - Need this num in the triple.
+
 TBD: To preserve order, we must insert   the  new triples before the old
 ones. This is significantly more complex,   notably because they must be
 re-indexed in reverse order in  this  case.   Probably  the  best way to
 implement this is to collect the  triples   that  must be reindexed in a
 triple buffer and then use a version of link_triple_hash() that prepends
 the triples, calling on the triples from the buffer in reverse order. We
-will ignore this for now: triple ordering  has no semantics in the first
-place.
+will ignore this for now: triple ordering has no semantics.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static void
