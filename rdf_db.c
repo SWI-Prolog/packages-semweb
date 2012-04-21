@@ -240,6 +240,7 @@ static sub_p_matrix *create_reachability_matrix(rdf_db *db,
 static void	free_reachability_matrix(rdf_db *db, sub_p_matrix *rm);
 static int	get_predicate(rdf_db *db, term_t t, predicate **p, query *q);
 static int	get_existing_predicate(rdf_db *db, term_t t, predicate **p);
+static void	free_bitmatrix(rdf_db *db, bitmatrix *bm);
 static predicate_cloud *new_predicate_cloud(rdf_db *db,
 					    predicate **p, size_t count,
 					    query *q);
@@ -951,6 +952,40 @@ triples_in_predicate_cloud(predicate_cloud *cloud)
 }
 
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+gc_cloud() removes old reachability matrices.   As  the query generation
+has passed, we can immediately remove the  old bitmap. We must leave the
+sub_p_matrix struct to GC as someone might be walking the chain.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+static void
+gc_cloud(rdf_db *db, predicate_cloud *cloud, gen_t gen)
+{ sub_p_matrix *rm, *older;
+  sub_p_matrix *prev = NULL;
+
+  for(rm=cloud->reachable; rm; rm=older)
+  { older = rm->older;
+
+    if ( rm->lifespan.died < gen )
+    { if ( prev )
+      { prev->older = older;
+      } else
+      { simpleMutexLock(&db->locks.misc);   /* sync with */
+	cloud->reachable = older;	    /* create_reachability_matrix() */
+	simpleMutexUnlock(&db->locks.misc);
+      }
+
+      free_bitmatrix(db, rm->matrix);
+      rm->matrix = NULL;		    /* Clean to avoid false pointers */
+      memset(&rm->lifespan, 0, sizeof(rm->lifespan));
+      PL_linger(rm);
+    } else
+    { prev = rm;
+    }
+  }
+}
+
+
 static void
 invalidateReachability(predicate_cloud *cloud, query *q)
 { sub_p_matrix *rm;
@@ -1287,9 +1322,11 @@ create_reachability_matrix(rdf_db *db, predicate_cloud *cloud, query *q)
   rm->lifespan.born = valid_from;
   rm->lifespan.died = valid_until;
   rm->matrix = m;
+  simpleMutexLock(&db->locks.misc);		/* sync with gc_cloud() */
   rm->older = cloud->reachable;
   MemoryBarrier();
   cloud->reachable = rm;
+  simpleMutexUnlock(&db->locks.misc);
 
   return rm;
 }

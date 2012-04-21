@@ -48,7 +48,7 @@
   * Reachability matrices
     - Transaction-specific matrices must be invalidated after completion
       of the transaction.
-      - Just flag them as inivalid?
+      - Flag them as invalid by setting died to GEN_PREHIST?	[OK]
     - We need matrix-GC.
       - Reclaim invalided?
       - DB: linked lists of clouds?
