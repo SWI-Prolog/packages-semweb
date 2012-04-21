@@ -2308,11 +2308,28 @@ See \url{http://www.semanticweb.gr/TheaOWLLib/}.
 
 \section{Version 3 release notes}
 
+RDF-DB version 3 is a major redesign of the SWI-Prolog RDF
+infrastructure. Notably, this version no longer demands usage of
+rdf_transaction/1 to deal with queries that both read and write the RDF
+store and this version allows for concurrent execution of transactions.
+As a consequence, many programs can be programmed much more naturally in
+version~3. Nevertheles, version~3 is almost perfectly upward compatible
+with version~2. Below are some issues to take into consideration when
+upgrading.
+
 \begin{description}
     \item [rdf_statistics/2]
 The information \const{triples_by_file} is renamed into
-\const{triples_by_graph}.
+\const{triples_by_graph}.  The information \const{core} is
+no longer provided.
 
+    \item [rdf_generation/1]
+Generations inside a transaction are represented as
+\arg{BaseGeneration}+\arg{TransactionGeneration}, where
+\arg{BaseGeneration} is the global generation where the transaction
+started and \arg{TransactionGeneration} expresses the generation within
+the transaction. Counting generation has changed as well. In particular,
+comitting a transaction steps the generation only by one.
 \end{description}
 
 
