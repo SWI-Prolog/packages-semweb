@@ -195,7 +195,7 @@ alloc_query(query_stack *qs)
   simpleMutexLock(&qs->lock);
   if ( !qs->blocks[b] )
   { size_t bytes = BLOCKLEN(b) * sizeof(query);
-    query *ql = rdf_malloc(qs->db, bytes);
+    query *ql = PL_malloc_uncollectable(bytes);
     query *parent;
     int i;
 
