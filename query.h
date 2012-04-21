@@ -85,6 +85,7 @@ typedef struct query
 { gen_t		rd_gen;			/* generation for reading */
   gen_t		wr_gen;			/* generation for writing */
   gen_t		tr_gen;			/* generation for transaction reading */
+  gen_t		reindex_gen;		/* Reindex counter at start */
   rdf_dbp	db;			/* Database on which we run */
   struct query *parent;			/* Parent query */
   struct query_stack  *stack;		/* Query-stack I am part of */
@@ -137,7 +138,7 @@ typedef struct thread_info
 COMMON(void)	init_query_admin(rdf_dbp db);
 COMMON(query *)	open_query(rdf_dbp db);
 COMMON(void)	close_query(query *q);
-COMMON(gen_t)	oldest_query_geneneration(rdf_db *db);
+COMMON(gen_t)	oldest_query_geneneration(rdf_db *db, gen_t *reindex_gen);
 
 COMMON(query *)	open_transaction(rdf_dbp db,
 				 struct triple_buffer *added,
@@ -156,9 +157,21 @@ COMMON(int)	update_triples(query *q,
 COMMON(int)	alive_lifespan(query *q, lifespan *span);
 COMMON(char *)	gen_name(gen_t gen, char *buf);
 
-static inline int
+/* dereference `optimized' triples.  See optimize_triple_hash() */
+
+static inline triple *
+deref_triple(triple *t)
+{ while(t->reindexed)
+    t = t->reindexed;
+
+  return t;
+}
+
+static inline triple *
 alive_triple(query *q, triple *t)
-{ return alive_lifespan(q, &t->lifespan);
+{ t = deref_triple(t);
+
+  return alive_lifespan(q, &t->lifespan) ? t : (triple*)NULL;
 }
 
 static inline gen_t

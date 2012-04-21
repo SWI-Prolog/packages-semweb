@@ -97,9 +97,10 @@ rdf_thread_info(rdf_db *db, int tid)
 
 
 gen_t
-oldest_query_geneneration(rdf_db *db)
+oldest_query_geneneration(rdf_db *db, gen_t *reindex_gen)
 { int tid;
   gen_t gen = db->snapshots.keep;
+  gen_t ren = GEN_MAX;
   query_admin *qa = &db->queries;
   per_thread *td = &qa->query.per_thread;
 
@@ -129,11 +130,16 @@ oldest_query_geneneration(rdf_db *db)
 
 	if ( q->rd_gen < gen )
 	  gen = q->rd_gen;
+	if ( q->reindex_gen < ren )
+	  ren = q->reindex_gen;
       } else
       { DEBUG(11, Sdprintf("Thread %d: no queries\n", tid));
       }
     }
   }
+
+  if ( reindex_gen )
+    *reindex_gen = ren;
 
   return gen;
 }
@@ -230,6 +236,7 @@ open_query(rdf_db *db)
 
   q->type = Q_NORMAL;
   q->transaction = ti->queries.transaction;
+  q->reindex_gen = db->reindexed;
   if ( q->transaction )			/* Query inside a transaction */
   { q->rd_gen = q->transaction->rd_gen;
     q->tr_gen = q->transaction->wr_gen;
@@ -505,7 +512,7 @@ del_triples(query *q, triple **triples, size_t count)
   gen = queryWriteGen(q) + 1;
 
   for(tp=triples; tp < ep; tp++)
-  { triple *t = *tp;
+  { triple *t = deref_triple(*tp);
 
     t->lifespan.died = gen;
     del_triple_consequences(db, t, q);
@@ -521,7 +528,7 @@ del_triples(query *q, triple **triples, size_t count)
 
   if ( !q->transaction && rdf_is_broadcasting(EV_RETRACT) )
   { for(tp=triples; tp < ep; tp++)
-    { triple *t = *tp;
+    { triple *t = deref_triple(*tp);
 
       if ( !rdf_broadcast(EV_RETRACT, t, NULL) )
 	return FALSE;
@@ -552,11 +559,14 @@ update_triples(query *q,
 
   for(to=old,tn=new; to < eo; to++,tn++)
   { if ( *tn )
-    { (*to)->lifespan.died = gen;
-      (*tn)->lifespan.born = gen;
-      (*tn)->lifespan.died = gen_max;
+    { triple *n = *tn;				/* new, cannot be reindexed */
+      triple *o = deref_triple(*to);
+
+      o->lifespan.died = gen;
+      n->lifespan.born = gen;
+      n->lifespan.died = gen_max;
       link_triple(db, *tn, q);
-      del_triple_consequences(db, *to, q);
+      del_triple_consequences(db, o, q);
       if ( q->transaction )
       { buffer_triple(q->transaction->transaction_data.updated, *to);
 	buffer_triple(q->transaction->transaction_data.updated, *tn);
@@ -581,6 +591,15 @@ update_triples(query *q,
   return TRUE;
 }
 
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Matrices  used  in  a  transaction  must  be  discarded  because  a  new
+transaction will use the same  generation   numbers,  but  typically for
+different modifications.
+
+TBD: Hand some statistics to  GC,  such   that  we  know  that there are
+matrices to collect.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static void
 invalidate_matrices_transaction(query *q)
@@ -616,7 +635,9 @@ close_transaction(query *q)
 
 static void
 commit_add(query *q, gen_t gen_max, gen_t gen, triple *t)
-{ if ( t->lifespan.died == gen_max )
+{ t = deref_triple(t);
+
+  if ( t->lifespan.died == gen_max )
   { t->lifespan.born = gen;
     add_triple_consequences(q->db, t, q);
     if ( q->transaction )
@@ -629,7 +650,9 @@ commit_add(query *q, gen_t gen_max, gen_t gen, triple *t)
 
 static void
 commit_del(query *q, gen_t gen, triple *t)
-{ if ( t->lifespan.died == q->wr_gen )
+{ t = deref_triple(t);
+
+  if ( t->lifespan.died == q->wr_gen )
   { t->lifespan.died = gen;
     if ( q->transaction )
     { del_triple_consequences(q->db, t, q);

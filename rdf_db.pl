@@ -725,7 +725,9 @@ consider_gc(_CPU) :-
 				 Garbage,	% Garbage triples in DB
 				 Optimizable,	% Non-optimized tables
 				 _KeepGen,	% Oldest active generation
-				 _LastGCGen))   % Oldest active gen at last GC
+				 _LastGCGen,    % Oldest active gen at last GC
+				 _ReindexGen,
+				 _LastGCReindexGen))
 	->  (   Garbage * 5 > Triples
 	    ;	Optimizable > 4
 	    )

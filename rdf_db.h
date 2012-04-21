@@ -281,6 +281,7 @@ typedef struct triple
   } object;
   atom_t	graph;			/* where it comes from */
   lifespan	lifespan;		/* Start and end generation */
+  struct triple *reindexed;		/* Remapped by optimize_triple_hash() */
 					/* indexing */
   union
   { struct triple*next[INDEX_TABLES];	/* hash-table next links */
@@ -297,7 +298,6 @@ typedef struct triple
   unsigned	allocated : 1;		/* Triple is allocated */
   unsigned	atoms_locked : 1;	/* Atoms have been locked */
   unsigned	linked : 4;		/* Linked into the hash-chains */
-  unsigned	reindexed : 1;		/* Remapped by optimize_triple_hash() */
   unsigned	loaded : 1;		/* for EV_ASSERT_LOAD */
   unsigned	erased : 1;		/* Consistency of erased */
 					/* Total: 32 */
@@ -357,7 +357,7 @@ typedef struct rdf_db
   size_t	created;		/* #triples created */
   size_t	duplicates;		/* #duplicate triples */
   size_t	erased;			/* #triples erased */
-  size_t	reindexed;		/* #triples reindexed (gc_hash_chain) */
+  gen_t		reindexed;		/* #triples reindexed (gc_hash_chain) */
   size_t	indexed[16];		/* Count calls (2**4 possible indices) */
   resource_db	resources;		/* admin of used resources */
   pred_hash	predicates;		/* Predicate table */
@@ -375,7 +375,8 @@ typedef struct rdf_db
     size_t	reclaimed_triples;	/* # reclaimed triples */
     size_t	reclaimed_reindexed;	/* # reclaimed reindexed triples */
     size_t	uncollectable;		/* # uncollectable erased at last GC */
-    gen_t	last_gen;		/* Keep generation at last-GC */
+    gen_t	last_gen;		/* Oldest generation at last-GC */
+    gen_t	last_reindex_gen;	/* Oldest reindexed at last GC */
   } gc;
 
   struct

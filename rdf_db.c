@@ -2585,13 +2585,10 @@ reindex_triple(rdf_db *db, triple *t)
   *t2 = *t;
   memset(&t2->tp, 0, sizeof(t2->tp));
   simpleMutexLock(&db->queries.write.lock);
-  t2->lifespan.born = db->queries.generation+1;
   link_triple_hash(db, t2);
-  t->lifespan.died = db->queries.generation;
-  db->queries.generation++;
+  t->reindexed = t2;
+  t->lifespan.died = db->reindexed++;
   simpleMutexUnlock(&db->queries.write.lock);
-  t->reindexed = TRUE;
-  db->reindexed++;
 }
 
 
@@ -2695,8 +2692,18 @@ latter only puts things at the end of the chain, so we only need to lock
 if we remove a triple near the end.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+static inline int
+is_garbage_triple(triple *t, gen_t old_query_gen, gen_t old_reindex_gen)
+{ if ( t->reindexed )
+    return t->lifespan.died < old_reindex_gen;
+  else
+    return t->lifespan.died < old_query_gen;
+}
+
+
 static void
-gc_hash_chain(rdf_db *db, size_t bucket_no, int icol, gen_t gen)
+gc_hash_chain(rdf_db *db, size_t bucket_no, int icol,
+	      gen_t gen, gen_t reindex_gen)
 { triple_bucket *bucket = &db->hash[icol].blocks[MSB(bucket_no)][bucket_no];
   triple *prev = NULL;
   triple *t = bucket->head;
@@ -2704,7 +2711,7 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol, gen_t gen)
   size_t uncollectable = 0;
 
   for(; t; t=t->tp.next[icol])
-  { if ( t->lifespan.died < gen )
+  { if ( is_garbage_triple(t, gen, reindex_gen) )
     { int lock = (t->tp.next[icol] == NULL);
 
       if ( lock )
@@ -2756,21 +2763,21 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol, gen_t gen)
 
 
 static void
-gc_hash(rdf_db *db, int icol, gen_t gen)
+gc_hash(rdf_db *db, int icol, gen_t gen, gen_t reindex_gen)
 { size_t mb = db->hash[icol].bucket_count;
   size_t b;
 
   for(b=0; b<mb; b++)
-    gc_hash_chain(db, b, icol, gen);
+    gc_hash_chain(db, b, icol, gen, reindex_gen);
 }
 
 
 static void
-gc_hashes(rdf_db *db, gen_t gen)
+gc_hashes(rdf_db *db, gen_t gen, gen_t reindex_gen)
 { int icol;
 
   for(icol=0; icol<INDEX_TABLES; icol++)
-    gc_hash(db, icol, gen);
+    gc_hash(db, icol, gen, reindex_gen);
 }
 
 
@@ -2796,7 +2803,7 @@ gc_clear_busy(rdf_db *db)
 
 
 static int
-gc_db(rdf_db *db, gen_t gen)
+gc_db(rdf_db *db, gen_t gen, gen_t reindex_gen)
 { char buf[64];
 
   if ( !gc_set_busy(db) )
@@ -2804,10 +2811,11 @@ gc_db(rdf_db *db, gen_t gen)
   simpleMutexLock(&db->locks.gc);
   DEBUG(10, Sdprintf("RDF GC; gen = %s\n", gen_name(gen, buf)));
   optimize_triple_hashes(db, gen);
-  gc_hashes(db, gen);
+  gc_hashes(db, gen, reindex_gen);
   gc_clouds(db, gen);
   db->gc.count++;
   db->gc.last_gen = gen;
+  db->gc.last_reindex_gen = reindex_gen;
   gc_clear_busy(db);
   simpleMutexUnlock(&db->locks.gc);
 
@@ -2852,9 +2860,10 @@ Fails without any action if there is already a GC in progress.
 static foreign_t
 rdf_gc(void)
 { rdf_db *db = rdf_current_db();
-  gen_t gen = oldest_query_geneneration(db);
+  gen_t reindex_gen;
+  gen_t gen = oldest_query_geneneration(db, &reindex_gen);
 
-  return gc_db(db, gen);
+  return gc_db(db, gen, reindex_gen);
 }
 
 
@@ -2888,6 +2897,8 @@ record with the following members:
   3. Total number of possible optimizations to hash-tables.
   4. Oldest generation we must keep
   5. Oldest generation at last GC
+  6. Oldest reindexed triple we must keep
+  7. Oldest reindexed at last GC
 */
 
 #define INT_ARG(val) PL_INT64, (int64_t)(val)
@@ -2898,7 +2909,8 @@ rdf_gc_info(term_t info)
   size_t life    = db->created - db->gc.reclaimed_triples;
   size_t garbage = (db->erased    - db->gc.reclaimed_triples) +
 		   (db->reindexed - db->gc.reclaimed_reindexed);
-  gen_t keep_gen = oldest_query_geneneration(db);
+  gen_t keep_reindex;
+  gen_t keep_gen = oldest_query_geneneration(db, &keep_reindex);
 
   if ( keep_gen == db->gc.last_gen )
   { garbage -= db->gc.uncollectable;
@@ -2906,12 +2918,14 @@ rdf_gc_info(term_t info)
   }
 
   return PL_unify_term(info,
-		       PL_FUNCTOR_CHARS, "gc_info", 5,
+		       PL_FUNCTOR_CHARS, "gc_info", 7,
 		         INT_ARG(life),
 		         INT_ARG(garbage),
 		         INT_ARG(optimizable_hashes(db)),
 		         INT_ARG(keep_gen),
-		         INT_ARG(db->gc.last_gen));
+		         INT_ARG(db->gc.last_gen),
+		         INT_ARG(keep_reindex),
+		         INT_ARG(db->gc.last_reindex_gen));
 }
 
 
@@ -5412,26 +5426,26 @@ new_answer(search_state *state, triple *t)
 }
 
 
-static int
+static triple *
 is_candidate(search_state *state, triple *t)
-{ if ( !alive_triple(state->query, t) )
-    return FALSE;
+{ if ( !(t=alive_triple(state->query, t)) )
+    return NULL;
 					/* hash-collision, skip */
   if ( state->has_literal_state )
   { if ( !(t->object_is_literal &&
 	   t->object.literal == state->literal_cursor) )
-      return FALSE;
+      return NULL;
   }
 
   if ( !match_triples(state->db, t, &state->pattern, state->query, state->flags) )
-    return FALSE;
+    return NULL;
 
   if ( t->is_duplicate && !state->src )
   { if ( !new_answer(state, t) )
-      return FALSE;
+      return NULL;
   }
 
-  return TRUE;
+  return t;
 }
 
 
@@ -5591,14 +5605,16 @@ next_search_state(search_state *state)
 
   do
   { while( (t = next_triple(tw)) )
-    { DEBUG(3, Sdprintf("Search: ");
+    { triple *t2;
+
+      DEBUG(3, Sdprintf("Search: ");
 	       print_triple(t, PRT_SRC|PRT_GEN|PRT_NL));
 
-      if ( is_candidate(state, t) )
+      if ( (t2=is_candidate(state, t)) )
       { int rc;
 
 	if ( (rc=unify_triple(state->subject, retpred, state->object,
-			      state->src, t, p->inversed)) == FALSE )
+			      state->src, t2, p->inversed)) == FALSE )
 	  continue;
 	if ( rc == ERROR )
 	  return FALSE;			/* makes rdf/3 return FALSE */
@@ -5942,7 +5958,7 @@ rdf_update5(term_t subject, term_t predicate, term_t object, term_t src,
   init_triple_buffer(&matches);
   init_triple_walker(&tw, db, &t, indexed);
   while((p=next_triple(&tw)))
-  { if ( !alive_triple(q, p) )
+  { if ( !(p=alive_triple(q, p)) )
       continue;
 
     if ( match_triples(db, p, &t, q, MATCH_EXACT) )
@@ -6017,7 +6033,7 @@ rdf_retractall4(term_t subject, term_t predicate, term_t object, term_t src)
   q = open_query(db);
   init_triple_walker(&tw, db, &t, t.indexed);
   while((p=next_triple(&tw)))
-  { if ( !alive_triple(q, p) )
+  { if ( !(p=alive_triple(q, p)) )
       continue;
 
     if ( match_triples(db, p, &t, q, MATCH_EXACT|MATCH_SRC) )
