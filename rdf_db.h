@@ -221,6 +221,7 @@ typedef struct predicate_cloud
   size_t	alt_hash_count;		/* Alternative hashes */
   unsigned int *alt_hashes;
   unsigned int  hash;			/* hash-code */
+  int		last_gc;		/* number of last gc */
 } predicate_cloud;
 
 

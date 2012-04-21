@@ -986,6 +986,35 @@ gc_cloud(rdf_db *db, predicate_cloud *cloud, gen_t gen)
 }
 
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+GC all clouds. We walk the predicates and   keep  a flag on the cloud in
+which GC run it was collected to avoid collecting a cloud multiple times
+in the same GC run. Alternatively,  we   could  keep  a list of possibly
+dirty clouds, but that is more complicated and most likely not worth the
+trouble. Afterall, we might walk  many   predicates  for few clouds, but
+generally the number of predicates is still small compared to the number
+of triples and thus the total cost in the GC process will be small.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+static void
+gc_clouds(rdf_db *db, gen_t gen)
+{ int i;
+  int gc_id = db->gc.count+1;
+
+  for(i=0; i<db->predicates.bucket_count; i++)
+  { predicate *p = db->predicates.blocks[MSB(i)][i];
+
+    for( ; p; p = p->next )
+    { if ( p->cloud->last_gc != gc_id )
+      { p->cloud->last_gc = gc_id;
+
+	gc_cloud(db, p->cloud, gen);
+      }
+    }
+  }
+}
+
+
 static void
 invalidateReachability(predicate_cloud *cloud, query *q)
 { sub_p_matrix *rm;
@@ -2758,6 +2787,7 @@ gc_db(rdf_db *db, gen_t gen)
   DEBUG(10, Sdprintf("RDF GC; gen = %s\n", gen_name(gen, buf)));
   optimize_triple_hashes(db, gen);
   gc_hashes(db, gen);
+  gc_clouds(db, gen);
   db->gc.count++;
   db->gc.last_gen = gen;
   gc_clear_busy(db);
