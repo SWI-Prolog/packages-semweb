@@ -2578,8 +2578,9 @@ reindex_triple(rdf_db *db, triple *t)
   link_triple_hash(db, t2);
   t->reindexed = t2;
   t->lifespan.died = db->reindexed++;
-  if ( t2->object_is_literal )
+  if ( t2->object_is_literal )			/* do not deallocate lit twice */
     t2->object.literal->references++;
+  t->atoms_locked = FALSE;			/* same for unlock_atoms() */
   simpleMutexUnlock(&db->queries.write.lock);
 }
 
@@ -2682,6 +2683,16 @@ generation gen.	 There are two thing we can do:
 (*) We must lock, to avoid a   conflict with link_triple_hash(), but the
 latter only puts things at the end of the chain, so we only need to lock
 if we remove a triple near the end.
+
+We count `uncollectable' triples: erased triples that still have queries
+that depend on them. If no  such  triples   exist  there  is no point in
+running GC.
+
+Should do something similar with reindexed   triples  that cannot yet be
+collected? The problem is less likely,   because they become ready after
+all active _queries_ started before the reindexing have died, wereas the
+generation stuff depends on longer lived  objects which as snapshots and
+transactions.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static inline int
@@ -2735,7 +2746,8 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol,
       }
     } else
     { prev=t;
-      if ( t->erased )
+      if ( icol == 0 && t->erased && !t->reindexed &&
+	   t->lifespan.died >= gen )
 	uncollectable++;
     }
   }
