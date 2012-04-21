@@ -455,12 +455,9 @@ add_triples(query *q, triple **triples, size_t count)
 
     t->lifespan.born = gen;
     t->lifespan.died = gen_max;
-    if ( link_triple(db, t, q) )
-    { if ( q->transaction )
-	buffer_triple(q->transaction->transaction_data.added, t);
-    } else
-    { *tp = NULL;			/* duplicate is deleted */
-    }
+    link_triple(db, t, q);
+    if ( q->transaction )
+      buffer_triple(q->transaction->transaction_data.added, t);
   }
 
   setWriteGen(q, gen);
@@ -469,13 +466,10 @@ add_triples(query *q, triple **triples, size_t count)
   if ( !q->transaction && rdf_is_broadcasting(EV_ASSERT|EV_ASSERT_LOAD) )
   { for(tp=triples; tp < ep; tp++)
     { triple *t = *tp;
+      broadcast_id id = t->loaded ? EV_ASSERT_LOAD : EV_ASSERT;
 
-      if ( t )
-      { broadcast_id id = t->loaded ? EV_ASSERT_LOAD : EV_ASSERT;
-
-	if ( !rdf_broadcast(id, t, NULL) )
-	  return FALSE;
-      }
+      if ( !rdf_broadcast(id, t, NULL) )
+	return FALSE;
     }
   }
 
