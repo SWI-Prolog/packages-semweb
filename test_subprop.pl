@@ -58,7 +58,7 @@ test(G, N) :-
 run_test(G, N) :-
 	show_graph(G),
 	graph_settings(G,
-		       [ verify(0.5),
+		       [ verify(0.1),
 			 create_snap(0.1),
 			 verify_snap(0.03),
 			 delete_snap(0.05)
@@ -79,7 +79,10 @@ reset_and_loop(N, G) :-
 	loop(1, N, G).
 reset_and_loop(N, G) :-
 	reset_graph(G),
-	rdf_transaction(loop(1,N,G), _, [snapshot(true)]).
+	rdf_generation(T0),
+	rdf_transaction(loop(1,N,G), _, [snapshot(true)]),
+	rdf_generation(T1),
+	assertion(T0 == T1).
 
 loop(I, I, _) :- !.
 loop(I, N, G) :-
