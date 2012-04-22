@@ -13,10 +13,6 @@
 
   * Deal with subPropertyOf predicate clouds			[OK]
 
-  * Cleanup reachability matrices in GC.  Fairly trivial: just delete
-    them if their lifespan has passed.  Except for concurrency issues,
-    we do not have to be cautious because they will be recreated anyway.
-
   * Deal with rdf_update/4,5.					[OK]
 
   * Optimize the following tables in GC (i.e., by cloning older
@@ -29,16 +25,11 @@
     and make a concurrent load wait for completion by the other
     thread.  This is the same as Prolog loading files concurrently.
 
-  * Test framework
-    - Controlled concurrency (test_con.pl).  How to generate a comprehensive
-      set of test-cases?
+  * Randomized Test framework (test_subprop.pl).
 
-      - Action grammar to generate sequences?
-      - Keep shadow admin in Prolog
-      - Formalise transaction/snapshot isolation
-
+    - Randomly mutating graphs					[OK]
     - Stress testing
-      - Run controlled tests concurrently in transactions?
+      - Run controlled tests concurrently in transactions?	[OK]
 
   * rdf_gc							[OK]
     - Erased triples that cannot really be deleted because a transaction/snapshot
