@@ -1619,8 +1619,7 @@ update_predicate_counts(rdf_db *db, predicate *p, int which, query *q)
     init_triple_walker(&tw, db, &t, t.indexed);
     while((byp=next_triple(&tw)))
     { if ( byp->lifespan.died == GEN_MAX && !byp->is_duplicate )
-      { if ( (which == DISTINCT_DIRECT &&
-	      byp->predicate.r == p) ||
+      { if ( byp->predicate.r == p ||
 	     (which != DISTINCT_DIRECT &&
 	      isSubPropertyOf(db, byp->predicate.r, p, q)) )
 	{ total++;
