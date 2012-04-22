@@ -199,6 +199,7 @@ static atom_t	ATOM_like;
 static atom_t	ATOM_error;
 static atom_t	ATOM_begin;
 static atom_t	ATOM_end;
+static atom_t	ATOM_error;
 static atom_t	ATOM_infinite;
 static atom_t	ATOM_snapshot;
 static atom_t	ATOM_true;
@@ -3864,9 +3865,11 @@ save_db(query *q, IOSTREAM *out, atom_t src)
 
   init_triple_walker(&tw, db, &p, p.indexed);
   while((t=next_triple(&tw)))
-  { if ( alive_triple(q, t) &&
-	 (!src || t->graph == src) )
-    { write_triple(db, out, t, &ctx);
+  { triple *t2;
+
+    if ( (t2=alive_triple(q, t)) &&
+	 (!src || t2->graph == src) )
+    { write_triple(db, out, t2, &ctx);
       if ( Sferror(out) )
 	return FALSE;
     }
@@ -4276,6 +4279,7 @@ rdf_load_db(term_t stream, term_t id, term_t graphs)
   { triple **tp;
 
 					/* discard partial loaded stuff */
+  fail_out:
     for(tp=ctx.triples.base;
 	tp<ctx.triples.top;
 	tp++)
@@ -4289,7 +4293,8 @@ rdf_load_db(term_t stream, term_t id, term_t graphs)
     return FALSE;
   }
 
-  rdf_broadcast(EV_LOAD, (void*)id, (void*)ATOM_begin);
+  if ( !rdf_broadcast(EV_LOAD, (void*)id, (void*)ATOM_begin) )
+    goto fail_out;
 
   if ( (rc=link_loaded_triples(db, &ctx)) )
   { if ( ctx.graph_table )
@@ -4304,7 +4309,10 @@ rdf_load_db(term_t stream, term_t id, term_t graphs)
     }
   }
 
-  rdf_broadcast(EV_LOAD, (void*)id, (void*)ATOM_end);
+  if ( rc )
+    rc = rdf_broadcast(EV_LOAD, (void*)id, (void*)ATOM_end);
+  else
+    rdf_broadcast(EV_LOAD, (void*)id, (void*)ATOM_error);
   close_query(ctx.query);
 
   if ( ctx.loaded_atoms )
@@ -7437,6 +7445,7 @@ install_rdf_db(void)
   ATOM_error	     = PL_new_atom("error");
   ATOM_begin	     = PL_new_atom("begin");
   ATOM_end	     = PL_new_atom("end");
+  ATOM_error	     = PL_new_atom("error");
   ATOM_infinite	     = PL_new_atom("infinite");
   ATOM_snapshot      = PL_new_atom("snapshot");
   ATOM_true          = PL_new_atom("true");

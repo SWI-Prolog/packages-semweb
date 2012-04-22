@@ -157,7 +157,11 @@ COMMON(int)	update_triples(query *q,
 COMMON(int)	alive_lifespan(query *q, lifespan *span);
 COMMON(char *)	gen_name(gen_t gen, char *buf);
 
-/* dereference `optimized' triples.  See optimize_triple_hash() */
+/* dereference `optimized' triples.  See optimize_triple_hash()
+
+   FIXME: Things are generally not so easy.  See alive_triple() for
+   avoiding duplicates.
+*/
 
 static inline triple *
 deref_triple(triple *t)
@@ -167,9 +171,18 @@ deref_triple(triple *t)
   return t;
 }
 
+/* Find out whether a triple is alive and, if the triple is reindexed,
+   return the current version.  Note that if the triple was reindexed
+   before this query was started, we will find the reindexed one as
+   well, so we can discard this one.
+*/
+
 static inline triple *
 alive_triple(query *q, triple *t)
-{ t = deref_triple(t);
+{ for ( ; t->reindexed; t = t->reindexed )
+  { if ( t->lifespan.died < q->reindex_gen )
+      return NULL;
+  }
 
   return alive_lifespan(q, &t->lifespan) ? t : (triple*)NULL;
 }
