@@ -218,7 +218,7 @@ transaction_max_gen(query *q)
 
 static inline int
 is_wr_transaction_gen(query *q, gen_t gen)
-{ if ( gen >  q->stack->tr_gen_base &&
+{ if ( gen >= q->stack->tr_gen_base &&
        gen <= q->stack->tr_gen_max )
     return TRUE;
 

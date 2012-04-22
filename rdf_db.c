@@ -1307,7 +1307,7 @@ fill_reachable(rdf_db *db,
     triple *t;
     triple_walker tw;
 
-    DEBUG(2, Sdprintf("    Reachable [%s (%d)]\n", pname(p), p->label));
+    DEBUG(3, Sdprintf("    Reachable [%s (%d)]\n", pname(p), p->label));
     setbit(bm, p0->label, p->label);
     pattern.subject = p->name;
     pattern.predicate.r = existing_predicate(db, ATOM_subPropertyOf);
@@ -1327,7 +1327,8 @@ fill_reachable(rdf_db *db,
 	continue;
       }
 
-      update_valid(valid_until, t->lifespan.died);
+      if ( t->lifespan.died != GEN_MAX )
+	update_valid(valid_until, t->lifespan.died);
       super = lookup_predicate(db, t->object.resource, q);
       assert(super->cloud == cloud);
       fill_reachable(db, cloud, bm, p0, super, q, valid_until);
@@ -1336,28 +1337,43 @@ fill_reachable(rdf_db *db,
 }
 
 
+static int
+is_transaction_start_gen(gen_t gen)
+{ return (gen-GEN_TBASE)%GEN_TNEST == 0;
+
+}
+
+
 static sub_p_matrix *
 create_reachability_matrix(rdf_db *db, predicate_cloud *cloud, query *q)
 { bitmatrix *m = alloc_bitmatrix(db, cloud->size, cloud->size);
   sub_p_matrix *rm = rdf_malloc(db, sizeof(*rm));
   predicate **p;
-  gen_t valid_until = query_max_gen(q);
+  gen_t valid_until;
   gen_t valid_from;
   int i;
 
-  if ( q->transaction )
+  if ( q->transaction && !is_transaction_start_gen(q->tr_gen) )
   { valid_from  = q->tr_gen;
+    valid_until = query_max_gen(q);
     add_list(db, &q->transaction->transaction_data.r_matrices, rm);
   } else
   { valid_from  = q->rd_gen;
+    valid_until = GEN_MAX;
   }
 
   check_labels_predicate_cloud(cloud);
   for(i=0, p=cloud->members; i<cloud->size; i++, p++)
-  { DEBUG(1, Sdprintf("Reachability for %s (%d)\n", pname(*p), (*p)->label));
+  { DEBUG(2, Sdprintf("Reachability for %s (%d)\n", pname(*p), (*p)->label));
 
     fill_reachable(db, cloud, m, *p, *p, q, &valid_until);
   }
+
+  DEBUG(1, { char buf[2][24];
+	     Sdprintf("Created matrix, valid %s..%s\n",
+		      gen_name(valid_from, buf[0]),
+		      gen_name(valid_until, buf[1]));
+	   });
 
   rm->lifespan.born = valid_from;
   rm->lifespan.died = valid_until;
@@ -1463,8 +1479,9 @@ isSubPropertyOf(rdf_db *db, predicate *sub, predicate *p, query *q)
     }
 
     if ( (rm = create_reachability_matrix(db, pc, q)) )
+    { assert(alive_lifespan(q, &rm->lifespan));
       return testbit(rm->matrix, sub_label, p_label);
-    else
+    } else
       assert(0);
   }
 
