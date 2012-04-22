@@ -2980,11 +2980,20 @@ rdf_gc_info(term_t info)
 		 *	      GC THREAD		*
 		 *******************************/
 
+/* gc_thread() runs the RDF-DB garbage collection thread.
+
+   FIXME: Reloading can cause the predicate to be undefined.  Can
+   we fix this globally by suspending if an undefined predicate is
+   called in a module that is being loaded?
+*/
+
 static void *
 gc_thread(void *data)
-{ //rdf_db *db = data;
+{ rdf_db *db = data;
   PL_thread_attr_t attr;
   int tid;
+
+  (void)db;					/* we do not need this */
 
   memset(&attr, 0, sizeof(attr));
   attr.alias = "__rdf_GC";
