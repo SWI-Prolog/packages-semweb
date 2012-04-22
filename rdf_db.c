@@ -2760,11 +2760,11 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol,
 	      gen_t gen, gen_t reindex_gen)
 { triple_bucket *bucket = &db->hash[icol].blocks[MSB(bucket_no)][bucket_no];
   triple *prev = NULL;
-  triple *t = bucket->head;
+  triple *t;
   size_t collected = 0;
   size_t uncollectable = 0;
 
-  for(; t; t=t->tp.next[icol])
+  for(t = bucket->head; t; t=t->tp.next[icol])
   { if ( is_garbage_triple(t, gen, reindex_gen) )
     { int lock = (t->tp.next[icol] == NULL);
 
@@ -2803,7 +2803,7 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol,
     }
   }
 
-  if ( collected )			/* concurrent with hashing new ones */
+  if ( collected && icol > 0 )		/* concurrent with hashing new ones */
     ATOMIC_SUB(&bucket->count, collected);
 
   if ( icol == 0 )
