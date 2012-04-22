@@ -6126,16 +6126,16 @@ do_broadcast(term_t term, long mask)
       if ( !(qid = PL_open_query(NULL, PL_Q_CATCH_EXCEPTION, cb->pred, term)) )
 	return FALSE;
       if ( !PL_next_solution(qid) && (ex = PL_exception(qid)) )
-      { term_t av = PL_new_term_refs(2);
+      { term_t av;
 
 	PL_cut_query(qid);
 
-	PL_put_atom(av+0, ATOM_error);
-	PL_put_term(av+1, ex);
-
-	PL_call_predicate(NULL, PL_Q_NORMAL,
-			  PL_predicate("print_message", 2, "user"),
-			  av);
+	if ( (av = PL_new_term_refs(2)) &&
+	     PL_put_atom(av+0, ATOM_error) &&
+	     PL_put_term(av+1, ex) )
+	  PL_call_predicate(NULL, PL_Q_NORMAL,
+			    PL_predicate("print_message", 2, "user"),
+			    av);
 	return FALSE;
       } else
       { PL_close_query(qid);
