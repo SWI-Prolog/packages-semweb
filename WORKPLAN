@@ -49,6 +49,10 @@
     - Transaction-specific matrices must be invalidated after completion
       of the transaction.
       - Flag them as invalid by setting died to GEN_PREHIST?	[OK]
-    - We need matrix-GC.
-      - Reclaim invalided?
-      - DB: linked lists of clouds?
+    - Implement matrix-GC.					[OK]
+
+================
+Issues
+================
+
+  * After loading P6 rewrite: old: 1209415 duplicates, now 8!?

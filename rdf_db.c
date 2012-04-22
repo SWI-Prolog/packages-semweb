@@ -271,9 +271,10 @@ static simpleMutex rdf_lock;
 
 #ifdef O_DEBUG
 
-#define PRT_SRC	0x1
-#define PRT_NL	0x2
-#define PRT_GEN	0x4
+#define PRT_SRC	0x1				/* print source */
+#define PRT_NL	0x2				/* add newline */
+#define PRT_GEN	0x4				/* print generation info */
+#define PRT_ADR	0x8				/* print address */
 
 static void
 print_literal(literal *lit)
@@ -361,10 +362,17 @@ static char *
 triple_status_flags(triple *t, char *buf)
 { char *o = buf;
 
+  *o++ = ' ';
   if ( t->atoms_locked )
     *o++ = 'L';
+  if ( t->is_duplicate )
+    *o++ = 'D';
 
-  *o = '\0';
+  if ( o > buf+1 )
+    *o = '\0';
+  else
+    buf[0] = '\0';
+
   return buf;
 }
 
@@ -390,6 +398,8 @@ print_triple(triple *t, int flags)
     print_src(t);
   if ( (flags & PRT_GEN) )
     print_gen(t);
+  if ( (flags & PRT_ADR) )
+    Sdprintf(" &%p", t);
   Sdprintf((flags & PRT_NL) ? ">\n" : ">");
 }
 
@@ -5626,7 +5636,7 @@ next_search_state(search_state *state)
     { triple *t2;
 
       DEBUG(3, Sdprintf("Search: ");
-	       print_triple(t, PRT_SRC|PRT_GEN|PRT_NL));
+	       print_triple(t, PRT_SRC|PRT_GEN|PRT_NL|PRT_ADR));
 
       if ( (t2=is_candidate(state, t)) )
       { int rc;
@@ -5640,7 +5650,7 @@ next_search_state(search_state *state)
 	do
 	{ while( (t = next_triple(tw)) )
 	  { DEBUG(3, Sdprintf("Search (prefetch): ");
-	       print_triple(t, PRT_SRC|PRT_GEN|PRT_NL));
+		  print_triple(t, PRT_SRC|PRT_GEN|PRT_NL|PRT_ADR));
 
 	    if ( is_candidate(state, t) )
 	    { set_next_triple(tw, t);
