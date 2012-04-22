@@ -397,6 +397,19 @@ alive_lifespan(query *q, lifespan *lifespan)
 }
 
 
+int
+born_lifespan(query *q, lifespan *lifespan)
+{ if ( q->rd_gen >= lifespan->born )
+    return TRUE;
+
+  if ( is_wr_transaction_gen(q, lifespan->born) &&
+       q->tr_gen >= lifespan->born )
+    return TRUE;
+
+  return FALSE;
+}
+
+
 		 /*******************************
 		 *     TRIPLE MANIPULATION	*
 		 *******************************/

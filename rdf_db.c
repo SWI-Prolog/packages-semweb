@@ -1304,25 +1304,28 @@ fill_reachable(rdf_db *db,
     pattern.predicate.r = existing_predicate(db, ATOM_subPropertyOf);
     init_triple_walker(&tw, db, &pattern, BY_SP);
     while((t=next_triple(&tw)))
-    { predicate *super;
+    { triple *t2;
+      predicate *super;
 
-      if ( !match_triples(db, t, &pattern, q, 0) ||
-	   t->object_is_literal )
-	continue;
+      if ( (t2=alive_triple(q, t)) )
+      { if ( match_triples(db, t2, &pattern, q, 0) &&
+	     !t2->object_is_literal )
+	{ if ( t->lifespan.died != query_max_gen(q) )
+	    update_valid(valid_until, t->lifespan.died);
 
-      if ( !alive_triple(q, t) )
-      { if ( q->rd_gen < t->lifespan.born &&
-	     !(is_wr_transaction_gen(q, t->lifespan.born) &&
-	       q->tr_gen < t->lifespan.born) )
-	  update_valid(valid_until, t->lifespan.born);
-	continue;
+	  super = lookup_predicate(db, t->object.resource, q);
+	  assert(super->cloud == cloud);
+	  fill_reachable(db, cloud, bm, p0, super, q, valid_until);
+	}
+      } else
+      { t2 = deref_triple(t);
+
+	if ( match_triples(db, t2, &pattern, q, 0) &&
+	     !t2->object_is_literal )
+	{ if ( !born_lifespan(q, &t->lifespan) )
+	    update_valid(valid_until, t->lifespan.born);
+	}
       }
-
-      if ( t->lifespan.died != GEN_MAX )
-	update_valid(valid_until, t->lifespan.died);
-      super = lookup_predicate(db, t->object.resource, q);
-      assert(super->cloud == cloud);
-      fill_reachable(db, cloud, bm, p0, super, q, valid_until);
     }
   }
 }

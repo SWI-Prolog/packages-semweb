@@ -155,6 +155,7 @@ COMMON(int)	del_triples(query *q, triplep *triples, size_t count);
 COMMON(int)	update_triples(query *q,
 			       triplep *old, triplep *new, size_t count);
 COMMON(int)	alive_lifespan(query *q, lifespan *span);
+COMMON(int)	born_lifespan(query *q, lifespan *lifespan);
 COMMON(char *)	gen_name(gen_t gen, char *buf);
 
 /* dereference `optimized' triples.  See optimize_triple_hash()
