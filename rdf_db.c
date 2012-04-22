@@ -4925,8 +4925,8 @@ unify_graph(term_t src, triple *t)
       { full_term:
 	return PL_unify_term(src,
 			     PL_FUNCTOR, FUNCTOR_colon2,
-			       PL_ATOM, t->graph,
-			       PL_LONG, t->line);
+			       PL_ATOM,  t->graph,
+			       PL_INT64, (int64_t)t->line); /* line is uint32_t */
       }
     }
     default:
