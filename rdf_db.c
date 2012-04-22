@@ -2454,16 +2454,21 @@ reset_triple_hash(rdf_db *db, triple_hash *hash)
 
 
 static int
-count_different(triple_bucket *tb, int index)
+count_different(triple_bucket *tb, int index, int *count)
 { triple *t;
   atomset hash_set;
   int rc;
+  int c = 0;
 
   init_atomset(&hash_set);
   for(t=tb->head; t; t=t->tp.next[ICOL(index)])
+  { c++;
     add_atomset(&hash_set, (atom_t)triple_hash_key(t, index));
+  }
   rc = hash_set.count;
   destroy_atomset(&hash_set);
+
+  *count = c;
 
   return rc;
 }
@@ -2482,9 +2487,14 @@ triple_hash_quality(rdf_db *db, int index)
   for(i=0; i<hash->bucket_count; i++)
   { int entry = MSB(i);
     triple_bucket *tb = &hash->blocks[entry][i];
-    int different = count_different(tb, col_index[index]);
+    int count;
+    int different = count_different(tb, col_index[index], &count);
 
-    if ( tb->count )
+    if ( count != tb->count )
+      Sdprintf("Inconsistent count in index=%d, bucket=%d, %d != %d\n",
+	       index, i, count, tb->count);
+
+    if ( count )
     { q += (float)tb->count/(float)different;
       total += tb->count;
     }
