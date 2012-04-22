@@ -2490,9 +2490,10 @@ triple_hash_quality(rdf_db *db, int index)
     int count;
     int different = count_different(tb, col_index[index], &count);
 
-    if ( count != tb->count )
-      Sdprintf("Inconsistent count in index=%d, bucket=%d, %d != %d\n",
-	       index, i, count, tb->count);
+    DEBUG(1,			/* inconsistency is normal due to concurrency */
+	  if ( count != tb->count )
+	    Sdprintf("Inconsistent count in index=%d, bucket=%d, %d != %d\n",
+		     index, i, count, tb->count));
 
     if ( count )
     { q += (float)tb->count/(float)different;
