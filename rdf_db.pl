@@ -1039,6 +1039,9 @@ rdf_load_db(File) :-
 %
 %	Other options are forwarded to process_rdf/3.
 
+:- dynamic
+	rdf_loading/3.				% Graph, Queue, Thread
+
 rdf_load(Spec) :-
 	rdf_load(Spec, []).
 
@@ -1048,9 +1051,53 @@ rdf_load([H|T], Options) :- !,
 	rdf_load(T, Options).
 rdf_load(Spec, M:Options) :-
 	must_be(list, Options),
+	must_be(ground, Spec),
+	source_url(Spec, Protocol, SourceURL),
+	load_graph(SourceURL, Graph, Options),
+	setup_call_cleanup(
+	    with_mutex(rdf_load_file,
+		       rdf_start_load(Graph, Loading, Options)),
+	    rdf_load_file(Loading, Spec, SourceURL, Protocol, Graph, M, Options),
+	    rdf_end_load(Loading)).
+
+%%	rdf_start_load(+Graph, -WhatToDo) is det.
+%%	rdf_end_load(+WhatToDo) is det.
+%%	rdf_load_file(+WhatToDo, +Spec, +SourceURL, +Protocol, +Graph,
+%%		      +Module, +Options) is det.
+%
+%	Of these three predicates, rdf_load_file/7   does the real work.
+%	The others deal with the  possibility   that  the graph is being
+%	loaded by another thread. In that case,   we  wait for the other
+%	thread to complete the work.
+%
+%	@tbd	What if both threads disagree on what is loaded into the
+%		graph?
+%	@see	Code is modelled closely after how concurrent loading
+%		is handled in SWI-Prolog's boot/init.pl
+
+rdf_start_load(Graph, queue(Queue), _) :-
+	rdf_loading(Graph, Queue, LoadThread),
+	\+ thread_self(LoadThread), !,
+	debug(rdf(load), 'Graph ~w is being loaded by thread ~w; waiting ...',
+	      [ Graph, LoadThread]).
+rdf_start_load(Graph, Ref, _) :-
+	thread_self(Me),
+	message_queue_create(Queue),
+	assertz(rdf_loading(Graph, Queue, Me), Ref).
+
+rdf_end_load(queue(_)) :- !.
+rdf_end_load(Ref) :-
+	clause(rdf_loading(_, Queue, _), _, Ref),
+	erase(Ref),
+	thread_send_message(Queue, done),
+	message_queue_destroy(Queue).
+
+rdf_load_file(queue(Queue), _Spec, _SourceURL, _Protocol, _Graph, _M, _Options) :- !,
+	catch(thread_get_message(Queue, _), _, true).
+rdf_load_file(_Ref, _Spec, SourceURL, Protocol, Graph, M, Options) :-
 	statistics(cputime, T0),
-	rdf_open_input(Spec, In, Cleanup, SourceURL, Graph, Modified,
-		       Format, Options),
+	rdf_open_input(SourceURL, Protocol, Graph,
+		       In, Cleanup, Modified, Format, Options),
 	return_modified(Modified, Options),
 	(   Modified == not_modified
 	->  Action = none
@@ -1134,9 +1181,8 @@ protocols. E.g. for HTTP we want to make a single call on the server and
 use If-modified-since to verify that we need not reloading this file.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-%%	rdf_open_input(+Spec, -Stream, -Cleanup,
-%%		       -Source, -Graph, -Modified, -Format,
-%%		       +Options)
+%%	rdf_open_input(+SourceURL, +Protocol, +Graph,
+%%		       -Stream, -Cleanup, -Modified, -Format, +Options)
 %
 %	Open an input source.
 %
@@ -1151,11 +1197,8 @@ use If-modified-since to verify that we need not reloading this file.
 %	@param	Modified is one of =not_modified=, last_modified(Time),
 %		cached(CacheFile) or =unknown=
 
-rdf_open_input(Spec, Stream, Cleanup,
-	       SourceURL, Graph, Modified, Format,
-	       Options) :-
-	source_url(Spec, Protocol, SourceURL),
-	load_graph(SourceURL, Graph, Options),
+rdf_open_input(SourceURL, Protocol, Graph,
+	       Stream, Cleanup, Modified, Format, Options) :-
 	option(if(If), Options, changed),
 	(   If == true
 	->  true

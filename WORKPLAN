@@ -21,9 +21,9 @@
 	- predicate-db
 	- graph-db
 
-  * Concurrent load: not that we are already loading some graph
+  * Concurrent load: not that we are already loading some graph	[UNTESTED]
     and make a concurrent load wait for completion by the other
-    thread.  This is the same as Prolog loading files concurrently.
+    thread.
 
   * Randomized Test framework (test_subprop.pl).
 
