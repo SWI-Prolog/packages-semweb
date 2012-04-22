@@ -78,7 +78,6 @@ library uses plain malloc to facilitate malloc debuggers.
 
 #define rdf_malloc(db, size)		malloc(size)
 #define rdf_free(db, ptr, size)		free(ptr)
-#define rdf_realloc(db, ptr, old, new)  realloc(ptr, new)
 
 #else /*DIRECT_MALLOC*/
 
@@ -102,19 +101,6 @@ rdf_free(rdf_db *db, void *ptr, size_t size)
   PL_free(&p[-1]);
 }
 
-
-void *
-rdf_realloc(rdf_db *db, void *ptr, size_t old, size_t new)
-{ size_t *p = ptr;
-  size_t bytes = new + sizeof(size_t);
-
-  assert(p[-1] == old);
-  p = PL_realloc(&p[-1], bytes);
-  *p++ = new;
-
-  return p;
-}
-
 #else /*CHECK_MALLOC_SIZES*/
 
 void *
@@ -125,12 +111,6 @@ rdf_malloc(rdf_db *db, size_t size)
 void
 rdf_free(rdf_db *db, void *ptr, size_t size)
 { PL_free(ptr);
-}
-
-
-void *
-rdf_realloc(rdf_db *db, void *ptr, size_t old, size_t new)
-{ return PL_realloc(ptr, new);
 }
 
 #endif /*CHECK_MALLOC_SIZES*/
@@ -1054,12 +1034,16 @@ append_clouds(rdf_db *db,
 	      predicate_cloud *c1, predicate_cloud *c2,
 	      int update_hash)
 { int i;
+  predicate **new_members;
+  predicate **old_members = c1->members;
 
 				/* assumes realloc(NULL, size) works */
-  c1->members = rdf_realloc(db, c1->members,
-			    c1->size*sizeof(predicate*),
-			    (c1->size+c2->size)*sizeof(predicate*));
-  memcpy(&c1->members[c1->size], c2->members, c2->size*sizeof(predicate*));
+  new_members = rdf_malloc(db, (c1->size+c2->size)*sizeof(predicate*));
+  memcpy(&new_members[0],        c1->members, c1->size*sizeof(predicate*));
+  memcpy(&new_members[c1->size], c2->members, c2->size*sizeof(predicate*));
+  c1->members = new_members;
+  PL_linger(old_members);
+
 					/* re-label the new ones */
   for(i=c1->size; i<c1->size+c2->size; i++)
   { predicate *p = c1->members[i];
@@ -1087,12 +1071,19 @@ append_clouds(rdf_db *db,
     DEBUG(1, Sdprintf("Cloud %p: %d alt-hashes\n", c1, newc));
 
     if ( c1->alt_hashes )
-    { c1->alt_hashes = rdf_realloc(db, c1->alt_hashes,
-				   c1->alt_hash_count*sizeof(unsigned int),
-				   newc*sizeof(unsigned int));
+    { unsigned int *new_hashes;
+      unsigned int *old_hashes = c1->alt_hashes;
+
+      new_hashes = rdf_malloc(db, newc*sizeof(unsigned int));
+      memcpy(&new_hashes[0], c1->alt_hashes,
+	     c1->alt_hash_count*sizeof(unsigned int));
+      MemoryBarrier();
+      c1->alt_hashes = new_hashes;
+      PL_linger(old_hashes);
     } else
     { c1->alt_hashes = rdf_malloc(db, newc*sizeof(unsigned int));
       c1->alt_hashes[0] = c1->hash;
+      MemoryBarrier();
       c1->alt_hash_count = 1;
     }
 

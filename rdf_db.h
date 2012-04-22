@@ -467,7 +467,6 @@ typedef enum
 
 COMMON(void *)	rdf_malloc(rdf_db *db, size_t size);
 COMMON(void)	rdf_free(rdf_db *db, void *ptr, size_t size);
-COMMON(void *)	rdf_realloc(rdf_db *db, void *ptr, size_t old, size_t new);
 COMMON(int)	link_triple(rdf_db *db, triple *t, query *q);
 COMMON(void)	erase_triple(rdf_db *db, triple *t, query *q);
 COMMON(void)	add_triple_consequences(rdf_db *db, triple *t, query *q);
