@@ -75,7 +75,9 @@ alloc_triple(void)
 void
 unalloc_triple(triple *t, int linger)
 { if ( t )
-  { if ( linger )
+  { assert(t->atoms_locked == FALSE);
+
+    if ( linger )
       GC_clear_flags(t, GC_FLAG_UNCOLLECTABLE);
     else
       GC_FREE(t);
