@@ -368,6 +368,15 @@ rdf_global_term(Term0, Term) :-
 	Term =.. [H|L].
 rdf_global_term(Term, Term).
 
+%%	rdf_global_graph(+TermIn, -GlobalTerm) is det.
+%
+%	Preforms rdf_global_id/2 on rdf/4, etc graph arguments
+
+rdf_global_graph(NS:Local, Global) :-
+	atom(NS), atom(Local), !,
+	global(NS, Local, Global).
+rdf_global_graph(G, G).
+
 
 		 /*******************************
 		 *	      EXPANSION		*
@@ -413,6 +422,7 @@ valid_arg(@).				% not modified
 valid_arg(r).				% RDF resource
 valid_arg(o).				% RDF object
 valid_arg(t).				% term with RDF resources
+valid_arg(g).				% graph argument
 valid_arg(A) :-
 	throw(error(type_error(rdf_meta_argument, A), _)).
 
@@ -474,6 +484,8 @@ rdf_expand_arg(o, A, E) :- !,
 	rdf_global_object(A, E).
 rdf_expand_arg(t, A, E) :- !,
 	rdf_global_term(A, E).
+rdf_expand_arg(g, A, E) :- !,
+	rdf_global_graph(A, E).
 rdf_expand_arg(:, A, E) :- !,
 	expand_goal(A, E).
 rdf_expand_arg(_, A, A).
@@ -516,7 +528,8 @@ mk_global(NS:Local, Global) :-
 	rdf_subject(r),
 	rdf_set_predicate(r, t),
 	rdf_predicate_property(r, -),
-	rdf_estimate_complexity(r,r,r,-).
+	rdf_estimate_complexity(r,r,r,-),
+	rdf_print_predicate_cloud(r,+).
 
 %%	rdf_equal(?Resource1, ?Resource2)
 %
