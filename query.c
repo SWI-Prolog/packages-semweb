@@ -208,7 +208,7 @@ alloc_query(query_stack *qs)
     ql -= depth;			/* rebase */
     parent = &qs->blocks[b-1][depth-1];
     for(i=depth; i<depth*2; i++)
-    { query *q = &ql[depth];
+    { query *q = &ql[i];
       preinit_query(qs->db, qs, q, parent, i);
       parent = q;
     }
