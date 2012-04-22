@@ -78,6 +78,7 @@
 	    rdf_save/1,			% +File
 	    rdf_save/2,			% +File, +Options
 	    rdf_unload/1,		% +File
+	    rdf_unload_graph/1,		% +Graph
 
 	    rdf_md5/2,			% +DB, -MD5
 	    rdf_atom_md5/3,		% +Text, +Times, -MD5
@@ -1434,8 +1435,12 @@ report_loaded(Action, Source, DB, Triples, T0, Options) :-
 
 %%	rdf_unload(+Spec) is det.
 %
-%	Remove the triples loaded from the specified source and remove
-%	the source from the database.
+%	Remove the triples loaded from the   specified source and remove
+%	the source from the database.  Succeeds   silenly  if the target
+%	graph does not exists, but raises an  error if Spec is neither a
+%	graph, nor resolves to a SourceURL.
+%
+%	@see rdf_unload_graph/1.
 
 rdf_unload(Graph) :-
 	atom(Graph),
@@ -1448,11 +1453,24 @@ rdf_unload(Spec) :-
 	do_unload(Graph).
 rdf_unload(_).
 
-do_unload(DB) :-
-	rdf_transaction(rdf_retractall(_,_,_,DB),
-			unload(DB)),
-	retractall(rdf_source(DB, _, _, _, _)),
-	rdf_unset_graph_source(DB).
+%%	rdf_unload_graph(+Graph) is det.
+%
+%	Remove Graph from the RDF store.  Succeeds silently if the named
+%	graoh does not exist.
+
+rdf_unload_graph(Graph) :-
+	must_be(atom, Graph),
+	rdf_statistics_(triples(Graph, Triples)),
+	Triples > 0, !,
+	do_unload(Graph).
+rdf_unload_graph(_).
+
+
+do_unload(Graph) :-
+	rdf_transaction(rdf_retractall(_,_,_,Graph),
+			unload(Graph)),
+	retractall(rdf_source(Graph, _, _, _, _)),
+	rdf_unset_graph_source(Graph).
 
 
 %%	rdf_source(?Graph, ?SourceURL) is nondet.
