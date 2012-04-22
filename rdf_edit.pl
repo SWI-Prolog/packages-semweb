@@ -229,7 +229,7 @@ rdfe_load(File, Options) :-
 	    ;	time_file(Path, Stamp)
 	    ),
 	    SecTime is round(Stamp),
-	    rdf_statistics(triples_by_file(Graph, Triples)),
+	    rdf_statistics(triples_by_graph(Graph, Triples)),
 	    rdf_md5(Graph, MD5),
 	    assert_action(TID, load_file(Path), -, -, -),
 	    journal(rdf_load(TID,
@@ -290,7 +290,7 @@ load_snapshot(Source, Path) :-
 	rdf_load_db(Path),
 	statistics(cputime, T1),
 	Time is T1 - T0,
-	rdf_statistics(triples_by_file(Source, Triples)),
+	rdf_statistics(triples_by_graph(Source, Triples)),
 	rdf_md5(Source, MD5),
 					% 1e10: modified far in the future
 	assert(rdf_db:rdf_source(Source, 1e12, Triples, MD5)),

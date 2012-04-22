@@ -382,7 +382,7 @@ load_source(DB, Silent, Nth, Total) :-
 	),
 	statistics(cputime, T1),
 	T is T1 - T0,
-	(   rdf_statistics(triples_by_file(DB, Count))
+	(   rdf_statistics(triples_by_graph(DB, Count))
 	->  true
 	;   Count = 0
 	),
