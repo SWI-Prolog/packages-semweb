@@ -106,6 +106,19 @@ mark_triple_next(triple *t, int icol)
   /* not count on the presence of a type descriptor, and must handle this */
   /* case correctly somehow.                                              */
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+(*) Hmmm. It seems this can be  called before unalloc_triple() is called
+on the triple. Although, while asserting  triples from multiple threads,
+we only see this for triples that are:
+
+  - reindexed
+  - have ->linked set to 1 (which seems to imply GC removed them from
+    all but one index).
+
+I.e., the triple seems to be in  a   sane  reindexed  state, about to be
+removed completely.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 static struct GC_ms_entry *
 mark_triple(GC_word *addr,
 	    struct GC_ms_entry *mark_stack_ptr,
@@ -115,8 +128,13 @@ mark_triple(GC_word *addr,
   int i;
 
   if ( !t->lingering )
-  { assert(!t->graph);			/* Graph is always present on a */
-    return mark_stack_ptr;		/* real triple */
+  { // assert(!t->graph);		/* See (*) */
+    if ( t->graph )
+    { DEBUG(40,
+	    Sdprintf("mark_triple(): reindexed = %p, linked = %d??\n",
+		     t->reindexed, t->linked));
+    }
+    return mark_stack_ptr;
   }
 
   for(i=0; i<INDEX_TABLES; i++)
