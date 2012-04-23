@@ -67,9 +67,8 @@ test(G, N*M) :- !,
 	       test(G, M)).
 
 test(G, N) :-
-	atom_concat(G, '.rec', LogFile),
 	setup_call_cleanup(
-	    record_in(LogFile, LogStream),
+	    record_in(G, LogStream),
 	    run_test(G, N),
 	    close_recording(LogStream)).
 
