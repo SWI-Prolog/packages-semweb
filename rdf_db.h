@@ -300,6 +300,7 @@ typedef struct triple
   unsigned	linked : 4;		/* Linked into the hash-chains */
   unsigned	loaded : 1;		/* for EV_ASSERT_LOAD */
   unsigned	erased : 1;		/* Consistency of erased */
+  unsigned	lingering : 1;		/* Deleted; waiting for GC */
 					/* Total: 32 */
 } triple;
 

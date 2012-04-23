@@ -78,8 +78,9 @@ unalloc_triple(triple *t, int linger)
   { assert(t->atoms_locked == FALSE);
 
     if ( linger )
+    { t->lingering = TRUE;
       GC_clear_flags(t, GC_FLAG_UNCOLLECTABLE);
-    else
+    } else
       GC_FREE(t);
   }
 }
@@ -89,9 +90,9 @@ static void
 mark_triple_next(triple *t, int icol)
 { triple *p, *e, *n;
 
-  for(e=t; e && !e->atoms_locked; e=e->tp.next[icol])
+  for(e=t; e && !e->lingering; e=e->tp.next[icol])
     ;
-  for(p=t; p && !p->atoms_locked; p=n)
+  for(p=t; p && !p->lingering; p=n)
   { n = p->tp.next[icol];
     p->tp.next[icol] = e;
   }
@@ -106,7 +107,7 @@ mark_triple(GC_word *addr,
 { triple *t = (triple*)addr;
   int i;
 
-  assert(t->atoms_locked == FALSE);		/* TBD: Unclear name for erased */
+  assert(t->lingering);
 
   for(i=0; i<INDEX_TABLES; i++)
     mark_triple_next(t, i);
