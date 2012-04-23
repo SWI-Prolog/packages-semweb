@@ -2651,8 +2651,13 @@ optimize_triple_hash() only doubles hash->bucket_count_epoch!  It may be
 necessary to call it multiple times, but   reindexing one step at a time
 is not slower than doing it all at once (is this true?)
 
-Note that there is some reason to do   only a little of the work because
-copying the triples temporarily costs memory.
+Note that there is another reason  to  do   only  a  little  of the work
+because copying the triples temporarily costs memory.
+
+(*) We have already done the reindexing  from another index. It may also
+mean that this triple was reindexed in a  previous pass, but that GC has
+not yet reclaimed the triple. I think that  should be fine because it is
+old and burried anyway, but still accessible for old queries.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static int
@@ -2670,7 +2675,7 @@ optimize_triple_hash(rdf_db *db, int icol, gen_t gen)
 
       for(t=bucket->head; t; t=t->tp.next[icol])
       { if ( t->lifespan.died >= gen &&
-	     t->reindexed == FALSE &&
+	     !t->reindexed &&		/* see (*) */
 	     triple_hash_key(t, col_index[icol]) % hash->bucket_count != b_no )
 	{ reindex_triple(db, t);
 	  copied++;
