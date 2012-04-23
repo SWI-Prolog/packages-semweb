@@ -2758,8 +2758,8 @@ transactions.
 
 static inline int
 is_garbage_triple(triple *t, gen_t old_query_gen, gen_t old_reindex_gen)
-{ if ( t->reindexed )
-    return t->lifespan.died < old_reindex_gen;
+{ if ( t->reindexed )				/* Safe: reindex_triple() */
+    return t->lifespan.died < old_reindex_gen;	/* is also part of GC */
   else
     return t->lifespan.died < old_query_gen;
 }
