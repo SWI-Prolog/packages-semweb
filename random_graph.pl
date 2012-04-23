@@ -6,8 +6,10 @@
 	    reset_graph/1,		% +Graph
 	    animate_graph/3		% +Graph, +Steps, +Delay
 	  ]).
+:- if(exists_source(library(pce))).
 :- use_module(pce_graph).
 :- use_module(library(pce)).
+:- endif.
 :- use_module(library(debug)).
 :- use_module(library(lists)).
 :- use_module(library(random)).
@@ -317,7 +319,12 @@ edge_count(Graph, Count) :-
 		 *	       SHOW		*
 		 *******************************/
 
-:- pce_global(@graph, new(graph_viewer)).
+show(Graph, Action) :-
+	broadcast(graph(Graph, Action)).
+
+
+:- if(exists_source(library(pce))).
+:- pce_global(@(graph), new(graph_viewer)).
 
 %%	show_graph(+Graph) is det.
 %
@@ -338,5 +345,9 @@ pce_show_graph(Graph) :-
 	forall(node(N, Graph),
 	       get(GV, node, N, _Node)).
 
-show(Graph, Action) :-
-	broadcast(graph(Graph, Action)).
+:- else.
+
+show_graph(_) :-
+	format(user_error, 'Cannot show graphs without xpce~n', []).
+
+:- endif.

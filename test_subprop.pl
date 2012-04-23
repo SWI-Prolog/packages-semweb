@@ -1,9 +1,11 @@
 :- module(test_subprop,
-	  [ test/1,			% +Times
+	  [ test_subprop/0,
+	    test/1,			% +Times
 	    test/2,			% +Graph, +Times
 	    replay/0,
 	    replay/1			% +File
 	  ]).
+:- include(local_test).
 :- use_module(library(semweb/rdf_db)).
 :- use_module(library(record)).
 :- use_module(library(debug)).
@@ -46,6 +48,27 @@ cleanup(G) :-
 	;   true
 	).
 
+%%	test_subprop
+%
+%	Toplevel for non-interactive test
+
+test_subprop :-
+	nodebug(subprop),
+	setup_call_cleanup(
+	    asserta((prolog:assertion_failed(Reason, Goal) :-
+			catch_failure(Reason, Goal)), Ref),
+	    catch(test(100*100), E,
+		  (	  print_message(error, E),
+			  fail
+		  )),
+	    erase(Ref)).
+
+catch_failure(Reason, Goal) :-
+	print_message(error, assertion_failed(Reason, Goal)),
+	backtrace(10),
+	throw(error(assertion_error(Reason, Goal), _)).
+
+
 %%	test(+Count) is det.
 %%	test(+Graph, +Count) is det.
 %
@@ -64,7 +87,8 @@ test(N) :-
 
 test(G, N*M) :- !,
 	forall(between(1, N, _),
-	       test(G, M)).
+	       test(G, M)),
+	nl(user_error).
 
 test(G, N) :-
 	setup_call_cleanup(
@@ -73,7 +97,10 @@ test(G, N) :-
 	    close_recording(LogStream)).
 
 run_test(G, N) :-
-	show_graph(G),
+	(   debugging(subprop)
+	->  show_graph(G)
+	;   true
+	),
 	graph_settings(G,
 		       [ verify(0.1),
 			 create_snap(0.1),
@@ -101,11 +128,15 @@ reset_and_loop(N, G) :-
 	rdf_generation(T1),
 	assertion(T0 == T1).
 
-loop(I, I, _) :- !.
+loop(I, I, _) :- !,
+	put_char(user_error, '.').
 loop(I, N, G) :-
 	graph_steps(G,1),
 	succ(I, I2),
-	format(user_error, '\r~t~D~6|', [I]),
+	(   debugging(subprop)
+	->  format(user_error, '\r~t~D~6|', [I])
+	;   true
+	),
 	loop(I2, N, G).
 
 
