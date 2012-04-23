@@ -99,6 +99,13 @@ mark_triple_next(triple *t, int icol)
 }
 
 
+/* From gc_mark.h: */
+  /* WARNING: Such a mark procedure may be invoked on an unused object    */
+  /* residing on a free list.  Such objects are cleared, except for a     */
+  /* free list link field in the first word.  Thus mark procedures may    */
+  /* not count on the presence of a type descriptor, and must handle this */
+  /* case correctly somehow.                                              */
+
 static struct GC_ms_entry *
 mark_triple(GC_word *addr,
 	    struct GC_ms_entry *mark_stack_ptr,
@@ -107,7 +114,10 @@ mark_triple(GC_word *addr,
 { triple *t = (triple*)addr;
   int i;
 
-  assert(t->lingering);
+  if ( !t->lingering )
+  { assert(!t->graph);			/* Graph is always present on a */
+    return mark_stack_ptr;		/* real triple */
+  }
 
   for(i=0; i<INDEX_TABLES; i++)
     mark_triple_next(t, i);
