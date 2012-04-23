@@ -26,6 +26,17 @@
 #ifndef BUFFER_H_INCLUDED
 #define BUFFER_H_INCLUDED
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Triples are buffered in an  array.  This   is  used  by transactions for
+committing, etc. The data is   allocated using PL_malloc_uncollectable()
+to make sure that discarded  triples  are   not  really  removed  by GC,
+notably before their changes can be broadcasted.
+
+FIXME: Check that all triple buffers are   allocated either on the stack
+or in memory that is scanned  by   BDWGC.  The ones for transactions are
+stored on the C-stack.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 #define TFAST_SIZE 64
 
 typedef struct triple_buffer
@@ -55,7 +66,7 @@ buffer_triple(triple_buffer *b, triple *t)
   { *b->top++ = t;
   } else
   { if ( b->base == b->fast )
-    { triple **tmp = malloc(TFAST_SIZE*2*sizeof(triple*));
+    { triple **tmp = PL_malloc_uncollectable(TFAST_SIZE*2*sizeof(triple*));
 
       if ( tmp )
       { memcpy(tmp, b->base, (char*)b->top - (char*)b->base);
@@ -67,7 +78,7 @@ buffer_triple(triple_buffer *b, triple *t)
 	return FALSE;
     } else
     { size_t size = (b->max - b->base);
-      triple **tmp = realloc(b->base, size*2*sizeof(triple*));
+      triple **tmp = PL_realloc(b->base, size*2*sizeof(triple*));
 
       assert(b->top == b->max);
 
@@ -88,7 +99,7 @@ buffer_triple(triple_buffer *b, triple *t)
 static inline void
 free_triple_buffer(triple_buffer *b)
 { if ( b->base && b->base != b->fast )
-    free(b->base);
+    PL_free(b->base);
 }
 
 #endif /*BUFFER_H_INCLUDED*/
