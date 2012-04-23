@@ -5555,7 +5555,8 @@ next_sub_property(search_state *state)
     triple_walker *tw = &state->cursor;
 
     if ( !state->p_cloud )
-    { if ( p->predicate.r->cloud->alt_hash_count )
+    { if ( p->predicate.r &&		/* no pred on rdf_has(?,-,?) */
+	   p->predicate.r->cloud->alt_hash_count )
       { state->p_cloud = p->predicate.r->cloud;
 
 	DEBUG(1, Sdprintf("%d alt hashes; first was 0x%x\n",
