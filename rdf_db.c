@@ -1310,10 +1310,13 @@ fill_reachable(rdf_db *db,
       if ( (t2=alive_triple(q, t)) )
       { if ( match_triples(db, t2, &pattern, q, 0) &&
 	     !t2->object_is_literal )
-	{ if ( t->lifespan.died != query_max_gen(q) )
-	    update_valid(valid_until, t->lifespan.died);
+	{ if ( t2->lifespan.died != query_max_gen(q) )
+	  { DEBUG(1, Sdprintf("Limit lifespan due to dead: ");
+		     print_triple(t2, PRT_GEN|PRT_NL));
+	    update_valid(valid_until, t2->lifespan.died);
+	  }
 
-	  super = lookup_predicate(db, t->object.resource, q);
+	  super = lookup_predicate(db, t2->object.resource, q);
 	  assert(super->cloud == cloud);
 	  fill_reachable(db, cloud, bm, p0, super, q, valid_until);
 	}
@@ -1322,8 +1325,12 @@ fill_reachable(rdf_db *db,
 
 	if ( match_triples(db, t2, &pattern, q, 0) &&
 	     !t2->object_is_literal )
-	{ if ( !born_lifespan(q, &t->lifespan) )
-	    update_valid(valid_until, t->lifespan.born);
+	{ if ( !t2->erased &&
+	       !born_lifespan(q, &t2->lifespan) )
+	  { DEBUG(1, Sdprintf("Limit lifespan due to new born: ");
+		     print_triple(t2, PRT_GEN|PRT_NL));
+	    update_valid(valid_until, t2->lifespan.born);
+	  }
 	}
       }
     }
@@ -1355,6 +1362,14 @@ create_reachability_matrix(rdf_db *db, predicate_cloud *cloud, query *q)
   { valid_from  = q->rd_gen;
     valid_until = GEN_MAX;
   }
+
+  DEBUG(1, { char buf[4][24];
+	     Sdprintf("Create matrix for q at %s/%s, valid %s..%s\n",
+		      gen_name(q->rd_gen, buf[0]),
+		      gen_name(q->tr_gen, buf[1]),
+		      gen_name(valid_from, buf[2]),
+		      gen_name(valid_until, buf[3]));
+	   });
 
   check_labels_predicate_cloud(cloud);
   for(i=0, p=cloud->members; i<cloud->size; i++, p++)
