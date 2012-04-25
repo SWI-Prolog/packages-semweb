@@ -606,19 +606,19 @@ matrices to collect.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static void
-invalidate_matrices_transaction(query *q)
+invalidate_lifespans_transaction(query *q)
 { cell *c, *next;
 
-  for(c=q->transaction_data.r_matrices.head; c; c=next)
-  { sub_p_matrix *rm = c->value;
+  for(c=q->transaction_data.lifespans.head; c; c=next)
+  { lifespan *span = c->value;
 
     next = c->next;
-    rm->lifespan.died = GEN_PREHIST;
+    span->died = GEN_PREHIST;
     rdf_free(q->db, c, sizeof(*c));
   }
 
-  q->transaction_data.r_matrices.head = NULL;
-  q->transaction_data.r_matrices.tail = NULL;
+  q->transaction_data.lifespans.head = NULL;
+  q->transaction_data.lifespans.tail = NULL;
 }
 
 
@@ -629,7 +629,7 @@ close_transaction(query *q)
   free_triple_buffer(q->transaction_data.added);
   free_triple_buffer(q->transaction_data.deleted);
   free_triple_buffer(q->transaction_data.updated);
-  invalidate_matrices_transaction(q);
+  invalidate_lifespans_transaction(q);
 
   q->stack->transaction = q->transaction;
 

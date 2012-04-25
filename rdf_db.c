@@ -1269,9 +1269,9 @@ check_labels_predicate_cloud(predicate_cloud *cloud)
 }
 
 static void
-update_valid(gen_t *valid_until, gen_t change)
-{ if ( change < *valid_until )
-    *valid_until = change;
+update_valid(lifespan *valid, gen_t change)
+{ if ( change < valid->died )
+    valid->died = change;
 }
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1292,7 +1292,7 @@ fill_reachable(rdf_db *db,
 	       bitmatrix *bm,
 	       predicate *p0, predicate *p,
 	       query *q,
-	       gen_t *valid_until)
+	       lifespan *valid)
 { if ( !testbit(bm, p0->label, p->label) )
   { triple pattern = {0};
     triple *t;
@@ -1313,12 +1313,12 @@ fill_reachable(rdf_db *db,
 	{ if ( t2->lifespan.died != query_max_gen(q) )
 	  { DEBUG(1, Sdprintf("Limit lifespan due to dead: ");
 		     print_triple(t2, PRT_GEN|PRT_NL));
-	    update_valid(valid_until, t2->lifespan.died);
+	    update_valid(valid, t2->lifespan.died);
 	  }
 
 	  super = lookup_predicate(db, t2->object.resource, q);
 	  assert(super->cloud == cloud);
-	  fill_reachable(db, cloud, bm, p0, super, q, valid_until);
+	  fill_reachable(db, cloud, bm, p0, super, q, valid);
 	}
       } else
       { t2 = deref_triple(t);
@@ -1329,7 +1329,7 @@ fill_reachable(rdf_db *db,
 	       !born_lifespan(q, &t2->lifespan) )
 	  { DEBUG(1, Sdprintf("Limit lifespan due to new born: ");
 		     print_triple(t2, PRT_GEN|PRT_NL));
-	    update_valid(valid_until, t2->lifespan.born);
+	    update_valid(valid, t2->lifespan.born);
 	  }
 	}
       }
@@ -1341,8 +1341,21 @@ fill_reachable(rdf_db *db,
 static int
 is_transaction_start_gen(gen_t gen)
 { return (gen-GEN_TBASE)%GEN_TNEST == 0;
-
 }
+
+
+static void
+init_valid_lifespan(rdf_db *db, lifespan *span, query *q)
+{ if ( q->transaction && !is_transaction_start_gen(q->tr_gen) )
+  { span->born = q->tr_gen;
+    span->died = query_max_gen(q);
+    add_list(db, &q->transaction->transaction_data.lifespans, span);
+  } else
+  { span->born = q->rd_gen;
+    span->died = GEN_MAX;
+  }
+}
+
 
 
 static sub_p_matrix *
@@ -1350,42 +1363,31 @@ create_reachability_matrix(rdf_db *db, predicate_cloud *cloud, query *q)
 { bitmatrix *m = alloc_bitmatrix(db, cloud->size, cloud->size);
   sub_p_matrix *rm = rdf_malloc(db, sizeof(*rm));
   predicate **p;
-  gen_t valid_until;
-  gen_t valid_from;
   int i;
 
-  if ( q->transaction && !is_transaction_start_gen(q->tr_gen) )
-  { valid_from  = q->tr_gen;
-    valid_until = query_max_gen(q);
-    add_list(db, &q->transaction->transaction_data.r_matrices, rm);
-  } else
-  { valid_from  = q->rd_gen;
-    valid_until = GEN_MAX;
-  }
+  init_valid_lifespan(db, &rm->lifespan, q);
 
   DEBUG(1, { char buf[4][24];
 	     Sdprintf("Create matrix for q at %s/%s, valid %s..%s\n",
 		      gen_name(q->rd_gen, buf[0]),
 		      gen_name(q->tr_gen, buf[1]),
-		      gen_name(valid_from, buf[2]),
-		      gen_name(valid_until, buf[3]));
+		      gen_name(rm->lifespan.born, buf[2]),
+		      gen_name(rm->lifespan.died, buf[3]));
 	   });
 
   check_labels_predicate_cloud(cloud);
   for(i=0, p=cloud->members; i<cloud->size; i++, p++)
   { DEBUG(2, Sdprintf("Reachability for %s (%d)\n", pname(*p), (*p)->label));
 
-    fill_reachable(db, cloud, m, *p, *p, q, &valid_until);
+    fill_reachable(db, cloud, m, *p, *p, q, &rm->lifespan);
   }
 
   DEBUG(1, { char buf[2][24];
 	     Sdprintf("Created matrix, valid %s..%s\n",
-		      gen_name(valid_from, buf[0]),
-		      gen_name(valid_until, buf[1]));
+		      gen_name(rm->lifespan.born, buf[0]),
+		      gen_name(rm->lifespan.died, buf[1]));
 	   });
 
-  rm->lifespan.born = valid_from;
-  rm->lifespan.died = valid_until;
   rm->matrix = m;
   simpleMutexLock(&db->locks.misc);		/* sync with gc_cloud() */
   rm->older = cloud->reachable;
@@ -1496,6 +1498,17 @@ isSubPropertyOf(rdf_db *db, predicate *sub, predicate *p, query *q)
 
   return FALSE;
 }
+
+
+static int
+is_leaf_predicate(rdf_db *db, predicate *p, query *q)
+{ if ( alive_lifespan(q, &p->is_leaf_valid) )
+  { return p->is_leaf;
+  } else
+  {
+  }
+}
+
 
 
 		 /*******************************
@@ -3535,7 +3548,11 @@ match_object(triple *t, triple *p, unsigned flags)
 
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Match triple t to pattern p.  Erased triples are always skipped.
+match_triples() is TRUE if the triple  t   matches  the  pattern p. This
+function does not  consider  whether  or   not  the  triple  is visible.
+Matching is controlled by flags:
+
+    -
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static int

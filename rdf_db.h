@@ -180,13 +180,16 @@ typedef struct predicate
 					/* hierarchy */
   list	            subPropertyOf;	/* the one I'm subPropertyOf */
   list	            siblings;		/* reverse of subPropertyOf */
-  int		    label;		/* Numeric label in cloud */
   struct predicate_cloud *cloud;	/* cloud I belong to */
   size_t	    hash;		/* key used for hashing
 					   (=hash if ->cloud is up-to-date) */
 					/* properties */
   struct predicate *inverse_of;		/* my inverse predicate */
+  int		    label;		/* Numeric label in cloud */
   unsigned	    transitive : 1;	/* P(a,b)&P(b,c) --> P(a,c) */
+  unsigned	    is_leaf : 1;	/* Predicate is a leaf in subPropertyOf */
+  lifespan	    is_leaf_valid;	/* is_leaf is valid in this span */
+
 					/* statistics */
   size_t	    triple_count;	/* # triples on this predicate */
   size_t	    distinct_updated[2];/* Is count still valid? */
