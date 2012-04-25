@@ -171,6 +171,12 @@ typedef struct bitmatrix
 } bitmatrix;
 
 
+typedef struct is_leaf
+{ lifespan	lifespan;		/* Computed for this lifespan */
+  struct is_leaf *older;		/* Older is_leaf info */
+  int		is_leaf;		/* Predicate was a leaf then */
+} is_leaf;
+
 #define DISTINCT_DIRECT 0		/* for ->distinct_subjects, etc */
 #define DISTINCT_SUB    1
 
@@ -185,15 +191,11 @@ typedef struct predicate
   list	            subPropertyOf;	/* the one I'm subPropertyOf */
   list	            siblings;		/* reverse of subPropertyOf */
   struct predicate_cloud *cloud;	/* cloud I belong to */
-  size_t	    hash;		/* key used for hashing
-					   (=hash if ->cloud is up-to-date) */
-					/* properties */
+  is_leaf	   *is_leaf;		/* cached is-leaf information */
   struct predicate *inverse_of;		/* my inverse predicate */
-  int		    label;		/* Numeric label in cloud */
+  unsigned int	    hash;		/* key used for hashing */
+  unsigned int	    label : 24;		/* Numeric label in cloud */
   unsigned	    transitive : 1;	/* P(a,b)&P(b,c) --> P(a,c) */
-  unsigned	    is_leaf : 2;	/* Predicate is a leaf in subPropertyOf */
-  lifespan	    is_leaf_valid;	/* is_leaf is valid in this span */
-
 					/* statistics */
   size_t	    triple_count;	/* # triples on this predicate */
   size_t	    distinct_updated[2];/* Is count still valid? */

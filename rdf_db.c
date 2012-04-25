@@ -219,6 +219,7 @@ static sub_p_matrix *create_reachability_matrix(rdf_db *db,
 						predicate_cloud *cloud,
 						query *q);
 static void	free_reachability_matrix(rdf_db *db, sub_p_matrix *rm);
+static void	gc_is_leaf(rdf_db *db, predicate *p, gen_t gen);
 static int	get_predicate(rdf_db *db, term_t t, predicate **p, query *q);
 static int	get_existing_predicate(rdf_db *db, term_t t, predicate **p);
 static void	free_bitmatrix(rdf_db *db, bitmatrix *bm);
@@ -1001,6 +1002,7 @@ gc_clouds(rdf_db *db, gen_t gen)
 
 	gc_cloud(db, p->cloud, gen);
       }
+      gc_is_leaf(db, p, gen);
     }
   }
 }
@@ -1532,33 +1534,66 @@ a seperate object that is not modified.
 
 static int
 is_leaf_predicate(rdf_db *db, predicate *p, query *q)
-{ int is_leaf;
+{ is_leaf *data;
+  triple pattern = {0};
+  triple_walker tw;
+  triple *t;
 
-  if ( (is_leaf = p->is_leaf) != IS_LEAF_UNKNOWN &&
-       alive_lifespan(q, &p->is_leaf_valid) )
-  { return (p->is_leaf == IS_LEAF);
-  } else
-  { lifespan valid;
-    triple pattern = {0};
-    triple_walker tw;
-    triple *t;
+  for( data=p->is_leaf; data; data=data->older )
+  { if ( alive_lifespan(q, &data->lifespan) )
+      return data->is_leaf;
+  }
 
-    p->is_leaf = IS_LEAF_UNKNOWN;
-    init_valid_lifespan(db, &valid, q);
-    pattern.object.resource = p->name;
-    pattern.predicate.r = existing_predicate(db, ATOM_subPropertyOf);
-    init_triple_walker(&tw, db, &pattern, BY_PO);
-    while((t=next_triple(&tw)))
-    { triple *t2;
+  data = rdf_malloc(db, sizeof(*data));
+  init_valid_lifespan(db, &data->lifespan, q);
 
-      if ( (t2=matching_object_triple_until(db, t, &pattern, q, 0, &valid)) )
-	p->is_leaf = IS_LEAF;
-      else
-	p->is_leaf = IS_NOT_LEAF;
+  pattern.object.resource = p->name;
+  pattern.predicate.r = existing_predicate(db, ATOM_subPropertyOf);
+  init_triple_walker(&tw, db, &pattern, BY_PO);
+
+  while((t=next_triple(&tw)))
+  { triple *t2;
+
+    if ( (t2=matching_object_triple_until(db, t, &pattern, q, 0,
+					  &data->lifespan)) )
+      data->is_leaf = IS_LEAF;
+    else
+      data->is_leaf = IS_NOT_LEAF;
+  }
+
+  simpleMutexLock(&db->locks.misc);
+  data->older = p->is_leaf;
+  MemoryBarrier();
+  p->is_leaf = data;
+  simpleMutexUnlock(&db->locks.misc);
+
+  return data->is_leaf;
+}
+
+
+static void
+gc_is_leaf(rdf_db *db, predicate *p, gen_t gen)
+{ is_leaf *il, *older;
+  is_leaf *prev = NULL;
+
+  for(il = p->is_leaf; il; il=older)
+  { older = il->older;
+
+    if ( il->lifespan.died < gen )
+    { if ( prev )
+      { prev->older = il;
+      } else
+      { simpleMutexLock(&db->locks.misc);   /* sync with */
+	p->is_leaf = older;		    /* is_leaf_predicate() */
+	simpleMutexUnlock(&db->locks.misc);
+      }
+
+      PL_linger(il);
+    } else
+    { prev = il;
     }
   }
 }
-
 
 
 		 /*******************************
