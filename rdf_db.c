@@ -5506,6 +5506,11 @@ init_search_state(search_state *state, query *query)
     return FALSE;
   }
 
+  if ( (p->match & MATCH_SUBPROPERTY) &&
+       p->predicate.r &&
+       is_leaf_predicate(state->db, p->predicate.r, query) )
+    p->match &= ~MATCH_SUBPROPERTY;
+
   if ( (p->match == STR_MATCH_PREFIX ||	p->match == STR_MATCH_LIKE) &&
        p->indexed != BY_SP &&
        (state->prefix = first_atom(p->object.literal->value.string, p->match)))
