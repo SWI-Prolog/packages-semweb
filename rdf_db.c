@@ -228,6 +228,7 @@ static predicate_cloud *new_predicate_cloud(rdf_db *db,
 					    query *q);
 static int	unify_literal(term_t lit, literal *l);
 static int	check_predicate_cloud(predicate_cloud *c);
+static void	invalidate_is_leaf(predicate *p, query *q, int add);
 
 
 		 /*******************************
@@ -1159,6 +1160,8 @@ addSubPropertyOf(rdf_db *db, triple *t, query *q)
   DEBUG(3, Sdprintf("addSubPropertyOf(%s, %s)\n",
 		    pname(sub), pname(super)));
 
+  invalidate_is_leaf(super, q, TRUE);
+
   if ( add_list(db, &sub->subPropertyOf, super) )
   { add_list(db, &super->siblings, sub);
     merge_clouds(db, sub->cloud, super->cloud, q);
@@ -1190,6 +1193,8 @@ delSubPropertyOf(rdf_db *db, triple *t, query *q)
 
   DEBUG(3, Sdprintf("delSubPropertyOf(%s, %s)\n",
 		    pname(sub), pname(super)));
+
+  invalidate_is_leaf(super, q, FALSE);
 
   if ( del_list(db, &sub->subPropertyOf, super) )
   { del_list(db, &super->siblings, sub);
@@ -1547,10 +1552,10 @@ is_leaf_predicate(rdf_db *db, predicate *p, query *q)
   data = rdf_malloc(db, sizeof(*data));
   init_valid_lifespan(db, &data->lifespan, q);
 
-  pattern.object.resource = p->name;
   if ( (pattern.predicate.r = existing_predicate(db, ATOM_subPropertyOf)) )
-  { init_triple_walker(&tw, db, &pattern, BY_PO);
+  { pattern.object.resource = p->name;
 
+    init_triple_walker(&tw, db, &pattern, BY_PO);
     while((t=next_triple(&tw)))
     { triple *t2;
 
@@ -1571,6 +1576,24 @@ is_leaf_predicate(rdf_db *db, predicate *p, query *q)
   simpleMutexUnlock(&db->locks.misc);
 
   return data->is_leaf;
+}
+
+
+/* invalidate the is_leaf status if a sub-property is added/deleted.
+   no need to do so if we add a child to a non-leaf.
+*/
+
+static void
+invalidate_is_leaf(predicate *p, query *q, int add)
+{ gen_t gen_max = query_max_gen(q);
+  is_leaf *il;
+
+  for(il=p->is_leaf; il; il=il->older)
+  { if ( il->lifespan.died == gen_max )
+    { if ( !(add && !il->is_leaf) )
+	il->lifespan.died = queryWriteGen(q);
+    }
+  }
 }
 
 
