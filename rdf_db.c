@@ -1274,6 +1274,47 @@ update_valid(lifespan *valid, gen_t change)
     valid->died = change;
 }
 
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Match triple t against pattern p in query q. Update the died-property of
+valid if the triple matches now,  but   will  not  after some generation
+(i.e., it will die) or the triple must still be born.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+static triple *
+matching_object_triple_until(rdf_db *db, triple *t, triple *p, query *q,
+			     unsigned flags, lifespan *valid)
+{ triple *t2;
+
+  if ( (t2=alive_triple(q, t)) )
+  { if ( match_triples(db, t2, p, q, 0) &&
+	 !t2->object_is_literal )	/* object properties only */
+    { if ( t2->lifespan.died != query_max_gen(q) )
+      { DEBUG(1, Sdprintf("Limit lifespan due to dead: ");
+	      print_triple(t2, PRT_GEN|PRT_NL));
+	update_valid(valid, t2->lifespan.died);
+      }
+
+      return t2;
+    }
+  } else
+  { t2 = deref_triple(t);		/* Dubious */
+
+    if ( match_triples(db, t2, p, q, 0) &&
+	 !t2->object_is_literal )
+    { if ( !t2->erased &&
+	   !born_lifespan(q, &t2->lifespan) )
+      { DEBUG(1, Sdprintf("Limit lifespan due to new born: ");
+	      print_triple(t2, PRT_GEN|PRT_NL));
+	update_valid(valid, t2->lifespan.born);
+      }
+    }
+  }
+
+  return NULL;
+}
+
+
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 fill_reachable()   computes   that    transitive     closure    of   the
 rdfs:subPropertyOf relation. In addition, it   maintains  the generation
@@ -1305,33 +1346,13 @@ fill_reachable(rdf_db *db,
     init_triple_walker(&tw, db, &pattern, BY_SP);
     while((t=next_triple(&tw)))
     { triple *t2;
-      predicate *super;
 
-      if ( (t2=alive_triple(q, t)) )
-      { if ( match_triples(db, t2, &pattern, q, 0) &&
-	     !t2->object_is_literal )
-	{ if ( t2->lifespan.died != query_max_gen(q) )
-	  { DEBUG(1, Sdprintf("Limit lifespan due to dead: ");
-		     print_triple(t2, PRT_GEN|PRT_NL));
-	    update_valid(valid, t2->lifespan.died);
-	  }
+      if ( (t2=matching_object_triple_until(db, t, &pattern, q, 0, valid)) )
+      { predicate *super;
 
-	  super = lookup_predicate(db, t2->object.resource, q);
-	  assert(super->cloud == cloud);
-	  fill_reachable(db, cloud, bm, p0, super, q, valid);
-	}
-      } else
-      { t2 = deref_triple(t);
-
-	if ( match_triples(db, t2, &pattern, q, 0) &&
-	     !t2->object_is_literal )
-	{ if ( !t2->erased &&
-	       !born_lifespan(q, &t2->lifespan) )
-	  { DEBUG(1, Sdprintf("Limit lifespan due to new born: ");
-		     print_triple(t2, PRT_GEN|PRT_NL));
-	    update_valid(valid, t2->lifespan.born);
-	  }
-	}
+	super = lookup_predicate(db, t2->object.resource, q);
+	assert(super->cloud == cloud);
+	fill_reachable(db, cloud, bm, p0, super, q, valid);
       }
     }
   }
