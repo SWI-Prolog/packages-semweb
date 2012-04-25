@@ -180,10 +180,6 @@ typedef struct is_leaf
 #define DISTINCT_DIRECT 0		/* for ->distinct_subjects, etc */
 #define DISTINCT_SUB    1
 
-#define IS_LEAF_UNKNOWN	0
-#define IS_LEAF		1
-#define IS_NOT_LEAF	2
-
 typedef struct predicate
 { atom_t	    name;		/* name of the predicate */
   struct predicate *next;		/* next in hash-table */

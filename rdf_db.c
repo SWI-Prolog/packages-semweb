@@ -1548,17 +1548,20 @@ is_leaf_predicate(rdf_db *db, predicate *p, query *q)
   init_valid_lifespan(db, &data->lifespan, q);
 
   pattern.object.resource = p->name;
-  pattern.predicate.r = existing_predicate(db, ATOM_subPropertyOf);
-  init_triple_walker(&tw, db, &pattern, BY_PO);
+  if ( (pattern.predicate.r = existing_predicate(db, ATOM_subPropertyOf)) )
+  { init_triple_walker(&tw, db, &pattern, BY_PO);
 
-  while((t=next_triple(&tw)))
-  { triple *t2;
+    while((t=next_triple(&tw)))
+    { triple *t2;
 
-    if ( (t2=matching_object_triple_until(db, t, &pattern, q, 0,
-					  &data->lifespan)) )
-      data->is_leaf = IS_LEAF;
-    else
-      data->is_leaf = IS_NOT_LEAF;
+      if ( (t2=matching_object_triple_until(db, t, &pattern, q, 0,
+					    &data->lifespan)) )
+	data->is_leaf = FALSE;
+      else
+	data->is_leaf = TRUE;
+    }
+  } else				/* rdfs:subPropertyOf doesn't exist */
+  { data->is_leaf = TRUE;		/* so all preds are leafs  */
   }
 
   simpleMutexLock(&db->locks.misc);
@@ -1593,6 +1596,20 @@ gc_is_leaf(rdf_db *db, predicate *p, gen_t gen)
     { prev = il;
     }
   }
+}
+
+
+static void
+free_is_leaf(rdf_db *db, predicate *p)
+{ is_leaf *il, *older;
+
+  for(il = p->is_leaf; il; il=older)
+  { older = il->older;
+
+    rdf_free(db, il, sizeof(*il));
+  }
+
+  p->is_leaf = NULL;
 }
 
 
@@ -5506,10 +5523,10 @@ init_search_state(search_state *state, query *query)
     return FALSE;
   }
 
-  if ( (p->match & MATCH_SUBPROPERTY) &&
+  if ( (state->flags & MATCH_SUBPROPERTY) &&
        p->predicate.r &&
        is_leaf_predicate(state->db, p->predicate.r, query) )
-    p->match &= ~MATCH_SUBPROPERTY;
+    state->flags &= ~MATCH_SUBPROPERTY;
 
   if ( (p->match == STR_MATCH_PREFIX ||	p->match == STR_MATCH_LIKE) &&
        p->indexed != BY_SP &&
@@ -5659,15 +5676,36 @@ that belong to the hash is a subPropertyOf the target.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static int
+hash_holds_candidates(rdf_db *db, unsigned int hash,
+		      predicate *p, predicate_cloud *pc,
+		      query *q)
+{ predicate **pp  = pc->members;
+  predicate **end = &pp[pc->size];
+
+  return TRUE;
+
+  for(; pp<end; pp++)
+  { predicate *p2 = *pp;
+
+    if ( p2->hash == hash && isSubPropertyOf(db, p2, p, q) )
+      return TRUE;
+  }
+
+  return FALSE;
+}
+
+
+static int
 next_sub_property(search_state *state)
 { if ( (state->flags & MATCH_SUBPROPERTY) )
   { triple *p = &state->pattern;
     triple_walker *tw = &state->cursor;
+    predicate_cloud *pc;
 
-    if ( !state->p_cloud )
+    if ( !(pc=state->p_cloud) )
     { if ( p->predicate.r &&		/* no pred on rdf_has(?,-,?) */
 	   p->predicate.r->cloud->alt_hash_count )
-      { state->p_cloud = p->predicate.r->cloud;
+      { pc = state->p_cloud = p->predicate.r->cloud;
 
 	DEBUG(1, Sdprintf("%d alt hashes; first was 0x%x\n",
 			  p->predicate.r->cloud->alt_hash_count,
@@ -5677,23 +5715,23 @@ next_sub_property(search_state *state)
       } else
 	return FALSE;			/* Cloud has only one hash */
     } else
-    { tw->unbounded_hash ^= state->p_cloud->alt_hashes[state->alt_hash_cursor];
+    { tw->unbounded_hash ^= pc->alt_hashes[state->alt_hash_cursor];
       state->alt_hash_cursor++;
     }
 
-    while( state->alt_hash_cursor < state->p_cloud->alt_hash_count &&
-	   state->p_cloud->alt_hashes[state->alt_hash_cursor] ==
-	   predicate_hash(p->predicate.r) )
-      state->alt_hash_cursor++;
+    for( ; state->alt_hash_cursor < pc->alt_hash_count; state->alt_hash_cursor++)
+    { unsigned new_hash = pc->alt_hashes[state->alt_hash_cursor];
 
-    if ( state->alt_hash_cursor < state->p_cloud->alt_hash_count )
-    { DEBUG(1, Sdprintf("Retrying with alt-hash %d (0x%x)\n",
-			state->alt_hash_cursor,
-			state->p_cloud->alt_hashes[state->alt_hash_cursor]));
-      tw->unbounded_hash ^= state->p_cloud->alt_hashes[state->alt_hash_cursor];
-      rewind_triple_walker(tw);
+      if ( new_hash != predicate_hash(p->predicate.r) &&
+	   hash_holds_candidates(state->db, new_hash,
+				 p->predicate.r, pc, state->query) )
+      { DEBUG(1, Sdprintf("Retrying with alt-hash %d (0x%x)\n",
+			  state->alt_hash_cursor, new_hash));
+	tw->unbounded_hash ^= new_hash;
+	rewind_triple_walker(tw);
 
-      return TRUE;
+	return TRUE;
+      }
     }
   }
 
@@ -7383,6 +7421,7 @@ erase_predicates(rdf_db *db)
       free_list(db, &p->siblings);
       if ( ++p->cloud->deleted == p->cloud->size )
 	free_predicate_cloud(db, p->cloud);
+      free_is_leaf(db, p);
 
       rdf_free(db, p, sizeof(*p));
     }
