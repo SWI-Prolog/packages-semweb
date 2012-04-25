@@ -5692,11 +5692,15 @@ hash of the cloud.
 
   - If the cloud doesn't have ->alt_hashes, all related predicates have
     the same hash, and we are done.
-  - If the cloud does have ->alt_hashes, we must walk all the
-    alt-hashes.
+  - If the cloud does have ->alt_hashes, we must walk the
+    alt-hashes.  We do not need to walk hashes that do not use
+    sub-properties of the target.  This is implemented using
+    hash_holds_candidates().
 
-TBD: Actually, we do not need to walk the hash if none of the predicates
-that belong to the hash is a subPropertyOf the target.
+TBD: How expensive is hash_holds_candidates(). Maybe  we should only try
+that if there are many candidates  in the hash-chains? Alternatively, we
+can keep a list of predicates that uses  a particular alt-hash, so we do
+not have to scan the whole cloud each time.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static int
@@ -5706,13 +5710,14 @@ hash_holds_candidates(rdf_db *db, unsigned int hash,
 { predicate **pp  = pc->members;
   predicate **end = &pp[pc->size];
 
-  return TRUE;
-
   for(; pp<end; pp++)
   { predicate *p2 = *pp;
 
     if ( p2->hash == hash && isSubPropertyOf(db, p2, p, q) )
+    { DEBUG(1, Sdprintf("\thash 0x%x: <%s rdfs:subPropertyOf %s>\n",
+			hash, pname(p2), pname(p)));
       return TRUE;
+    }
   }
 
   return FALSE;
