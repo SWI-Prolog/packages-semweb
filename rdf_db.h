@@ -174,6 +174,10 @@ typedef struct bitmatrix
 #define DISTINCT_DIRECT 0		/* for ->distinct_subjects, etc */
 #define DISTINCT_SUB    1
 
+#define IS_LEAF_UNKNOWN	0
+#define IS_LEAF		1
+#define IS_NOT_LEAF	2
+
 typedef struct predicate
 { atom_t	    name;		/* name of the predicate */
   struct predicate *next;		/* next in hash-table */
@@ -187,7 +191,7 @@ typedef struct predicate
   struct predicate *inverse_of;		/* my inverse predicate */
   int		    label;		/* Numeric label in cloud */
   unsigned	    transitive : 1;	/* P(a,b)&P(b,c) --> P(a,c) */
-  unsigned	    is_leaf : 1;	/* Predicate is a leaf in subPropertyOf */
+  unsigned	    is_leaf : 2;	/* Predicate is a leaf in subPropertyOf */
   lifespan	    is_leaf_valid;	/* is_leaf is valid in this span */
 
 					/* statistics */

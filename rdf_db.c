@@ -1521,12 +1521,41 @@ isSubPropertyOf(rdf_db *db, predicate *sub, predicate *p, query *q)
 }
 
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+is_leaf_predicate()  is  true   if   p   has    no   children   in   the
+rdfs:subPropertyOf tree at query q. We cache this information.
+
+FIXME: Note that this code is subject to  race conditions. If we want to
+avoid that without using locks, we must  put the validity information in
+a seperate object that is not modified.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 static int
 is_leaf_predicate(rdf_db *db, predicate *p, query *q)
-{ if ( alive_lifespan(q, &p->is_leaf_valid) )
-  { return p->is_leaf;
+{ int is_leaf;
+
+  if ( (is_leaf = p->is_leaf) != IS_LEAF_UNKNOWN &&
+       alive_lifespan(q, &p->is_leaf_valid) )
+  { return (p->is_leaf == IS_LEAF);
   } else
-  {
+  { lifespan valid;
+    triple pattern = {0};
+    triple_walker tw;
+    triple *t;
+
+    p->is_leaf = IS_LEAF_UNKNOWN;
+    init_valid_lifespan(db, &valid, q);
+    pattern.object.resource = p->name;
+    pattern.predicate.r = existing_predicate(db, ATOM_subPropertyOf);
+    init_triple_walker(&tw, db, &pattern, BY_PO);
+    while((t=next_triple(&tw)))
+    { triple *t2;
+
+      if ( (t2=matching_object_triple_until(db, t, &pattern, q, 0, &valid)) )
+	p->is_leaf = IS_LEAF;
+      else
+	p->is_leaf = IS_NOT_LEAF;
+    }
   }
 }
 
@@ -3573,7 +3602,10 @@ match_triples() is TRUE if the triple  t   matches  the  pattern p. This
 function does not  consider  whether  or   not  the  triple  is visible.
 Matching is controlled by flags:
 
-    -
+    - MATCH_SUBPROPERTY		Perform rdfs:subPropertyOf matching
+    - MATCH_SRC			Also match the source
+    - MATCH_QUAL		Match language/type qualifiers
+    - STR_MATCH_*		Additional string matching
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static int
