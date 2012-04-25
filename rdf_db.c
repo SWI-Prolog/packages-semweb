@@ -1561,8 +1561,9 @@ is_leaf_predicate(rdf_db *db, predicate *p, query *q)
 
       if ( (t2=matching_object_triple_until(db, t, &pattern, q, 0,
 					    &data->lifespan)) )
-	data->is_leaf = FALSE;
-      else
+      { data->is_leaf = FALSE;
+	break;
+      } else
 	data->is_leaf = TRUE;
     }
   } else				/* rdfs:subPropertyOf doesn't exist */
