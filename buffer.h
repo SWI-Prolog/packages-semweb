@@ -78,12 +78,14 @@ buffer_triple(triple_buffer *b, triple *t)
 	return FALSE;
     } else
     { size_t size = (b->max - b->base);
-      triple **tmp = PL_realloc(b->base, size*2*sizeof(triple*));
+      triple **tmp = PL_malloc_uncollectable(size*2*sizeof(triple*));
 
       assert(b->top == b->max);
 
       if ( tmp )
-      { b->base = tmp;
+      { memcpy(tmp, b->base, (char*)b->top - (char*)b->base);
+	PL_free(b->base);
+	b->base = tmp;
 	b->top  = b->base + size;
 	b->max  = b->base + size*2;
 	*b->top++ = t;
