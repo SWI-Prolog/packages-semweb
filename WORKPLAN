@@ -49,4 +49,4 @@ Issues
   * After loading P6 rewrite: old: 1209415 duplicates, now 8!?
 
   * Deadlock: lookupAtom() --> GC --> free_node_data() --> PL_unregister_atom()
-    Can be fixed using atomic incr/decr for PL_unregister_atom().
+    Can be fixed using atomic incr/decr for PL_unregister_atom(). [OK (GCC)]
