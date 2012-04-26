@@ -1574,6 +1574,7 @@ gc_is_leaf(rdf_db *db, predicate *p, gen_t gen)
 	simpleMutexUnlock(&db->locks.misc);
       }
 
+      memset(&il->lifespan, 0, sizeof(il->lifespan));
       PL_linger(il);
     } else
     { prev = il;
