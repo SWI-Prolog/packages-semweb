@@ -310,7 +310,8 @@ close_query(query *q)
 int
 empty_transaction(query *q)
 { return ( is_empty_buffer(q->transaction_data.added) &&
-	   is_empty_buffer(q->transaction_data.deleted) );
+	   is_empty_buffer(q->transaction_data.deleted) &&
+	   is_empty_buffer(q->transaction_data.updated) );
 }
 
 
