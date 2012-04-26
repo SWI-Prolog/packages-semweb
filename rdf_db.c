@@ -1567,7 +1567,7 @@ gc_is_leaf(rdf_db *db, predicate *p, gen_t gen)
 
     if ( il->lifespan.died < gen )
     { if ( prev )
-      { prev->older = il;
+      { prev->older = older;
       } else
       { simpleMutexLock(&db->locks.misc);   /* sync with */
 	p->is_leaf = older;		    /* is_leaf_predicate() */
