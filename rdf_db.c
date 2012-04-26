@@ -1000,7 +1000,6 @@ append_clouds(rdf_db *db,
   predicate **new_members;
   predicate **old_members = c1->members;
 
-				/* assumes realloc(NULL, size) works */
   new_members = rdf_malloc(db, (c1->size+c2->size)*sizeof(predicate*));
   memcpy(&new_members[0],        c1->members, c1->size*sizeof(predicate*));
   memcpy(&new_members[c1->size], c2->members, c2->size*sizeof(predicate*));
