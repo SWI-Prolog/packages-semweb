@@ -172,8 +172,8 @@ typedef struct bitmatrix
 
 
 typedef struct is_leaf
-{ lifespan	lifespan;		/* Computed for this lifespan */
-  struct is_leaf *older;		/* Older is_leaf info */
+{ struct is_leaf *older;		/* Older is_leaf info */
+  lifespan	lifespan;		/* Computed for this lifespan */
   int		is_leaf;		/* Predicate was a leaf then */
 } is_leaf;
 

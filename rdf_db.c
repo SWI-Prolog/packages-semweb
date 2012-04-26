@@ -66,43 +66,6 @@ static void sum_digest(md5_byte_t *digest, md5_byte_t *add);
 static void dec_digest(md5_byte_t *digest, md5_byte_t *add);
 #endif
 
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-We now use malloc/free/realloc  calls  with   explicit  sizes  to  allow
-maintaining statistics as well as to   prepare  for dealing with special
-memory  pools  associated  with  databases.  Using  -DDIRECT_MALLOC  the
-library uses plain malloc to facilitate malloc debuggers.
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-#ifdef DIRECT_MALLOC
-
-#define rdf_malloc(db, size)		malloc(size)
-#define rdf_free(db, ptr, size)		free(ptr)
-
-#else /*DIRECT_MALLOC*/
-
-#if CHECK_MALLOC_SIZES
-void *
-rdf_malloc(rdf_db *db, size_t size)
-{ size_t bytes = size + sizeof(size_t);
-  size_t *ptr = PL_malloc(bytes);
-
-  *ptr++ = size;
-
-  return ptr;
-}
-
-void
-rdf_free(rdf_db *db, void *ptr, size_t size)
-{ size_t *p = ptr;
-
-  assert(p[-1] == size);
-
-  PL_free(&p[-1]);
-}
-
-#else /*CHECK_MALLOC_SIZES*/
-
 void *
 rdf_malloc(rdf_db *db, size_t size)
 { return PL_malloc_unmanaged(size);
@@ -112,9 +75,6 @@ void
 rdf_free(rdf_db *db, void *ptr, size_t size)
 { PL_free(ptr);
 }
-
-#endif /*CHECK_MALLOC_SIZES*/
-#endif /*DIRECT_MALLOC*/
 
 static functor_t FUNCTOR_literal1;
 static functor_t FUNCTOR_literal2;
