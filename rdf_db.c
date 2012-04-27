@@ -5257,7 +5257,11 @@ mark_duplicate(rdf_db *db, triple *t, query *q)
 
   init_triple_walker(&tw, db, t, indexed);
   while((d=next_triple(&tw)) && d != t)
-  { if ( !(d=alive_triple(q, d)) )		/* does that make sense? */
+  { d = deref_triple(d);
+    DEBUG(3, Sdprintf("Possible duplicate: ");
+	     print_triple(d, PRT_NL|PRT_ADR));
+
+    if ( !overlap_lifespan(&d->lifespan, &t->lifespan) )
       continue;
 
     if ( match_triples(db, d, t, q, MATCH_DUPLICATE) )
