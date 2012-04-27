@@ -155,11 +155,6 @@ static predicate_t PRED_call1;
 #define MATCH_QUAL		0x10	/* Match qualifiers too */
 #define MATCH_DUPLICATE		(MATCH_EXACT|MATCH_QUAL)
 
-typedef enum
-{ DUP_NONE,
-  DUP_DUPLICATE
-} dub_state;
-
 static int match_triples(rdf_db *db, triple *t, triple *p,
 			 query *q, unsigned flags);
 static void unlock_atoms(rdf_db *db, triple *t);
@@ -168,7 +163,7 @@ static void unlock_atoms_literal(literal *lit);
 
 static size_t	triple_hash_key(triple *t, int which);
 static size_t	object_hash(triple *t);
-static dub_state mark_duplicate(rdf_db *db, triple *t, query *q);
+static void	mark_duplicate(rdf_db *db, triple *t, query *q);
 static void	link_triple_hash(rdf_db *db, triple *t);
 static void	init_triple_walker(triple_walker *tw, rdf_db *db,
 				   triple *t, int index);
@@ -5254,16 +5249,15 @@ TBD: Duplicate marks may be removed by   GC:  walk over all triples that
 are marked as duplicates and try to find the duplicate.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-static dub_state
+static void
 mark_duplicate(rdf_db *db, triple *t, query *q)
 { triple_walker tw;
   triple *d;
   const int indexed = BY_SPO;
-  dub_state rc = DUP_NONE;
 
   init_triple_walker(&tw, db, t, indexed);
   while((d=next_triple(&tw)) && d != t)
-  { if ( !alive_triple(q, d) )
+  { if ( !(d=alive_triple(q, d)) )		/* does that make sense? */
       continue;
 
     if ( match_triples(db, d, t, q, MATCH_DUPLICATE) )
@@ -5276,12 +5270,10 @@ mark_duplicate(rdf_db *db, triple *t, query *q)
 	db->duplicates++;
       }
 
-      rc = DUP_DUPLICATE;
+      return;
     }
   }
   destroy_triple_walker(db, &tw);
-
-  return rc;
 }
 
 
