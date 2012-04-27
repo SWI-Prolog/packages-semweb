@@ -13,31 +13,40 @@
 \htmlmainfile{semweb}		% Main document file
 \bodycolor{white}		% Page colour
 
-\renewcommand{\runningtitle}{SWI-Prolog Semantic Web Library}
+\renewcommand{\runningtitle}{SWI-Prolog Semantic Web Library (version 3)}
 
 \newcommand{\elem}[1]{{\tt\string<#1\string>}}
 
 \begin{document}
 
-\title{SWI-Prolog Semantic Web Library}
+\title{SWI-Prolog Semantic Web Library 3.0}
 \author{Jan Wielemaker \\
 	University of Amsterdam/VU University Amsterdam \\
 	The Netherlands \\
-	E-mail: \email{J.Wielemaker@cs.vu.nl}}
+	E-mail: \email{J.Wielemaker@vu.nl}}
 
 \maketitle
 
 \begin{abstract}
+
 This document describes a library for dealing with standards from the
 \url[W3C]{http://www.w3c.org/} standard for the \emph{Semantic Web}.
-Like the standards themselves (RDF, RDFS and OWL) this infrastructure
-is modular.  It consists of Prolog packages for reading, querying and
-storing semantic web documents as well as XPCE libraries that provide
-visualisation and editing.  The Prolog libraries can be used without
-the XPCE GUI modules.  The library has been actively used with upto 10
-million triples, using approximately 1GB of memory.  Its scalability
-is limited by memory only.  The library can be used both on 32-bit
-and 64-bit platforms.
+Like the standards themselves (RDF, RDFS and OWL) this infrastructure is
+modular. It consists of Prolog packages for reading, querying and
+storing semantic web documents. A read-to-run platform for developing
+Semantic Web applications named
+\url[ClioPatria]{http://cliopatria.swi-prolog.org} is distributed
+seperately. The SWI-Prolog RDF store is amoung the most memory efficient
+main-memory stores for
+RDF\footnote{\url{http://cliopatria.swi-prolog.org/help/source/doc/home/vnc/prolog/src/ClioPatria/web/help/memusage.txt}}
+
+Version~3 of the RDF library enhances concurrent use of the library by
+allowing for lock-free reading, writing using short-held locks.  It
+provides Prolog compatible \jargon{logical update view} on the triple
+store and isolation using \jargon{transactions} and jargon{snapshots}.
+This version of the library provides near real-time modification and
+querying of RDF graphs, making it particularly interesting for handling
+streaming RDF and graph manipulation tasks.
 \end{abstract}
 
 \vfill
@@ -49,12 +58,13 @@ and 64-bit platforms.
 
 \section{Introduction}
 
-SWI-Prolog has started support for web-documents with the development of
-a small and fast SGML/XML parser, followed by an RDF parser (early
-2000). With the \file{semweb} library we provide more high level support
-for manipulating semantic web documents.  The semantic web is the likely
-point of orientation for knowledge representation in the future, making
-a library designed in its spirit promising.
+The core of the SWI-Prolog package \file{semweb} is an efficient
+main-memory RDF store written in C and tightly integrated with Prolog.
+It provides a fully logical predicate rdf/3 to query the RDF store
+efficiently by using multiple (10) indexes.  In addition, SWI-Prolog
+provides libraries for reading and writing XML/RDF and Turtle and a
+library that provides persistency using a combination of efficient
+binary snapshots and journals.
 
 
 \section{Provided libraries}
@@ -64,10 +74,8 @@ providing storage and basic querying for RDF triples. This triple store
 is filled using the RDF parser realised by \pllib{rdf.pl}. The storage
 module can quickly save and load (partial) databases. The modules
 \pllib{semweb/rdfs.pl} and \pllib{semweb/owl.pl} add querying in terms
-of the more powerful RDFS and OWL languages. Module
-\pllib{semweb/rdf_edit.pl} adds editing, undo, journaling and
-change-forwarding. Finally, a variety of XPCE modules visualise and edit
-the database. Figure \figref{modules} summarised the modular design.
+of the more powerful RDFS and OWL languages. Figure \figref{modules}
+summarised the modular design.
 
 \postscriptfig[width=0.8\linewidth]{modules}
 	{Modules for the Semantic Web library}
@@ -82,33 +90,34 @@ the database. Figure \figref{modules} summarised the modular design.
 
 The central module is called \file{rdf_db}.  It provides storage and
 indexed querying of RDF triples.  Triples are stored as a quintuple.
-The first three elements denote the RDF triple. \arg{File} and
-\arg{Line} provide information about the origin of the triple.
+The first three elements denote the RDF triple. The extra \arg{Graph}
+and \arg{Line} elements provide information about the origin of the
+triple.
 
 \begin{quote}
-\{\arg{Subject} \arg{Predicate} \arg{Object} \arg{File} \arg{Line}\}
+\{\arg{Subject} \arg{Predicate} \arg{Object} \arg{Graph} \arg{Line}\}
 \end{quote}
 
 The actual storage is provided by the \jargon{foreign language (C)}
-module \file{rdf_db.c}.  Using a dedicated C-based implementation we
-can reduced memory usage and improve indexing capabilities.%
-	\footnote{The orginal implementation was in Prolog.  This
-		  version was implemented in 3 hours, where the C-based
-		  implementation costed a full week.  The C-based
-		  implementation requires about half the memory and
-		  provides about twice the performance.}
-Currently the following indexing is provided.
+module \file{rdf_db.c}. Using a dedicated C-based implementation we can
+reduced memory usage and improve indexing capabilities. Currently the
+following indexes are provided (S=subject, P=predicate, O=object,
+G=graph):
 
 \begin{itemize}
-    \item Any of the 3 fields of the triple
-    \item \arg{Subject} + \arg{Predicate} and \arg{Predicate} + \arg{Object}
-    \item \arg{Predicates} are indexed on the \jargon{highest property}.  In
-          other words, if predicates are related through
-	  \const{subPropertyOf} predicates indexing happens on the most
-	  abstract predicate. This makes calls to rdf_has/4 very
-	  efficient.
-    \item String literal \arg{Objects} are indexed case-insensitive to make
-          case-insensitive queries fully indexed. See rdf/3.
+    \item S, P, O, SP, PO, SPO, G, SG, PG
+    \item Predicates connect by \const{rdfs:subPropertyOf} are combined
+          in a \jargon{predicate cloud}.  The system causes multiple
+	  predicates in the cloud to share the same hash.  The cloud
+	  maintains a 2-dimensional array that expresses the
+	  closure of all \const{rdfs:subPropertyOf} relations.  This
+	  index supports rdf_has/3 to query a property and all its
+	  children efficiently.
+    \item String literal \arg{Objects} are combined in a \jargon{skip list}
+          after case normalization. This provides for efficient
+	  case-insensitive search, prefix and range search.  The plugin
+	  library \secref{litindex} provides indexed search on tokens
+	  inside literals.
 \end{itemize}
 
 \subsection{Query the RDF database}
@@ -288,23 +297,19 @@ the call is the same as \term{rdf}{_,_,literal(Literal)}.
 
 \subsubsection{Literal matching and indexing}	\label{sec:litindex}
 
-Starting with version 2.5.0 of this library, literal values are ordered
-and indexed using a balanced binary tree (AVL tree).  The aim of this
-index is threefold.
+Literal values are ordered and indexed using a \jargon{skip list} The
+aim of this index is threefold.
 
 \begin{itemize}
     \item Unlike hash-tables, binary trees allow for efficient
-	  \jargon{prefix} matching.  Prefix matching is very useful in
-	  interactive applications to provide feedback while typing such
-	  as auto-completion.
+	  \jargon{prefix} and \jargon{range} matching. Prefix matching
+	  is useful in interactive applications to provide feedback
+	  while typing such as auto-completion.
 
     \item Having a table of unique literals we generate creation and
 	  destruction events (see rdf_monitor/2).  These events can
 	  be used to maintain additional indexing on literals, such
-	  as `by word'.
-
-    \item A binary table allow for fast interval matching on typed
-          numeric literals.\footnote{Not yet implemented}
+	  as `by word'.  See \secref{litindex}.
 \end{itemize}
 
 As string literal matching is most frequently used for searching
@@ -368,7 +373,7 @@ the properties \const{symmetric}, \const{inverse_of} and
 \const{transitive} as defined with rdf_predicate_property/2.  Adding
 an $A$ inverse_of $B$ also adds $B$ inverse_of $A$.  An inverse relation
 is deleted using \term{inverse_of}{[]}.
-`
+
     \predicate{rdf_predicate_property}{2}{?Predicate, -Property}
 Query properties of a defined predicate.  Currently defined properties
 are given below.
@@ -477,91 +482,104 @@ As rdf_update/4 but allows for specifying the graph.
 \end{description}
 
 
-\subsubsection{Transactions}			\label{transactions}
+\subsubsection{Update view, transactions and snapshots}
+\label{sec:transactions}
 
 \index{transaction}%
 The predicates from \secref{modpreds} perform immediate and atomic
-modifications to the database. There are two cases where this is not
-desirable:
+modifications to the database. Queries (e.g., rdf/3, rdf_has/3) and
+updates (e.g., rdf_assert/3, rdf_retractall/3) follow the standard
+Prolog \jargon{logical update view}. This means that a query returns the
+answer-set that was visible when the query was started, regardless of
+which triples are added or deleted during the execution of the query.
+Note that such modifications can origin from the same thread (where
+the query remains active because it succeeded non-deterministically)
+or from another thread.
 
-\begin{enumerate}
-    \item
-If the database is modified using information based on reading the same
-database. A typical case is a forward reasoner examining the database
-and asserting new triples that can be deduced from the already existing
-ones.   For example, \emph{if $length(X) > 2$ then size(X) is large}:
-
-\begin{code}
-	(   rdf(X, length, literal(L)),
-	    atom_number(L, IL),
-	    IL > 2,
-	    rdf_assert(X, size, large),
-	    fail
-	;   true
-	).
-\end{code}
-
-Running this code without precautions causes an error because
-rdf_assert/3 tries to get a write lock on the database which has
-an a read operation (rdf/3 has choicepoints) in progress.
-
-    \item
-Multi-threaded access making multiple changes to the database that
-must be handled as a unit.
-\end{enumerate}
-
-Where the second case is probably obvious, the first case is less so.
-The storage layer may require reindexing after adding or deleting
-triples. Such reindexing operatations however are not possible while
-there are active read operations in other threads or from choicepoints
-that can be in the same thread. For this reason we added
-rdf_transaction/2. Note that, like the predicates from
-\secref{modpreds}, rdf_transaction/2 raises a permission error exception
-if the calling thread has active choicepoints on the database. The
-problem is illustrated below.  The rdf/3 call leaves a choicepoint and
-as the read lock originates from the calling thread itself the system
-will deadlock if it would not generate an exception.
-
-\begin{code}
-1 ?- rdf_assert(a,b,c).
-
-Yes
-2 ?- rdf_assert(a,b,d).
-
-Yes
-3 ?- rdf(a,b,X), rdf_transaction(rdf_assert(a,b,e)).
-ERROR: No permission to write rdf_db `default' (Operation would deadlock)
-^  Exception: (8) rdf_db:rdf_transaction(rdf_assert(a, b, e)) ? no debug
-4 ?-
-\end{code}
-
+Prologs logical update view on querying a modifying database results in
+reliable answers to programs that modify the data that is being queried.
+However, it provides no solution to (1) a sequence of modifications that
+cannot complete, thus leaving the database in an inconsistent state and
+(2) sequences of modifications are visible to other threads `as they
+happen', resulting in (temporary) inconsistent states.  This is normally
+solved using \jargon{transactions}, as implemented by rdf_transaction/3.
 
 \begin{description}
     \predicate{rdf_transaction}{1}{:Goal}
-Same as \term{rdf_transaction}{Goal, \const{user}}.
+Same as \term{rdf_transaction}{Goal, \const{user}, []}.
 
     \predicate{rdf_transaction}{2}{:Goal, +Id}
-After starting a transaction, all predicates from \secref{modpreds}
-append their operation to the \emph{transaction} instead of modifying
-the database. If \arg{Goal} succeeds rdf_transaction cuts all
-choicepoints in \arg{Goal} and executes all recorded operations. If
-\arg{Goal} fails or throws an exception, all recorded operations are
-discarded and rdf_transaction/1 fails or re-throws the exception.
+Same as \term{rdf_transaction}{Goal, Id, []}.
 
-On entry, rdf_transaction/1 gains exclusive access to the database, but
-does allow readers to come in from all threads. After the successful
-completion of \arg{Goal} rdf_transaction/1 gains completely exclusive
-access while performing the database updates.
+    \predicate{rdf_transaction}{3}{:Goal, +Id, +Options}
+Run \arg{Goal} in a transaction. This implies that modifications called
+from \arg{Goal} (e.g., calls to rdf_assert/3, rdf_retractall/3) are
+\emph{not} visible in other threads. If \arg{Goal} succeeds, possibly
+pending choice-points are discarded and all modifications become
+\jargon{atomically} visible to other threads. If \arg{Goal} fails or
+throws an exception, all modifications are discarded and
+rdf_transaction/3 fails or re-throws the exception.
 
-Transactions may be nested.  Committing a nested transactions merges
-its change records into the outer transaction, while discarding a
-nested transaction simply destroys the change records belonging to
-the nested transaction.
+Queries executed by \arg{Goal} see the RDF-store at the moment the
+transaction was started, modified only by modifications done inside
+the transactions.  I.e., modifications in other threads and other
+transactions are invisible inside the transaction.
+
+Transactions can be nested. The semantics of nested transactions is as
+described above, but relative to the transaction it is nested in instead
+of the global RDF store.
 
 The \arg{Id} argument may be used to identify the transaction. It is
 passed to the begin/end events posted to hooks registered with
 rdf_monitor/2. The \arg{Id} \term{log}{Term} can be used to enrich the
 journal files with additional history context. See \secref{enrich}.
+
+Options processed:
+
+\begin{description}
+    \termitem{snapshot}{+Snapshot}
+The \const{snapshot} option is intended for `what-if' reasoning and
+reasoning about a status in the past. \arg{Goal} is executed as
+described above, but modification inside the transaction are
+\emph{always} discarded, i.e., also if \arg{Goal} succeeds. This allows
+for goals as below, where \arg{Results} are computed based on the data
+loaded from \arg{Source} while the database as seen by other threads
+and in this thread after completion of the transaction remains
+unmodified.
+
+\begin{code}
+?- rdf_transaction(( rdf_load(Source),
+		     compute(Results)
+		   ), _,
+		   [ snapshot(true)
+		   ]).
+\end{code}
+
+\arg{Snapshot} is either the atom \const{true} or a snapshot identifier
+as provided by rdf_snapshot/1. The latter allows for going back in time.
+Snapshots on the global database can be handed to other threads.
+Snapshots created inside a transaction can only be used inside the
+transaction (and thus the thread) in which they were created.
+\end{description}
+
+    \predicate{rdf_snapshot}{-Snapshot}
+Create a snapshot of the current database. At a later point, this
+snapshot can be used run queries using this state of the database.
+Snapshots are (currently) not persistent. Note that creating a snapshot
+is a cheap operation, but triples deletes after this point in time will
+not be reclaimed before the snapshot is deleted or reclaimed by the
+garbage collector. The snapshot identifier is a special Prolog symbol,
+similar to stream and database handles. These handles can be passed
+around in Prolog, including asserting them in the Prolog dynamic
+database. Snapshot handles cannot be converted to text and back
+(e.g., using write/1 and read/1).  Thanks to these features, snapshots
+are subject to Prolog atom garbage collection.  See also
+rdf_transaction/3 and rdf_delete_snapshot/1.
+
+    \predicate{rdf_delete_snapshot}{+Snapshot}
+Explicitly make a snapshot inaccessible.  This allows the RDF garbage
+collector to reclaim triples that were deleted after the snapshot was
+created.
 
     \predicate{rdf_active_transaction}{1}{?Id}
 True if \arg{Id} is the identifier of a currently active transaction
@@ -584,18 +602,28 @@ for portable RDF load and save.
 
 \begin{description}
     \predicate{rdf_load}{1}{+InOrList}
-Load triples from \arg{In}, which is either a stream opened for reading,
-an atom specifying a filename, a URL or a list of valid inputs. This
-predicate calls process_rdf/3 to read the source one description at a
-time, avoiding limits to the size of the input. By default, this
-predicate provides for caching the results for quick-load using
-rdf_load_db/1 described below.   Caching strategy and options are
-description in \secref{rdfcache}.
+Same as \term{rdf_load}{InOrList, []}.
 
     \predicate{rdf_load}{2}{+FileOrList, +Options}
-As rdf_load/1, providing additional options.  The options are handed
-to the RDF parser and implemented by process_rdf/3.  In addition, the
-following options are provided:
+Load triples from \arg{In}, which is either a stream opened for reading,
+an atom specifying a filename, a URL or a list of valid inputs. Without
+plugins, rdf_load/2 only processes uncompressed XML/RDF from files.
+Plugins to process alternative input formats and sources are described
+in \secref{hooks}.
+
+The predicate rdf_load/2 can be called from multiple threads, loading
+multiple sources concurrently. See also concurrent/2. If rdf_load/2
+discovers that another thread is loading the same graph it suspends
+until the other thread completed the load.\bug{This behaviour is correct
+if both threads want to load into the global RDF database, but is wrong
+if the loading thread loads the data to a transaction that is not
+immediately committed.}.
+
+This predicate can be asked to maintain a cache of processed files using
+the binary format described with rdf_load_db/1. Caching strategy and
+options are description in \secref{rdfcache}.
+
+The following options are processed:
 
 \begin{description}
     \termitem{cache}{+Bool}
@@ -609,7 +637,7 @@ Deprecated.  New code should use the \term{graph}{+Graph} option.
 Specify the source format explicitly.  Normally this is deduced from
 the filename extension or the mime-type.  The core library understands
 the formats \const{xml} (RDF/XML) and \const{triples} (internal quick
-load and cache format).
+load and cache format).  See \secref{hooks}.
 
     \termitem{graph}{+Graph}
 Load the data in the given named graph.  The default is the URL of the
@@ -630,7 +658,8 @@ printed using level \const{silent}. Otherwise the level is
     \termitem{register_namespaces}{+Bool}
 If \const{true} (default \const{false}), register \verb$xmlns:ns=url$
 namespace declarations as rdf_db:ns(ns,url) namespaces if there is no
-conflict.
+conflict.  In the input format is Turtle, namespaces are registered
+based on the \const{@prefix} keyword.
 \end{description}
 
     \predicate{rdf_unload}{1}{+Spec}
@@ -1224,9 +1253,21 @@ that is about \arg{Subject}.
     \predicate{rdf_generation}{1}{-Generation}
 Returns the \arg{Generation} of the database. Each modification to the
 database increments the generation. It can be used to check the validity
-of cached results deduced from the database. Modifications changing
-multiple triples increment \arg{Generation} with the number of triples
-modified, providing a heuristic for `how dirty' cached results may be.
+of cached results deduced from the database. Committing a non-empty
+transaction increments the generation by one.\footnote{Previous versions
+incremented by the number of changes inside the transaction. The current
+approach results in smaller numbers, but provides no clue on how much
+was changed inside the transaction.  If there are good reasons to revert
+to the old numbering, this can be achieved.}
+
+When inside a tranaction, \arg{Generation} is unified to a term
+\mbox{\arg{TransactionStartGen}+\arg{InsideTransactionGen}}. I.e.,
+\verb$4+3$ means that the transaction was started at generation 4 of the
+global database and we have created 3 new generations inside the
+transaction. Note that this choice of representation allows for
+comparing generations using Prolog arithmetic. Comparing a generation in
+one transaction with a generation in another transaction is normally
+meaningless.
 
     \predicate{rdf_estimate_complexity}{4}{?Subject, ?Predicate, ?Object,
 					   -Complexity}
@@ -2303,6 +2344,46 @@ See \url{http://www.semanticweb.gr/TheaOWLLib/}.
 
 
 		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		 %     TECHNICAL BACKGROUND	%
+		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Technical background}
+
+
+		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		 %	        GC		%
+		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Understanding RDF DB memory handling}
+\label{sec:rdfgc}
+
+Removing triples from the RDF database is implemented as a three stage
+process. The thread deleting a triple simply sets the `died' generation
+of the triple to the current generation and increments the generation,
+making the triple inaccessible for new queries. A seperate thread scans
+the triple chains asynchronously. This thread is registered as a normal
+Prolog thread, named \const{__rdf_GC}. This allows for inspecting its
+activity using the Prolog thread monitor. This thread unlinks
+unreachable triples, but also unreachable rdfs:subPropertyOf entailment
+matrices from their datastructures, making them available for the last
+step: a modified version of the Boehm-Demers-Weiser conservative garbage
+collector\footnote{\url{http://www.hpl.hp.com/personal/Hans_Boehm/gc/}}
+makes the memory available for actual re-use. Using the BDWGC collector
+ensures proper behaviour if a triple is unlinked from the chains that is
+currently being scanned by another thread.
+
+The BDWGC collector is, like the SWI-Prolog atom garbage collector, a
+stop-the-world collector: they stop all known threads and do the marking
+work to identify reachable objects before restarting the world. The
+modifications prevent BDWGC from scanning the entire triple store,
+ensuring shorter service interrupts.
+
+Note that the BDWGC collector needs full control over the environment,
+which implies it must already be part of teh hosting SWI-Prolog
+environment.
+
+
+		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		 %	    VERSION 3		%
 		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -2338,10 +2419,8 @@ comitting a transaction steps the generation only by one.
 This research was supported by the following projects: MIA and
 MultimediaN project (www.multimedian.nl) funded through the BSIK
 programme of the Dutch Government, the FP-6 project HOPS of the
-European Commision.
+European Commission.
 
-The implementation of AVL trees is based on libavl by Brad Appleton.
-See the source file \file{avl.c} for details.
 
 
 		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
