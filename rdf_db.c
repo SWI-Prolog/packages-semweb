@@ -2214,8 +2214,6 @@ static int
 free_literal_value(rdf_db *db, literal *lit)
 { int rc = TRUE;
 
-  unlock_atoms_literal(lit);
-
   if ( lit->shared && !db->resetting )
   { literal_ex lex;
     literal **data;
@@ -2231,13 +2229,17 @@ free_literal_value(rdf_db *db, literal *lit)
     prepare_literal_ex(&lex);
 
     if ( (data=skiplist_delete(&db->literals, &lex)) )
-    { PL_linger(data);				/* someone else may be reading */
+    { unlock_atoms_literal(lit);
+
+      PL_linger(data);				/* someone else may be reading */
     } else
     { Sdprintf("Failed to delete %p (size=%ld): ", lit, db->literals.count);
       print_literal(lit);
       Sdprintf("\n");
       assert(0);
     }
+  } else
+  { unlock_atoms_literal(lit);
   }
 
   if ( lit->objtype == OBJ_TERM &&
