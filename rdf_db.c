@@ -2252,6 +2252,14 @@ free_literal_value(rdf_db *db, literal *lit)
 }
 
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+free_literal() frees a literal, normally referenced   from a triple. The
+triple may be shared or not. Triples that   are part of the database are
+always shared. Unshared  triples  are   typically  search  patterns,  or
+created triples that are deleted  because   some  part  of the operation
+fails.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 static int
 free_literal(rdf_db *db, literal *lit)
 { int rc = TRUE;
@@ -2458,6 +2466,10 @@ Called from link_triple(), which implies we hold write.lock.
 (*) Typically, the from literal  is   a  new literal. rdf_update/4,5 and
 triple reindexing however may cause link_triple()   to be called with an
 already shared literal.
+
+TBD:	broadcast happens with write.lock held.  Would be nice to move
+	this out of the lock to reduce the risc for deadlock and improve
+	concurrency.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static literal *
@@ -3187,6 +3199,16 @@ new_triple(rdf_db *db)
   return t;
 }
 
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+free_triple() is called in  two  scenarios.   One  is  from  the garbage
+collector after a triple is deleted from   all hash chains. In this case
+the linger argument is TRUE and  the   next-pointers  of the triples are
+still in place because search may be   scanning  the triple. See alloc.c
+for details on the triple memory management. The second case is deletion
+of temporary triples, something that may   happen  from many threads. In
+either case, this is typically called unlocked.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static void
 free_triple(rdf_db *db, triple *t, int linger)
