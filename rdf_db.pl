@@ -1,11 +1,9 @@
-/*  $Id$
-
-    Part of SWI-Prolog
+/*  Part of SWI-Prolog
 
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@cs.vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 1985-2010, University of Amsterdam
+    Copyright (C): 1985-2012, University of Amsterdam
 			      VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
@@ -669,13 +667,32 @@ rdf_source_location(Subject, Source) :-
 		 *	 GARBAGE COLLECT	*
 		 *******************************/
 
+%%	rdf_create_gc_thread
+%
+%	Create the garbage collection thread.
+
+:- public
+	rdf_create_gc_thread/0.
+
+rdf_create_gc_thread :-
+	thread_create(rdf_gc_loop, _,
+		      [ alias('__rdf_GC')
+		      ]).
+
 %%	rdf_gc_loop
 %
 %	Take care of running the RDF garbage collection.  This predicate
 %	is called from a thread started by creating the RDF DB.
 
 rdf_gc_loop :-
-	rdf_gc_loop(0).
+	catch(rdf_gc_loop(0), E, recover_gc(E)).
+
+recover_gc('$aborted') :- !,
+	thread_self(Me),
+	thread_detach(Me).
+recover_gc(Error) :-
+	print_message(error, Error),
+	rdf_gc_loop.
 
 rdf_gc_loop(CPU) :-
 	(   consider_gc(CPU)
