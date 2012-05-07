@@ -68,7 +68,7 @@ alloc_triple(void)
 
   t = GC_generic_malloc(sizeof(*t), triple_kind);
   if ( t )
-    GC_set_flags(t, GC_FLAG_UNCOLLECTABLE);
+    GC_SET_FLAGS(t, GC_FLAG_UNCOLLECTABLE);
 
   return t;
 }
@@ -82,7 +82,7 @@ unalloc_triple(triple *t, int linger)
     if ( linger )
     { t->lingering = TRUE;
       t->line = LINE_LINGER_MAGIC;
-      GC_clear_flags(t, GC_FLAG_UNCOLLECTABLE);
+      GC_CLEAR_FLAGS(t, GC_FLAG_UNCOLLECTABLE);
     } else
       GC_FREE(t);
   }
