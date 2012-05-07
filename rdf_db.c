@@ -2215,8 +2215,6 @@ static int
 free_literal_value(rdf_db *db, literal *lit)
 { int rc = TRUE;
 
-  unlock_atoms_literal(lit);
-
   if ( lit->shared && !db->resetting )
   { literal_ex lex;
     literal **data;
@@ -2232,13 +2230,17 @@ free_literal_value(rdf_db *db, literal *lit)
     prepare_literal_ex(&lex);
 
     if ( (data=skiplist_delete(&db->literals, &lex)) )
-    { PL_linger(data);				/* someone else may be reading */
+    { unlock_atoms_literal(lit);
+
+      PL_linger(data);				/* someone else may be reading */
     } else
     { Sdprintf("Failed to delete %p (size=%ld): ", lit, db->literals.count);
       print_literal(lit);
       Sdprintf("\n");
       assert(0);
     }
+  } else
+  { unlock_atoms_literal(lit);
   }
 
   if ( lit->objtype == OBJ_TERM &&
@@ -2252,6 +2254,14 @@ free_literal_value(rdf_db *db, literal *lit)
   return rc;
 }
 
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+free_literal() frees a literal, normally referenced   from a triple. The
+triple may be shared or not. Triples that   are part of the database are
+always shared. Unshared  triples  are   typically  search  patterns,  or
+created triples that are deleted  because   some  part  of the operation
+fails.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static int
 free_literal(rdf_db *db, literal *lit)
@@ -2459,6 +2469,10 @@ Called from link_triple(), which implies we hold write.lock.
 (*) Typically, the from literal  is   a  new literal. rdf_update/4,5 and
 triple reindexing however may cause link_triple()   to be called with an
 already shared literal.
+
+TBD:	broadcast happens with write.lock held.  Would be nice to move
+	this out of the lock to reduce the risc for deadlock and improve
+	concurrency.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static literal *
@@ -3100,44 +3114,10 @@ rdf_gc_info(term_t info)
 		 *	      GC THREAD		*
 		 *******************************/
 
-/* gc_thread() runs the RDF-DB garbage collection thread.
-
-   FIXME: Reloading can cause the predicate to be undefined.  Can
-   we fix this globally by suspending if an undefined predicate is
-   called in a module that is being loaded?
-*/
-
-static void *
-gc_thread(void *data)
-{ rdf_db *db = data;
-  PL_thread_attr_t attr;
-  int tid;
-
-  (void)db;					/* we do not need this */
-
-  memset(&attr, 0, sizeof(attr));
-  attr.alias = "__rdf_GC";
-
-  if ( (tid=PL_thread_attach_engine(&attr)) < 0 )
-  { Sdprintf("Failed to create RDF garbage collection thread\n");
-    return NULL;
-  }
-
-  PL_call_predicate(NULL, PL_Q_NORMAL,
-		    PL_predicate("rdf_gc_loop", 0, "rdf_db"), 0);
-
-  PL_thread_destroy_engine();
-
-  return NULL;
-}
-
-
-
 static int
 rdf_create_gc_thread(rdf_db *db)
-{ pthread_t tid;
-
-  pthread_create(&tid, NULL, gc_thread, (void*)db);
+{ PL_call_predicate(NULL, PL_Q_NORMAL,
+		    PL_predicate("rdf_create_gc_thread", 0, "rdf_db"), 0);
 
   return TRUE;
 }
@@ -3188,6 +3168,16 @@ new_triple(rdf_db *db)
   return t;
 }
 
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+free_triple() is called in  two  scenarios.   One  is  from  the garbage
+collector after a triple is deleted from   all hash chains. In this case
+the linger argument is TRUE and  the   next-pointers  of the triples are
+still in place because search may be   scanning  the triple. See alloc.c
+for details on the triple memory management. The second case is deletion
+of temporary triples, something that may   happen  from many threads. In
+either case, this is typically called unlocked.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static void
 free_triple(rdf_db *db, triple *t, int linger)
@@ -5258,7 +5248,11 @@ mark_duplicate(rdf_db *db, triple *t, query *q)
 
   init_triple_walker(&tw, db, t, indexed);
   while((d=next_triple(&tw)) && d != t)
-  { if ( !(d=alive_triple(q, d)) )		/* does that make sense? */
+  { d = deref_triple(d);
+    DEBUG(3, Sdprintf("Possible duplicate: ");
+	     print_triple(d, PRT_NL|PRT_ADR));
+
+    if ( !overlap_lifespan(&d->lifespan, &t->lifespan) )
       continue;
 
     if ( match_triples(db, d, t, q, MATCH_DUPLICATE) )

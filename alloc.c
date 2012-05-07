@@ -60,13 +60,15 @@ deleted data, this is unlikely to become an issue.
 static void **triple_free_list;
 static unsigned triple_kind;
 
+#define LINE_LINGER_MAGIC 30203020
+
 triple *
 alloc_triple(void)
 { triple *t;
 
   t = GC_generic_malloc(sizeof(*t), triple_kind);
   if ( t )
-    GC_set_flags(t, GC_FLAG_UNCOLLECTABLE);
+    GC_SET_FLAGS(t, GC_FLAG_UNCOLLECTABLE);
 
   return t;
 }
@@ -79,7 +81,8 @@ unalloc_triple(triple *t, int linger)
 
     if ( linger )
     { t->lingering = TRUE;
-      GC_clear_flags(t, GC_FLAG_UNCOLLECTABLE);
+      t->line = LINE_LINGER_MAGIC;
+      GC_CLEAR_FLAGS(t, GC_FLAG_UNCOLLECTABLE);
     } else
       GC_FREE(t);
   }
@@ -136,6 +139,8 @@ mark_triple(GC_word *addr,
     }
     return mark_stack_ptr;
   }
+
+  assert(t->line == LINE_LINGER_MAGIC);
 
   for(i=0; i<INDEX_TABLES; i++)
     mark_triple_next(t, i);

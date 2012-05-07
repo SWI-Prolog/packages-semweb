@@ -42,6 +42,8 @@
       - Flag them as invalid by setting died to GEN_PREHIST?	[OK]
     - Implement matrix-GC.					[OK]
 
+  * Ordering of literal values should be based on SPARQL literal ordering.
+
 ================
 Issues
 ================

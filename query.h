@@ -188,6 +188,17 @@ alive_triple(query *q, triple *t)
   return alive_lifespan(q, &t->lifespan) ? t : (triple*)NULL;
 }
 
+
+static inline int
+overlap_lifespan(lifespan *l1, lifespan *l2)
+{ if ( l1->died < l2->born ||		/* l1 entirely before l2 */
+       l2->died < l1->born )		/* l2 entirely before l1 */
+    return FALSE;
+
+  return TRUE;
+}
+
+
 static inline gen_t
 queryWriteGen(query *q)
 { if ( q->transaction )
