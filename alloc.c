@@ -102,6 +102,20 @@ mark_triple_next(triple *t, int icol)
 }
 
 
+static void
+mark_triple_reindex(triple *t)
+{ triple *p, *e, *n;
+
+  for(e=t; e && !e->lingering; e=e->reindexed)
+    ;
+  for(p=t; p && !p->lingering; p=n)
+  { n = p->reindexed;
+    p->reindexed = e;
+  }
+}
+
+
+
 /* From gc_mark.h: */
   /* WARNING: Such a mark procedure may be invoked on an unused object    */
   /* residing on a free list.  Such objects are cleared, except for a     */
@@ -144,6 +158,7 @@ mark_triple(GC_word *addr,
 
   for(i=0; i<INDEX_TABLES; i++)
     mark_triple_next(t, i);
+  mark_triple_reindex(t);
 
   mark_stack_ptr = GC_MARK_AND_PUSH(t->predicate.r,
 				    mark_stack_ptr, mark_stack_limit,
