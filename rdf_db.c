@@ -2744,7 +2744,7 @@ will ignore this for now: triple ordering has no semantics.
 
 static void
 reindex_triple(rdf_db *db, triple *t)
-{ triple *t2 = rdf_malloc(db, sizeof(*t));
+{ triple *t2 = alloc_triple();
 
   *t2 = *t;
   memset(&t2->tp, 0, sizeof(t2->tp));
