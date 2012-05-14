@@ -944,7 +944,7 @@ generally the number of predicates is still small compared to the number
 of triples and thus the total cost in the GC process will be small.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-static void
+static int
 gc_clouds(rdf_db *db, gen_t gen)
 { int i;
   int gc_id = db->gc.count+1;
@@ -957,10 +957,14 @@ gc_clouds(rdf_db *db, gen_t gen)
       { p->cloud->last_gc = gc_id;
 
 	gc_cloud(db, p->cloud, gen);
+	if ( PL_handle_signals() < 0 )
+	  return -1;
       }
       gc_is_leaf(db, p, gen);
     }
   }
+
+  return 0;
 }
 
 
@@ -2808,10 +2812,13 @@ optimize_triple_hash(rdf_db *db, int icol, gen_t gen)
 static int
 optimize_triple_hashes(rdf_db *db, gen_t gen)
 { int icol;
-  int optimized = FALSE;
+  int optimized = 0;
 
   for(icol=1; icol<INDEX_TABLES; icol++)
-    optimized += optimize_triple_hash(db, icol, gen);
+  { optimized += optimize_triple_hash(db, icol, gen);
+    if ( PL_handle_signals() < 0 )
+      return -1;
+  }
 
   return optimized;			/* # hashes optimized */
 }
@@ -2950,12 +2957,17 @@ gc_hash(rdf_db *db, int icol, gen_t gen, gen_t reindex_gen)
 }
 
 
-static void
+static int
 gc_hashes(rdf_db *db, gen_t gen, gen_t reindex_gen)
 { int icol;
 
   for(icol=0; icol<INDEX_TABLES; icol++)
-    gc_hash(db, icol, gen, reindex_gen);
+  { gc_hash(db, icol, gen, reindex_gen);
+    if ( PL_handle_signals() < 0 )
+      return -1;
+  }
+
+  return 0;
 }
 
 
@@ -2983,21 +2995,25 @@ gc_clear_busy(rdf_db *db)
 static int
 gc_db(rdf_db *db, gen_t gen, gen_t reindex_gen)
 { char buf[64];
+  int rc = FALSE;
 
   if ( !gc_set_busy(db) )
     return FALSE;
   simpleMutexLock(&db->locks.gc);
   DEBUG(10, Sdprintf("RDF GC; gen = %s\n", gen_name(gen, buf)));
-  optimize_triple_hashes(db, gen);
-  gc_hashes(db, gen, reindex_gen);
-  gc_clouds(db, gen);
+  if ( optimize_triple_hashes(db, gen) < 0 ||
+       gc_hashes(db, gen, reindex_gen) < 0 ||
+       gc_clouds(db, gen) < 0 )
+    goto out;
   db->gc.count++;
   db->gc.last_gen = gen;
   db->gc.last_reindex_gen = reindex_gen;
+  rc = TRUE;
+out:
   gc_clear_busy(db);
   simpleMutexUnlock(&db->locks.gc);
 
-  return TRUE;
+  return rc;
 }
 
 
