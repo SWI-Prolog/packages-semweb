@@ -1237,7 +1237,10 @@ check_labels_predicate_cloud(predicate_cloud *cloud)
 static void
 update_valid(lifespan *valid, gen_t change)
 { if ( change < valid->died )
-    valid->died = change;
+  { if ( valid->died <= GEN_MAX ||	/* both non-transaction */
+	 change > GEN_MAX )		/* both in transaction */
+      valid->died = change;
+  }
 }
 
 
