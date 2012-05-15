@@ -2434,15 +2434,48 @@ compare_literals(literal_ex *lex, literal *l2)
   }
 }
 
+#ifdef SL_CHECK
+static int sl_checking = FALSE;
+#endif
 
 static int
 sl_compare_literals(void *p1, void *p2, void *cd)
-{ literal_ex *lex = p1;
-  literal *l2 = *(literal**)p2;
+{ literal *l2 = *(literal**)p2;
   (void)cd;
 
-  return compare_literals(lex, l2);
+#ifdef SL_CHECK
+  if ( sl_checking )
+  { literal *l1 = *(literal**)p1;
+    literal_ex lex;
+
+    lex.literal = l1;
+    prepare_literal_ex(&lex);
+    return compare_literals(&lex, l2);
+  } else
+#endif
+  { literal_ex *lex = p1;
+
+    return compare_literals(lex, l2);
+  }
 }
+
+
+#ifdef SL_CHECK
+static int
+sl_check(rdf_db *db, int print)
+{ int rc = TRUE;
+
+  DEBUG(2, { assert(sl_checking == FALSE);
+	     sl_checking = TRUE;
+	     rc = skiplist_check(&db->literals, print);
+	     sl_checking = FALSE;
+	   });
+
+  return rc;
+}
+#else
+#define sl_check(db, print) (void)0
+#endif
 
 
 static void *
@@ -2499,7 +2532,9 @@ share_literal(rdf_db *db, literal *from)
   lex.literal = from;
   prepare_literal_ex(&lex);
 
+  sl_check(db, FALSE);
   data = skiplist_insert(&db->literals, &lex, &is_new);
+  sl_check(db, FALSE);
 
   if ( !is_new )
   { literal *l2 = *data;
@@ -2521,6 +2556,7 @@ share_literal(rdf_db *db, literal *from)
 	  Sdprintf("\n"));
 
     assert(from->references==1);
+    assert(from->atoms_locked==1);
     from->shared = TRUE;
     rdf_broadcast(EV_NEW_LITERAL, from, NULL);
     return from;
@@ -4710,7 +4746,8 @@ unlock_atoms(rdf_db *db, triple *t)
 
     unregister_resource(&db->resources, t->subject);
     if ( t->object_is_literal )
-    { unlock_atoms_literal(t->object.literal);
+    { if ( !t->object.literal->shared )
+	unlock_atoms_literal(t->object.literal);
     } else
     { unregister_resource(&db->resources, t->object.resource);
     }
