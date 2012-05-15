@@ -2194,7 +2194,10 @@ rdf_unset_graph_source(term_t graph_name)
 
 static inline void
 prepare_literal_ex(literal_ex *lex)
-{ SECURE(lex->magic = LITERAL_EX_MAGIC);
+{
+#ifdef LITERAL_EX_MAGIC
+  lex->magic = LITERAL_EX_MAGIC;
+#endif
 
   if ( lex->literal->objtype == OBJ_STRING )
   { lex->atom.handle = lex->literal->value.string;
@@ -2374,7 +2377,9 @@ static int
 compare_literals(literal_ex *lex, literal *l2)
 { literal *l1 = lex->literal;
 
-  SECURE(assert(lex->magic == LITERAL_EX_MAGIC));
+#ifdef LITERAL_EX_MAGIC
+  assert(lex->magic == LITERAL_EX_MAGIC);
+#endif
 
   if ( l1->objtype == l2->objtype )
   { int rc;

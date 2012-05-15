@@ -412,7 +412,7 @@ typedef struct rdf_db
 typedef struct literal_ex
 { literal  *literal;			/* the real literal */
   atom_info atom;			/* prepared info on value */
-#ifdef O_SECURE
+#ifdef LITERAL_EX_MAGIC
   long	    magic;
 #endif
 } literal_ex;
