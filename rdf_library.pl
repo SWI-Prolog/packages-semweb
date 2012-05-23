@@ -1,11 +1,9 @@
-/*  $Id$
-
-    Part of SWI-Prolog
+/*  Part of SWI-Prolog
 
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2007-2011, University of Amsterdam
+    Copyright (C): 2007-2012, University of Amsterdam
 			      VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
@@ -342,15 +340,16 @@ dry_load(Id, Level, Options) :-
 	->  merge_base_uri(Facets, Options, Options1),
 	    merge_source(Facets, Options1, Options2),
 	    merge_blanks(Facets, Options2, Options3),
+	    merge_format(Facets, Options3, Options4),
 	    (   \+ memberchk(virtual, Facets)
-	    ->  load_options(Options3, File, RdfOptions),
+	    ->  load_options(Options4, File, RdfOptions),
 		assert(command(Level, rdf_load(File, RdfOptions)))
 	    ;	assert(command(Level, virtual(File)))
 	    ),
 	    (	option(import(true), Options, true)
 	    ->	Level1 is Level + 1,
-	        forall(member(imports(_, Import), Facets),
-		       import(Import, Level1, Options3))
+		forall(member(imports(Type, Import), Facets),
+		       import(Import, Level1, [type(Type)|Options4]))
 	    ;	true
 	    )
 	;   existence_error(ontology, Id)
@@ -377,6 +376,13 @@ merge_blanks(Facets, Options0, Options) :-
 	;   Options = Options0
 	).
 
+merge_format(Facets, Options0, Options) :-
+	(   option(format(Format), Facets)
+	->  exclude(name_option(format), Options0, Options1),
+	    Options = [format(Format)|Options1]
+	;   Options = Options0
+	).
+
 name_option(Name, Term) :-
 	functor(Term, Name, 1).
 
@@ -397,9 +403,15 @@ load_option(Options, File, base_uri(BaseURI)) :-
 	atom_concat(Base0, File, BaseURI).
 load_option(Options, _File, blank_nodes(Share)) :-
 	option(blank_nodes(Share), Options).
+load_option(Options, _File, format(Format)) :-
+	option(format(Format), Options).
 
 %%	import(+URL, +Level, +Options) is det.
 
+import(Path, Level, Options) :-
+	option(type(data_dump), Options), !,
+	load_options(Options, Path, RdfOptions),
+	assert(command(Level, rdf_load(Path, RdfOptions))).
 import(Path, Level, Options) :-
 	(   (   library(Id, Path, _)
 	    ->	true
@@ -543,6 +555,11 @@ plain_string(lang(_, String), String) :- !.
 %		Share is one of =share= or =noshare=.  Default is to
 %		share.
 %
+%		* format(Format)
+%		Format of the resource.  Can be used to overrule
+%		if the format as derived from the HTTP content type
+%		is wrong.
+%
 %		* provides_ns(URL)
 %		Ontology provides definitions in the namespace URL.
 %		The formal definition of this is troublesome, but in
@@ -651,12 +668,15 @@ hidden_base('cvs').			% Windows
 %	@param	Location is either a path name or a URL.
 
 process_manifest(Source) :-
-	(   uri_file_name(Source, Manifest0)
-	->  absolute_file_name(Manifest0, ManifestFile)
-	;   absolute_file_name(Source, ManifestFile)
-	),				% Manifest is a canonical filename
-	uri_file_name(Manifest, ManifestFile),
-	source_time(ManifestFile, MT),
+	(   web_url(Source)
+	->  uri_normalized(Source, Manifest)
+	;   uri_file_name(Source, Manifest0)
+	->  absolute_file_name(Manifest0, ManifestFile),
+	    uri_file_name(Manifest, ManifestFile)
+	;   absolute_file_name(Source, ManifestFile),
+	    uri_file_name(Manifest, ManifestFile)
+	),				% Manifest is a canonical URI
+	source_time(Manifest, MT),
 	(   manifest(Manifest, Time),
 	    (	MT =< Time
 	    ->  !
@@ -666,7 +686,7 @@ process_manifest(Source) :-
 		retractall(library_db(Id, URL, Facets)),
 		fail
 	    )
-	;   read_triples(ManifestFile, Triples),
+	;   read_triples(Manifest, Triples),
 	    process_triples(Manifest, Triples),
 	    print_message(informational, rdf(manifest(loaded, Manifest))),
 	    assert(manifest(Manifest, MT))
@@ -702,8 +722,20 @@ extract_ontology(Triples, library(Name, URL, Options)) :-
 	(   ontology_type(Type)
 	->  file_base_name(URL, BaseName),
 	    file_name_extension(Name, _, BaseName),
-	    findall(Facet, facet(Triples, URL, Facet), Options)
+	    findall(Facet, facet(Triples, URL, Facet), Options0),
+	    sort(Options0, Options1),
+	    keep_specialized_facets(Options1, Options)
 	).
+
+keep_specialized_facets(All, Special) :-
+	exclude(more_general(All), All, Special).
+
+more_general(All, Facet) :-
+	generalized(Facet, Special),
+	memberchk(Special, All).
+
+generalized(imports(ontology, Path), imports(Other, Path)) :-
+	dif(Other, ontology).
 
 ontology_type(X) :-
 	(   rdf_equal(X, lib:'Ontology')
@@ -728,6 +760,8 @@ facet(Triples, File, base_uri(BaseURI)) :-
 	edge(Triples, File, lib:baseURI, BaseURI).
 facet(Triples, File, claimed_source(Source)) :-
 	edge(Triples, File, lib:source, Source).
+facet(Triples, File, format(Format)) :-
+	edge(Triples, File, lib:format, literal(Format)).
 facet(Triples, File, blank_nodes(Mode)) :-
 	edge(Triples, File, lib:blankNodes, literal(Mode)),
 	must_be(oneof([share,noshare]), Mode).
@@ -777,11 +811,10 @@ sub_p(Sub, P) :-
 :- rdf_meta
 	sub_property_of(r,r).
 
-sub_property_of(void:subset, owl:imports).
+sub_property_of(void:subset,	     owl:imports).
 sub_property_of(dcterms:description, rdfs:comment).
-sub_property_of(void:subset, owl:imports).
-sub_property_of(void:dataDump, owl:imports).
-sub_property_of(dc:title, dcterms:title).
+sub_property_of(void:dataDump,	     owl:imports).
+sub_property_of(dc:title,	     dcterms:title).
 
 %%	source_time(+Source, -Modified) is semidet.
 %
@@ -790,7 +823,7 @@ sub_property_of(dc:title, dcterms:title).
 %	@error	existence_error(Type, Source).
 
 source_time(URL, Modified) :-
-	sub_atom(URL, 0, _, _, 'http://'), !,
+	web_url(URL), !,
 	http_open(URL, Stream,
 		  [ header(last_modified, Date),
 		    method(head)
@@ -804,17 +837,32 @@ source_time(URL, Modified) :-
 source_time(File, Modified) :-
 	time_file(File, Modified).
 
+web_url(URL) :-
+	sub_atom(URL, 0, _, _, 'http://').
 
-%%	read_triples(+File, -Triples) is det.
+
+%%	read_triples(+URL, -Triples) is det.
 %
 %	Read RDF/XML or Turtle file into a list of triples.
 
-read_triples(File, Triples) :-
-	file_name_extension(_, rdf, File), !,
-	load_rdf(File, Triples).
-read_triples(File, Triples) :-
-	file_name_extension(_, ttl, File), !,
-	rdf_load_turtle(File, Triples, []).
+read_triples(FileURL, Triples) :-
+	uri_file_name(FileURL, File), !,
+	(   file_name_extension(_, rdf, File)
+	->  load_rdf(File, Triples)
+	;   rdf_load_turtle(File, Triples, [])
+	).
+read_triples(HTTPURL, Triples) :-
+	file_name_extension(_, Ext, HTTPURL),
+	setup_call_cleanup(
+	    http_open(HTTPURL, In, []),
+	    stream_triples(In, Ext, Triples),
+	    close(In)).
+
+stream_triples(Stream, rdf, Triples) :-
+	load_rdf(stream(Stream), Triples).
+stream_triples(Stream, ttl, Triples) :-
+	rdf_load_turtle(stream(Stream), Triples, []).
+
 
 manifest_file('void').			% make order optional?
 manifest_file('Manifest').
