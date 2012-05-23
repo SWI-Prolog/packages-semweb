@@ -34,7 +34,7 @@
 :- module(rdf_http_plugin, []).
 :- use_module(library(http/http_open)).
 :- use_module(library(http/http_header)).
-:- use_module(library(semweb/rdf_db)).
+:- use_module(library(semweb/rdf_db), []). % we define hooks for this
 :- use_module(library(date)).
 :- use_module(library(error)).
 

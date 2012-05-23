@@ -2528,9 +2528,9 @@ source(SourceURL) -->
 	{ uri_file_name(SourceURL, File), !,
 	  file_base_name(File, Base)	% TBD: relative file?
 	},
-	[ ' "~p"'-[Base] ].
+	[ ' "~w"'-[Base] ].
 source(SourceURL) -->
-	[ ' "~p"'-[SourceURL] ].
+	[ ' "~w"'-[SourceURL] ].
 
 into(_, _) --> [].			% TBD
 
