@@ -2040,10 +2040,30 @@ typedef struct enum_graph
   int i;
 } enum_graph;
 
+
+static graph *
+advance_graph_enum(rdf_db *db, enum_graph *eg)
+{ if ( eg->g )
+    eg->g = eg->g->next;
+
+  while ( !eg->g || eg->g->triple_count == 0 )
+  { if ( !eg->g )
+    { while ( ++eg->i < db->graphs.bucket_count &&
+	      !(eg->g = db->graphs.blocks[MSB(eg->i)][eg->i]) )
+	;
+      if ( !eg->g )
+	return NULL;
+    } else
+      eg->g = eg->g->next;
+  }
+
+  return eg->g;
+}
+
+
 static foreign_t
 rdf_graph(term_t name, control_t h)
 { rdf_db *db = rdf_current_db();
-  graph *g;
   enum_graph *eg;
   atom_t a;
 
@@ -2051,8 +2071,9 @@ rdf_graph(term_t name, control_t h)
   { case PL_FIRST_CALL:
       if ( PL_is_variable(name) )
       { eg = rdf_malloc(db, sizeof(*eg));
-	eg->i  = 0;
+	eg->i  = -1;
 	eg->g  = NULL;
+	advance_graph_enum(db, eg);
 	goto next;
       } else if ( PL_get_atom_ex(name, &a) )
       { graph *g;
@@ -2075,25 +2096,17 @@ rdf_graph(term_t name, control_t h)
   }
 
 next:
-  if ( !(g=eg->g) )
-  { while ( !(g = db->graphs.blocks[MSB(eg->i)][eg->i]) ||
-	    g->triple_count == 0 )
-    { if ( ++eg->i >= db->graphs.bucket_count )
-	goto fail;
-    }
-  }
-
-  if ( !PL_unify_atom(name, g->name) )
-  { fail:
-    rdf_free(db, eg, sizeof(*eg));
+  if ( !eg->g || !PL_unify_atom(name, eg->g->name) )
+  { rdf_free(db, eg, sizeof(*eg));
     return FALSE;
   }
 
-  if ( !(eg->g = g->next) )
-  { if ( ++eg->i >= db->graphs.bucket_count )
-      goto fail;
+  if ( advance_graph_enum(db, eg) )
+  { PL_retry_address(eg);
+  } else
+  { rdf_free(db, eg, sizeof(*eg));
+    return TRUE;
   }
-  PL_retry_address(eg);
 }
 
 
