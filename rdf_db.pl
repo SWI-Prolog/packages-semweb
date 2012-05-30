@@ -524,6 +524,7 @@ mk_global(NS:Local, Global) :-
 	rdf_source_location(r,-),
 	rdf_resource(r),
 	rdf_subject(r),
+	rdf_graph(r),
 	rdf_set_predicate(r, t),
 	rdf_predicate_property(r, -),
 	rdf_estimate_complexity(r,r,r,-),
