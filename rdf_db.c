@@ -3456,13 +3456,6 @@ destroy_triple_walker(rdf_db *db, triple_walker *tw)
 }
 
 
-static void
-set_next_triple(triple_walker *tw, triple *t)
-{ tw->current = t;
-}
-
-
-
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 by_inverse[] returns the index key to use   for inverse search as needed
 to realise symmetric and inverse predicates.
@@ -5873,7 +5866,7 @@ next_pattern(search_state *state)
 
 static int
 next_search_state(search_state *state)
-{ triple *t;
+{ triple *t, *t2;
   triple_walker *tw = &state->cursor;
   triple *p = &state->pattern;
   term_t retpred;
@@ -5888,16 +5881,20 @@ next_search_state(search_state *state)
   { retpred = state->predicate;
   }
 
+  if ( (t2=state->prefetched) )
+  { state->prefetched = NULL;		/* retrying; to need to check */
+    goto retry;
+  }
+
   do
   { while( (t = next_triple(tw)) )
-    { triple *t2;
-
-      DEBUG(3, Sdprintf("Search: ");
+    { DEBUG(3, Sdprintf("Search: ");
 	       print_triple(t, PRT_SRC|PRT_GEN|PRT_NL|PRT_ADR));
 
       if ( (t2=is_candidate(state, t)) )
       { int rc;
 
+      retry:
 	if ( (rc=unify_triple(state->subject, retpred, state->object,
 			      state->src, t2, p->inversed)) == FALSE )
 	  continue;
@@ -5909,8 +5906,8 @@ next_search_state(search_state *state)
 	  { DEBUG(3, Sdprintf("Search (prefetch): ");
 		  print_triple(t, PRT_SRC|PRT_GEN|PRT_NL|PRT_ADR));
 
-	    if ( is_candidate(state, t) )
-	    { set_next_triple(tw, t);
+	    if ( (t2=is_candidate(state, t)) )
+	    { state->prefetched = t2;
 
 	      return TRUE;		/* non-deterministic */
 	    }
@@ -5963,7 +5960,7 @@ rdf(term_t subject, term_t predicate, term_t object,
 
     search:
       if ( (rc=next_search_state(state)) )
-      { if ( state->cursor.current || state->has_literal_state )
+      { if ( state->prefetched )
 	  return allow_retry_state(state);
       }
 

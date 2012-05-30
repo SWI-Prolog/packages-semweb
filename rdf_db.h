@@ -440,6 +440,7 @@ typedef struct search_state
   int		alt_hash_cursor;	/* Index in alternative hashes */
   triple	pattern;		/* Pattern triple */
   triple	saved_pattern;		/* For inverse */
+  triple       *prefetched;		/* Prefetched triple (retry) */
   triple_buffer	dup_answers;		/* possible duplicate answers */
 } search_state;
 
