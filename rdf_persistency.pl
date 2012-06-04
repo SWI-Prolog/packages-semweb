@@ -44,7 +44,6 @@
 :- use_module(library(error)).
 :- use_module(library(thread)).
 :- use_module(library(pairs)).
-:- use_module(library(time)).
 
 
 /** <module> RDF persistency plugin
@@ -284,10 +283,7 @@ make_goals([DB|T0], Silent, I,  Total,
 
 verbosity(_DBCount, Silent) :-
 	rdf_option(silent(Silent)), !.
-verbosity(DBCount, Silent) :-
-	DBCount > 25, !,
-	Silent = brief.
-verbosity(_DBCount, false).
+verbosity(_DBCount, brief).
 
 
 %%	concurrency(-Jobs)
