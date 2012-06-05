@@ -696,14 +696,13 @@ recover_gc(Error) :-
 	rdf_gc_loop.
 
 rdf_gc_loop(CPU) :-
+	repeat,
 	(   consider_gc(CPU)
 	->  rdf_gc(CPU1),
-	    sleep(CPU1),
-	    rdf_gc_loop(CPU1)
-	;   garbage_collect,
-	    sleep(0.1),
-	    rdf_gc_loop(CPU)
-	).
+	    sleep(CPU1)
+	;   sleep(0.1)
+	),
+	fail.
 
 %%	rdf_gc(-CPU) is det.
 %
