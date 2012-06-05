@@ -59,7 +59,7 @@ being flexible to ordering of tokens.
 	exclude_from_index/2.		% +Which, +Token
 
 
-setting(verbose(true)).			% print progress messages
+setting(verbose(false)).		% print progress messages
 setting(index_threads(1)).		% # threads for creating the index
 setting(index(default)).		% Use a thread for incremental updates
 
