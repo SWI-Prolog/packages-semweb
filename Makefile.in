@@ -34,9 +34,9 @@ RDFDBOBJ=	rdf_db.o atom.o md5.o atom_map.o debug.o alloc.o \
 all:		$(TARGETS)
 
 rdf_db.@SO@:	$(RDFDBOBJ)
-		$(LD) $(LDSOFLAGS) -o $@ $(RDFDBOBJ) $(LIBS)
+		$(LD) $(LDSOFLAGS) -o $@ $(RDFDBOBJ) $(LIBS) $(LIBPLSO)
 turtle.@SO@:	turtle.o
-		$(LD) $(LDSOFLAGS) -o $@ turtle.o $(LIBS)
+		$(LD) $(LDSOFLAGS) -o $@ turtle.o $(LIBS) $(LIBPLSO)
 
 turtle.o:	turtle.c turtle_chars.c
 
