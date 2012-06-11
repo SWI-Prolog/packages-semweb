@@ -70,6 +70,7 @@
 
 	    rdf_is_resource/1,		% +Term
 	    rdf_is_literal/1,		% +Term
+	    rdf_literal_value/2,	% +Term, -Value
 
 	    rdf_load/1,			% +File
 	    rdf_load/2,			% +File, +Options
@@ -648,6 +649,60 @@ rdf_is_resource(Term) :-
 
 rdf_is_literal(literal(Value)) :-
 	ground(Value).
+
+		 /*******************************
+		 *	       LITERALS		*
+		 *******************************/
+
+%%	rdf_literal_value(+Literal, -Value) is semidet.
+%
+%	True when value is  the   appropriate  Prolog  representation of
+%	Literal in the RDF _|value space|_.  Current mapping:
+%
+%	  | Plain literals		| Atom			  |
+%	  | Language tagged literal	| Atom holding plain text |
+%	  | xsd:string			| Atom			  |
+%	  | rdf:XMLLiteral		| XML DOM Tree		  |
+%	  | Numeric XSD type		| Number		  |
+%
+%	@tbd	Well, this is the long-term idea.
+%	@tbd	Add mode (-,+)
+
+:- rdf_meta
+	typed_value(r, +, -).
+
+rdf_literal_value(literal(String), Value) :-
+	atom(String), !,
+	Value = String.
+rdf_literal_value(literal(lang(_Lang, String)), String).
+rdf_literal_value(literal(type(Type, String)), Value) :-
+	typed_value(Type, String, Value).
+
+typed_value(Numeric, String, Value) :-
+	xsdp_numeric_uri(Numeric, NumType), !,
+	numeric_value(NumType, String, Value).
+typed_value(xsd:string, String, String).
+typed_value(rdf:'XMLLiteral', Value, DOM) :-
+	(   atom(Value)
+	->  setup_call_cleanup(
+		( atom_to_memory_file(Value, MF),
+		  open_memory_file(MF, read, In, [free_on_close(true)])
+		),
+		load_structure(stream(In), DOM, [dialect(xml)]),
+		close(In))
+	;   DOM = Value
+	).
+numeric_value(integer, String, Value) :-
+	atom_number(String, Value),
+	integer(Value).
+numeric_value(float, String, Value) :-
+	atom_number(String, Number),
+	Value is float(Number).
+numeric_value(double, String, Value) :-
+	atom_number(String, Number),
+	Value is float(Number).
+numeric_value(decimal, String, Value) :-
+	atom_number(String, Value).
 
 
 		 /*******************************
