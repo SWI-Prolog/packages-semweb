@@ -61,7 +61,7 @@ being flexible to ordering of tokens.
 
 setting(verbose(false)).		% print progress messages
 setting(index_threads(1)).		% # threads for creating the index
-setting(index(default)).		% Use a thread for incremental updates
+setting(index(thread(1))).		% Use a thread for incremental updates
 
 %%	rdf_set_literal_index_option(+Options:list)
 %
@@ -390,11 +390,8 @@ token_index(Map) :-
 		    old_literal
 		  ],
 	(   setting(index(default))
-	->  (   current_prolog_flag(cpu_count, N), N > 1
-	    ->	create_update_literal_thread(1),
-		rdf_monitor(thread_monitor_literal, Monitor)
-	    ;	rdf_monitor(monitor_literal, Monitor)
-	    )
+	->  create_update_literal_thread(1),
+	    rdf_monitor(thread_monitor_literal, Monitor)
 	;   setting(index(thread(N)))
 	->  create_update_literal_thread(N),
 	    rdf_monitor(thread_monitor_literal, Monitor)
