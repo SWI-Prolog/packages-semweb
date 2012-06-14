@@ -19,7 +19,6 @@ include ../Makefile.defs
 include common.mk
 CFLAGS+= -I.
 LIBDIR=$(PLBASE)/library/semweb
-PKGDOC=$(PKGDOCDIR)/semweb
 
 TARGETS=	rdf_db.@SO@ turtle.@SO@
 
@@ -57,13 +56,13 @@ ln-install::
 rpm-install:	install
 
 html-install::
-		mkdir -p $(DESTDIR)$(PKGDOC)
-		$(INSTALL) -m 644 $(DOC).html $(DESTDIR)$(PKGDOC)
-		$(INSTALL) -m 644 modules.gif $(DESTDIR)$(PKGDOC)
+		mkdir -p $(DESTDIR)$(PKGDOCDIR)
+		$(INSTALL) -m 644 $(DOC).html $(DESTDIR)$(PKGDOCDIR)
+		$(INSTALL) -m 644 modules.gif $(DESTDIR)$(PKGDOCDIR)
 
 pdf-install::
-		mkdir -p $(DESTDIR)$(PKGDOC)
-		$(INSTALL) -m 644 $(DOC).pdf $(DESTDIR)$(PKGDOC)
+		mkdir -p $(DESTDIR)$(PKGDOCDIR)
+		$(INSTALL) -m 644 $(DOC).pdf $(DESTDIR)$(PKGDOCDIR)
 
 uninstall::
 		(cd $(SOLIBDIR) && rm -f $(TARGETS))
