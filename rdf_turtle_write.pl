@@ -237,10 +237,15 @@ rdf_save_canonical_turtle(Spec, M:Options) :-
 %	@param	Cleanup is a goal that must be used to revert the side
 %		effects of open_output/4.
 
-open_output(stream(Out), Encoding, Out,
-	    set_stream(Out, encoding(Old))) :- !,
+open_output(stream(Out), Encoding, Out, Cleanup) :- !,
 	stream_property(Out, encoding(Old)),
-	set_stream(Out, encoding(Encoding)).
+	(   (   Old == Encoding
+	    ;	Old == wchar_t		% Internal encoding
+	    )
+	->  Cleanup = true
+	;   set_stream(Out, encoding(Encoding)),
+	    Cleanup = set_stream(Out, encoding(Old))
+	).
 open_output(Stream, Encoding, Out, Cleanup) :-
 	\+ atom(Stream),
 	is_stream(Stream), !,
