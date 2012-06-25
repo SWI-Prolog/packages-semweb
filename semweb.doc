@@ -705,6 +705,18 @@ interpreted using \arg{XMLLang}.
 	\termitem{namespaces}{+List}
 Explicitely specify saved namespace declarations.  See rdf_save_header/2
 option namespaces for details.
+
+	\termitem{xml_attributes}{+Boolean}
+If \const{false} (default \const{true}), never use xml attributes to
+save plain literal attributes, i.e., always used an XML element as in
+\verb$<name>Joe</name>$.
+
+	\termitem{inline}{+Boolean}
+If \const{true} (default \const{false}), inline resources when
+encountered for the first time.  Normally, only bnodes are handled
+this way.\footnote{The \const{inline} and \const{xml_attributes}
+options were introduced to support the OAEI format for ontology
+alignment.}
     \end{description}
 
     \predicate{rdf_graph}{1}{?DB}
