@@ -183,7 +183,9 @@
 		       convert_typed_literal(callable),
 		       encoding(encoding),
 		       document_language(atom),
-		       namespaces(list(atom))
+		       namespaces(list(atom)),
+		       xml_attributes(boolean),
+		       inline(boolean)
 		     ]).
 :- predicate_options(rdf_save_header/2, 2,
 		     [ graph(atom),
@@ -1711,7 +1713,8 @@ rdf_reset_db :-
 %			in a term stream(Out).
 
 :- thread_local
-	named_anon/2.			% +Resource, -Id
+	named_anon/2,			% +Resource, -Id
+	inlined/1.			% +Resource
 
 rdf_save(File) :-
 	rdf_save2(File, []).
@@ -1771,6 +1774,7 @@ cleanup_save(Reason,
 	flag(rdf_db_saved_subjects, SavedSubjects, OSavedSubjects),
 	flag(rdf_db_saved_triples, SavedTriples, OSavedTriples),
 	retractall(named_anon(_, _)),
+	retractall(inlined(_)),
 	(   Reason == exit
 	->  print_message(informational,
 			  rdf(saved(File, SavedSubjects, SavedTriples)))
@@ -2091,6 +2095,7 @@ xml_code(0'-).				% Match 0'-
 
 rdf_save_footer(Out) :-
 	retractall(named_anon(_, _)),
+	retractall(inlined(_)),
 	format(Out, '</rdf:RDF>~n', []).
 
 %%	rdf_save_non_anon_subject(+Out, +Subject, +Options)
@@ -2134,7 +2139,12 @@ rdf_save_subject(Out, Subject, DB) :-
 %
 %	@param Indent	Current indentation
 
+rdf_save_subject(_, Subject, _, _, _) :-
+	inlined(Subject), !.
 rdf_save_subject(Out, Subject, BaseURI, Indent, Options) :-
+	do_save_subject(Out, Subject, BaseURI, Indent, Options).
+
+do_save_subject(Out, Subject, BaseURI, Indent, Options) :-
 	graph(Options, DB),
 	findall(Pred=Object, rdf_db(Subject, Pred, Object, DB), Atts0),
 	sort(Atts0, Atts),		% remove duplicates
@@ -2203,7 +2213,7 @@ save_about(Out, BaseURI, Subject) :-
 %	begin tag has already been filled.
 
 save_attributes(Atts, BaseURI, Out, Element, Indent, Options) :-
-	split_attributes(Atts, InTag, InBody),
+	split_attributes(Atts, InTag, InBody, Options),
 	SubIndent is Indent + 2,
 	save_attributes2(InTag, BaseURI, tag, Out, SubIndent, Options),
 	(   InBody == []
@@ -2215,13 +2225,15 @@ save_attributes(Atts, BaseURI, Out, Element, Indent, Options) :-
 	    format(Out, '>~n', [])
 	).
 
-%%	split_attributes(+Attributes, -HeadAttrs, -BodyAttr)
+%%	split_attributes(+Attributes, -HeadAttrs, -BodyAttr, Options)
 %
 %	Split attribute (Name=Value) list into attributes for the head
 %	and body. Attributes can only be in the head if they are literal
 %	and appear only one time in the attribute list.
 
-split_attributes(Atts, HeadAttr, BodyAttr) :-
+split_attributes(Atts, [], Atts, Options) :-
+	option(xml_attributes(false), Options), !.
+split_attributes(Atts, HeadAttr, BodyAttr, _) :-
 	duplicate_attributes(Atts, Dupls, Singles),
 	simple_literal_attributes(Singles, HeadAttr, Rest),
 	append(Dupls, Rest, BodyAttr).
@@ -2304,7 +2316,7 @@ save_attribute(body, Name=Value, BaseURI, Out, Indent, Options) :-
 		(S1 \== S2 ; Name \== P2)
 	    ->  predicate_property(named_anon(_,_), number_of_clauses(N)),
 		atom_concat('bn', N, NodeID),
-		assert(named_anon(Value, NodeID))
+		assertz(named_anon(Value, NodeID))
 	    ;	true
 	    ),
 	    SubIndent is Indent + 2,
@@ -2319,6 +2331,24 @@ save_attribute(body, Name=Value, BaseURI, Out, Indent, Options) :-
 	    rdf_write_id(Out, NameText),
 	    format(Out, '>~n', [])
 	).
+save_attribute(body, Name=Value, BaseURI, Out, Indent, Options) :-
+	option(inline(true), Options),
+	\+ inlined(Value), !,
+	assertz(inlined(Value)),
+	rdf_id(Name, BaseURI, NameText),
+	format(Out, '~N~*|<', [Indent]),
+	rdf_write_id(Out, NameText),
+	SubIndent is Indent + 2,
+	(   rdf_collection(Value)
+	->  save_about(Out, BaseURI, Value),
+	    format(Out, ' rdf:parseType="Collection">~n', []),
+	    rdf_save_list(Out, Value, BaseURI, SubIndent, Options)
+	;   format(Out, '>~n', []),
+	    do_save_subject(Out, Value, BaseURI, SubIndent, Options)
+	),
+	format(Out, '~N~*|</', [Indent]),
+	rdf_write_id(Out, NameText),
+	format(Out, '>~n', []).
 save_attribute(body, Name=Value, BaseURI, Out, Indent, _DB) :-
 	stream_property(Out, encoding(Encoding)),
 	rdf_value(Value, BaseURI, QVal, Encoding),
