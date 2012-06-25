@@ -2333,6 +2333,7 @@ save_attribute(body, Name=Value, BaseURI, Out, Indent, Options) :-
 	).
 save_attribute(body, Name=Value, BaseURI, Out, Indent, Options) :-
 	option(inline(true), Options),
+	has_attributes(Value, Options),
 	\+ inlined(Value), !,
 	assertz(inlined(Value)),
 	rdf_id(Name, BaseURI, NameText),
@@ -2356,6 +2357,10 @@ save_attribute(body, Name=Value, BaseURI, Out, Indent, _DB) :-
 	format(Out, '~N~*|<', [Indent]),
 	rdf_write_id(Out, NameText),
 	format(Out, ' rdf:resource="~w"/>', [QVal]).
+
+has_attributes(URI, Options) :-
+	graph(Options, DB),
+	rdf_db(URI, _, _, DB), !.
 
 %%	save_body_literal(+Literal, +NameText, +BaseURI,
 %%			  +Out, +Indent, +Options).
