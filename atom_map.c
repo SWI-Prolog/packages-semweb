@@ -904,10 +904,7 @@ find_atom_map(term_t handle, term_t keys, term_t literals)
     for(i=1; i<ns; i++)
     { if ( !as[i].neg )
       { if ( !in_atom_set(as[i].set, a) )
-	{ if ( a > as[i].set->atoms[as[i].set->size-1] )
-	    goto empty;
 	  goto next;
-	}
       } else
       { if ( in_atom_set(as[i].set, a) )
 	  goto next;
@@ -920,7 +917,6 @@ find_atom_map(term_t handle, term_t keys, term_t literals)
 next:;
   }
 
-empty:
   RDUNLOCK(map);
   return PL_unify_nil(tail);
 
