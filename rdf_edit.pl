@@ -894,17 +894,17 @@ journal_comment(start, Time) :-
 	journal(_, _, Stream),
 	format_time(string(String), '%+', Time),
 	format(Stream,
-	       '/* Triple20 Journal File\n\n   \
-	       Created: ~w\n   \
-	       Triple20 by Jan Wielemaker <wielemak@science.uva.nl>\n\n   \
-	       EDIT WITH CARE!\n\
+	       '/* Triple20 Journal File\n\n   \c
+	       Created: ~w\n   \c
+	       Triple20 by Jan Wielemaker <wielemak@science.uva.nl>\n\n   \c
+	       EDIT WITH CARE!\n\c
 	       */~n~n', [String]).
 journal_comment(resume, Time) :-
 	journal(_, _, Stream),
 	format_time(string(String), '%+', Time),
 	format(Stream,
-	       '\n\
-	       /* Resumed: ~w\n\
+	       '\n\c
+	       /* Resumed: ~w\n\c
 	       */~n~n', [String]).
 
 %%	rdfe_close_journal

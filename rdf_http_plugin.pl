@@ -73,10 +73,10 @@ rdf_db:url_protocol(http).
 %	reply with the HTML description rather than the RDF).
 
 rdf_extra_headers(
-	[ request_header('Accept' = 'application/rdf+xml, \
-				     text/rdf+xml; q=0.9, \
-				     text/turtle, \
-				     application/x-turtle; q=0.8, \
+	[ request_header('Accept' = 'application/rdf+xml, \c
+				     text/rdf+xml; q=0.9, \c
+				     text/turtle, \c
+				     application/x-turtle; q=0.8, \c
 				     */*; q=0.1')
 	]).
 
