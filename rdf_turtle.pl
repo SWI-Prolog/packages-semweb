@@ -148,6 +148,10 @@ one of the extensions =|.ttl|=, =|.n3|= or =|.nt|=.
 %		* error_count(-Count)
 %		If on_error(warning) is active, this option cane be
 %		used to retrieve the number of generated errors.
+%
+%	@param	Input is one of stream(Stream), atom(Atom), a =http=,
+%		=https= or =file= url or a filename specification as
+%		accepted by absolute_file_name/3.
 
 rdf_read_turtle(In, Triples, Options) :-
 	open_input(In, Stream, Close),
@@ -267,10 +271,18 @@ open_input(stream(Stream), Stream, true) :- !,
 open_input(Stream, Stream, Close) :-
 	is_stream(Stream), !,
 	open_input(stream(Stream), Stream, Close).
+open_input(atom(Atom), Stream, close(Stream)) :- !,
+	atom_to_memory_file(Atom, MF),
+	open_memory_file(MF, read, Stream, [free_on_close(true)]).
 open_input(URL, Stream, close(Stream)) :-
-	sub_atom(URL, 0, _, _, 'http://'), !,
+	(   sub_atom(URL, 0, _, _, 'http://')
+	;   sub_atom(URL, 0, _, _, 'https://')
+	), !,
 	http_open(URL, Stream, []),
 	set_stream(Stream, encoding(utf8)).
+open_input(URL, Stream, close(Stream)) :-
+	uri_file_name(URL, Path), !,
+	open(Path, read, Stream, [encoding(utf8)]).
 open_input(File, Stream, close(Stream)) :-
 	absolute_file_name(File, Path,
 			   [ access(read),
