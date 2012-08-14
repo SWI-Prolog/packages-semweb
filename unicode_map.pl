@@ -139,14 +139,14 @@ write_header(Out, Options) :-
 	option(last_codepage(Last), Options, 127),
 	Size is Last+1,
 	format(Out,
-	       '#ifdef WIN32\n\
-		typedef int int32_t;\n\
-		#else\n\
-		#include <inttypes.h>\n\
+	       '#ifdef WIN32\n\c
+		typedef int int32_t;\n\c
+		#else\n\c
+		#include <inttypes.h>\n\c
 		#endif\n\n', []),
 	format(Out,
-	       '#ifndef NULL\n\
-		#define NULL ((void*)0)\n\
+	       '#ifndef NULL\n\c
+		#define NULL ((void*)0)\n\c
 		#endif\n\n', []),
 	format(Out,
 	       '#define UNICODE_MAP_SIZE ~d~n~n', [Size]).
@@ -157,19 +157,19 @@ write_footer(Out, Options) :-
 	;   Add = ''
 	),
 	format(Out,
-	       'static int\n\
-		sort_point(int code)\n\
-		{ int cp = code / 256;\n\
-		\n  \
-		  if ( cp < UNICODE_MAP_SIZE && ucoll_map[cp] )\n    \
-		    return ucoll_map[cp][code&0xff];\n\
-		\n  \
-		  return (code<<8)~w;\n\
+	       'static int\n\c
+		sort_point(int code)\n\c
+		{ int cp = code / 256;\n\c
+		\n  \c
+		  if ( cp < UNICODE_MAP_SIZE && ucoll_map[cp] )\n    \c
+		    return ucoll_map[cp][code&0xff];\n\c
+		\n  \c
+		  return (code<<8)~w;\n\c
 		}\n\n', [Add]),
 	format(Out,
-	       'static int\n\
-		sort_pointA(int code)\n\
-		{ return ucp0x00[code&0xff];\n\
+	       'static int\n\c
+		sort_pointA(int code)\n\c
+		{ return ucp0x00[code&0xff];\n\c
 		}\n\n', []).
 
 
