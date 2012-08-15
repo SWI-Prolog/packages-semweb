@@ -19,7 +19,9 @@ fix_load_path :-
 	file_base_name(Dir, LocalDir),
 	LocalDir \== semweb, !,
 	asserta(system:term_expansion((:- use_module(library(semweb/X))),
-				      (:- use_module(library(LocalDir/X))))).
+				      (:- use_module(library(LocalDir/X))))),
+	asserta(system:term_expansion((:- use_module(library(semweb/X), Opts)),
+				      (:- use_module(library(LocalDir/X), Opts)))).
 fix_load_path.
 
 :- fix_load_path.

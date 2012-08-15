@@ -1,11 +1,10 @@
-/*  $Id$
-
-    Part of SWI-Prolog
+/*  Part of SWI-Prolog
 
     Author:        Jan Wielemaker
     E-mail:        wielemak@science.uva.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 1985-2007, University of Amsterdam
+    Copyright (C): 1985-2012, University of Amsterdam
+			      VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License
@@ -33,7 +32,7 @@
 
 :- use_module(library(plunit)).
 :- use_module(library(uri)).
-:- use_module(rdf_db).
+:- use_module(library(semweb/rdf_db)).
 :- use_module(rdf_zlib_plugin).
 :- use_module(rdf_http_plugin).
 
