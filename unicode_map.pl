@@ -2,7 +2,7 @@
 	  [ write_unicode_collate_map/2	% +File, +Options
 	  ]).
 :- use_module(library(unicode/unicode_data)).
-:- use_module(library(dcg_basics)).
+:- use_module(library(dcg/basics)).
 :- use_module(library(debug)).
 :- use_module(library(option)).
 
