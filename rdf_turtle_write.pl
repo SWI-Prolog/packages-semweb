@@ -1123,9 +1123,6 @@ tw_literal(literal(lang(Lang, Value)), State, Out) :- !,
 tw_literal(literal(Value), State, Out) :-
 	atom(Value), !,
 	tw_quoted_string(Value, State, Out).
-tw_literal(literal(Value), State, Out) :-
-	atom(Value), !,
-	tw_quoted_string(Value, State, Out).
 						% Add types automatically
 tw_literal(literal(Value), State, Out) :-
 	integer(Value), !,
