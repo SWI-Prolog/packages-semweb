@@ -370,7 +370,9 @@ triples(State, []) -->
 triples(State, []) -->
 	[ '@', name(prefix), ':' ], !,
 	iri(State, URI),
-	{ set_base_uri_of_ttl_state(URI, State)
+	{ ttl_state_prefix_map(State, Map0),
+	  put_assoc('', Map0, URI, Map),
+	  set_prefix_map_of_ttl_state(Map, State)
 	}.
 triples(State, []) -->
 	[ '@', name(base) ], !,
@@ -476,9 +478,12 @@ resource(State, IRI) -->
 	iri(State, IRI), !.
 resource(State, IRI) -->
 	[ :(Name) ], !,
-	{ ttl_state_base_uri(State, Base),
-	  atom_concat(Base, Name, URI),
-	  uri_iri(State, URI, IRI)
+	{ ttl_state_prefix_map(State, Map),
+	  (   get_assoc('', Map, Base)
+	  ->  atom_concat(Base, Name, URI),
+	      uri_iri(State, URI, IRI)
+	  ;   throw(error(existence_error(prefix, ''), _))
+	  )
 	}.
 resource(State, IRI) -->
 	[ name(Prefix), : ], !,
@@ -494,9 +499,13 @@ resource(State, IRI) -->
 	  ;   throw(error(existence_error(prefix, Prefix), _))
 	  )
 	}.
-resource(State, BaseIRI) -->
+resource(State, IRI) -->
 	[ : ], !,
-	{ ttl_state_base_uri(State, BaseIRI)
+	{ ttl_state_prefix_map(State, Map),
+	  (   get_assoc('', Map, URI)
+	  ->  uri_iri(State, URI, IRI)
+	  ;   throw(error(existence_error(prefix, ''), _))
+	  )
 	}.
 
 uri_iri(State, URI, IRI) :-
