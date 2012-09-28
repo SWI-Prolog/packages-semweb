@@ -478,35 +478,46 @@ resource(State, IRI) -->
 	iri(State, IRI), !.
 resource(State, IRI) -->
 	[ :(Name) ], !,
-	{ ttl_state_prefix_map(State, Map),
-	  (   get_assoc('', Map, Base)
-	  ->  atom_concat(Base, Name, URI),
-	      uri_iri(State, URI, IRI)
-	  ;   throw(error(existence_error(prefix, ''), _))
-	  )
-	}.
+	{ prefix_iri(:(Name), State, IRI) }.
 resource(State, IRI) -->
 	[ name(Prefix), : ], !,
-	{ ttl_state_prefix_map(State, Map),
-	  get_assoc(Prefix, Map, IRI)
-	}.
+	{ prefix_iri(prefix(Prefix), State, IRI) }.
 resource(State, IRI) -->
 	[ Prefix:Name ], !,
-	{ ttl_state_prefix_map(State, Map),
-	  (   get_assoc(Prefix, Map, Base)
-	  ->  atom_concat(Base, Name, URI),
-	      uri_iri(State, URI, IRI)
-	  ;   throw(error(existence_error(prefix, Prefix), _))
-	  )
-	}.
+	{ prefix_iri(Prefix:Name, State, IRI) }.
 resource(State, IRI) -->
 	[ : ], !,
-	{ ttl_state_prefix_map(State, Map),
-	  (   get_assoc('', Map, URI)
-	  ->  uri_iri(State, URI, IRI)
-	  ;   throw(error(existence_error(prefix, ''), _))
-	  )
-	}.
+	{ prefix_iri(:, State, IRI) }.
+
+%%	prefix_iri(+PrefixSpec, +State, -IRI).
+
+prefix_iri(:(Name), State, IRI) :-		% :<prefix>
+	ttl_state_prefix_map(State, Map),
+	(   get_assoc('', Map, Base)
+	->  atom_concat(Base, Name, URI),
+	    uri_iri(State, URI, IRI)
+	;   throw(error(existence_error(prefix, ''), _))
+	).
+prefix_iri(prefix(Prefix), State, IRI) :-	% <prefix>:
+	ttl_state_prefix_map(State, Map),
+	(   get_assoc(Prefix, Map, IRI)
+	->  true
+	;   throw(error(existence_error(prefix, Prefix), _))
+	).
+prefix_iri(Prefix:Name, State, IRI) :-		% <prefix>:<local>
+	ttl_state_prefix_map(State, Map),
+	(   get_assoc(Prefix, Map, Base)
+	->  atom_concat(Base, Name, URI),
+	    uri_iri(State, URI, IRI)
+	;   throw(error(existence_error(prefix, Prefix), _))
+	).
+prefix_iri(:, State, IRI) :-			% :
+	ttl_state_prefix_map(State, Map),
+	(   get_assoc('', Map, URI)
+	->  uri_iri(State, URI, IRI)
+	;   throw(error(existence_error(prefix, ''), _))
+	).
+
 
 uri_iri(State, URI, IRI) :-
 	(   ttl_state_resources(State, uri)
@@ -581,19 +592,8 @@ anonid(State, _NodeId, Node) :-
 	anonid(State, Node).
 anonid(_State, NodeId, node(NodeId)).
 
-mk_object(type(Prefix:Name, Value), State, literal(type(Type, Value))) :- !,
-	  ttl_state_prefix_map(State, Map),
-	  get_assoc(Prefix, Map, Base),
-	  atom_concat(Base, Name, Type).
-mk_object(type(relative_uri(Rel), Value), State, literal(type(Type, Value))) :- !,
-	  ttl_state_base_uri(State, Base),
-	  (   Rel == ''			% must be in global_url?
-	  ->  Type = Base
-	  ;   uri_normalized_iri(Rel, Base, Type)
-	  ).
-mk_object(type(:(Name), Value), State, literal(type(Type, Value))) :- !,
-	  ttl_state_base_uri(State, Base),
-	  atom_concat(Base, Name, Type).
+mk_object(type(TypeSpec, Value), State, literal(type(TypeIRI, Value))) :- !,
+	prefix_iri(TypeSpec, State, TypeIRI).
 mk_object(Value, _State, literal(Value)).
 
 syntax_rule(State, Error) -->
