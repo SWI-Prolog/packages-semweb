@@ -296,20 +296,29 @@ rdfs_class_property(Class, Property) :-
 %	parseType="Collection" as well as on Bag, Set and Alt.
 
 rdfs_member(Element, Set) :-
-	rdf_has(Set, rdf:first, _),
+	rdf_has(Set, rdf:first, _), !,
 	rdfs_collection_member(Element, Set).
 rdfs_member(Element, Set) :-
-	rdfs_individual_of(Set, rdfs:'Container'), !,
+	container_class(Class),
+	rdfs_individual_of(Set, Class), !,
 	(   nonvar(Element)
 	->  rdf(Set, Predicate, Element),
 	    rdf_member_property(Predicate, _N)
-	;   between(1, infinite, N),
-	    rdf_member_property(Prop, N),
-	    (	rdf(Set, Prop, Member)
-	    ->	Member = Element
-	    ;	!, fail
-	    )
+	;   findall(N-V, rdf_nth(Set, N, V), Pairs),
+	    keysort(Pairs, Sorted),
+	    member(_-Element, Sorted)
 	).
+
+rdf_nth(Set, N, V) :-
+	rdf(Set, P, V),
+	rdf_member_property(P, N).
+
+:- rdf_meta container_class(r).
+
+container_class(rdf:'Bag').
+container_class(rdf:'Seq').
+container_class(rdf:'Alt').
+
 
 rdfs_collection_member(Element, Set) :-
 	rdf_has(Set, rdf:first, Element).
