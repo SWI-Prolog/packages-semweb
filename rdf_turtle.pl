@@ -37,7 +37,7 @@
 	  ]).
 :- use_module(library(assoc)).
 :- use_module(library(option)).
-:- use_module(library('semweb/rdf_db')).
+:- use_module(library(semweb/rdf_db)).
 :- use_module(library(debug)).
 :- use_module(library(uri)).
 :- use_module(library(record)).
@@ -492,32 +492,32 @@ resource(State, IRI) -->
 %%	prefix_iri(+PrefixSpec, +State, -IRI).
 
 prefix_iri(:(Name), State, IRI) :-		% :<prefix>
-	ttl_state_prefix_map(State, Map),
-	(   get_assoc('', Map, Base)
-	->  atom_concat(Base, Name, URI),
-	    uri_iri(State, URI, IRI)
-	;   throw(error(existence_error(prefix, ''), _))
-	).
+	prefix('', Base, State),
+	atom_concat(Base, Name, URI),
+	uri_iri(State, URI, IRI).
 prefix_iri(prefix(Prefix), State, IRI) :-	% <prefix>:
-	ttl_state_prefix_map(State, Map),
-	(   get_assoc(Prefix, Map, IRI)
-	->  true
-	;   throw(error(existence_error(prefix, Prefix), _))
-	).
+	prefix(Prefix, IRI, State).
 prefix_iri(Prefix:Name, State, IRI) :-		% <prefix>:<local>
-	ttl_state_prefix_map(State, Map),
-	(   get_assoc(Prefix, Map, Base)
-	->  atom_concat(Base, Name, URI),
-	    uri_iri(State, URI, IRI)
-	;   throw(error(existence_error(prefix, Prefix), _))
-	).
+	prefix(Prefix, Base, State),
+	atom_concat(Base, Name, URI),
+	uri_iri(State, URI, IRI).
 prefix_iri(:, State, IRI) :-			% :
-	ttl_state_prefix_map(State, Map),
-	(   get_assoc('', Map, URI)
-	->  uri_iri(State, URI, IRI)
-	;   throw(error(existence_error(prefix, ''), _))
-	).
+	prefix('', URI, State),
+	uri_iri(State, URI, IRI).
 
+prefix(Prefix, URI, State) :-
+	ttl_state_prefix_map(State, Map),
+	get_assoc(Prefix, Map, URI), !.
+prefix(Prefix, URI, _) :-
+	predefined(Prefix), !,
+	rdf_current_ns(Prefix, URI).
+prefix(Prefix, _, _) :-
+	throw(error(existence_error(prefix, Prefix), _)).
+
+predefined(rdf).
+predefined(rdfs).
+predefined(owl).
+predefined(xsd).
 
 uri_iri(State, URI, IRI) :-
 	(   ttl_state_resources(State, uri)
