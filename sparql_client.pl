@@ -381,7 +381,7 @@ json_to_result(json([ head    = json(Head),
 	memberchk(bindings=Bindings, Body), !,
 	maplist(json_row(VarList), Bindings, Rows).
 json_to_result(json(JSon), ask(Boolean)) :-
-	memberchk(boolean=Boolean, JSon).
+	memberchk(boolean = @(Boolean), JSon).
 
 
 json_row(Vars, json(Columns), Row) :-
