@@ -3469,6 +3469,7 @@ load_db(rdf_db *db, IOSTREAM *in, ld_context *ctx)
   if ( !load_magic(in) )
     return LOAD_ERROR;
   version = (int)load_int(in);
+  (void)version;
 
   while((c=Sgetc(in)) != EOF)
   { switch(c)
@@ -5161,7 +5162,6 @@ next_search_state(search_state *state)
 { triple *t = state->cursor;
   triple *p = &state->pattern;
   term_t retpred;
-  int unify_pred;
 
   if ( state->realpred )
   { retpred = state->realpred;
@@ -5171,7 +5171,6 @@ next_search_state(search_state *state)
     }
   } else
   { retpred = state->predicate;
-    unify_pred = FALSE;
   }
 
 retry:
