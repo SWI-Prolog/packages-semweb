@@ -259,12 +259,16 @@ term_expansion(T0, T) :-
 %		* ask(Bool)
 %		Where Bool is either =true= or =false=
 
+:- thread_local
+	bnode_map/2.
+
 sparql_read_xml_result(Input, Result) :-
 	load_structure(Input, DOM,
 		       [ dialect(xmlns),
 			 space(remove)
 		       ]),
-	dom_to_result(DOM, Result).
+	call_cleanup(dom_to_result(DOM, Result),
+		     retractall(bnode_map(_,_))).
 
 dom_to_result(DOM, Result) :-
 	(   sub_element(DOM, sparql:head, _HAtt, Content)
@@ -278,7 +282,7 @@ dom_to_result(DOM, Result) :-
 	    Result = select(VarTerm, Rows),
 	    sub_element(DOM, sparql:results, _RAtt, RContent)
 	->  rows(RContent, Vars, Rows)
-	).
+	), !.					% Guarantee finalization
 
 %%	variables(+DOM, -Varnames)
 %
@@ -319,7 +323,7 @@ value([element(sparql:literal, Att, Content)], literal(Lit)) :- !,
 	).
 value([element(sparql:uri, [], [URI])], URI) :- !.
 value([element(sparql:bnode, [], [NodeID])], URI) :- !,
-	atom_concat('__', NodeID, URI).			% DUBIOUS
+	bnode(NodeID, URI).
 value([element(sparql:unbound, [], [])], '$null$').
 
 
@@ -336,6 +340,14 @@ sub_element([H|T], Name, Att, Content) :-
 	(   sub_element(H, Name, Att, Content)
 	;   sub_element(T, Name, Att, Content)
 	).
+
+
+bnode(Name, URI) :-
+	bnode_map(Name, URI), !.
+bnode(Name, URI) :-
+	gensym('__bnode', URI0),
+	assertz(bnode_map(Name, URI0)),
+	URI = URI0.
 
 
 %%	sparql_read_json_result(+Input, -Result) is det.
@@ -365,8 +377,10 @@ open_input(File, In, close(In)) :-
 	open(File, read, In, [encoding(utf8)]).
 
 close_input(close(In)) :- !,
+	retractall(bnode_map(_,_)),
 	close(In).
-close_input(_).
+close_input(_) :-
+	retractall(bnode_map(_,_)).
 
 read_json_result(In, Result) :-
 	json_read(In, JSON),
@@ -411,3 +425,10 @@ jvalue(literal, JValue, literal(Literal)) :-
 	->  Literal = type(Type, Value)
 	;   Literal = Value
 	).
+jvalue('typed-literal', JValue, literal(type(Type, Value))) :-
+	memberchk(value=Value, JValue),
+	memberchk('datatype'=Type, JValue).
+jvalue(bnode, JValue, URI) :-
+	memberchk(value=NodeID, JValue),
+	bnode(NodeID, URI).
+
