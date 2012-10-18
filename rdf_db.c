@@ -4697,7 +4697,7 @@ rdf_atom_md5(term_t text, term_t times, term_t md5)
   size_t len;
   md5_byte_t digest[16];
 
-  if ( !PL_get_nchars(text, &len, &s, CVT_ALL|CVT_EXCEPTION) )
+  if ( !PL_get_nchars(text, &len, &s, CVT_ALL|REP_UTF8|CVT_EXCEPTION) )
     return FALSE;
   if ( !PL_get_integer_ex(times, &n) )
     return FALSE;
