@@ -2593,7 +2593,7 @@ init_triple_hash(rdf_db *db, int index, size_t count)
   for(i=0; i<MSB(count); i++)
     h->blocks[i] = t;
 
-  h->bucket_count_epoch = h->bucket_count = count;
+  h->bucket_preinit = h->bucket_count_epoch = h->bucket_count = count;
 
   return TRUE;
 }
@@ -2618,17 +2618,21 @@ resize_triple_hash(rdf_db *db, int index)
 
 static void
 reset_triple_hash(rdf_db *db, triple_hash *hash)
-{ size_t bytes = sizeof(triple_bucket)*hash->bucket_count_epoch;
+{ size_t bytes = sizeof(triple_bucket)*hash->bucket_preinit;
   int i;
 
-  memset(hash->blocks[0], 0, bytes);
-  for(i=MSB(hash->bucket_count_epoch); i<MAX_TBLOCKS; i++)
+  memset(hash->blocks[0], 0, bytes);	/* clear first block */
+  for(i=MSB(hash->bucket_preinit); i<MAX_TBLOCKS; i++)
   { if ( hash->blocks[i] )
-    { PL_free(hash->blocks[i]);
+    { triple_bucket *t = hash->blocks[i];
+
       hash->blocks[i] = NULL;
-    }
+      t += 1<<(i-1);
+      PL_free(t);
+    } else
+      break;
   }
-  hash->bucket_count = hash->bucket_count_epoch;
+  hash->bucket_count = hash->bucket_count_epoch = hash->bucket_preinit;
 }
 
 

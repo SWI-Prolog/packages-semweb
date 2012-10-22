@@ -328,6 +328,7 @@ typedef struct triple_hash
 { triple_bucket	*blocks[MAX_TBLOCKS];	/* Dynamic array starts */
   size_t	bucket_count;		/* Allocated #buckets */
   size_t	bucket_count_epoch;	/* Initial bucket count */
+  size_t	bucket_preinit;		/* Pre-initializaed bucket count */
 } triple_hash;
 
 typedef struct triple_walker
