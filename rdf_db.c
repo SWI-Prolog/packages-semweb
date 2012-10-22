@@ -3097,7 +3097,6 @@ suspend_gc(rdf_db *db)
   db->gc.uncollectable	     = 0;
   db->gc.last_gen	     = 0;
   db->gc.busy		     = FALSE;
-  simpleMutexUnlock(&db->locks.gc);
 
   return TRUE;
 }
