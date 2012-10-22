@@ -3080,7 +3080,7 @@ out:
 
 
 static int
-reset_gc(rdf_db *db)
+suspend_gc(rdf_db *db)
 { int was_busy = db->gc.busy;
 
   DEBUG(2, if ( was_busy )
@@ -3100,6 +3100,12 @@ reset_gc(rdf_db *db)
   simpleMutexUnlock(&db->locks.gc);
 
   return TRUE;
+}
+
+
+static void
+resume_gc(rdf_db *db)
+{ simpleMutexUnlock(&db->locks.gc);
 }
 
 
@@ -7493,7 +7499,7 @@ reset_db(rdf_db *db)
 
   db->resetting = TRUE;
 
-  reset_gc(db);
+  suspend_gc(db);
   erase_snapshots(db);
   erase_triples(db);
   erase_predicates(db);
@@ -7508,6 +7514,7 @@ reset_db(rdf_db *db)
   db->snapshots.keep = GEN_MAX;
   db->queries.generation = GEN_EPOCH;
 
+  resume_gc(db);
   db->resetting = FALSE;
 
   return rc;
