@@ -3094,6 +3094,7 @@ suspend_gc(rdf_db *db)
   db->gc.time		     = 0.0;
   db->gc.reclaimed_triples   = 0;
   db->gc.reclaimed_reindexed = 0;
+  db->reindexed		     = 0;
   db->gc.uncollectable	     = 0;
   db->gc.last_gen	     = 0;
   db->gc.busy		     = FALSE;
