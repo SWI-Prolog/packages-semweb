@@ -622,6 +622,8 @@ rehash_atom_set(atomset *as)
     as->entries = new;
     free(old);
   }
+
+  as->size = newsize;
 }
 
 
