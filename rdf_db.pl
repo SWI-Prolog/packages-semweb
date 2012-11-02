@@ -207,10 +207,7 @@
 	ns/2,
 	rdf_meta_specification/3.	% UnboundHead, Module, Head
 :- dynamic
-	ns/2,			% ID, URL
-	rdf_source/5.		% DB, SourceURL, ModTimeAtLoad, Triples, MD5
-:- volatile
-	rdf_source/5.
+	ns/2.			% ID, URL
 :- discontiguous
 	term_expansion/2.
 
@@ -838,7 +835,7 @@ consider_gc(_CPU) :-
 %	@param KeyValue	Term of the form Key(Value).
 
 rdf_statistics(sources(Count)) :-
-	predicate_property(rdf_source(_,_,_,_,_), number_of_clauses(Count)).
+	rdf_statistics_(graphs(Count)).
 rdf_statistics(resources(Count)) :-
 	rdf_statistics_(resources(Count)).
 rdf_statistics(properties(Count)) :-
@@ -1055,24 +1052,11 @@ check_loaded_cache(DB, Graphs, _) :-
 
 %%	rdf_load_db(+File) is det.
 %
-%	Load triples from a file created using rdf_save_db/2 and update
-%	the file administration.
+%	Load triples from a file created using rdf_save_db/2.
 
 rdf_load_db(File) :-
 	uri_file_name(URL, File),
-	rdf_load_db_no_admin(File, URL, Graphs),
-	(   (   is_list(Graphs)
-	    ->	member(DB, Graphs)
-	    ;	DB = Graphs
-	    ),
-	    rdf_md5(DB, MD5),
-	    rdf_statistics_(triples(DB, Triples)),
-	    rdf_graph_source_(DB, SourceURL, Modified),
-	    retractall(rdf_source(DB, _, _, _, _)),
-	    assert(rdf_source(DB, SourceURL, Modified, Triples, MD5)),
-	    fail
-	;   true
-	).
+	rdf_load_db_no_admin(File, URL, _Graphs).
 
 
 		 /*******************************
@@ -1214,9 +1198,6 @@ rdf_load_file(_Ref, _Spec, SourceURL, Protocol, Graph, M, Options) :-
 			 Cleanup),
 	    save_cache(Graph, SourceURL, Options),
 	    register_file_ns(NSList),
-	    rdf_statistics_(triples(Graph, Triples)),
-	    rdf_md5(Graph, MD5),
-	    assert(rdf_source(Graph, SourceURL, Modified, Triples, MD5)),
 	    format_action(Format, Action)
 	),
 	report_loaded(Action, SourceURL, Graph, Triples, T0, Options).
@@ -1544,7 +1525,7 @@ rdf_unload(_).
 %%	rdf_unload_graph(+Graph) is det.
 %
 %	Remove Graph from the RDF store.  Succeeds silently if the named
-%	graoh does not exist.
+%	graph does not exist.
 
 rdf_unload_graph(Graph) :-
 	must_be(atom, Graph),
@@ -1557,7 +1538,6 @@ rdf_unload_graph(_).
 do_unload(Graph) :-
 	rdf_transaction(rdf_retractall(_,_,_,Graph),
 			unload(Graph)),
-	retractall(rdf_source(Graph, _, _, _, _)),
 	rdf_unset_graph_source(Graph).
 
 
@@ -1676,8 +1656,7 @@ assert_triples([H|_], _) :-
 %	statistics.
 
 rdf_reset_db :-
-	rdf_reset_db_,
-	retractall(rdf_source(_,_,_,_,_)).
+	rdf_reset_db_.
 
 
 		 /*******************************
