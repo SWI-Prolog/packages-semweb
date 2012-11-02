@@ -195,10 +195,7 @@
 	ns/2,
 	rdf_meta_specification/3.	% UnboundHead, Module, Head
 :- dynamic
-	ns/2,			% ID, URL
-	rdf_source/5.		% DB, SourceURL, ModTimeAtLoad, Triples, MD5
-:- volatile
-	rdf_source/5.
+	ns/2.			% ID, URL
 :- discontiguous
 	term_expansion/2.
 
@@ -644,7 +641,7 @@ rdf_source_location(Subject, Source) :-
 %	@param KeyValue	Term of the form Key(Value).
 
 rdf_statistics(sources(Count)) :-
-	predicate_property(rdf_source(_,_,_,_,_), number_of_clauses(Count)).
+	rdf_statistics_(graphs(Count)).
 rdf_statistics(subjects(Count)) :-
 	rdf_statistics_(subjects(Count)).
 rdf_statistics(properties(Count)) :-
@@ -866,24 +863,11 @@ check_loaded_cache(DB, Graphs, _) :-
 
 %%	rdf_load_db(+File) is det.
 %
-%	Load triples from a file created using rdf_save_db/2 and update
-%	the file administration.
+%	Load triples from a file created using rdf_save_db/2.
 
 rdf_load_db(File) :-
 	uri_file_name(URL, File),
-	rdf_load_db_no_admin(File, URL, Graphs),
-	(   (   is_list(Graphs)
-	    ->	member(DB, Graphs)
-	    ;	DB = Graphs
-	    ),
-	    rdf_md5(DB, MD5),
-	    rdf_statistics_(triples(DB, Triples)),
-	    rdf_graph_source_(DB, SourceURL, Modified),
-	    retractall(rdf_source(DB, _, _, _, _)),
-	    assert(rdf_source(DB, SourceURL, Modified, Triples, MD5)),
-	    fail
-	;   true
-	).
+	rdf_load_db_no_admin(File, URL, _Graphs).
 
 
 		 /*******************************
@@ -978,9 +962,6 @@ rdf_load(Spec, M:Options) :-
 			 Cleanup),
 	    save_cache(Graph, SourceURL, Options),
 	    register_file_ns(NSList),
-	    rdf_statistics_(triples(Graph, Triples)),
-	    rdf_md5(Graph, MD5),
-	    assert(rdf_source(Graph, SourceURL, Modified, Triples, MD5)),
 	    format_action(Format, Action)
 	),
 	report_loaded(Action, SourceURL, Graph, Triples, T0, Options).
@@ -1308,7 +1289,6 @@ rdf_unload(_).
 do_unload(DB) :-
 	rdf_transaction(rdf_retractall(_,_,_,DB),
 			unload(DB)),
-	retractall(rdf_source(DB, _, _, _, _)),
 	rdf_unset_graph_source(DB).
 
 
@@ -1442,7 +1422,6 @@ assert_triples([H|_], _) :-
 %	statistics.
 
 rdf_reset_db :-
-	retractall(rdf_source(_,_,_,_,_)),
 	rdf_transaction(rdf_reset_db_, reset).
 
 
