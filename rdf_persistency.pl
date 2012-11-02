@@ -38,12 +38,14 @@
 	    rdf_db_to_file/2		% ?DB, ?FileBase
 	  ]).
 :- use_module(library(semweb/rdf_db)).
+:- use_module(library(filesex)).
 :- use_module(library(lists)).
-:- use_module(library(url)).
+:- use_module(library(uri)).
 :- use_module(library(debug)).
 :- use_module(library(error)).
 :- use_module(library(thread)).
 :- use_module(library(pairs)).
+:- use_module(library(apply)).
 
 
 /** <module> RDF persistency plugin
@@ -66,8 +68,14 @@ is restored by loading  the  snapshot   and  replaying  the journal. The
 predicate rdf_flush_journals/1 can be used to create fresh snapshots and
 delete the journals.
 
-@tbd if there is a complete `.new'   snapshot  and no journal, we should
-move the .new to the plain snapshot name as a means of recovery.
+@tbd If there is a complete `.new'   snapshot  and no journal, we should
+     move the .new to the plain snapshot name as a means of recovery.
+
+@tbd Backup of each graph using one or two files is very costly if there
+     are many graphs.  Although the currently used subdirectories avoid
+     hitting OS limits early, this is still not ideal. Probably we
+     should collect (small, older?) files and combine them into a single
+     quick load file.  We could call this (similar to GIT) a `pack'.
 
 @see	rdf_edit.pl
 */
@@ -116,6 +124,10 @@ move the .new to the plain snapshot name as a means of recovery.
 %		* max_open_journals(+Count)
 %		Maximum number of journals kept open.  If not provided,
 %		the default is 10.  See limit_fd_pool/0.
+%
+%		* directory_levels(+Count)
+%		Number of levels of intermediate directories for storing
+%		the graph files.  Default is 2.
 %
 %		* silent(+BoolOrBrief)
 %		If =true= (default =false=), do not print informational
@@ -169,6 +181,7 @@ assert_options([H|T]) :-
 
 option_type(concurrency(X),		must_be(positive_integer, X)).
 option_type(max_open_journals(X),	must_be(positive_integer, X)).
+option_type(directory_levels(X),	must_be(positive_integer, X)).
 option_type(silent(X),	       must_be(oneof([true,false,brief]), X)).
 option_type(log_nested_transactions(X),	must_be(boolean, X)).
 
@@ -202,7 +215,6 @@ rdf_detach_db :-
 	    save_prefixes(Dir),
 	    retractall(rdf_option(_)),
 	    retractall(source_journal_fd(_,_)),
-	    retractall(db_file_base(_,_)),
 	    unlock_db(Dir)
 	;   true
 	).
@@ -254,13 +266,12 @@ rdf_flush_journal(DB, Options) :-
 
 load_db :-
 	rdf_directory(Dir),
-	load_prefixes(Dir),
-	working_directory(Old, Dir),
 	concurrency(Jobs),
 	cpu_stat_key(Jobs, StatKey),
 	get_time(Wall0),
 	statistics(StatKey, T0),
-	call_cleanup(find_dbs(DBs), working_directory(_, Old)),
+	load_prefixes(Dir),
+	find_dbs(Dir, DBs),
 	length(DBs, DBCount),
 	verbosity(DBCount, Silent),
 	make_goals(DBs, Silent, 1, DBCount, Goals),
@@ -299,50 +310,93 @@ cpu_stat_key(1, cputime) :- !.
 cpu_stat_key(_, process_cputime).
 
 
-%%	find_dbs(-DBs:list(atom)) is det.
+%%	find_dbs(+Dir, -DBs:list(atom), -Depth) is det.
 %
 %	DBs is a  list  of  database   (named  graph)  names,  sorted in
 %	increasing file-size. Small files  are   loaded  first  as these
 %	typically contain the schemas and we   want  to avoid re-hashing
 %	large databases due to added rdfs:subPropertyOf triples.
+%
+%	@param Depth is the depth at which all files have been found.
 
-find_dbs(DBs) :-
-	expand_file_name(*, Files),
-	phrase(scan_db_files(Files), Scanned),
+find_dbs(Dir, DBs) :-
+	find_dbs(Dir, DBs, Depth),
+	(   var(Depth)			% empty DB
+	->  true
+	;   length(DBs, Count),
+	    LevelsRequired is floor(log(Count)/log(256)),
+	    Depth < LevelsRequired
+	->  print_message(informational, rdf(reindex(Count, LevelsRequired))),
+	    reindex_db(Dir, LevelsRequired),
+	    retractall(rdf_option(directory_levels(_))),
+	    assertz(rdf_option(directory_levels(LevelsRequired)))
+	;   retractall(rdf_option(directory_levels(_))),
+	    assertz(rdf_option(directory_levels(Depth)))
+	).
+
+find_dbs(Dir, DBs, Depth) :-
+	directory_files(Dir, Files),
+	phrase(scan_db_files(Files, Dir, '.', 0), Scanned),
 	sort(Scanned, ByDB),
 	join_snapshot_and_journals(ByDB, BySize),
 	keysort(BySize, SortedBySize),
-	pairs_values(SortedBySize, DBs).
+	pairs_values(SortedBySize, DBs),
+	(   maplist(depth(Depth), Scanned)
+	->  true
+	;   length(DBs, Count),
+	    Levels is floor(log(Count)/log(256)),
+	    print_message(warning, rdf(fix_index(Levels))),
+	    reindex_db(Dir, Levels)
+	).
 
+depth(Depth, DB) :-
+	arg(4, DB, Depth).
 
-%%	scan_db_files(+Files)// is det.
+%%	scan_db_files(+Files, +Dir, +Prefix, +Depth)// is det.
 %
 %	Produces a list of db(DB,  Size,   File)  for all recognised RDF
-%	database files.
+%	database files.  File is relative to the database directory Dir.
 
-scan_db_files([]) -->
+scan_db_files([], _, _, _) -->
 	[].
-scan_db_files([File|T]) -->
+scan_db_files([Nofollow|T], Dir, Prefix, Depth) -->
+	{ nofollow(Nofollow) }, !,
+	scan_db_files(T, Dir, Prefix, Depth).
+scan_db_files([File|T], Dir, Prefix, Depth) -->
 	{ file_name_extension(Base, Ext, File),
 	  db_extension(Ext), !,
 	  rdf_db_to_file(DB, Base),
-	  size_file(File, Size)
+	  directory_file_path(Prefix, File, DBFile),
+	  directory_file_path(Dir, DBFile, AbsFile),
+	  size_file(AbsFile, Size)
 	},
-	[ db(DB, Size, File) ],
-	scan_db_files(T).
-scan_db_files([_|T]) -->
-	scan_db_files(T).
+	[ db(DB, Size, DBFile, Depth) ],
+	scan_db_files(T, Dir, Prefix, Depth).
+scan_db_files([D|T], Dir, Prefix, Depth) -->
+	{ directory_file_path(Prefix, D, SubD),
+	  directory_file_path(Dir, SubD, AbsD),
+	  exists_directory(AbsD),
+	  \+ read_link(AbsD, _, _), !,	% Do not follow links
+	  directory_files(AbsD, SubFiles),
+	  SubDepth is Depth + 1
+	},
+	scan_db_files(SubFiles, Dir, SubD, SubDepth),
+	scan_db_files(T, Dir, Prefix, Depth).
+scan_db_files([_|T], Dir, Prefix, Depth) -->
+	scan_db_files(T, Dir, Prefix, Depth).
 
+nofollow(.).
+nofollow(..).
 
 db_extension(trp).
 db_extension(jrn).
 
 join_snapshot_and_journals([], []).
-join_snapshot_and_journals([db(DB,S0,_)|T0], [S-DB|T]) :- !,
+join_snapshot_and_journals([db(DB,S0,_,_)|T0], [S-DB|T]) :- !,
 	same_db(DB, T0, T1, S0, S),
 	join_snapshot_and_journals(T1, T).
 
-same_db(DB, [db(DB,S1,_)|T0], T, S0, S) :- !,
+same_db(DB, [db(DB,S1,_,_)|T0], T, S0, S) :- !,
 	S2 is S0+S1,
 	same_db(DB, T0, T, S2, S).
 same_db(_, L, L, S, S).
@@ -920,17 +974,49 @@ unlock_db(Out, File) :-
 lockfile(Dir, LockFile) :-
 	atomic_list_concat([Dir, /, lock], LockFile).
 
+directory_levels(Levels) :-
+	rdf_option(directory_levels(Levels)), !.
+directory_levels(2).
+
 db_file(Base, File) :-
 	rdf_directory(Dir),
-	atomic_list_concat([Dir, /, Base], File).
+	directory_levels(Levels),
+	db_file(Dir, Base, Levels, File).
+
+db_file(Dir, Base, Levels, File) :-
+	dir_levels(Base, Levels, Segments, [Base]),
+	atomic_list_concat([Dir|Segments], /, File).
 
 open_db(Base, Mode, Stream, Options) :-
 	db_file(Base, File),
+	(   rdf_option(directory_levels(0))
+	->  true
+	;   file_directory_name(File, Dir),
+	    make_directory_path(Dir)
+	),
 	open(File, Mode, Stream, [encoding(utf8)|Options]).
 
 exists_db(Base) :-
 	db_file(Base, File),
 	exists_file(File).
+
+%%	dir_levels(+File, +Levels, ?Segments, ?Tail) is det.
+%
+%	Create a list of intermediate directory names for File.  Each
+%	directory consists of two hexadecimal digits.
+
+dir_levels(_, 0, Segments, Segments) :- !.
+dir_levels(File, Levels, Segments, Tail) :-
+	rdf_atom_md5(File, 1, Hash),
+	create_dir_levels(Levels, 0, Hash, Segments, Tail).
+
+create_dir_levels(0, _, _, Segments, Segments) :- !.
+create_dir_levels(N, S, Hash, [S1|Segments0], Tail) :-
+	sub_atom(Hash, S, 2, _, S1),
+	S2 is S+2,
+	N2 is N-1,
+	create_dir_levels(N2, S2, Hash, Segments0, Tail).
+
 
 %%	db_files(+DB, -Snapshot, -Journal).
 %%	db_files(-DB, +Snapshot, -Journal).
@@ -1012,7 +1098,7 @@ url_to_filename(URL, FileName) :-
 	phrase(url_encode(EncCodes), Codes),
 	atom_codes(FileName, EncCodes).
 url_to_filename(URL, FileName) :-
-	www_form_encode(URL, FileName).
+	uri_encoded(path, URL, FileName).
 
 url_encode([0'+|T]) -->
 	" ", !,
@@ -1050,6 +1136,70 @@ alphanum(C) -->
 	}.
 
 no_enc_extra(0'_) --> "_".
+
+
+		 /*******************************
+		 *	       REINDEX		*
+		 *******************************/
+
+%%	reindex_db(+Dir)
+%
+%	Reindex the database by creating intermediate directories.
+
+reindex_db(Dir) :-
+	directory_levels(Levels),
+	reindex_db(Dir, Levels).
+
+reindex_db(Dir, Levels) :-
+	directory_files(Dir, Files),
+	reindex_files(Files, Dir, '.', 0, Levels),
+	remove_empty_directories(Files, Dir).
+
+reindex_files([], _, _, _, _).
+reindex_files([Nofollow|Files], Dir, Prefix, CLevel, Levels) :-
+	nofollow(Nofollow), !,
+	reindex_files(Files, Dir, Prefix, CLevel, Levels).
+reindex_files([File|Files], Dir, Prefix, CLevel, Levels) :-
+	CLevel \== Levels,
+	file_name_extension(_Base, Ext, File),
+	db_extension(Ext), !,
+	directory_file_path(Prefix, File, DBFile),
+	directory_file_path(Dir, DBFile, OldPath),
+	db_file(Dir, File, Levels, NewPath),
+	debug(rdf_persistency, 'Rename ~q --> ~q', [OldPath, NewPath]),
+	file_directory_name(NewPath, NewDir),
+	make_directory_path(NewDir),
+	rename_file(OldPath, NewPath),
+	reindex_files(Files, Dir, Prefix, CLevel, Levels).
+reindex_files([D|Files], Dir, Prefix, CLevel, Levels) :-
+	directory_file_path(Prefix, D, SubD),
+	directory_file_path(Dir, SubD, AbsD),
+	exists_directory(AbsD),
+	\+ read_link(AbsD, _, _), !,	% Do not follow links
+	directory_files(AbsD, SubFiles),
+	CLevel2 is CLevel + 1,
+	reindex_files(SubFiles, Dir, SubD, CLevel2, Levels),
+	reindex_files(Files, Dir, Prefix, CLevel, Levels).
+reindex_files([_|Files], Dir, Prefix, CLevel, Levels) :-
+	reindex_files(Files, Dir, Prefix, CLevel, Levels).
+
+
+remove_empty_directories([], _).
+remove_empty_directories([File|Files], Dir) :-
+	\+ nofollow(File),
+	directory_file_path(Dir, File, Path),
+	exists_directory(Path),
+	\+ read_link(Path, _, _), !,
+	directory_files(Path, Content),
+	exclude(nofollow, Content, RealContent),
+	(   RealContent == []
+	->  debug(rdf_persistency, 'Remove empty dir ~q', [Path]),
+	    delete_directory(Path)
+	;   remove_empty_directories(RealContent, Path)
+	),
+	remove_empty_directories(Files, Dir).
+remove_empty_directories([_|Files], Dir) :-
+	remove_empty_directories(Files, Dir).
 
 
 		 /*******************************
@@ -1152,6 +1302,10 @@ message(restore(_, done(_, Time, Count, _Nth, _Total))) -->
 	[ at_same_line, '~D triples in ~2f sec.'-[Count, Time] ].
 message(update_failed(S,P,O,Action)) -->
 	[ 'Failed to update <~p ~p ~p> with ~p'-[S,P,O,Action] ].
+message(reindex(Count, Depth)) -->
+	[ 'Restructuring database with ~d levels (~D graphs)'-[Depth, Count] ].
+message(reindex(Depth)) -->
+	[ 'Fixing database directory structure (~d levels)'-[Depth] ].
 
 silent_message(_Action) --> [].
 
