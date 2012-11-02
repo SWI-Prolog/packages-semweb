@@ -83,6 +83,7 @@
 	    rdf_atom_md5/3,		% +Text, +Times, -MD5
 
 	    rdf_graph_property/2,	% ?Graph, ?Property
+	    rdf_set_graph/2,		% +Graph, +Property
 	    rdf_graph/1,		% ?Graph
 	    rdf_source/1,		% ?File
 	    rdf_source/2,		% ?DB, ?SourceURL
@@ -1603,6 +1604,9 @@ modified_graph(SourceURL, Graph) :-
 %
 %	    * hash(Hash)
 %	    Hash is the (MD5-)hash for the content of Graph.
+%	    * modified(Boolean)
+%	    True if the graph is modified since it was loaded or
+%	    rdf_set_graph/2 was called with modified(false).
 %	    * source(Source)
 %	    The graph is loaded from the Source (a URL)
 %	    * source_last_modified(?Time)
@@ -1617,6 +1621,8 @@ rdf_graph_property(Graph, Property) :-
 
 rdf_graph_property_(hash(Hash), Graph) :-
 	rdf_md5(Graph, Hash).
+rdf_graph_property_(modified(Boolean), Graph) :-
+	rdf_graph_modified_(Graph, Boolean, _).
 rdf_graph_property_(source(URL), Graph) :-
 	rdf_graph_source_(Graph, URL, _).
 rdf_graph_property_(source_last_modified(Time), Graph) :-
@@ -1624,6 +1630,17 @@ rdf_graph_property_(source_last_modified(Time), Graph) :-
 	Time > 0.0.
 rdf_graph_property_(triples(Count), Graph) :-
 	rdf_statistics_(triples(Graph, Count)).
+
+%%	rdf_set_graph(+Graph, +Property) is det.
+%
+%	Set properties of Graph.  Defined properties are:
+%
+%	    * modified(false)
+%	    Set the modified state of Graph to false.
+
+rdf_set_graph(Graph, modified(Modified)) :-
+	must_be(Modified, oneof([false])),
+	rdf_graph_clear_modified_(Graph).
 
 
 %%	save_cache(+DB, +Cache) is det.
