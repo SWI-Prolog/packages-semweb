@@ -840,6 +840,25 @@ add_atomset(atomset *as, atom_t atom)
 }
 
 
+static int
+for_atomset(atomset *as,
+	    int (*func)(atom_t a, void *closure),
+	    void *closure)
+{ int key;
+
+  for(key=0; key < as->size; key++)
+  { atom_cell *c;
+
+    for(c=as->entries[key]; c; c=c->next)
+    { if ( !(*func)(c->atom, closure) )
+	return FALSE;
+    }
+  }
+
+  return TRUE;
+}
+
+
 		 /*******************************
 		 *	    PREDICATES		*
 		 *******************************/
@@ -3327,7 +3346,7 @@ typedef struct ld_context
   double	modified;
   int		has_digest;
   md5_byte_t    digest[16];
-  atom_hash    *graph_table;		/* multi-graph file */
+  atomset       graph_table;		/* multi-graph file */
 } ld_context;
 
 
@@ -3474,10 +3493,7 @@ load_triple(rdf_db *db, IOSTREAM *in, ld_context *ctx)
   t->graph = load_atom(db, in, ctx);
   t->line  = (unsigned long)load_int(in);
   if ( !ctx->graph )
-  { if ( !ctx->graph_table )
-      ctx->graph_table = new_atom_hash(64);
-    add_atom_hash(ctx->graph_table, t->graph);
-  }
+    add_atomset(&ctx->graph_table, t->graph);
 
   return t;
 }
@@ -3636,18 +3652,18 @@ link_loaded_triples(rdf_db *db, triple *t, ld_context *ctx)
 }
 
 
+typedef struct
+{ term_t tail;
+  term_t head;
+} add_graph_context;
+
 static int
-append_graph_to_list(ptr_hash_node *node, void *closure)
-{ atom_t graph = (atom_t)node->value;
-  term_t tail  = (term_t)closure;
-  term_t head  = PL_new_term_ref();
-  int rc;
+append_graph_to_list(atom_t graph, void *closure)
+{ add_graph_context *ctx = closure;
 
-  rc = (PL_unify_list(tail, head, tail) &&
-	PL_unify_atom(head, graph));
-  PL_reset_term_refs(head);
-
-  return rc;
+  return ( PL_unify_list(ctx->tail, ctx->head, ctx->tail) &&
+	   PL_unify_atom(ctx->head, graph)
+	 );
 }
 
 
@@ -3663,6 +3679,7 @@ rdf_load_db(term_t stream, term_t id, term_t graphs)
     return type_error(stream, "stream");
 
   memset(&ctx, 0, sizeof(ctx));
+  init_atomset(&ctx.graph_table);
   if ( (list=load_db(db, in, &ctx)) == LOAD_ERROR )
     return FALSE;
 
@@ -3671,13 +3688,16 @@ rdf_load_db(term_t stream, term_t id, term_t graphs)
   broadcast(EV_LOAD, (void*)id, (void*)ATOM_begin);
 
   if ( (rc=link_loaded_triples(db, list, &ctx)) )
-  { if ( ctx.graph_table )
-    { term_t tail = PL_copy_term_ref(graphs);
+  { if ( ctx.graph_table.count )
+    { add_graph_context gctx;
 
-      rc = ( for_atom_hash(ctx.graph_table, append_graph_to_list, (void*)tail) &&
-	     PL_unify_nil(tail) );
+      gctx.tail = PL_copy_term_ref(graphs);
+      gctx.head = PL_new_term_ref();
 
-      destroy_atom_hash(ctx.graph_table);
+      rc = ( for_atomset(&ctx.graph_table, append_graph_to_list, &gctx) &&
+	     PL_unify_nil(gctx.tail) );
+
+      destroy_atomset(&ctx.graph_table);
     } else
     { rc = PL_unify_atom(graphs, ctx.graph);
     }
