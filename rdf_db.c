@@ -69,6 +69,7 @@
 static void md5_triple(triple *t, md5_byte_t *digest);
 static void sum_digest(md5_byte_t *digest, md5_byte_t *add);
 static void dec_digest(md5_byte_t *digest, md5_byte_t *add);
+static int  md5_unify_digest(term_t t, md5_byte_t digest[16]);
 #endif
 
 
@@ -216,6 +217,7 @@ static functor_t FUNCTOR_type2;
 static functor_t FUNCTOR_gc2;
 static functor_t FUNCTOR_rehash2;
 static functor_t FUNCTOR_core1;
+static functor_t FUNCTOR_graphs1;
 
 static functor_t FUNCTOR_assert4;
 static functor_t FUNCTOR_retract4;
@@ -1825,6 +1827,74 @@ rdf_unset_graph_source(term_t graph_name)
   return TRUE;
 }
 
+
+#ifdef WITH_MD5
+/** rdf_graph_modified_(+Graph, -IsModified, -UnmodifiedHash)
+
+True when IsModified reflects  the  modified   status  relative  to  the
+`unmodified' digest.
+*/
+
+static foreign_t
+rdf_graph_modified_(term_t graph_name, term_t ismodified, term_t hash)
+{ atom_t gn;
+  rdf_db *db = DB;
+  graph *g;
+  int rc;
+
+  if ( !get_atom_ex(graph_name, &gn) )
+    return FALSE;
+
+  if ( !RDLOCK(db) )
+    return FALSE;
+  if ( (g = lookup_graph(db, gn, TRUE)) )
+  { int ismod = (memcmp(g->digest, g->unmodified_digest, 16) == 0);
+
+    rc = ( PL_unify_bool(ismodified, ismod) &&
+	   md5_unify_digest(hash, g->unmodified_digest)
+	 );
+  } else
+    rc = FALSE;
+  RDUNLOCK(db);
+
+  return rc;
+}
+
+
+static int
+clear_modified(graph *g)
+{ if ( g->md5 )
+  { memcpy(g->unmodified_digest, g->digest, 16);
+    return TRUE;
+  }
+
+  return FALSE;
+}
+
+
+static foreign_t
+rdf_graph_clear_modified_(term_t graph_name)
+{ atom_t gn;
+  rdf_db *db = DB;
+  graph *g;
+  int rc;
+
+  if ( !get_atom_ex(graph_name, &gn) )
+    return FALSE;
+
+  if ( !RDLOCK(db) )
+    return FALSE;
+  if ( (g = lookup_graph(db, gn, TRUE)) )
+    rc = clear_modified(g);
+  else
+    rc = FALSE;
+  RDUNLOCK(db);
+
+  return rc;
+}
+
+
+#endif /*WITH_MD5*/
 
 
 		 /*******************************
@@ -3679,6 +3749,7 @@ link_loaded_triples(rdf_db *db, triple *t, ld_context *ctx)
     { sum_digest(graph->digest, ctx->digest);
     }
     graph->md5 = TRUE;
+    clear_modified(graph);
   }
 
   db->generation += (db->created-created0);
@@ -6803,6 +6874,8 @@ unify_statistics(rdf_db *db, term_t key, functor_t f)
   { v = db->pred_count;
   } else if ( f == FUNCTOR_core1 )
   { v = db->core;
+  } else if ( f == FUNCTOR_graphs1 )
+  { v = db->graph_count;
   } else if ( f == FUNCTOR_indexed16 )
   { int i;
     term_t a = PL_new_term_ref();
@@ -7105,6 +7178,7 @@ install_rdf_db()
   MKFUNCTOR(gc, 2);
   MKFUNCTOR(rehash, 2);
   MKFUNCTOR(core, 1);
+  MKFUNCTOR(graphs, 1);
   MKFUNCTOR(assert, 4);
   MKFUNCTOR(retract, 4);
   MKFUNCTOR(update, 5);
@@ -7134,6 +7208,7 @@ install_rdf_db()
   PRED_call1         = PL_predicate("call", 1, "user");
 
 					/* statistics */
+  keys[i++] = FUNCTOR_graphs1;
   keys[i++] = FUNCTOR_triples1;
   keys[i++] = FUNCTOR_subjects1;
   keys[i++] = FUNCTOR_indexed16;
@@ -7194,6 +7269,9 @@ install_rdf_db()
 /*PL_register_foreign("rdf_broadcast_", 2, rdf_broadcast,   0);*/
 #ifdef WITH_MD5
   PL_register_foreign("rdf_md5",	2, rdf_md5,	    0);
+  PL_register_foreign("rdf_graph_modified_", 3, rdf_graph_modified_, 0);
+  PL_register_foreign("rdf_graph_clear_modified_",
+				        1, rdf_graph_clear_modified_, 0);
   PL_register_foreign("rdf_atom_md5",	3, rdf_atom_md5,    0);
 #endif
 
