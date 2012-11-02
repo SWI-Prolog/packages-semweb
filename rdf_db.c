@@ -1549,6 +1549,34 @@ init_graph_table(rdf_db *db)
 }
 
 
+static void
+rehash_graph_table(rdf_db *db)
+{ size_t newsize = db->graph_table_size*2;
+  graph **old, **new = rdf_malloc(db, newsize*sizeof(graph*));
+  int i;
+
+  memset(new, 0, newsize*sizeof(graph*));
+
+  for(i=0; i<db->graph_table_size; i++)
+  { graph *c, *n;
+
+    for(c=db->graph_table[i]; c; c=n)
+    { size_t inew = atom_hash(c->name) % newsize;
+
+      n = c->next;
+      c->next = new[inew];
+      new[inew] = c;
+    }
+  }
+
+  old = db->graph_table;
+  db->graph_table = new;
+  db->graph_table_size = newsize;
+
+  rdf_free(db, old, db->graph_table_size*sizeof(graph*));
+}
+
+
 static graph *
 lookup_graph(rdf_db *db, atom_t name, int create)
 { int hash = atom_hash(name) % db->graph_table_size;
@@ -1565,6 +1593,11 @@ lookup_graph(rdf_db *db, atom_t name, int create)
   if ( !create )
   { UNLOCK_MISC(db);
     return NULL;
+  }
+
+  if ( db->graph_count * 2 > db->graph_table_size )
+  { rehash_graph_table(db);
+    hash = atom_hash(name) % db->graph_table_size;
   }
 
   src = rdf_malloc(db, sizeof(*src));
