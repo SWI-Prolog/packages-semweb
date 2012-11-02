@@ -77,14 +77,12 @@ move the .new to the plain snapshot name as a means of recovery.
 	rdf_lock/2,
 	rdf_option/1,
 	source_journal_fd/2,
-	db_file_base/2,
 	file_base_db/2.
 :- dynamic
 	rdf_directory/1,		% Absolute path
 	rdf_lock/2,			% Dir, Lock
 	rdf_option/1,			% Defined options
 	source_journal_fd/2,		% DB, JournalFD
-	db_file_base/2,			% DB, FileBase
 	file_base_db/2.			% FileBase, DB
 
 :- meta_predicate
@@ -990,20 +988,11 @@ rdf_journal_file(DB, Journal) :-
 %	reasons. Speed, but much more important   is that the mapping of
 %	raw --> encoded provided by  www_form_encode/2 is not guaranteed
 %	to be unique by the W3C standards.
-%
-%	@tbd	We keep two predicates for exploiting Prolog indexing.
-%		Once multi-argument indexed is hashed we should clean
-%		this up.
 
 rdf_db_to_file(DB, File) :-
-	nonvar(File),
 	file_base_db(File, DB), !.
 rdf_db_to_file(DB, File) :-
-	nonvar(DB),
-	db_file_base(DB, File), !.
-rdf_db_to_file(DB, File) :-
 	url_to_filename(DB, File),
-	assert(db_file_base(DB, File)),
 	assert(file_base_db(File, DB)).
 
 %%	url_to_filename(+URL, -FileName) is det.
