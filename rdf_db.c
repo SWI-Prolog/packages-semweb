@@ -713,8 +713,8 @@ free_list(rdf_db *db, list *list)
 		 *	     ATOM SETS		*
 		 *******************************/
 
-
-#define CHUNKSIZE 1024
+#define CHUNKSIZE 4000				/* normally a page */
+#define ATOMSET_INITIAL_ENTRIES 16
 
 typedef struct mchunk
 { struct mchunk *next;
@@ -722,15 +722,23 @@ typedef struct mchunk
   char buf[CHUNKSIZE];
 } mchunk;
 
+typedef struct atom_cell
+{ struct atom_cell *next;
+  atom_t     atom;
+} atom_cell;
+
 typedef struct
-{ avl_tree tree;
-  mchunk *node_store;
-  mchunk store0;
+{ atom_cell **entries;				/* Hash entries */
+  size_t      size;				/* Hash-table size */
+  size_t      count;				/* # atoms stored */
+  mchunk     *node_store;
+  mchunk      store0;
+  atom_cell  *entries0[ATOMSET_INITIAL_ENTRIES];
 } atomset;
 
 
 static void *
-alloc_node_atomset(void *ptr, size_t size)
+alloc_atomset(void *ptr, size_t size)
 { void *p;
   atomset *as = ptr;
 
@@ -752,31 +760,15 @@ alloc_node_atomset(void *ptr, size_t size)
 
 
 static void
-free_node_atomset(void *ptr, void *data, size_t size)
-{ assert(0);
-}
-
-
-static int
-cmp_long_ptr(void *p1, void *p2, NODE type)
-{ long *l1 = p1;
-  long *l2 = p2;
-
-  return *l1 < *l2 ? -1 : *l1 > *l2 ? 1 : 0;
-}
-
-
-static void
 init_atomset(atomset *as)
-{ avlinit(&as->tree, as, sizeof(atom_t),
-	  cmp_long_ptr,
-	  NULL,
-	  alloc_node_atomset,
-	  free_node_atomset);
-
-  as->node_store = &as->store0;
+{ as->node_store = &as->store0;
   as->node_store->next = NULL;
   as->node_store->used = 0;
+
+  memset(as->entries0, 0, sizeof(as->entries0));
+  as->entries = as->entries0;
+  as->size = ATOMSET_INITIAL_ENTRIES;
+  as->count = 0;
 }
 
 
@@ -788,12 +780,63 @@ destroy_atomset(atomset *as)
   { next = ch->next;
     free(ch);
   }
+
+  if ( as->entries != as->entries0 )
+    free(as->entries);
+}
+
+
+static void
+rehash_atom_set(atomset *as)
+{ size_t newsize = as->size*2;
+  atom_cell **new = malloc(newsize*sizeof(atom_cell*));
+  int i;
+
+  memset(new, 0, newsize*sizeof(atom_cell*));
+
+  for(i=0; i<as->size; i++)
+  { atom_cell *c, *n;
+
+    for(c=as->entries[i]; c; c=n)
+    { size_t inew = atom_hash(c->atom)&(newsize-1);
+
+      n = c->next;
+      c->next = new[inew];
+      new[inew] = c;
+    }
+  }
+
+  if ( as->entries == as->entries0 )
+  { as->entries = new;
+  } else
+  { atom_cell **old = as->entries;
+    as->entries = new;
+    free(old);
+  }
 }
 
 
 static int
 add_atomset(atomset *as, atom_t atom)
-{ return avlins(&as->tree, &atom) ? FALSE : TRUE;
+{ size_t i = atom_hash(atom)&(as->size-1);
+  atom_cell *c;
+
+  for(c=as->entries[i]; c; c=c->next)
+  { if ( c->atom == atom )
+      return 0;
+  }
+
+  if ( ++as->count > 2*as->size )
+  { rehash_atom_set(as);
+    i = atom_hash(atom)&(as->size-1);
+  }
+
+  c = alloc_atomset(as, sizeof(*c));
+  c->atom = atom;
+  c->next = as->entries[i];
+  as->entries[i] = c;
+
+  return 1;
 }
 
 
@@ -1402,8 +1445,8 @@ update_predicate_counts(rdf_db *db, predicate *p, int which)
     }
 
     p->distinct_count[which]    = total;
-    p->distinct_subjects[which] = subject_set.tree.count;
-    p->distinct_objects[which]  = object_set.tree.count;
+    p->distinct_subjects[which] = subject_set.count;
+    p->distinct_objects[which]  = object_set.count;
 
     destroy_atomset(&subject_set);
     destroy_atomset(&object_set);
