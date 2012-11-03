@@ -44,3 +44,13 @@ rdf_debug(term_t level)
 }
 
 #endif
+
+#if __GNUC__ == 4 && __GNUC_MINOR__ == 7
+void
+gcc_47_dummy(void *ptr)
+{ static void *p;
+
+  if ( p != ptr )
+    p = ptr;
+}
+#endif

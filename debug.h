@@ -27,6 +27,10 @@
 
 #define O_DEBUG 1
 
+#if __GNUC__ == 4 && __GNUC_MINOR__ == 7
+void		gcc_47_dummy(void *ptr);
+#endif
+
 #ifdef O_DEBUG
 int		rdf_debuglevel();
 foreign_t	rdf_debug(term_t level);

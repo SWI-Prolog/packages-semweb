@@ -5279,13 +5279,13 @@ init_search_state(search_state *state)
       return FALSE;
     }
   } else
-  { state->cursor = state->db->table[ICOL(p->indexed)]
-				    [triple_hash(state->db, p, p->indexed)];
+  { triple *c = state->db->table[ICOL(p->indexed)]
+				[triple_hash(state->db, p, p->indexed)];
+    state->cursor = c;
   }
 
   return TRUE;
 }
-
 
 static void
 free_search_state(search_state *state)
@@ -5467,6 +5467,9 @@ rdf(term_t subject, term_t predicate, term_t object,
 
       if ( !init_search_state(state) )
 	return FALSE;
+#if __GNUC__ == 4 && __GNUC_MINOR__ == 7
+      gcc_47_dummy(state->cursor);
+#endif
 
       goto search;
     }
