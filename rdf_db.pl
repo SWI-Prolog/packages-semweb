@@ -1178,7 +1178,6 @@ rdf_load_file(_Ref, _Spec, SourceURL, Protocol, Graph, M, Options) :-
 	->  do_unload(Graph),
 	    catch(rdf_load_db_no_admin(CacheFile, cache(Graph), Graphs), _, fail),
 	    check_loaded_cache(Graph, Graphs, Modified),
-	    rdf_statistics_(triples(Graph, Triples)),
 	    Action = load
 	;   option(base_uri(BaseURI), Options, Graph),
 	    (	var(BaseURI)
@@ -1200,6 +1199,7 @@ rdf_load_file(_Ref, _Spec, SourceURL, Protocol, Graph, M, Options) :-
 	    register_file_ns(NSList),
 	    format_action(Format, Action)
 	),
+	rdf_statistics_(triples(Graph, Triples)),
 	report_loaded(Action, SourceURL, Graph, Triples, T0, Options).
 
 format_action(triples, load) :- !.
