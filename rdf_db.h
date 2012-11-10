@@ -360,6 +360,14 @@ typedef struct query_admin
 } query_admin;
 
 
+#define JOINED_DEFER 1
+
+#ifdef JOINED_DEFER
+#define defer_triples  defer_all	/* Use the same for now */
+#define defer_clouds   defer_all
+#define defer_literals defer_all
+#endif
+
 typedef struct rdf_db
 { triple_bucket by_none;		/* Plain linked list of triples */
   triple_hash   hash[INDEX_TABLES];	/* Hash-tables */
@@ -376,9 +384,13 @@ typedef struct rdf_db
   query_admin	queries;		/* Active query administration */
 
 					/* Deferred free handling */
+#if JOINED_DEFER
+  defer_free	defer_all;
+#else
   defer_free	defer_triples;		/* triples */
   defer_free	defer_clouds;		/* Predicate clouds */
   defer_free	defer_literals;		/* Literals */
+#endif
 
   int		resetting;		/* We are in rdf_reset_db() */
 

@@ -222,14 +222,16 @@ alloc_query(query_stack *qs)
 
 
 static void
-push_query(query *q)
-{ q->stack->top++;
+push_query(rdf_db *db, query *q)
+{ enter_scan(&db->defer_all);
+  q->stack->top++;
 }
 
 
 static void
-pop_query(query *q)
+pop_query(rdf_db *db, query *q)
 { q->stack->top--;
+  exit_scan(&db->defer_all);
 }
 
 
@@ -252,7 +254,7 @@ open_query(rdf_db *db)
     q->wr_gen = GEN_UNDEF;
   }
 
-  push_query(q);
+  push_query(db, q);
 
   return q;
 }
@@ -295,7 +297,7 @@ open_transaction(rdf_db *db,
   q->transaction_data.deleted = deleted;
   q->transaction_data.updated = updated;
 
-  push_query(q);
+  push_query(db, q);
 
   return q;
 }
@@ -303,7 +305,7 @@ open_transaction(rdf_db *db,
 
 void
 close_query(query *q)
-{ pop_query(q);
+{ pop_query(q->db, q);
 }
 
 
