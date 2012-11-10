@@ -666,6 +666,10 @@ destroy_atom_map(term_t handle)
     return FALSE;
 
   LOCK(m);
+  if ( m->defer.active )
+  { UNLOCK(m);
+    return PL_permission_error("destroy", "atom_map", handle);
+  }
   m->magic = 0;
   skiplist_destroy(&m->list);
   UNLOCK(m);
@@ -693,6 +697,7 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
        !get_datum(to, &a2) )
     return FALSE;
 
+  enter_scan(&map->defer);
   if ( (data=skiplist_find(&map->list, &search)) )
   { int rc;
 
@@ -710,14 +715,20 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
     UNLOCK(map);
 
     if ( rc < 0 )
+    { exit_scan(&map->defer);
       return PL_resource_error("memory");
+    }
   } else
   { int is_new;
 
     if ( keys && !PL_unify_integer(keys, map->list.count+1) )
+    { exit_scan(&map->defer);
       return FALSE;
+    }
     if ( !init_atom_set(map, &search.data.values, a2) )
+    { exit_scan(&map->defer);
       return PL_resource_error("memory");
+    }
 
     LOCK(map);
     data = skiplist_insert(&map->list, &search, &is_new);
@@ -733,6 +744,7 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
 	lock_datum(a2);
       } else if ( rc < 0 )
       { UNLOCK(map);
+	exit_scan(&map->defer);
 	return PL_resource_error("memory");
       }
     }
@@ -742,6 +754,7 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
     }
   }
 
+  exit_scan(&map->defer);
   return TRUE;
 }
 
@@ -767,11 +780,12 @@ delete_atom_map2(term_t handle, term_t from)
     return FALSE;
 
   LOCK(map);
+  enter_scan(&map->defer);
   if ( (data = skiplist_delete(&map->list, &search)) )
   { map->value_count -= data->values.size;
-    UNLOCK(map);
     deferred_finalize(&map->defer, data, free_node_data, map);
   }
+  exit_scan(&map->defer);
   UNLOCK(map);
 
   return TRUE;
@@ -790,6 +804,7 @@ delete_atom_map3(term_t handle, term_t from, term_t to)
        !get_datum(to, &a2) )
     return FALSE;
 
+  enter_scan(&map->defer);
   if ( (data = skiplist_find(&map->list, &search)) &&
        in_atom_set(&data->values, a2) )
   { atom_set *as = &data->values;
@@ -808,6 +823,7 @@ delete_atom_map3(term_t handle, term_t from, term_t to)
     }
     UNLOCK(map);
   }
+  exit_scan(&map->defer);
 
   return TRUE;
 }
@@ -839,18 +855,14 @@ cmp_atom_set_size(const void *p1, const void *p2)
 #define MAX_SETS 100
 
 static foreign_t
-find_atom_map(term_t handle, term_t keys, term_t literals)
-{ atom_map  *map;
-  pn_set    as[MAX_SETS];		/* TBD */
+find_atom_map_protected(atom_map  *map, term_t keys, term_t literals)
+{ pn_set as[MAX_SETS];				/* TBD */
   int ns = 0;
   term_t tmp = PL_new_term_ref();
   term_t tail = PL_copy_term_ref(keys);
   term_t head = PL_new_term_ref();
   atom_hash *ah;
   size_t ca;
-
-  if ( !get_atom_map(handle, &map) )
-    return FALSE;
 
   while(PL_get_list(tail, head, tail))
   { node_data *data;
@@ -916,6 +928,22 @@ next:;
 }
 
 
+static foreign_t
+find_atom_map(term_t handle, term_t keys, term_t literals)
+{ atom_map *map;
+  int rc;
+
+  if ( !get_atom_map(handle, &map) )
+    return FALSE;
+
+  enter_scan(&map->defer);
+  rc = find_atom_map_protected(map, keys, literals);
+  exit_scan(&map->defer);
+
+  return rc;
+}
+
+
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 rdf_keys_in_literal_map(+Map, +Spec, -Keys)
 
@@ -964,15 +992,11 @@ between_keys(atom_map *map, intptr_t min, intptr_t max, term_t head, term_t tail
 
 
 static foreign_t
-rdf_keys_in_literal_map(term_t handle, term_t spec, term_t keys)
-{ atom_map *map;
-  term_t tail = PL_copy_term_ref(keys);
+rdf_keys_in_literal_map_proteced(atom_map *map, term_t spec, term_t keys)
+{ term_t tail = PL_copy_term_ref(keys);
   term_t head = PL_new_term_ref();
   atom_t name;
   int arity;
-
-  if ( !get_atom_map(handle, &map) )
-    return FALSE;
 
   if ( !PL_get_name_arity(spec, &name, &arity) )
     PL_type_error("key-specifier", spec);
@@ -1077,6 +1101,22 @@ rdf_keys_in_literal_map(term_t handle, term_t spec, term_t keys)
   }
 
   return PL_unify_nil(tail);
+}
+
+
+static foreign_t
+rdf_keys_in_literal_map(term_t handle, term_t spec, term_t keys)
+{ atom_map *map;
+  int rc;
+
+  if ( !get_atom_map(handle, &map) )
+    return FALSE;
+
+  enter_scan(&map->defer);
+  rc = rdf_keys_in_literal_map_proteced(map, spec, keys);
+  exit_scan(&map->defer);
+
+  return rc;
 }
 
 
