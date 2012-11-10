@@ -84,6 +84,7 @@ typedef struct defer_free
 { unsigned int	active;				/* Active users */
   defer_cell   *free_cells;			/* List if free cells */
   defer_cell   *freed;				/* Freed objects */
+  size_t	allocated;			/* Allocated free cells */
 } defer_free;
 
 
@@ -100,6 +101,8 @@ new_cells(defer_free *df, defer_cell **lastp)
       n->next = n+1;
     last->next = NULL;
     *lastp = last;
+
+    df->allocated += FREE_CHUNK_SIZE;		/* not locked; but just stats */
   }
 
   return c;
@@ -126,14 +129,21 @@ alloc_defer_cell(defer_free *df)
     if ( !c )
     { defer_cell *last;
       defer_cell *fl = new_cells(df, &last);
-      free_defer_list(df, fl, last);
-      c = df->free_cells;
+
+      if ( fl )
+      { free_defer_list(df, fl, last);
+	c = df->free_cells;
+      } else
+	return NULL;
     }
   } while ( !__sync_bool_compare_and_swap(&df->free_cells, c, c->next) );
 
   return c;
 }
 
+
+/* TBD: what to do of alloc_defer_cell() return NULL?
+*/
 
 static inline void
 deferred_free(defer_free *df, void *data)
@@ -160,7 +170,6 @@ deferred_finalize(defer_free *df, void *data,
   c->mem	 = data;
   c->finalizer	 = finalizer;
   c->client_data = client_data;
-
 
   do
   { o = df->freed;
