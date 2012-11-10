@@ -160,7 +160,7 @@ skiplist_find(skiplist *sl, void *payload)
   scpp = NULL;
 
   while(h>=0)
-  { void *next;
+  { void *nscp;
 
     if ( scpp )
     { skipcell *sc = subPointer(scp, SIZEOF_SKIP_CELL_NOPLAYLOAD(h));
@@ -182,16 +182,15 @@ skiplist_find(skiplist *sl, void *payload)
       }
     }
 
-    if ( (next = *scp) == NULL )
+    if ( (nscp = *scp) )
+    { scpp = scp;
+      scp  = (void**)nscp;
+    } else
     { if ( scpp )
 	scpp--;
       scp--;
       h--;
-      continue;
     }
-
-    scpp = scp;
-    scp  = (void**)next;
   }
 
   return NULL;
