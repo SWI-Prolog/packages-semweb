@@ -969,6 +969,7 @@ gc_clouds(rdf_db *db, gen_t gen)
 { int i;
   int gc_id = db->gc.count+1;
 
+  enter_scan(&db->defer_all);
   for(i=0; i<db->predicates.bucket_count; i++)
   { predicate *p = db->predicates.blocks[MSB(i)][i];
 
@@ -983,6 +984,7 @@ gc_clouds(rdf_db *db, gen_t gen)
       gc_is_leaf(db, p, gen);
     }
   }
+  exit_scan(&db->defer_all);
 
   return 0;
 }
@@ -2955,7 +2957,9 @@ optimize_triple_hashes(rdf_db *db, gen_t gen)
   int optimized = 0;
 
   for(icol=1; icol<INDEX_TABLES; icol++)
-  { optimized += optimize_triple_hash(db, icol, gen);
+  { enter_scan(&db->defer_all);
+    optimized += optimize_triple_hash(db, icol, gen);
+    exit_scan(&db->defer_all);
     if ( PL_handle_signals() < 0 )
       return -1;
   }
@@ -3102,7 +3106,9 @@ gc_hashes(rdf_db *db, gen_t gen, gen_t reindex_gen)
 { int icol;
 
   for(icol=0; icol<INDEX_TABLES; icol++)
-  { gc_hash(db, icol, gen, reindex_gen);
+  { enter_scan(&db->defer_all);
+    gc_hash(db, icol, gen, reindex_gen);
+    exit_scan(&db->defer_all);
     if ( PL_handle_signals() < 0 )
       return -1;
   }
