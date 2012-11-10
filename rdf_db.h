@@ -58,6 +58,7 @@ supposed to be local to the SWI-Prolog kernel are declared using
 #include <SWI-Prolog.h>
 #include <assert.h>
 #include <string.h>
+#include "deferfree.h"
 #include "debug.h"
 #include "memory.h"
 #include "hash.h"

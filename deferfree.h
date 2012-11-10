@@ -50,7 +50,7 @@ typedef struct defer_cell
 } defer_cell;
 
 typedef struct defer_free
-{ atomic_t	active;				/* Active users */
+{ unsigned int	active;				/* Active users */
   defer_cell   *free_cells;			/* List if free cells */
   defer_cell   *freed;				/* Freed objects */
 } defer_free;
@@ -63,7 +63,7 @@ new_cells(defer_free *df, defer_cell **lastp)
 { defer_cell *c = malloc(sizeof(*c)*FREE_CHUNK_SIZE);
 
   if ( c )
-  { defer_cell *last = &c[FREE_CHUNK_SIZE-1]
+  { defer_cell *n, *last = &c[FREE_CHUNK_SIZE-1];
 
     for(n=c; n != last; n++)
       n->next = n+1;
