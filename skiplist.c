@@ -208,7 +208,7 @@ skiplist_find_first(skiplist *sl, void *payload, skiplist_enum *en)
   en->list = sl;
 
   if ( payload )
-  { void **scpp;
+  { void **scpp, *nscp;
 
     h    = sl->height-1;			/* h>=1 */
     scp  = &sl->next[h];
@@ -228,23 +228,25 @@ skiplist_find_first(skiplist *sl, void *payload, skiplist_enum *en)
 	{ if ( h == 0 )
 	    goto found;
 
-	  scpp--;
-	  scp = (void**)*scpp;
-	  h--;
+	  do
+	  { scpp--;
+	    scp = (void**)*scpp;
+	    h--;
+	  } while(scp == NULL && h>=0 );
+
 	  continue;
 	}
       }
 
-      if ( *scp == NULL )
+      if ( (nscp = *scp) )
+      { scpp = scp;
+	scp  = (void**)nscp;
+      } else
       { if ( scpp )
 	  scpp--;
 	scp--;
 	h--;
-	continue;
       }
-
-      scpp = scp;
-      scp  = (void**)*scp;
     }
 
     return NULL;
