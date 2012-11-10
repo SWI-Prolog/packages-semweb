@@ -2783,9 +2783,12 @@ Note that we could also leave this to   GC and/or run this in a separate
 thread!
 */
 
+#define SPO_FACTOR 1
+#define   O_FACTOR 4
+
 static void
 consider_triple_rehash(rdf_db *db)
-{ if ( db->created - db->erased > db->hash[ICOL(BY_SPO)].bucket_count )
+{ if ( db->created - db->erased > SPO_FACTOR*db->hash[ICOL(BY_SPO)].bucket_count )
   { int i;
     int resized = 0;
 
@@ -2803,11 +2806,11 @@ consider_triple_rehash(rdf_db *db)
 	  break;
 	case BY_O:
 	  if ( (db->resources.hash.count + db->literals.count) >
-	       db->hash[i].bucket_count )
+	       O_FACTOR*db->hash[i].bucket_count )
 	    resize = TRUE;
 	  break;
 	case BY_SPO:
-	  if ( db->created - db->erased > db->hash[i].bucket_count )
+	  if ( db->created - db->erased > SPO_FACTOR*db->hash[i].bucket_count )
 	    resize = TRUE;
 	  break;
 	case BY_G:
