@@ -1,3 +1,25 @@
+/*  Part of SWI-Prolog
+
+    Author:        Jan Wielemaker
+    E-mail:        J.Wielemaker@vu.nl
+    WWW:           http://www.swi-prolog.org
+    Copyright (C): 2012 VU University Amsterdam
+
+    This library is free software; you can redistribute it and/or
+    modify it under the terms of the GNU Lesser General Public
+    License as published by the Free Software Foundation; either
+    version 2.1 of the License, or (at your option) any later version.
+
+    This library is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    Lesser General Public License for more details.
+
+    You should have received a copy of the GNU Lesser General Public
+    License along with this library; if not, write to the Free Software
+    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+*/
+
 #ifndef PL_DEFER_FREE_H_INCLUDED
 #define PL_DEFER_FREE_H_INCLUDED
 
@@ -21,9 +43,12 @@ sequence below instead of acquiring a lock:
 
 And, it demands writers to call the following rather than PL_free():
 
-    defered_free(handle, ptr)
+    deferred_free(handle, ptr)
+    deferred_finalize(handle, ptr,
+		      (*finalizer)(void*mem, void*client_data),
+		      client_data)
 
-Actual freeing the  objects  is  defered   until  there  are  no readers
+Actual freeing the  objects  is  deferred   until  there  are  no readers
 scanning the object.  Note  that  this   is  too  strong  a requirement.
 Ideally, we'd pick the free list  and   wait  until all threads have had
 some point where they finished all their scanning activities. I.e., this
@@ -44,9 +69,15 @@ TODO:
   way to switch between the two techniques.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+/* TODO: Use tagged pointers to have both finalized destruction and
+   plain simple destruction?
+*/
+
 typedef struct defer_cell
 { struct defer_cell *next;
   void		    *mem;			/* guarded memory */
+  void		   (*finalizer)(void*mem, void*client_data);
+  void		    *client_data;
 } defer_cell;
 
 typedef struct defer_free
@@ -105,15 +136,38 @@ alloc_defer_cell(defer_free *df)
 
 
 static inline void
-defered_free(defer_free *df, void *data)
+deferred_free(defer_free *df, void *data)
 { defer_cell *c = alloc_defer_cell(df);
   defer_cell *o;
+
+  c->mem       = data;
+  c->finalizer = NULL;
 
   do
   { o = df->freed;
     c->next = o;
   } while ( !__sync_bool_compare_and_swap(&df->freed, o, c) );
 }
+
+
+static inline void
+deferred_finalize(defer_free *df, void *data,
+		 void (*finalizer)(void *data, void *client_data),
+		 void *client_data)
+{ defer_cell *c = alloc_defer_cell(df);
+  defer_cell *o;
+
+  c->mem	 = data;
+  c->finalizer	 = finalizer;
+  c->client_data = client_data;
+
+
+  do
+  { o = df->freed;
+    c->next = o;
+  } while ( !__sync_bool_compare_and_swap(&df->freed, o, c) );
+}
+
 
 
 static inline void
@@ -131,7 +185,10 @@ exit_scan(defer_free *df)
     { defer_cell *fl = o;
 
       for(;;)
-      { PL_free(o->mem);
+      { if ( o->finalizer )
+	  (*o->finalizer)(o->mem, o->client_data);
+	free(o->mem);
+
 	if ( o->next )
 	{ o = o->next;
 	} else

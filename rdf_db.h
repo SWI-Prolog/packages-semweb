@@ -375,6 +375,11 @@ typedef struct rdf_db
   graph	       *last_graph;		/* last accessed graph */
   query_admin	queries;		/* Active query administration */
 
+					/* Deferred free handling */
+  defer_free	defer_triples;		/* triples */
+  defer_free	defer_clouds;		/* Predicate clouds */
+  defer_free	defer_literals;		/* Literals */
+
   int		resetting;		/* We are in rdf_reset_db() */
 
   struct

@@ -21,164 +21,34 @@
 */
 
 #include "rdf_db.h"
+#include "deferfree.h"
 #include "alloc.h"
-#define GC_THREADS
-#define DYNAMIC_MARKS
-#include <gc/gc.h>
-#include <gc/gc_mark.h>
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Triples are removed in two steps:
-
-  - rdf_gc() removes triples died before the oldest active generation
-    from the hash-chains. They are there left to be reclaimed by
-    Boehm-GC.
-  - Boehm-GC won't collect the triple as long as there are pointers
-    (e.g., from Prolog choice-points or threads scanning the clause
-    list) pointing to the triple.
-
-Unfortunately, Boehm-GC is a  _conservative_   garbage  collector.  This
-means that it may  incorrectly  (due  to   bits  being  recognised  as a
-pointer) not release a triple. This is fine as long as it only affects a
-small minority of the triples, but   if multiple consequtive triples are
-removed, these form a chain of  garbage.   If  some  triple in the chain
-cannot be removed,  the  remainder  of   the  chain  cannot  be removed.
-Experiments show this works out poorly for the triple-store.
-
-We fix this using a private mark procedure. This procedure is called for
-triples *after* step (1) above. It first scans for the first life triple
-(or NULL) and then replaces all next  pointers in the garbage chain with
-a direct pointer to the life cell (or NULL). Note that these markers may
-run concurrently, but in  a  stop-the-world   situation  this  is  not a
-problem.
-
-It is probably not even a problem   for the incremental GC scenario, but
-this remains to be proven. As  long  as   we  use  Boehm-GC to deal with
-deleted data, this is unlikely to become an issue.
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-static void **triple_free_list;
-static unsigned triple_kind;
-
-#define LINE_LINGER_MAGIC 30203020
 
 triple *
 alloc_triple(void)
-{ triple *t;
+{ triple *t = malloc(sizeof(*t));
 
-  t = GC_generic_malloc(sizeof(*t), triple_kind);
   if ( t )
-    GC_SET_FLAGS(t, GC_FLAG_UNCOLLECTABLE);
+    memset(t, 0, sizeof(*t));
 
   return t;
 }
 
 
 void
-unalloc_triple(triple *t, int linger)
+unalloc_triple(rdf_db *db, triple *t, int linger)
 { if ( t )
   { assert(t->atoms_locked == FALSE);
 
     if ( linger )
-    { t->lingering = TRUE;
-      t->line = LINE_LINGER_MAGIC;
-      GC_CLEAR_FLAGS(t, GC_FLAG_UNCOLLECTABLE);
-    } else
-      GC_FREE(t);
+      deferred_free(&db->defer_triples, t);
+    else
+      free(t);
   }
-}
-
-
-static void
-mark_triple_next(triple *t, int icol)
-{ triple *p, *e, *n;
-
-  for(e=t; e && !e->lingering; e=e->tp.next[icol])
-    ;
-  for(p=t; p && !p->lingering; p=n)
-  { n = p->tp.next[icol];
-    p->tp.next[icol] = e;
-  }
-}
-
-
-static void
-mark_triple_reindex(triple *t)
-{ triple *p, *e, *n;
-
-  for(e=t; e && !e->lingering; e=e->reindexed)
-    ;
-  for(p=t; p && !p->lingering; p=n)
-  { n = p->reindexed;
-    p->reindexed = e;
-  }
-}
-
-
-
-/* From gc_mark.h: */
-  /* WARNING: Such a mark procedure may be invoked on an unused object    */
-  /* residing on a free list.  Such objects are cleared, except for a     */
-  /* free list link field in the first word.  Thus mark procedures may    */
-  /* not count on the presence of a type descriptor, and must handle this */
-  /* case correctly somehow.                                              */
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-(*) Hmmm. It seems this can be  called before unalloc_triple() is called
-on the triple. Although, while asserting  triples from multiple threads,
-we only see this for triples that are:
-
-  - reindexed
-  - have ->linked set to 1 (which seems to imply GC removed them from
-    all but one index).
-
-I.e., the triple seems to be in  a   sane  reindexed  state, about to be
-removed completely.
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-static struct GC_ms_entry *
-mark_triple(GC_word *addr,
-	    struct GC_ms_entry *mark_stack_ptr,
-	    struct GC_ms_entry *mark_stack_limit,
-	    GC_word env)
-{ triple *t = (triple*)addr;
-  int i;
-
-  if ( !t->lingering )
-  { // assert(!t->graph);		/* See (*) */
-    if ( t->graph )
-    { DEBUG(40,
-	    Sdprintf("mark_triple(): reindexed = %p, linked = %d??\n",
-		     t->reindexed, t->linked));
-    }
-    return mark_stack_ptr;
-  }
-
-  assert(t->line == LINE_LINGER_MAGIC);
-
-  for(i=0; i<INDEX_TABLES; i++)
-    mark_triple_next(t, i);
-  mark_triple_reindex(t);
-
-  mark_stack_ptr = GC_MARK_AND_PUSH(t->predicate.r,
-				    mark_stack_ptr, mark_stack_limit,
-				    (void**)&t);
-  if ( t->object_is_literal )
-    mark_stack_ptr = GC_MARK_AND_PUSH(t->object.literal,
-				      mark_stack_ptr, mark_stack_limit,
-				      (void**)&t);
-
-  return mark_stack_ptr;
 }
 
 
 int
 init_alloc(void)
-{ int proc;
-
-  triple_free_list = GC_new_free_list();
-  proc = GC_new_proc(mark_triple);
-  triple_kind = GC_new_kind(triple_free_list, GC_MAKE_PROC(proc, 0), 0, 1);
-
-  return TRUE;
+{ return TRUE;
 }

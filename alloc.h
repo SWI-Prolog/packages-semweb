@@ -24,7 +24,7 @@
 #define ALLOC_H_INCLUDED
 
 COMMON(triple*)	alloc_triple(void);
-COMMON(void)	unalloc_triple(triple *t, int linger);
+COMMON(void)	unalloc_triple(rdf_db *db, triple *t, int linger);
 COMMON(int)	init_alloc(void);
 
 #endif /*ALLOC_H_INCLUDED*/

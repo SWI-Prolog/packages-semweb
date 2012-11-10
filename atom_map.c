@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@cs.vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2002-2010, University of Amsterdam
+    Copyright (C): 2002-2012, University of Amsterdam
 			      VU University Amsterdam
 
     This library is free software; you can redistribute it and/or
@@ -29,6 +29,7 @@
 /*#define O_SECURE 1*/
 #include <SWI-Stream.h>
 #include <SWI-Prolog.h>
+#include "deferfree.h"
 #include "skiplist.h"
 #include "mutex.h"
 #include "memory.h"
@@ -71,12 +72,6 @@ Searching is done using
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 			      TODO
 
-Concurrency issues:
-    - Both node_data (payload for the skiplist) and the close hash-table
-      array must be left to GC.
-    - Search in atom sets must reliably get pointer and size.  See
-      resize_atom_set();
-    - The map itself must be left to GC to avoid interaction on destroy
     - The set must be handled by a Prolog symbol to ensure clean
       destruction.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -93,6 +88,7 @@ typedef struct atom_map
   size_t	value_count;		/* total # values in all keys */
   simpleMutex	lock;			/* Multi-threaded access */
   skiplist	list;			/* Skip list */
+  defer_free	defer;			/* Concurrent free handling */
 } atom_map;
 
 typedef void *datum;
@@ -365,21 +361,20 @@ format_datum(datum d, char *buf)
 		 *	     ATOM SETS		*
 		 *******************************/
 
-static int insert_atom_set(atom_set *as, datum a);
+static int insert_atom_set(atom_map *map, atom_set *as, datum a);
 static int insert_atom_hash(atom_hash *hash, datum add);
 
 #define AS_INITIAL_SIZE 4
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-A set of  datums  (atoms  or  integers)   is  a  close  hash-table.  The
+A set of datums  (atoms  or  integers)   is  a  closed  hash-table.  The
 implementation is an adapted copy from   XPCE's  class hash_table, using
 closed hash-tables.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static int
-init_atom_set(atom_set *as, datum a0)
-{ if ( (as->entries = PL_malloc_atomic_unmanaged(
-			  SIZEOF_ATOM_HASH(AS_INITIAL_SIZE))) )
+init_atom_set(atom_map *map, atom_set *as, datum a0)
+{ if ( (as->entries = malloc(SIZEOF_ATOM_HASH(AS_INITIAL_SIZE))) )
   { size_t i;
 
     as->size = 0;
@@ -387,7 +382,7 @@ init_atom_set(atom_set *as, datum a0)
     for(i=0; i<AS_INITIAL_SIZE; i++)
       as->entries->atoms[i] = EMPTY;
 
-    insert_atom_set(as, a0);
+    insert_atom_set(map, as, a0);
     lock_datum(a0);
 
     return TRUE;
@@ -447,8 +442,8 @@ in_atom_set(atom_set *as, datum a)
 
 
 static int
-resize_atom_set(atom_set *as, size_t size)
-{ atom_hash *new = PL_malloc_atomic_unmanaged(SIZEOF_ATOM_HASH(size));
+resize_atom_set(atom_map *map, atom_set *as, size_t size)
+{ atom_hash *new = malloc(SIZEOF_ATOM_HASH(size));
 
   if ( new )
   { size_t i;
@@ -467,7 +462,7 @@ resize_atom_set(atom_set *as, size_t size)
 
     old = as->entries;
     as->entries = new;			/* must be synchronized */
-    PL_linger(old);			/* leave to GC */
+    deferred_free(&map->defer, old);	/* leave to GC */
 
     return TRUE;
   }
@@ -499,11 +494,11 @@ insert_atom_hash(atom_hash *hash, datum add)
 */
 
 static int
-insert_atom_set(atom_set *as, datum a)
+insert_atom_set(atom_map *map, atom_set *as, datum a)
 { int rc;
 
   if ( 4*(as->size+1) > 3*as->entries->allocated )
-  { if ( !resize_atom_set(as, 2*as->entries->allocated) )
+  { if ( !resize_atom_set(map, as, 2*as->entries->allocated) )
       return -1;				/* no memory */
   }
 
@@ -516,13 +511,13 @@ insert_atom_set(atom_set *as, datum a)
 
 
 static int
-delete_atom_set(atom_set *as, datum a)
+delete_atom_set(atom_map *map, atom_set *as, datum a)
 { unsigned int i;
   int j, r;
 
   if ( as->size < as->entries->allocated/4 &&
        as->entries->allocated > AS_INITIAL_SIZE )
-  { if ( !resize_atom_set(as, as->entries->allocated/2) )
+  { if ( !resize_atom_set(map, as, as->entries->allocated/2) )
       return -1;				/* no memory */
   }
 
@@ -568,24 +563,25 @@ destroy_atom_set(atom_set *as)
   for(i=0; i<as->entries->allocated; i++)
     unlock_datum(as->entries->atoms[i]);
 
-  PL_free(as->entries);
+  free(as->entries);
 }
 
 
 static void
-finalize_atom_set(atom_set *as)
+finalize_atom_set(atom_map *am, atom_set *as)
 { size_t i;
 
   for(i=0; i<as->entries->allocated; i++)
     unlock_datum(as->entries->atoms[i]);
 
-  PL_linger(as->entries);			/* leave to GC */
+  deferred_free(&am->defer, as->entries);
 }
 
 
 static void
 free_node_data(void *ptr, void *cd)
 { node_data *data = ptr;
+  atom_map *am = cd;
 
   DEBUG(2,
 	char b[20];
@@ -593,7 +589,7 @@ free_node_data(void *ptr, void *cd)
 		 format_datum(data->key, b)));
 
   unlock_datum(data->key);
-  finalize_atom_set(&data->values);
+  finalize_atom_set(am, &data->values);
 }
 
 
@@ -631,7 +627,7 @@ static void *
 map_alloc(size_t size, void *cd)
 { (void)cd;
 
-  return PL_malloc_unmanaged(size);
+  return malloc(size);
 }
 
 
@@ -639,7 +635,7 @@ static void
 init_map(atom_map *m)
 { skiplist_init(&m->list,
 		sizeof(node_data),	/* Payload size */
-		NULL,			/* Client data */
+		m,			/* Client data */
 		cmp_node_data,		/* Compare */
 		map_alloc,		/* Allocate */
 		free_node_data);	/* Destroy */
@@ -650,7 +646,7 @@ static foreign_t
 new_atom_map(term_t handle)
 { atom_map *m;
 
-  if ( !(m=PL_malloc_unmanaged(sizeof(*m))) )
+  if ( !(m=malloc(sizeof(*m))) )
     return PL_resource_error("memory");
 
   memset(m, 0, sizeof(*m));
@@ -674,7 +670,7 @@ destroy_atom_map(term_t handle)
   skiplist_destroy(&m->list);
   UNLOCK(m);
   simpleMutexDelete(&m->lock);
-  PL_linger(m);
+  free(m);
 
   return TRUE;
 }
@@ -704,7 +700,7 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
 
     LOCK(map);
     rc = ( !skiplist_erased_payload(&map->list, data) &&
-	   insert_atom_set(&data->values, a2)
+	   insert_atom_set(map, &data->values, a2)
 	 );
     if ( rc )
     { lock_datum(a2);			/* Must be locked because it may */
@@ -720,7 +716,7 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
 
     if ( keys && !PL_unify_integer(keys, map->list.count+1) )
       return FALSE;
-    if ( !init_atom_set(&search.data.values, a2) )
+    if ( !init_atom_set(map, &search.data.values, a2) )
       return PL_resource_error("memory");
 
     LOCK(map);
@@ -732,7 +728,7 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
     } else
     { int rc;
 
-      if ( (rc = insert_atom_set(&data->values, a2)) > 0 )
+      if ( (rc = insert_atom_set(map, &data->values, a2)) > 0 )
       { map->value_count++;
 	lock_datum(a2);
       } else if ( rc < 0 )
@@ -774,8 +770,7 @@ delete_atom_map2(term_t handle, term_t from)
   if ( (data = skiplist_delete(&map->list, &search)) )
   { map->value_count -= data->values.size;
     UNLOCK(map);
-    GC_REGISTER_FINALIZER(data, free_node_data, NULL, NULL, NULL);
-    PL_linger(data);
+    deferred_finalize(&map->defer, data, free_node_data, map);
   }
   UNLOCK(map);
 
@@ -801,15 +796,14 @@ delete_atom_map3(term_t handle, term_t from, term_t to)
 
     LOCK(map);
     if ( !skiplist_erased_payload(&map->list, data) &&
-	 delete_atom_set(as, a2) )
+	 delete_atom_set(map, as, a2) )
     { unlock_datum(a2);
       map->value_count--;
       if ( as->size == 0 )
       { search.data = *data;
 	if ( data != skiplist_delete(&map->list, &search) )
 	  assert(0);
-	GC_REGISTER_FINALIZER(data, free_node_data, NULL, NULL, NULL);
-	PL_linger(data);
+	deferred_finalize(&map->defer, data, free_node_data, map);
       }
     }
     UNLOCK(map);
@@ -1147,11 +1141,6 @@ install_t
 install_atom_map(void)
 { init_functors();
   init_datum_store();
-
-  if ( !PL_linger(0) )
-    Sdprintf("Warning: SWI-Prolog is not compiled with customized "
-	     "Boehm-GC\n");
-
 
   PRED("rdf_new_literal_map",	     1,	new_atom_map,		    0);
   PRED("rdf_destroy_literal_map",    1,	destroy_atom_map,	    0);

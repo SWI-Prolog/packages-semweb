@@ -45,10 +45,6 @@
 #endif
 #endif
 
-#define GC_THREADS
-#define DYNAMIC_MARKS
-#include <gc/gc.h>
-
 #include "rdf_db.h"
 #include "alloc.h"
 #include <wctype.h>
@@ -70,12 +66,12 @@ static int  md5_unify_digest(term_t t, md5_byte_t digest[16]);
 
 void *
 rdf_malloc(rdf_db *db, size_t size)
-{ return PL_malloc_unmanaged(size);
+{ return malloc(size);
 }
 
 void
 rdf_free(rdf_db *db, void *ptr, size_t size)
-{ PL_free(ptr);
+{ free(ptr);
 }
 
 static functor_t FUNCTOR_literal1;
@@ -950,7 +946,7 @@ gc_cloud(rdf_db *db, predicate_cloud *cloud, gen_t gen)
       free_bitmatrix(db, rm->matrix);
       rm->matrix = NULL;		    /* Clean to avoid false pointers */
       memset(&rm->lifespan, 0, sizeof(rm->lifespan));
-      PL_linger(rm);
+      deferred_free(&db->defer_clouds, rm);
     } else
     { prev = rm;
     }
@@ -1027,7 +1023,7 @@ append_clouds(rdf_db *db,
   memcpy(&new_members[0],        c1->members, c1->size*sizeof(predicate*));
   memcpy(&new_members[c1->size], c2->members, c2->size*sizeof(predicate*));
   c1->members = new_members;
-  PL_linger(old_members);
+  deferred_free(&db->defer_clouds, old_members);
 
 					/* re-label the new ones */
   for(i=c1->size; i<c1->size+c2->size; i++)
@@ -1064,7 +1060,7 @@ append_clouds(rdf_db *db,
 	     c1->alt_hash_count*sizeof(unsigned int));
       MemoryBarrier();
       c1->alt_hashes = new_hashes;
-      PL_linger(old_hashes);
+      deferred_free(&db->defer_clouds, old_hashes);
     } else
     { c1->alt_hashes = rdf_malloc(db, newc*sizeof(unsigned int));
       c1->alt_hashes[0] = c1->hash;
@@ -1601,7 +1597,7 @@ gc_is_leaf(rdf_db *db, predicate *p, gen_t gen)
       }
 
       memset(&il->lifespan, 0, sizeof(il->lifespan));
-      PL_linger(il);
+      deferred_free(&db->defer_clouds, il);
     } else
     { prev = il;
     }
@@ -2337,7 +2333,7 @@ free_literal_value(rdf_db *db, literal *lit)
     if ( (data=skiplist_delete(&db->literals, &lex)) )
     { unlock_atoms_literal(lit);
 
-      PL_linger(data);				/* someone else may be reading */
+      deferred_free(&db->defer_literals, data);	/* someone else may be reading */
     } else
     { Sdprintf("Failed to delete %p (size=%ld): ", lit, db->literals.count);
       print_literal(lit);
@@ -3354,7 +3350,7 @@ free_triple(rdf_db *db, triple *t, int linger)
     free_literal_value(db, &t->tp.end);
 
   if ( t->allocated )
-    unalloc_triple(t, linger);
+    unalloc_triple(db, t, linger);
 }
 
 
