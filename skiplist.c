@@ -175,9 +175,12 @@ skiplist_find(skiplist *sl, void *payload)
 	else
 	  return NULL;
       } else if ( diff < 0 )		/* cell payload > target */
-      { scpp--;
-	scp = (void**)*scpp;
-	h--;
+      { do
+	{ scpp--;
+	  scp = (void**)*scpp;
+	  h--;
+	} while(scp == NULL && h>=0 );
+
 	continue;
       }
     }
