@@ -189,9 +189,6 @@ static void	invalidate_is_leaf(predicate *p, query *q, int add);
 		 *	       LOCKING		*
 		 *******************************/
 
-#define LOCK_LIT(db)			simpleMutexLock(&db->locks.literal)
-#define UNLOCK_LIT(db)			simpleMutexUnlock(&db->locks.literal)
-
 static void
 INIT_LOCK(rdf_db *db)
 { simpleMutexInit(&db->locks.literal);
@@ -2424,8 +2421,9 @@ new_literal(rdf_db *db)
 
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-FIXME: rdf_broadcast(EV_OLD_LITERAL,...) may happen with a write-lock on
-the RDF DB.
+FIXME: rdf_broadcast(EV_OLD_LITERAL,...) happens with   the literal lock
+helt. Needs better merging with  free_literal()   to  reduce locking and
+avoid this problem.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static int
@@ -2485,14 +2483,14 @@ free_literal(rdf_db *db, literal *lit)
 { int rc = TRUE;
 
   if ( lit->shared )
-  { simpleMutexLock(&db->queries.write.lock);
+  { simpleMutexLock(&db->locks.literal);
     if ( --lit->references == 0 )
     { rc = free_literal_value(db, lit);
-      simpleMutexUnlock(&db->queries.write.lock);
+      simpleMutexUnlock(&db->locks.literal);
 
       rdf_free(db, lit, sizeof(*lit));
     } else
-    { simpleMutexUnlock(&db->queries.write.lock);
+    { simpleMutexUnlock(&db->locks.literal);
     }
   } else				/* not shared; no locking needed */
   { if ( --lit->references == 0 )
@@ -2725,7 +2723,7 @@ deadlocks and reduces collisions.
 
 literal *
 share_literal(rdf_db *db, literal *from)
-{ literal **data;
+{ literal **data, *shared;
   literal_ex lex;
   int is_new;
 
@@ -2735,27 +2733,27 @@ share_literal(rdf_db *db, literal *from)
   lex.literal = from;
   prepare_literal_ex(&lex);
 
-  simpleMutexLock(&db->queries.write.lock);
+  simpleMutexLock(&db->locks.literal);
   sl_check(db, FALSE);
   data = skiplist_insert(&db->literals, &lex, &is_new);
   sl_check(db, FALSE);
   if ( is_new )
-    from->shared = TRUE;
-  simpleMutexUnlock(&db->queries.write.lock);
+  { from->shared = TRUE;
+    shared = from;
+  } else
+  { shared = *data;
+    shared->references++;
+  }
+  simpleMutexUnlock(&db->locks.literal);
 
   if ( !is_new )
-  { literal *l2 = *data;
-
-    DEBUG(2,
-	  Sdprintf("Replace %p by %p:\n", from, l2);
+  { DEBUG(2,
+	  Sdprintf("Replace %p by %p:\n", from, shared);
 	  Sdprintf("\tfrom: "); print_literal(from);
-	  Sdprintf("\n\tto: "); print_literal(l2);
+	  Sdprintf("\n\tto: "); print_literal(shared);
 	  Sdprintf("\n"));
 
-    l2->references++;
     free_literal(db, from);
-
-    return l2;
   } else
   { DEBUG(2,
 	  Sdprintf("Insert %p into literal table: ", from);
@@ -2765,8 +2763,9 @@ share_literal(rdf_db *db, literal *from)
     assert(from->references==1);
     assert(from->atoms_locked==1);
     rdf_broadcast(EV_NEW_LITERAL, from, NULL);
-    return from;
   }
+
+  return shared;
 }
 
 
