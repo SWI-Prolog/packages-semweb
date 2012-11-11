@@ -665,6 +665,10 @@ for_atomset(atomset *as,
 		 *	   TRIPLE SETS		*
 		 *******************************/
 
+/* Note that only ->entries need to be NULL to consider the set empty.
+   The remainder of the initialization is done lazily.
+*/
+
 static void *
 alloc_tripleset(void *ptr, size_t size)
 { void *p;
@@ -6122,7 +6126,6 @@ rdf(term_t subject, term_t predicate, term_t object,
     { query *q = open_query(db);
 
       state = &q->state.search;
-      memset(state, 0, sizeof(*state));
       state->query     = q;
       state->db	       = db;
       state->subject   = subject;
@@ -6131,6 +6134,10 @@ rdf(term_t subject, term_t predicate, term_t object,
       state->src       = src;
       state->realpred  = realpred;
       state->flags     = flags;
+						/* clear the rest */
+      memset(&state->cursor, 0,
+	     (char*)&state->lit_ex - (char*)&state->cursor);
+      state->dup_answers.entries = NULL;	/* see add_tripleset() */
 
       if ( !init_search_state(state, q) )
       { free_search_state(state);

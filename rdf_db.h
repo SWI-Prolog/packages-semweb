@@ -473,27 +473,29 @@ typedef struct literal_ex
 
 
 typedef struct search_state
-{ rdf_db       *db;			/* our database */
+{ struct query *query;			/* Associated query */
+  rdf_db       *db;			/* our database */
   term_t	subject;		/* Prolog term references */
   term_t	object;
   term_t	predicate;
   term_t	src;
   term_t	realpred;
-  atom_t	prefix;			/* prefix and like search */
   unsigned	flags;			/* Misc flags controlling search */
-  int		has_literal_state;	/* Literal state is present */
-  int		alt_hash_cursor;	/* Index in alternative hashes */
-  skiplist_enum literal_state;		/* Literal search state */
-  literal      *literal_cursor;		/* pointer in current literal */
-  literal_ex    lit_ex;			/* extended literal for fast compare */
-  literal      *restart_lit;		/* for restarting literal search */
-  skiplist_enum restart_lit_state;	/* for restarting literal search */
+					/* START memset() cleared area */
   triple_walker cursor;			/* Pointer in triple DB */
-  struct query *query;			/* Associated query */
-  predicate_cloud *p_cloud;		/* Searched predicate cloud */
   triple	pattern;		/* Pattern triple */
-  triple	saved_pattern;		/* For inverse */
+  atom_t	prefix;			/* prefix and like search */
+  int		alt_hash_cursor;	/* Index in alternative hashes */
+  int		has_literal_state;	/* Literal state is present */
+  literal      *literal_cursor;		/* pointer in current literal */
+  literal      *restart_lit;		/* for restarting literal search */
+  skiplist_enum literal_state;		/* Literal search state */
+  skiplist_enum restart_lit_state;	/* for restarting literal search */
+  predicate_cloud *p_cloud;		/* Searched predicate cloud */
   triple       *prefetched;		/* Prefetched triple (retry) */
+					/* END memset() cleared area */
+  literal_ex    lit_ex;			/* extended literal for fast compare */
+  triple	saved_pattern;		/* For inverse */
   tripleset	dup_answers;		/* possible duplicate answers */
 } search_state;
 
