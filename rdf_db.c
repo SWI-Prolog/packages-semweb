@@ -2828,38 +2828,86 @@ reset_triple_hash(rdf_db *db, triple_hash *hash)
 }
 
 
+/* count_different() returns the number of elements in a hash bucket
+   that have a different unbounded hash.  That is, the bucket might
+   split if we resize the table.
+
+   *count is assigned with the size.  That is merely consistency because
+   we also keep track of this value.
+*/
+
+#define COUNT_DIFF_NOHASH 5
+
 static int
 count_different(triple_bucket *tb, int index, int *count)
 { triple *t;
-  atomset hash_set;
   int rc;
-  int c = 0;
 
-  init_atomset(&hash_set);
-  for(t=tb->head; t; t=t->tp.next[ICOL(index)])
-  { c++;
-    add_atomset(&hash_set, (atom_t)triple_hash_key(t, index));
+  if ( tb->count < COUNT_DIFF_NOHASH )
+  { if ( tb->count <= 1 )
+    { *count = tb->count;
+
+      return tb->count;
+    } else
+    { size_t hashes[COUNT_DIFF_NOHASH];
+      int different = 0;
+      int found = 0;
+
+      for(t=tb->head;
+	  t && different < COUNT_DIFF_NOHASH;	/* be careful with concurrently */
+	  t=t->tp.next[ICOL(index)])		/* added triples */
+      { size_t hash = triple_hash_key(t, index);
+	int i;
+
+	found++;
+	for(i=0; i<different; i++)
+	{ if ( hashes[i] == hash )
+	    goto next;
+	}
+	hashes[different++] = hash;
+
+      next:;
+      }
+
+      *count = found;
+
+      return different;
+    }
+  } else
+  { atomset hash_set;
+    int c = 0;
+
+    init_atomset(&hash_set);
+    for(t=tb->head; t; t=t->tp.next[ICOL(index)])
+    { c++;
+      add_atomset(&hash_set, (atom_t)triple_hash_key(t, index));
+    }
+    rc = hash_set.count;
+    destroy_atomset(&hash_set);
+
+    *count = c;
   }
-  rc = hash_set.count;
-  destroy_atomset(&hash_set);
-
-  *count = c;
 
   return rc;
 }
 
 
 static float
-triple_hash_quality(rdf_db *db, int index)
+triple_hash_quality(rdf_db *db, int index, int sample)
 { triple_hash *hash = &db->hash[index];
-  int i;
+  int i, step;
   float q = 0;
   size_t total = 0;
 
   if ( index == 0 )
     return 1.0;
 
-  for(i=0; i<hash->bucket_count; i++)
+  if ( sample > 0 )
+    step = (hash->bucket_count+sample)/sample;	/* step >= 1 */
+  else
+    step = 1;
+
+  for(i=0; i<hash->bucket_count; i += step)
   { int entry = MSB(i);
     triple_bucket *tb = &hash->blocks[entry][i];
     int count;
@@ -2933,7 +2981,7 @@ consider_triple_rehash(rdf_db *db)
 	case BY_SG:
 	case BY_SP:
 	case BY_PG:
-	  if ( triple_hash_quality(db, i) < 0.5 )
+	  if ( triple_hash_quality(db, i, 1024) < 0.5 )
 	    resize = TRUE;
 	  break;
 	default:
@@ -7522,7 +7570,7 @@ unify_statistics(rdf_db *db, term_t key, functor_t f)
     { if ( !PL_unify_list(tail, head, tail) ||
 	   !PL_put_integer(av+0, col_index[i]) ||
 	   !PL_put_integer(av+1, db->hash[i].bucket_count) ||
-	   !PL_put_float(av+2, triple_hash_quality(db, i)) ||
+	   !PL_put_float(av+2, triple_hash_quality(db, i, 1024)) ||
 	   !PL_cons_functor_v(tmp, FUNCTOR_hash3, av) ||
 	   !PL_unify(head, tmp) )
 	return FALSE;
