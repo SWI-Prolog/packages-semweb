@@ -3754,10 +3754,7 @@ add_triple_consequences(rdf_db *db, triple *t, query *q)
 
 int
 link_triple(rdf_db *db, triple *t, query *q)
-{ if ( t->linked )
-  { add_triple_consequences(db, t, q);
-    return TRUE;			/* already done */
-  }
+{ assert(!t->linked);
 
   link_triple_hash(db, t);
   consider_triple_rehash(db);
