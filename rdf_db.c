@@ -256,7 +256,7 @@ static predicate_t PRED_call1;
 static int WANT_GC(rdf_db *db);
 static int match_triples(triple *t, triple *p, unsigned flags);
 static int update_duplicates_add(rdf_db *db, triple *t);
-static void update_duplicates_del(rdf_db *db, triple *t);
+static int update_duplicates_del(rdf_db *db, triple *t);
 static void unlock_atoms(triple *t);
 static void lock_atoms(triple *t);
 static void unlock_atoms_literal(literal *lit);
@@ -1192,10 +1192,11 @@ predicate_hash(predicate *p)
 
 static void
 addSubPropertyOf(rdf_db *db, predicate *sub, predicate *super)
-{ /*DEBUG(2, Sdprintf("addSubPropertyOf(%s, %s)\n", pname(sub), pname(super)));*/
+{ DEBUG(2, Sdprintf("addSubPropertyOf(%s, %s)\n", pname(sub), pname(super)));
 
   if ( add_list(db, &sub->subPropertyOf, super) )
-  { add_list(db, &super->siblings, sub);
+  { DEBUG(2, Sdprintf("\tnew!\n"));
+    add_list(db, &super->siblings, sub);
     merge_clouds(db, sub->cloud, super->cloud);
   }
 }
@@ -2807,14 +2808,15 @@ erase_triple_silent(rdf_db *db, triple *t)
 { if ( !t->erased )
   { t->erased = TRUE;
 
-    update_duplicates_del(db, t);
+    if ( update_duplicates_del(db, t) == FALSE )
+    { /* not a duplicate, this is a real delete */
+      if ( t->predicate.r->name == ATOM_subPropertyOf &&
+	   t->object_is_literal == FALSE )
+      { predicate *me    = lookup_predicate(db, t->subject);
+	predicate *super = lookup_predicate(db, t->object.resource);
 
-    if ( t->predicate.r->name == ATOM_subPropertyOf &&
-	 t->object_is_literal == FALSE )
-    { predicate *me    = lookup_predicate(db, t->subject);
-      predicate *super = lookup_predicate(db, t->object.resource);
-
-      delSubPropertyOf(db, me, super);
+	delSubPropertyOf(db, me, super);
+      }
     }
 
     if ( t->first )
@@ -4627,7 +4629,12 @@ update_duplicates_add(rdf_db *db, triple *t)
 }
 
 
-static void				/* t is about to be deleted */
+/* returns TRUE if this deletes a duplicate (and this the triple
+   still exists) and FALSE if this is not a duplicate and the DB
+   really changes.
+*/
+
+static int				/* t is about to be deleted */
 update_duplicates_del(rdf_db *db, triple *t)
 { const int indexed = BY_SPO;
 
@@ -4650,7 +4657,7 @@ update_duplicates_del(rdf_db *db, triple *t)
 	      print_src(d);
 	      Sdprintf("\n"));
 
-	return;
+	return TRUE;
       }
     }
     assert(0);
@@ -4671,7 +4678,7 @@ update_duplicates_del(rdf_db *db, triple *t)
 		Sdprintf("Principal %p at ", d);
 		print_src(d);
 		Sdprintf(" has %d duplicates\n", d->duplicates));
-	  return;
+	  return TRUE;
 	}
       }
     }
@@ -4679,6 +4686,8 @@ update_duplicates_del(rdf_db *db, triple *t)
     PL_halt(1);
     assert(0);
   }
+
+  return FALSE;
 }
 
 
