@@ -479,10 +479,10 @@ typedef struct search_state
   term_t	predicate;
   term_t	src;
   term_t	realpred;
-  unsigned	allocated;		/* State has been allocated */
-  unsigned	flags;			/* Misc flags controlling search */
   atom_t	prefix;			/* prefix and like search */
+  unsigned	flags;			/* Misc flags controlling search */
   int		has_literal_state;	/* Literal state is present */
+  int		alt_hash_cursor;	/* Index in alternative hashes */
   skiplist_enum literal_state;		/* Literal search state */
   literal      *literal_cursor;		/* pointer in current literal */
   literal_ex    lit_ex;			/* extended literal for fast compare */
@@ -491,7 +491,6 @@ typedef struct search_state
   triple_walker cursor;			/* Pointer in triple DB */
   struct query *query;			/* Associated query */
   predicate_cloud *p_cloud;		/* Searched predicate cloud */
-  int		alt_hash_cursor;	/* Index in alternative hashes */
   triple	pattern;		/* Pattern triple */
   triple	saved_pattern;		/* For inverse */
   triple       *prefetched;		/* Prefetched triple (retry) */

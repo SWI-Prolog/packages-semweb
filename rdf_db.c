@@ -5849,9 +5849,6 @@ free_search_state(search_state *state)
 
   if ( state->prefix )
     PL_unregister_atom(state->prefix);
-
-  if ( state->allocated )		/* also means redo! */
-    rdf_free(state->db, state, sizeof(*state));
 }
 
 
