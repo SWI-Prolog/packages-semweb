@@ -328,6 +328,7 @@ init_query_admin(rdf_db *db)
   memset(qa, 0, sizeof(*qa));
   simpleMutexInit(&qa->query.lock);
   simpleMutexInit(&qa->write.lock);
+  simpleMutexInit(&qa->write.generation_lock);
 }
 
 
@@ -467,6 +468,7 @@ add_triples(query *q, triple **triples, size_t count)
   }
 
 					/* locked phase */
+  simpleMutexLock(&db->queries.write.generation_lock);
   simpleMutexLock(&db->queries.write.lock);
   gen = queryWriteGen(q)+1;
   gen_max = query_max_gen(q);
@@ -483,6 +485,7 @@ add_triples(query *q, triple **triples, size_t count)
 
   setWriteGen(q, gen);
   simpleMutexUnlock(&db->queries.write.lock);
+  simpleMutexUnlock(&db->queries.write.generation_lock);
 
   if ( !q->transaction && rdf_is_broadcasting(EV_ASSERT|EV_ASSERT_LOAD) )
   { for(tp=triples; tp < ep; tp++)
@@ -515,6 +518,7 @@ del_triples(query *q, triple **triples, size_t count)
   triple **ep = triples+count;
   triple **tp;
 
+  simpleMutexLock(&db->queries.write.generation_lock);
   simpleMutexLock(&db->queries.write.lock);
   gen = queryWriteGen(q) + 1;
 
@@ -532,6 +536,7 @@ del_triples(query *q, triple **triples, size_t count)
 
   setWriteGen(q, gen);
   simpleMutexUnlock(&db->queries.write.lock);
+  simpleMutexUnlock(&db->queries.write.generation_lock);
 
   if ( !q->transaction && rdf_is_broadcasting(EV_RETRACT) )
   { for(tp=triples; tp < ep; tp++)
@@ -560,6 +565,7 @@ update_triples(query *q,
   triple **to, **tn;
   size_t updated = 0;
 
+  simpleMutexLock(&db->queries.write.generation_lock);
   simpleMutexLock(&db->queries.write.lock);
   gen = queryWriteGen(q) + 1;
   gen_max = query_max_gen(q);
@@ -587,6 +593,7 @@ update_triples(query *q,
 
   setWriteGen(q, gen);
   simpleMutexUnlock(&db->queries.write.lock);
+  simpleMutexUnlock(&db->queries.write.generation_lock);
 
   if ( !q->transaction && rdf_is_broadcasting(EV_UPDATE) )
   { for(to=old,tn=new; to < eo; to++,tn++)
@@ -677,6 +684,7 @@ commit_transaction(query *q)
   triple **tp;
   gen_t gen, gen_max;
 
+  simpleMutexLock(&db->queries.write.generation_lock);
   simpleMutexLock(&db->queries.write.lock);
   gen = queryWriteGen(q) + 1;
   gen_max = transaction_max_gen(q);
@@ -706,6 +714,7 @@ commit_transaction(query *q)
 
   setWriteGen(q, gen);
   simpleMutexUnlock(&db->queries.write.lock);
+  simpleMutexUnlock(&db->queries.write.generation_lock);
 
   q->stack->transaction = q->transaction; /* do not nest monitor calls */
 					  /* inside the transaction */

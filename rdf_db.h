@@ -356,6 +356,7 @@ typedef struct query_admin
   } query;				/* active query administration */
   struct
   { simpleMutex	lock;			/* Locks writing triples */
+    simpleMutex generation_lock;	/* Interlocked fix of generations */
   } write;				/* write administration */
 } query_admin;
 
