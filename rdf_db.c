@@ -2716,32 +2716,32 @@ literal database if there is a match.   On a match, the argument literal
 is destroyed. Without a match it adds   the  literal to the database and
 returns it.
 
-Called from link_triple(), which implies we hold write.lock.
+Called from add_triples() and update_triples() outside the locked areas.
+We must hold queries.write.lock for updating the literal database.
 
-(*) Typically, the from literal  is   a  new literal. rdf_update/4,5 and
-triple reindexing however may cause link_triple()   to be called with an
-already shared literal.
-
-TBD:	broadcast happens with write.lock held.  Would be nice to move
-	this out of the lock to reduce the risc for deadlock and improve
-	concurrency.
+TBD: Use a separate lock for this   task.  This both simplifies avoiding
+deadlocks and reduces collisions.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-static literal *
+literal *
 share_literal(rdf_db *db, literal *from)
 { literal **data;
   literal_ex lex;
   int is_new;
 
-  if ( from->shared )				/* See (*) */
-    return from;
+  if ( from->shared )
+    return from;				/* already shared */
 
   lex.literal = from;
   prepare_literal_ex(&lex);
 
+  simpleMutexLock(&db->queries.write.lock);
   sl_check(db, FALSE);
   data = skiplist_insert(&db->literals, &lex, &is_new);
   sl_check(db, FALSE);
+  if ( is_new )
+    from->shared = TRUE;
+  simpleMutexUnlock(&db->queries.write.lock);
 
   if ( !is_new )
   { literal *l2 = *data;
@@ -2764,7 +2764,6 @@ share_literal(rdf_db *db, literal *from)
 
     assert(from->references==1);
     assert(from->atoms_locked==1);
-    from->shared = TRUE;
     rdf_broadcast(EV_NEW_LITERAL, from, NULL);
     return from;
   }
@@ -3742,9 +3741,6 @@ link_triple(rdf_db *db, triple *t, query *q)
   { add_triple_consequences(db, t, q);
     return TRUE;			/* already done */
   }
-
-  if ( t->object_is_literal )
-    t->object.literal = share_literal(db, t->object.literal);
 
   mark_duplicate(db, t, q);
   link_triple_hash(db, t);

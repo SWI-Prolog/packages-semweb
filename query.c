@@ -465,6 +465,8 @@ add_triples(query *q, triple **triples, size_t count)
     { t->predicate.r = lookup_predicate(db, t->predicate.u, q);
       t->resolve_pred = FALSE;
     }
+    if ( t->object_is_literal )
+      t->object.literal = share_literal(db, t->object.literal);
   }
 
 					/* locked phase */
@@ -562,8 +564,16 @@ update_triples(query *q,
 { rdf_db *db = q->db;
   gen_t gen, gen_max;
   triple **eo = old+count;
+  triple **en = new+count;
   triple **to, **tn;
   size_t updated = 0;
+
+  for(tn=new; tn < en; tn++)
+  { triple *t = *tn;
+
+    if ( t->object_is_literal )
+      t->object.literal = share_literal(db, t->object.literal);
+  }
 
   simpleMutexLock(&db->queries.write.generation_lock);
   simpleMutexLock(&db->queries.write.lock);
