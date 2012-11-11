@@ -459,15 +459,7 @@ add_triples(query *q, triple **triples, size_t count)
 
 					/* pre-lock phase */
   for(tp=triples; tp < ep; tp++)
-  { triple *t = *tp;
-
-    if ( t->resolve_pred )
-    { t->predicate.r = lookup_predicate(db, t->predicate.u, q);
-      t->resolve_pred = FALSE;
-    }
-    if ( t->object_is_literal )
-      t->object.literal = share_literal(db, t->object.literal);
-  }
+    prelink_triple(db, *tp, q);
 
 					/* locked phase */
   simpleMutexLock(&db->queries.write.generation_lock);
@@ -569,11 +561,7 @@ update_triples(query *q,
   size_t updated = 0;
 
   for(tn=new; tn < en; tn++)
-  { triple *t = *tn;
-
-    if ( t->object_is_literal )
-      t->object.literal = share_literal(db, t->object.literal);
-  }
+    prelink_triple(db, *tn, q);
 
   simpleMutexLock(&db->queries.write.generation_lock);
   simpleMutexLock(&db->queries.write.lock);

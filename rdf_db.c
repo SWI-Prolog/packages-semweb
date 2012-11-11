@@ -2721,7 +2721,7 @@ TBD: Use a separate lock for this   task.  This both simplifies avoiding
 deadlocks and reduces collisions.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-literal *
+static literal *
 share_literal(rdf_db *db, literal *from)
 { literal **data, *shared;
   literal_ex lex;
@@ -3711,6 +3711,23 @@ link_triple_hash(rdf_db *db, triple *t)
   }
 
   t->linked = INDEX_TABLES;
+}
+
+
+/* prelink_triple() performs that part of the triple loading that does
+   not require locking.
+*/
+
+int
+prelink_triple(rdf_db *db, triple *t, query *q)
+{ if ( t->resolve_pred )
+  { t->predicate.r = lookup_predicate(db, t->predicate.u, q);
+    t->resolve_pred = FALSE;
+  }
+  if ( t->object_is_literal )
+    t->object.literal = share_literal(db, t->object.literal);
+
+  return TRUE;
 }
 
 
