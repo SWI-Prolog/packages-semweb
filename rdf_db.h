@@ -422,6 +422,40 @@ typedef struct rdf_db
 
 
 		 /*******************************
+		 *	       SETS		*
+		 *******************************/
+
+#define CHUNKSIZE 4000				/* normally a page */
+
+typedef struct mchunk
+{ struct mchunk *next;
+  size_t used;
+  char buf[CHUNKSIZE];
+} mchunk;
+
+
+		 /*******************************
+		 *	     TRIPLE SET		*
+		 *******************************/
+
+#define TRIPLESET_INITIAL_ENTRIES 4		/* often small */
+
+typedef struct triple_cell
+{ struct triple_cell *next;
+  triple *triple;
+} triple_cell;
+
+typedef struct
+{ triple_cell **entries;			/* Hash entries */
+  size_t      size;				/* Hash-table size */
+  size_t      count;				/* # atoms stored */
+  mchunk     *node_store;
+  mchunk      store0;
+  triple_cell *entries0[TRIPLESET_INITIAL_ENTRIES];
+} tripleset;
+
+
+		 /*******************************
 		 *	    QUERY TYPES		*
 		 *******************************/
 
@@ -461,7 +495,7 @@ typedef struct search_state
   triple	pattern;		/* Pattern triple */
   triple	saved_pattern;		/* For inverse */
   triple       *prefetched;		/* Prefetched triple (retry) */
-  triple_buffer	dup_answers;		/* possible duplicate answers */
+  tripleset	dup_answers;		/* possible duplicate answers */
 } search_state;
 
 #include "query.h"

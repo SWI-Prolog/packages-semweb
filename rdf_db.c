@@ -520,14 +520,7 @@ free_list(rdf_db *db, list *list)
 		 *	     ATOM SETS		*
 		 *******************************/
 
-#define CHUNKSIZE 4000				/* normally a page */
 #define ATOMSET_INITIAL_ENTRIES 16
-
-typedef struct mchunk
-{ struct mchunk *next;
-  size_t used;
-  char buf[CHUNKSIZE];
-} mchunk;
 
 typedef struct atom_cell
 { struct atom_cell *next;
@@ -665,6 +658,123 @@ for_atomset(atomset *as,
   }
 
   return TRUE;
+}
+
+
+		 /*******************************
+		 *	   TRIPLE SETS		*
+		 *******************************/
+
+static void *
+alloc_tripleset(void *ptr, size_t size)
+{ void *p;
+  tripleset *ts = ptr;
+
+  assert(size < CHUNKSIZE);
+
+  if ( ts->node_store->used + size > CHUNKSIZE )
+  { mchunk *ch = malloc(sizeof(mchunk));
+
+    ch->used = 0;
+    ch->next = ts->node_store;
+    ts->node_store = ch;
+  }
+
+  p = &ts->node_store->buf[ts->node_store->used];
+  ts->node_store->used += size;
+
+  return p;
+}
+
+
+static void
+init_tripleset(tripleset *ts)
+{ ts->node_store = &ts->store0;
+  ts->node_store->next = NULL;
+  ts->node_store->used = 0;
+
+  memset(ts->entries0, 0, sizeof(ts->entries0));
+  ts->entries = ts->entries0;
+  ts->size = TRIPLESET_INITIAL_ENTRIES;
+  ts->count = 0;
+}
+
+
+static void
+destroy_tripleset(tripleset *ts)
+{ if ( ts->entries )
+  { mchunk *ch, *next;
+
+    for(ch=ts->node_store; ch != &ts->store0; ch = next)
+    { next = ch->next;
+      free(ch);
+    }
+
+    if ( ts->entries != ts->entries0 )
+      free(ts->entries);
+  }
+}
+
+
+static void
+rehash_triple_set(tripleset *ts)
+{ size_t newsize = ts->size*2;
+  triple_cell **new = malloc(newsize*sizeof(triple_cell*));
+  int i;
+
+  memset(new, 0, newsize*sizeof(triple_cell*));
+
+  for(i=0; i<ts->size; i++)
+  { triple_cell *c, *n;
+
+    for(c=ts->entries[i]; c; c=n)
+    { size_t inew = triple_hash_key(c->triple, BY_SPO)&(newsize-1);
+
+      n = c->next;
+      c->next = new[inew];
+      new[inew] = c;
+    }
+  }
+
+  if ( ts->entries == ts->entries0 )
+  { ts->entries = new;
+  } else
+  { triple_cell **old = ts->entries;
+    ts->entries = new;
+    free(old);
+  }
+
+  ts->size = newsize;
+}
+
+
+static int
+add_tripleset(search_state *state, tripleset *ts, triple *triple)
+{ size_t i;
+  triple_cell *c;
+
+  if ( !ts->entries )
+    init_tripleset(ts);
+
+  i = triple_hash_key(triple, BY_SPO)&(ts->size-1);
+  for(c=ts->entries[i]; c; c=c->next)
+  { if ( match_triples(state->db,
+		       triple, c->triple,
+		       state->query, MATCH_DUPLICATE) )
+      return 0;
+  }
+
+  if ( ++ts->count > 2*ts->size )
+  { rehash_triple_set(ts);
+    i = triple_hash_key(triple, BY_SPO)&(ts->size-1);
+  }
+
+  c = alloc_tripleset(ts, sizeof(*c));
+  c->triple = triple;
+  c->next = ts->entries[i];
+  ts->entries[i] = c;
+
+  return 1;
 }
 
 
@@ -5735,7 +5845,7 @@ free_search_state(search_state *state)
 
   free_triple(state->db, &state->pattern, FALSE);
   destroy_triple_walker(state->db, &state->cursor);
-  free_triple_buffer(&state->dup_answers);
+  destroy_tripleset(&state->dup_answers);
 
   if ( state->prefix )
     PL_unregister_atom(state->prefix);
@@ -5753,26 +5863,7 @@ allow_retry_state(search_state *state)
 
 static int
 new_answer(search_state *state, triple *t)
-{ triple **tp;
-
-  for(tp=state->dup_answers.base;
-      tp<state->dup_answers.top;
-      tp++)
-  { triple *old = *tp;
-
-    if ( match_triples(state->db, t, old, state->query, MATCH_DUPLICATE) )
-    { DEBUG(5, Sdprintf("Rejected duplicate answer\n"));
-      return FALSE;
-    }
-  }
-
-  if ( !state->dup_answers.base )	/* not initialized */
-  { DEBUG(5, Sdprintf("Init duplicate admin\n"));
-    init_triple_buffer(&state->dup_answers);
-  }
-  buffer_triple(&state->dup_answers, t);
-
-  return TRUE;
+{ return add_tripleset(state, &state->dup_answers, t);
 }
 
 
