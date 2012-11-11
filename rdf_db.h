@@ -540,7 +540,7 @@ COMMON(predicate *) lookup_predicate(rdf_db *db, atom_t name, query *q);
 COMMON(rdf_db*)	rdf_current_db(void);
 COMMON(int)	rdf_broadcast(broadcast_id id, void *a1, void *a2);
 COMMON(int)	rdf_is_broadcasting(broadcast_id id);
-
+COMMON(void)	consider_triple_rehash(rdf_db *db, size_t extra);
 
 
 #endif /*RDFDB_H_INCLUDED*/

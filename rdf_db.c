@@ -2792,17 +2792,20 @@ init_triple_hash(rdf_db *db, int index, size_t count)
 
 
 static int
-resize_triple_hash(rdf_db *db, int index)
+resize_triple_hash(rdf_db *db, int index, int resize)
 { triple_hash *hash = &db->hash[index];
-  int i = MSB(hash->bucket_count);
-  size_t bytes  = sizeof(triple_bucket)*hash->bucket_count;
-  triple_bucket *t = PL_malloc_uncollectable(bytes);
 
-  memset(t, 0, bytes);
-  hash->blocks[i] = t-hash->bucket_count;
-  hash->bucket_count *= 2;
-  DEBUG(1, Sdprintf("Resized triple index %s to %ld\n",
-		    col_name[index], (long)hash->bucket_count));
+  while( resize-- > 0 )
+  { int i = MSB(hash->bucket_count);
+    size_t bytes  = sizeof(triple_bucket)*hash->bucket_count;
+    triple_bucket *t = PL_malloc_uncollectable(bytes);
+
+    memset(t, 0, bytes);
+    hash->blocks[i] = t-hash->bucket_count;
+    hash->bucket_count *= 2;
+    DEBUG(1, Sdprintf("Resized triple index %s to %ld\n",
+		      col_name[index], (long)hash->bucket_count));
+  }
 
   return TRUE;
 }
@@ -2946,53 +2949,69 @@ thread!
 #define SPO_FACTOR 1
 #define   O_FACTOR 4
 
-static void
-consider_triple_rehash(rdf_db *db)
-{ if ( db->created - db->erased > SPO_FACTOR*db->hash[ICOL(BY_SPO)].bucket_count )
+void
+consider_triple_rehash(rdf_db *db, size_t extra)
+{ size_t triples = db->created - db->erased;
+
+  if ( extra + triples > SPO_FACTOR*db->hash[ICOL(BY_SPO)].bucket_count )
   { int i;
     int resized = 0;
+    int factor = ((extra+triples+100000)*16)/(triples+100000);
+
+#define SCALE(n) (((n)*factor)/16)
+#define SCALEF(n) (((n)*(float)factor)/16.0)
 
     for(i=1; i<INDEX_TABLES; i++)
-    { int resize = FALSE;
+    { int resize = 0;
+      size_t sizenow = db->hash[i].bucket_count;
 
       switch(col_index[i])
       { case BY_S:
-	  if ( db->resources.hash.count > db->hash[i].bucket_count )
-	    resize = TRUE;
+	  while ( SCALE(db->resources.hash.count) > sizenow<<resize )
+	    resize++;
 	  break;
 	case BY_P:
-	  if ( db->predicates.count > db->hash[i].bucket_count )
-	    resize = TRUE;
+	  while ( SCALE(db->predicates.count) > sizenow<<resize )
+	    resize++;
 	  break;
 	case BY_O:
-	  if ( (db->resources.hash.count + db->literals.count) >
-	       O_FACTOR*db->hash[i].bucket_count )
-	    resize = TRUE;
+	  while ( SCALE(db->resources.hash.count + db->literals.count) >
+		  (O_FACTOR*sizenow)<<resize )
+	    resize++;
 	  break;
 	case BY_SPO:
-	  if ( db->created - db->erased > SPO_FACTOR*db->hash[i].bucket_count )
-	    resize = TRUE;
+	  while ( extra+triples > (SPO_FACTOR*sizenow)<<resize )
+	    resize++;
 	  break;
 	case BY_G:
-	  if ( db->graphs.count > db->graphs.bucket_count )
-	    resize = TRUE;
+	  while ( SCALE(db->graphs.count) > (db->graphs.bucket_count)<<resize )
+	    resize++;
 	  break;
 	case BY_PO:
 	case BY_SG:
 	case BY_SP:
 	case BY_PG:
-	  if ( triple_hash_quality(db, i, 1024) < 0.5 )
-	    resize = TRUE;
+	{ float qexpect = SCALEF(triple_hash_quality(db, i, 1024));
+
+	  while ( qexpect < 0.5 )
+	  { qexpect *= 2;
+	    resize++;
+	  }
+
 	  break;
+	}
 	default:
 	  assert(0);
       }
 
       if ( resize )
       { resized++;
-	resize_triple_hash(db, i);
+	resize_triple_hash(db, i, resize);
       }
     }
+
+#undef SCALE
+#undef SCALEF
 
     if ( resized )
       invalidate_distinct_counts(db);
@@ -3805,7 +3824,6 @@ link_triple(rdf_db *db, triple *t, query *q)
 { assert(!t->linked);
 
   link_triple_hash(db, t);
-  consider_triple_rehash(db);
   add_triple_consequences(db, t, q);
   db->created++;
 

@@ -460,6 +460,7 @@ add_triples(query *q, triple **triples, size_t count)
 					/* pre-lock phase */
   for(tp=triples; tp < ep; tp++)
     prelink_triple(db, *tp, q);
+  consider_triple_rehash(db, count);
 
 					/* locked phase */
   simpleMutexLock(&db->queries.write.generation_lock);
@@ -605,6 +606,8 @@ update_triples(query *q,
   setWriteGen(q, gen);
   simpleMutexUnlock(&db->queries.write.lock);
   simpleMutexUnlock(&db->queries.write.generation_lock);
+
+  consider_triple_rehash(db, 1);
 
   if ( !q->transaction && rdf_is_broadcasting(EV_UPDATE) )
   { for(to=old,tn=new; to < eo; to++,tn++)
