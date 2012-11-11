@@ -3759,9 +3759,15 @@ link_triple(rdf_db *db, triple *t, query *q)
   link_triple_hash(db, t);
   consider_triple_rehash(db);
   add_triple_consequences(db, t, q);
-
   db->created++;
-  register_predicate(db, t);
+
+  return TRUE;
+}
+
+
+int
+postlink_triple(rdf_db *db, triple *t, query *q)
+{ register_predicate(db, t);
   register_graph(db, t);
 
   return TRUE;

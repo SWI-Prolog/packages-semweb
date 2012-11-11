@@ -483,10 +483,17 @@ add_triples(query *q, triple **triples, size_t count)
   { for(tp=triples; tp < ep; tp++)
     { triple *t = *tp;
 
+      postlink_triple(db, t, q);
       buffer_triple(q->transaction->transaction_data.added, t);
     }
   } else
-  { if ( rdf_is_broadcasting(EV_ASSERT|EV_ASSERT_LOAD) )
+  { for(tp=triples; tp < ep; tp++)
+    { triple *t = *tp;
+
+      postlink_triple(db, t, q);
+    }
+
+    if ( rdf_is_broadcasting(EV_ASSERT|EV_ASSERT_LOAD) )
     { for(tp=triples; tp < ep; tp++)
       { triple *t = *tp;
 	broadcast_id id = t->loaded ? EV_ASSERT_LOAD : EV_ASSERT;
@@ -601,9 +608,14 @@ update_triples(query *q,
 
   if ( !q->transaction && rdf_is_broadcasting(EV_UPDATE) )
   { for(to=old,tn=new; to < eo; to++,tn++)
-    { if ( !rdf_broadcast(EV_UPDATE, *to, *tn) )
+    { postlink_triple(db, *tn, q);
+
+      if ( !rdf_broadcast(EV_UPDATE, *to, *tn) )
 	return FALSE;
     }
+  } else
+  { for(tn=new; tn < en; tn++)
+      postlink_triple(db, *tn, q);
   }
 
   return TRUE;
