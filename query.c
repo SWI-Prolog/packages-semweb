@@ -473,21 +473,27 @@ add_triples(query *q, triple **triples, size_t count)
     t->lifespan.born = gen;
     t->lifespan.died = gen_max;
     link_triple(db, t, q);
-    if ( q->transaction )
-      buffer_triple(q->transaction->transaction_data.added, t);
   }
 
   setWriteGen(q, gen);
   simpleMutexUnlock(&db->queries.write.lock);
   simpleMutexUnlock(&db->queries.write.generation_lock);
 
-  if ( !q->transaction && rdf_is_broadcasting(EV_ASSERT|EV_ASSERT_LOAD) )
+  if ( q->transaction )
   { for(tp=triples; tp < ep; tp++)
     { triple *t = *tp;
-      broadcast_id id = t->loaded ? EV_ASSERT_LOAD : EV_ASSERT;
 
-      if ( !rdf_broadcast(id, t, NULL) )
-	return FALSE;
+      buffer_triple(q->transaction->transaction_data.added, t);
+    }
+  } else
+  { if ( rdf_is_broadcasting(EV_ASSERT|EV_ASSERT_LOAD) )
+    { for(tp=triples; tp < ep; tp++)
+      { triple *t = *tp;
+	broadcast_id id = t->loaded ? EV_ASSERT_LOAD : EV_ASSERT;
+
+	if ( !rdf_broadcast(id, t, NULL) )
+	  return FALSE;
+      }
     }
   }
 
