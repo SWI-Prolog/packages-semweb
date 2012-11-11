@@ -3726,6 +3726,7 @@ prelink_triple(rdf_db *db, triple *t, query *q)
   }
   if ( t->object_is_literal )
     t->object.literal = share_literal(db, t->object.literal);
+  mark_duplicate(db, t, q);
 
   return TRUE;
 }
@@ -3758,7 +3759,6 @@ link_triple(rdf_db *db, triple *t, query *q)
     return TRUE;			/* already done */
   }
 
-  mark_duplicate(db, t, q);
   link_triple_hash(db, t);
   consider_triple_rehash(db);
   add_triple_consequences(db, t, q);
@@ -5526,7 +5526,12 @@ unloading one of these files the database would be left without triples.
 mark_duplicate() searches the DB for  a   duplicate  triple and sets the
 flag is_duplicate on both. This flag is   used by rdf/3, where duplicate
 triples are stored into a  temporary  table   to  be  filtered  from the
-results.
+results by new_answer().
+
+(*) We pick the write generation of the current query. This may still be
+set higher, but that  that  may  only   lead  to  triples  being  marked
+duplicates that are not. By use this   conservatie approach, we can move
+mark_duplicate() into prelink_triple().
 
 TBD: Duplicate marks may be removed by   GC:  walk over all triples that
 are marked as duplicates and try to find the duplicate.
@@ -5537,6 +5542,10 @@ mark_duplicate(rdf_db *db, triple *t, query *q)
 { triple_walker tw;
   triple *d;
   const int indexed = BY_SPO;
+  lifespan qls;
+
+  qls.born = queryWriteGen(q) + 1;		/* (*) */
+  qls.died = query_max_gen(q);
 
   init_triple_walker(&tw, db, t, indexed);
   while((d=next_triple(&tw)) && d != t)
@@ -5544,7 +5553,7 @@ mark_duplicate(rdf_db *db, triple *t, query *q)
     DEBUG(3, Sdprintf("Possible duplicate: ");
 	     print_triple(d, PRT_NL|PRT_ADR));
 
-    if ( !overlap_lifespan(&d->lifespan, &t->lifespan) )
+    if ( !overlap_lifespan(&d->lifespan, &qls) )
       continue;
 
     if ( match_triples(db, d, t, q, MATCH_DUPLICATE) )
