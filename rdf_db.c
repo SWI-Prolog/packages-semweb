@@ -4489,7 +4489,8 @@ typedef struct ld_context
 { long		loaded_id;		/* keep track of atoms */
   atom_t       *loaded_atoms;
   long		atoms_size;
-  atom_t	graph;			/* for single-graph files */
+  atom_t	graph_name;		/* for single-graph files */
+  graph	       *graph;
   atom_t	graph_source;
   double	modified;
   int		has_digest;
@@ -4688,7 +4689,7 @@ load_db(rdf_db *db, IOSTREAM *in, ld_context *ctx)
       }
 					/* file holding exactly one graph */
       case 'S':				/* name of the graph */
-      { ctx->graph = load_atom(db, in, ctx);
+      { ctx->graph_name = load_atom(db, in, ctx);
         break;
       }
       case 'M':				/* MD5 of the graph */
@@ -4721,39 +4722,31 @@ load_db(rdf_db *db, IOSTREAM *in, ld_context *ctx)
 
 static int
 prepare_loaded_triples(rdf_db *db, ld_context *ctx)
-{ graph *graph;
-  triple **t;
+{ triple **t;
 
-  if ( ctx->graph )			/* lookup named graph */
-  { graph = lookup_graph(db, ctx->graph);
-    if ( ctx->graph_source && graph->source != ctx->graph_source )
-    { if ( graph->source )
-	PL_unregister_atom(graph->source);
-      graph->source = ctx->graph_source;
-      PL_register_atom(graph->source);
-      graph->modified = ctx->modified;
+  if ( ctx->graph_name )			/* lookup named graph */
+  { ctx->graph = lookup_graph(db, ctx->graph_name);
+    if ( ctx->graph_source && ctx->graph->source != ctx->graph_source )
+    { if ( ctx->graph->source )
+	PL_unregister_atom(ctx->graph->source);
+      ctx->graph->source = ctx->graph_source;
+      PL_register_atom(ctx->graph->source);
+      ctx->graph->modified = ctx->modified;
     }
 
     if ( ctx->has_digest )
-    { if ( graph->md5 )
-      { graph->md5 = FALSE;		/* kill repetitive MD5 update */
+    { if ( ctx->graph->md5 )
+      { ctx->graph->md5 = FALSE;		/* kill repetitive MD5 update */
       } else
       { ctx->has_digest = FALSE;
       }
     }
   } else
-  { graph = NULL;
+  { ctx->graph = NULL;
   }
 
   for(t=ctx->triples.base; t<ctx->triples.top; t++)
     lock_atoms(db, *t);
-
-					/* update the graph info */
-  if ( ctx->has_digest )
-  { sum_digest(graph->digest, ctx->digest);
-    graph->md5 = TRUE;
-    clear_modified(graph);
-  }
 
   return TRUE;
 }
@@ -4834,7 +4827,7 @@ rdf_load_db(term_t stream, term_t id, term_t graphs)
 
       destroy_atomset(&ctx.graph_table);
     } else
-    { rc = PL_unify_atom(graphs, ctx.graph);
+    { rc = PL_unify_atom(graphs, ctx.graph_name);
     }
   }
 
@@ -4842,8 +4835,14 @@ rdf_load_db(term_t stream, term_t id, term_t graphs)
   { query *q = open_query(db);
 
     add_triples(q, ctx.triples.base, ctx.triples.top - ctx.triples.base);
-
     close_query(q);
+    if ( ctx.graph )
+    { if ( ctx.has_digest )
+      { sum_digest(ctx.graph->digest, ctx.digest);
+	ctx.graph->md5 = TRUE;
+      }
+      clear_modified(ctx.graph);
+    }
     rc = rdf_broadcast(EV_LOAD, (void*)id, (void*)ATOM_end);
     destroy_load_context(db, &ctx, FALSE);
   } else
