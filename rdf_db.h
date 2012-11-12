@@ -401,7 +401,6 @@ typedef struct rdf_db
     double	time;			/* time spent in GC */
     size_t	reclaimed_triples;	/* # reclaimed triples */
     size_t	reclaimed_reindexed;	/* # reclaimed reindexed triples */
-    size_t	reindexed;		/* # reindexed triples */
     size_t	uncollectable;		/* # uncollectable erased at last GC */
     gen_t	last_gen;		/* Oldest generation at last-GC */
     gen_t	last_reindex_gen;	/* Oldest reindexed at last GC */

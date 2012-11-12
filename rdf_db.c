@@ -3128,7 +3128,6 @@ optimize_triple_hash(rdf_db *db, int icol, gen_t gen)
     }
 
     hash->bucket_count_epoch = upto*2;
-    db->gc.reindexed += copied;
     DEBUG(1, Sdprintf("Optimized hash %s (epoch=%ld; size=%ld; copied=%ld)\n",
 		      col_name[icol],
 		      (long)hash->bucket_count_epoch,
@@ -7638,7 +7637,7 @@ unify_statistics(rdf_db *db, term_t key, functor_t f)
 			 PL_FUNCTOR, f,
 			   PL_INT,   (int)db->gc.count,
 			   PL_INT64, (int64_t)db->gc.reclaimed_triples,
-			   PL_INT64, (int64_t)db->gc.reindexed,
+			   PL_INT64, (int64_t)db->reindexed,
 			   PL_FLOAT, (double)db->gc.time);	/* time spent */
   } else
     assert(0);
