@@ -3331,21 +3331,21 @@ gc_clear_busy(rdf_db *db)
 static int
 gc_db(rdf_db *db, gen_t gen, gen_t reindex_gen)
 { char buf[64];
-  int rc = FALSE;
+  int rc;
 
   if ( !gc_set_busy(db) )
     return FALSE;
   simpleMutexLock(&db->locks.gc);
   DEBUG(10, Sdprintf("RDF GC; gen = %s\n", gen_name(gen, buf)));
-  if ( optimize_triple_hashes(db, gen) < 0 ||
-       gc_hashes(db, gen, reindex_gen) < 0 ||
-       gc_clouds(db, gen) < 0 )
-    goto out;
-  db->gc.count++;
-  db->gc.last_gen = gen;
-  db->gc.last_reindex_gen = reindex_gen;
-  rc = TRUE;
-out:
+  if ( optimize_triple_hashes(db, gen) >= 0 &&
+       gc_hashes(db, gen, reindex_gen) >= 0 &&
+       gc_clouds(db, gen) >= 0 )
+  { db->gc.count++;
+    db->gc.last_gen = gen;
+    db->gc.last_reindex_gen = reindex_gen;
+    rc = TRUE;
+  } else
+    rc = FALSE;
   gc_clear_busy(db);
   simpleMutexUnlock(&db->locks.gc);
 
