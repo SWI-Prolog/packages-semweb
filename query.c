@@ -431,24 +431,20 @@ other addition calls, but not  with   read  nor  delete operations. This
 synchronization is needed because without we   cannot set the generation
 for new queries to a proper value.
 
-Hmmm. Really long writes will block  short   ones.  Can we do something?
-Introduce a priority, possibly  automatically   on  #triples, less means
-higher.
+To reduce the locked time, we perform this in multiple steps:
 
-  - If blocked, set a `wants-priority-write'
-  - Super checks this and
-    1. Numbers already numbered triples into the future
-    2. Release lock
-    3. Re-acquire lock
-    4. If all have been added, find the proper generation,
-       renumber all triples and step the generation.
-
-Or, hand them to a separate thread?
-
-  + Only this thread manages the chains: no need for locking.
-  - If a thread adds triples, it has to wait.  This means two-way
-    communication.  --> probably too high overhead.
+  - prelink_triple() performs tasks that do not affect the remainder of
+    the database.
+  - In the link-phase, we add the triples in packages of ADD_CHUNK_SIZE
+    to the database, but addressed in the far future.  No reader sees
+    see what we are doing.
+  - Next, we grab the generation_lock and update the triples to
+    the next generation and increment the generation to make them
+    visible.
+  - Finally, we do some post-hock work to update statistics.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+#define ADD_CHUNK_SIZE 50
 
 int
 add_triples(query *q, triple **triples, size_t count)
@@ -462,22 +458,34 @@ add_triples(query *q, triple **triples, size_t count)
     prelink_triple(db, *tp, q);
   consider_triple_rehash(db, count);
 
-					/* locked phase */
-  simpleMutexLock(&db->queries.write.generation_lock);
-  simpleMutexLock(&db->queries.write.lock);
-  gen = queryWriteGen(q)+1;
+					/* Add the triples in the future */
   gen_max = query_max_gen(q);
+  for(tp=triples; tp < ep; )
+  { triple **echunk = tp+50;
 
+    if ( echunk > ep )
+      echunk = ep;
+
+    simpleMutexLock(&db->queries.write.lock);
+    for(; tp<echunk; tp++)
+    { triple *t = *tp;
+
+      t->lifespan.born = gen_max;
+      t->lifespan.died = gen_max;
+      link_triple(db, t, q);
+    }
+    simpleMutexUnlock(&db->queries.write.lock);
+  }
+
+					/* generation update */
+  simpleMutexLock(&db->queries.write.generation_lock);
+  gen = queryWriteGen(q)+1;
   for(tp=triples; tp < ep; tp++)
   { triple *t = *tp;
 
     t->lifespan.born = gen;
-    t->lifespan.died = gen_max;
-    link_triple(db, t, q);
   }
-
   setWriteGen(q, gen);
-  simpleMutexUnlock(&db->queries.write.lock);
   simpleMutexUnlock(&db->queries.write.generation_lock);
 
   if ( q->transaction )
