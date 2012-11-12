@@ -2939,20 +2939,15 @@ triple_hash_quality(rdf_db *db, int index, int sample)
 }
 
 
-/* Consider resizing the hash-tables.  This seems to work quite ok, but there
-   are some issues:
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Consider resizing the hash-tables. The argument 'extra' gives the number
+of triples that  will  be  added.  This   is  used  to  guess  the  hash
+requirements of the table  and  thus   avoid  duplicating  triples in on
+optimize_triple_hashes().
 
-    * When should this be called? Just doubling the number of triples is
-    too simple. The ones based on triple_hash_quality() could easily get
-    poor. Note that once poor, the dynamic expansion trick makes it
-    impossible to improve without stopping all threads.
-
-    * triple_hash_quality() is quite costly. This could use sampling and
-    it migth be a good idea to sample only the latest expansion.
-
-Note that we could also leave this to   GC and/or run this in a separate
-thread!
-*/
+TBD: Can we omit linking all  the   hashes  when adding triples? Then we
+need to materialize on the first query.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #define SPO_FACTOR 1
 #define   O_FACTOR 4
