@@ -1058,8 +1058,7 @@ db_abs_files(DB, Snapshot, Journal) :-
 
 rdf_journal_file(DB, Journal) :-
 	(   var(DB)
-	->  rdf_db:rdf_graphs_(All),	% also pick the empty graphs
-	    member(DB, All)
+	->  rdf_graph_(DB, _Count)	% also pick the empty graphs
 	;   true
 	),
 	db_abs_files(DB, _Snapshot, Journal),

@@ -85,6 +85,7 @@
 	    rdf_graph_property/2,	% ?Graph, ?Property
 	    rdf_set_graph/2,		% +Graph, +Property
 	    rdf_graph/1,		% ?Graph
+	    rdf_graph_/2,		% ?Graph, -Count
 	    rdf_source/1,		% ?File
 	    rdf_source/2,		% ?DB, ?SourceURL
 	    rdf_make/0,			% Reload modified databases
@@ -860,11 +861,8 @@ rdf_statistics(searched_nodes(Count)) :-
 rdf_statistics(literals(Count)) :-
 	rdf_statistics_(literals(Count)).
 rdf_statistics(triples_by_graph(Graph, Count)) :-
-	(   var(Graph)
-	->  rdf_graph(Graph),
-	    rdf_statistics_(triples(Graph, Count))
-	;   rdf_statistics_(triples(Graph, Count))
-	).
+	rdf_graph_(Graph, Count),
+	Count \== 0.
 rdf_statistics(duplicates(Count)) :-
 	rdf_statistics_(duplicates(Count)).
 
@@ -1540,6 +1538,13 @@ do_unload(Graph) :-
 			unload(Graph)),
 	rdf_unset_graph_source(Graph).
 
+%%	rdf_graph(?Graph) is nondet.
+%
+%	True when Graph is an existing graph with at least one triple.
+
+rdf_graph(Graph) :-
+	rdf_graph_(Graph, Triples),
+	Triples > 0.
 
 %%	rdf_source(?Graph, ?SourceURL) is nondet.
 %

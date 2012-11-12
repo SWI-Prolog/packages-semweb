@@ -2194,7 +2194,7 @@ advance_graph_enum(rdf_db *db, enum_graph *eg)
 
 
 static foreign_t
-rdf_graph(term_t name, control_t h)
+rdf_graph(term_t name, term_t triple_count, control_t h)
 { rdf_db *db = rdf_current_db();
   enum_graph *eg;
   atom_t a;
@@ -2210,9 +2210,8 @@ rdf_graph(term_t name, control_t h)
       } else if ( PL_get_atom_ex(name, &a) )
       { graph *g;
 
-	if ( (g=existing_graph(db, a)) &&
-	     g->triple_count > 0 )
-	  return TRUE;
+	if ( (g=existing_graph(db, a)) )
+	  return PL_unify_int64(triple_count, g->triple_count);
       }
       return FALSE;
     case PL_REDO:
@@ -2228,7 +2227,9 @@ rdf_graph(term_t name, control_t h)
   }
 
 next:
-  if ( !eg->g || !PL_unify_atom(name, eg->g->name) )
+  if ( !eg->g ||
+       !PL_unify_atom(name, eg->g->name) ||
+       !PL_unify_int64(triple_count, eg->g->triple_count) )
   { rdf_free(db, eg, sizeof(*eg));
     return FALSE;
   }
@@ -4486,7 +4487,6 @@ typedef struct ld_context
   int		has_digest;
   md5_byte_t    digest[16];
   atomset       graph_table;		/* multi-graph file */
-  query	       *query;
   triple_buffer	triples;
 } ld_context;
 
@@ -4712,7 +4712,7 @@ load_db(rdf_db *db, IOSTREAM *in, ld_context *ctx)
 
 
 static int
-link_loaded_triples(rdf_db *db, ld_context *ctx)
+prepare_loaded_triples(rdf_db *db, ld_context *ctx)
 { graph *graph;
   triple **t;
 
@@ -4739,7 +4739,6 @@ link_loaded_triples(rdf_db *db, ld_context *ctx)
 
   for(t=ctx->triples.base; t<ctx->triples.top; t++)
     lock_atoms(db, *t);
-  add_triples(ctx->query, ctx->triples.base, ctx->triples.top-ctx->triples.base);
 
 					/* update the graph info */
   if ( ctx->has_digest )
@@ -4751,6 +4750,32 @@ link_loaded_triples(rdf_db *db, ld_context *ctx)
   return TRUE;
 }
 
+
+static void
+destroy_load_context(rdf_db *db, ld_context *ctx, int delete_triples)
+{ if ( delete_triples )
+  { triple **tp;
+
+    for(tp=ctx->triples.base;
+	tp<ctx->triples.top;
+	tp++)
+    { triple *t = *tp;
+
+      free_triple(db, t, FALSE);
+    }
+  }
+
+  free_triple_buffer(&ctx->triples);
+
+  if ( ctx->loaded_atoms )
+  { atom_t *ap, *ep;
+
+    for(ap=ctx->loaded_atoms, ep=ap+ctx->loaded_id; ap<ep; ap++)
+      PL_unregister_atom(*ap);
+
+    free(ctx->loaded_atoms);
+  }
+}
 
 typedef struct
 { term_t tail;
@@ -4783,29 +4808,13 @@ rdf_load_db(term_t stream, term_t id, term_t graphs)
   rc = load_db(db, in, &ctx);
   PL_release_stream(in);
 
-  if ( !rc )
-  { triple **tp;
-
-					/* discard partial loaded stuff */
-  fail_out:
-    for(tp=ctx.triples.base;
-	tp<ctx.triples.top;
-	tp++)
-    { triple *t = *tp;
-
-      free_triple(db, t, FALSE);
-    }
-
-    free_triple_buffer(&ctx.triples);
-
+  if ( !rc ||
+       !rdf_broadcast(EV_LOAD, (void*)id, (void*)ATOM_begin) )
+  { destroy_load_context(db, &ctx, TRUE);
     return FALSE;
   }
 
-  if ( !rdf_broadcast(EV_LOAD, (void*)id, (void*)ATOM_begin) )
-    goto fail_out;
-
-  ctx.query = open_query(db);
-  if ( (rc=link_loaded_triples(db, &ctx)) )
+  if ( (rc=prepare_loaded_triples(db, &ctx)) )
   { if ( ctx.graph_table.count )
     { add_graph_context gctx;
 
@@ -4822,18 +4831,16 @@ rdf_load_db(term_t stream, term_t id, term_t graphs)
   }
 
   if ( rc )
+  { query *q = open_query(db);
+
+    add_triples(q, ctx.triples.base, ctx.triples.top - ctx.triples.base);
+
+    close_query(q);
     rc = rdf_broadcast(EV_LOAD, (void*)id, (void*)ATOM_end);
-  else
-    rdf_broadcast(EV_LOAD, (void*)id, (void*)ATOM_error);
-  close_query(ctx.query);
-
-  if ( ctx.loaded_atoms )
-  { atom_t *ap, *ep;
-
-    for(ap=ctx.loaded_atoms, ep=ap+ctx.loaded_id; ap<ep; ap++)
-      PL_unregister_atom(*ap);
-
-    free(ctx.loaded_atoms);
+    destroy_load_context(db, &ctx, FALSE);
+  } else
+  { rdf_broadcast(EV_LOAD, (void*)id, (void*)ATOM_error);
+    destroy_load_context(db, &ctx, TRUE);
   }
 
   return rc;
@@ -8048,7 +8055,7 @@ install_rdf_db(void)
 					1, rdf_current_predicate, NDET);
   PL_register_foreign("rdf_current_literal",
 					1, rdf_current_literal, NDET);
-  PL_register_foreign("rdf_graph",      1, rdf_graph,       NDET);
+  PL_register_foreign("rdf_graph_",     2, rdf_graph,       NDET);
   PL_register_foreign("rdf_set_graph_source", 3, rdf_set_graph_source, 0);
   PL_register_foreign("rdf_unset_graph_source", 1, rdf_unset_graph_source, 0);
   PL_register_foreign("rdf_graph_source_", 3, rdf_graph_source, 0);
