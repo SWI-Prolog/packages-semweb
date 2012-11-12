@@ -2998,9 +2998,9 @@ consider_triple_rehash(rdf_db *db, size_t extra)
 	case BY_SG:
 	case BY_SP:
 	case BY_PG:
-	{ float qexpect = SCALEF(triple_hash_quality(db, i, 1024));
+	{ float qexpect = triple_hash_quality(db, i, 1024);
 
-	  while ( qexpect < 0.5 )
+	  while ( qexpect < SCALEF(0.5) )
 	  { qexpect *= 2;
 	    resize++;
 	  }
