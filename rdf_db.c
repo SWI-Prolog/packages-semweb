@@ -3219,7 +3219,7 @@ is_garbage_triple(triple *t, gen_t old_query_gen, gen_t old_reindex_gen)
 }
 
 
-static void
+static size_t
 gc_hash_chain(rdf_db *db, size_t bucket_no, int icol,
 	      gen_t gen, gen_t reindex_gen)
 { triple_bucket *bucket = &db->hash[icol].blocks[MSB(bucket_no)][bucket_no];
@@ -3278,29 +3278,43 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol,
 		      uncollectable));
     db->gc.uncollectable = uncollectable;
   }
+
+  return collected;
 }
 
 
-static void
+static size_t
 gc_hash(rdf_db *db, int icol, gen_t gen, gen_t reindex_gen)
 { size_t mb = db->hash[icol].bucket_count;
   size_t b;
+  size_t collected = 0;
 
   for(b=0; b<mb; b++)
-    gc_hash_chain(db, b, icol, gen, reindex_gen);
+    collected += gc_hash_chain(db, b, icol, gen, reindex_gen);
+
+  return collected;
 }
 
 
 static int
 gc_hashes(rdf_db *db, gen_t gen, gen_t reindex_gen)
-{ int icol;
+{ size_t garbage = db->erased    - db->gc.reclaimed_triples;
+  size_t reindex = db->reindexed - db->gc.reclaimed_reindexed;
 
-  for(icol=0; icol<INDEX_TABLES; icol++)
-  { enter_scan(&db->defer_all);
-    gc_hash(db, icol, gen, reindex_gen);
-    exit_scan(&db->defer_all);
-    if ( PL_handle_signals() < 0 )
-      return -1;
+  if ( garbage + reindex > 0 )
+  { int icol;
+
+    for(icol=0; icol<INDEX_TABLES; icol++)
+    { size_t collected;
+
+      enter_scan(&db->defer_all);
+      collected = gc_hash(db, icol, gen, reindex_gen);
+      exit_scan(&db->defer_all);
+      if ( PL_handle_signals() < 0 )
+	return -1;
+      if ( icol == 0 && collected == 0 )
+	break;
+    }
   }
 
   return 0;
