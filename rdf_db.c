@@ -115,7 +115,7 @@ static functor_t FUNCTOR_searched_nodes1;
 static functor_t FUNCTOR_lang2;
 static functor_t FUNCTOR_type2;
 
-static functor_t FUNCTOR_gc3;
+static functor_t FUNCTOR_gc4;
 static functor_t FUNCTOR_graphs1;
 
 static functor_t FUNCTOR_assert4;
@@ -3127,6 +3127,7 @@ optimize_triple_hash(rdf_db *db, int icol, gen_t gen)
     }
 
     hash->bucket_count_epoch = upto*2;
+    db->gc.reindexed += copied;
     DEBUG(1, Sdprintf("Optimized hash %s (epoch=%ld; size=%ld; copied=%ld)\n",
 		      col_name[icol],
 		      (long)hash->bucket_count_epoch,
@@ -4575,7 +4576,8 @@ load_triple(rdf_db *db, IOSTREAM *in, ld_context *ctx)
   int c;
 
   t->subject   = load_atom(db, in, ctx);
-  t->predicate.r = lookup_predicate(db, load_atom(db, in, ctx), ctx->query);
+  t->resolve_pred = TRUE;
+  t->predicate.u = load_atom(db, in, ctx);
   if ( (c=Sgetc(in)) == 'R' )
   { t->object.resource = load_atom(db, in, ctx);
   } else
@@ -4778,9 +4780,9 @@ rdf_load_db(term_t stream, term_t id, term_t graphs)
   memset(&ctx, 0, sizeof(ctx));
   init_atomset(&ctx.graph_table);
   init_triple_buffer(&ctx.triples);
-  ctx.query = open_query(db);
   rc = load_db(db, in, &ctx);
   PL_release_stream(in);
+
   if ( !rc )
   { triple **tp;
 
@@ -4802,6 +4804,7 @@ rdf_load_db(term_t stream, term_t id, term_t graphs)
   if ( !rdf_broadcast(EV_LOAD, (void*)id, (void*)ATOM_begin) )
     goto fail_out;
 
+  ctx.query = open_query(db);
   if ( (rc=link_loaded_triples(db, &ctx)) )
   { if ( ctx.graph_table.count )
     { add_graph_context gctx;
@@ -7623,12 +7626,13 @@ unify_statistics(rdf_db *db, term_t key, functor_t f)
 
     _PL_get_arg(2, key, a);
     return PL_unify_int64(a, v);
-  } else if ( f == FUNCTOR_gc3 )
+  } else if ( f == FUNCTOR_gc4 )
   { return PL_unify_term(key,
 			 PL_FUNCTOR, f,
-			   PL_INT,   db->gc.count,
-			   PL_INT64, db->gc.reclaimed_triples,
-			   PL_FLOAT, db->gc.time);	/* time spent */
+			   PL_INT,   (int)db->gc.count,
+			   PL_INT64, (int64_t)db->gc.reclaimed_triples,
+			   PL_INT64, (int64_t)db->gc.reindexed,
+			   PL_FLOAT, (double)db->gc.time);	/* time spent */
   } else
     assert(0);
 
@@ -7959,7 +7963,7 @@ install_rdf_db(void)
   MKFUNCTOR(rdf_object_branch_factor, 1);
   MKFUNCTOR(rdfs_subject_branch_factor, 1);
   MKFUNCTOR(rdfs_object_branch_factor, 1);
-  MKFUNCTOR(gc, 3);
+  MKFUNCTOR(gc, 4);
   MKFUNCTOR(graphs, 1);
   MKFUNCTOR(assert, 4);
   MKFUNCTOR(retract, 4);
@@ -8005,7 +8009,7 @@ install_rdf_db(void)
   keys[i++] = FUNCTOR_duplicates1;
   keys[i++] = FUNCTOR_literals1;
   keys[i++] = FUNCTOR_triples2;
-  keys[i++] = FUNCTOR_gc3;
+  keys[i++] = FUNCTOR_gc4;
   keys[i++] = 0;
   assert(i<=16);
 

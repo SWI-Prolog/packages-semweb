@@ -842,8 +842,8 @@ rdf_statistics(properties(Count)) :-
 	rdf_statistics_(predicates(Count)).
 rdf_statistics(triples(Count)) :-
 	rdf_statistics_(triples(Count)).
-rdf_statistics(gc(Count, Reclaimed, Time)) :-
-	rdf_statistics_(gc(Count, Reclaimed, Time)).
+rdf_statistics(gc(Count, Reclaimed, Reindexed, Time)) :-
+	rdf_statistics_(gc(Count, Reclaimed, Reindexed, Time)).
 rdf_statistics(lookup(Index, Count)) :-
 	functor(Indexed, indexed, 16),
 	rdf_statistics_(Indexed),
