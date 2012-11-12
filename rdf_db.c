@@ -2795,6 +2795,12 @@ static int
 resize_triple_hash(rdf_db *db, int index, int resize)
 { triple_hash *hash = &db->hash[index];
 
+  DEBUG(1, if ( resize > 1 )
+	   { Sdprintf("Resized triple index %s with %d steps\n",
+		      col_name[index], resize);
+	   });
+
+  simpleMutexLock(&db->queries.write.lock);
   while( resize-- > 0 )
   { int i = MSB(hash->bucket_count);
     size_t bytes  = sizeof(triple_bucket)*hash->bucket_count;
@@ -2803,9 +2809,10 @@ resize_triple_hash(rdf_db *db, int index, int resize)
     memset(t, 0, bytes);
     hash->blocks[i] = t-hash->bucket_count;
     hash->bucket_count *= 2;
-    DEBUG(1, Sdprintf("Resized triple index %s to %ld\n",
-		      col_name[index], (long)hash->bucket_count));
+    DEBUG(1, Sdprintf("Resized triple index %s=%d to %ld at %d\n",
+		      col_name[index], index, (long)hash->bucket_count, i));
   }
+  simpleMutexUnlock(&db->queries.write.lock);
 
   return TRUE;
 }
