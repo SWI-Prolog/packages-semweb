@@ -2856,6 +2856,19 @@ resize_triple_hash(rdf_db *db, int index, int resize)
 }
 
 
+static int
+size_triple_hash(rdf_db *db, int icol, size_t size)
+{ int extra = MSB(size) - MSB(db->hash[icol].bucket_count);
+
+  if ( extra >= 0 && MSB(size) < MAX_TBLOCKS )
+  { resize_triple_hash(db, icol, extra);
+    return TRUE;
+  }
+
+  return FALSE;
+}
+
+
 static void
 reset_triple_hash(rdf_db *db, triple_hash *hash)
 { size_t bytes = sizeof(triple_bucket)*hash->bucket_preinit;
@@ -3004,7 +3017,7 @@ consider_triple_rehash(rdf_db *db, size_t extra)
     { int resize = 0;
       size_t sizenow = db->hash[i].bucket_count;
 
-      if ( db->hash[i].user_size )
+      if ( db->hash[i].user_size || db->hash[i].created == FALSE )
 	continue;			/* user set size */
 
       switch(col_index[i])
@@ -3058,6 +3071,60 @@ consider_triple_rehash(rdf_db *db, size_t extra)
     if ( resized )
       invalidate_distinct_counts(db);
   }
+}
+
+
+static size_t
+distinct_hash_values(rdf_db *db, int icol)
+{ triple *t;
+  size_t count;
+  atomset hash_set;
+  int byx = col_index[icol];
+
+  init_atomset(&hash_set);
+  for(t=db->by_none.head; t; t=t->tp.next[ICOL(BY_NONE)])
+  { add_atomset(&hash_set, (atom_t)triple_hash_key(t, byx));
+  }
+  count = hash_set.count;
+  destroy_atomset(&hash_set);
+
+  return count;
+}
+
+
+static void
+initial_size_triple_hash(rdf_db *db, int icol)
+{ triple_hash *hash = &db->hash[icol];
+  size_t size;
+
+  switch(col_index[icol])
+  { case BY_S:
+      size = db->resources.hash.count;
+      break;
+    case BY_P:
+      size = db->predicates.count;
+      break;
+    case BY_O:
+      size = db->resources.hash.count + db->literals.count;
+      break;
+    case BY_SPO:
+      size = db->created - db->erased;
+      break;
+    case BY_G:
+      size = db->graphs.count;
+      break;
+    case BY_PO:
+    case BY_SG:
+    case BY_SP:
+    case BY_PG:
+      size = distinct_hash_values(db, icol);
+      break;
+    default:
+      assert(0);
+  }
+
+  size /= hash->avg_chain_len;
+  size_triple_hash(db, icol, size);
 }
 
 
@@ -3356,7 +3423,8 @@ gc_hashes(rdf_db *db, gen_t gen, gen_t reindex_gen)
 
 	if ( PL_handle_signals() < 0 )
 	  return -1;
-      }
+      } else
+	collected = 0;
 
       if ( icol == 0 && collected == 0 )
 	break;
@@ -3835,6 +3903,7 @@ static void
 create_triple_hash(rdf_db *db, int ic)
 { triple_hash *hash = &db->hash[ic];
 
+  initial_size_triple_hash(db, ic);
   simpleMutexLock(&db->queries.write.lock);
   if ( !hash->created )
   { triple *t;
@@ -7754,16 +7823,18 @@ unify_statistics(rdf_db *db, term_t key, functor_t f)
     _PL_get_arg(1, key, list);
     tail = PL_copy_term_ref(list);
 
-    for(i=0; i<INDEX_TABLES; i++)
-    { if ( !PL_unify_list(tail, head, tail) ||
-	   !PL_put_integer(av+0, col_index[i]) ||
-	   !PL_put_integer(av+1, db->hash[i].bucket_count) ||
-	   !PL_put_float(av+2, triple_hash_quality(db, i, 1024)) ||
-	   !PL_put_integer(av+3, MSB(db->hash[i].bucket_count)-
-			         MSB(db->hash[i].bucket_count_epoch)) ||
-	   !PL_cons_functor_v(tmp, FUNCTOR_hash4, av) ||
-	   !PL_unify(head, tmp) )
-	return FALSE;
+    for(i=1; i<INDEX_TABLES; i++)
+    { if ( db->hash[i].created )
+      { if ( !PL_unify_list(tail, head, tail) ||
+	     !PL_put_integer(av+0, col_index[i]) ||
+	     !PL_put_integer(av+1, db->hash[i].bucket_count) ||
+	     !PL_put_float(av+2, triple_hash_quality(db, i, 1024)) ||
+	     !PL_put_integer(av+3, MSB(db->hash[i].bucket_count)-
+				   MSB(db->hash[i].bucket_count_epoch)) ||
+	     !PL_cons_functor_v(tmp, FUNCTOR_hash4, av) ||
+	     !PL_unify(head, tmp) )
+	  return FALSE;
+      }
     }
 
     return PL_unify_nil(tail);
@@ -7940,16 +8011,14 @@ rdf_set(term_t what)
       return FALSE;
 
     if ( param == ATOM_size )
-    { int extra = MSB(value) - MSB(db->hash[index].bucket_count);
-
-      if ( extra >= 0 && MSB(value) < MAX_TBLOCKS )
+    { if ( size_triple_hash(db, index, value) )
       { db->hash[index].user_size = MSB(value);
-	resize_triple_hash(db, index, extra);
-      } else if ( extra < 0 )
-      { return PL_permission_error("size", "hash", arg);
-      } else
-      { return PL_domain_error("hash_size", arg);
+	return TRUE;
       }
+      if ( value <= 0 || MSB(value) >= MAX_TBLOCKS )
+	return PL_domain_error("hash_size", arg);
+						/* cannot shrink */
+      return PL_permission_error("size", "hash", arg);
     } else if ( param == ATOM_optimize_threshold )
     { if ( value >= 0 && value < 20 )
 	db->hash[index].optimize_threshold = value;
