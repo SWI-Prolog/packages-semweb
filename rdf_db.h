@@ -405,6 +405,7 @@ typedef struct rdf_db
   struct
   { int		count;			/* # garbage collections */
     int		busy;			/* Processing a GC */
+    int		thread_started;		/* GC thread has been started */
     double	time;			/* time spent in GC */
     size_t	reclaimed_triples;	/* # reclaimed triples */
     size_t	reclaimed_reindexed;	/* # reclaimed reindexed triples */
@@ -548,6 +549,6 @@ COMMON(rdf_db*)	rdf_current_db(void);
 COMMON(int)	rdf_broadcast(broadcast_id id, void *a1, void *a2);
 COMMON(int)	rdf_is_broadcasting(broadcast_id id);
 COMMON(void)	consider_triple_rehash(rdf_db *db, size_t extra);
-
+COMMON(int)	rdf_create_gc_thread(rdf_db *db);
 
 #endif /*RDFDB_H_INCLUDED*/

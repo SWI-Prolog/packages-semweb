@@ -534,6 +534,11 @@ del_triples(query *q, triple **triples, size_t count)
   triple **ep = triples+count;
   triple **tp;
 
+  if ( count == 0 )
+    return TRUE;
+  else
+    rdf_create_gc_thread(db);
+
   simpleMutexLock(&db->queries.write.generation_lock);
   simpleMutexLock(&db->queries.write.lock);
   gen = queryWriteGen(q) + 1;
@@ -581,6 +586,11 @@ update_triples(query *q,
   triple **en = new+count;
   triple **to, **tn;
   size_t updated = 0;
+
+  if ( count == 0 )
+    return TRUE;
+  else
+    rdf_create_gc_thread(db);
 
   for(tn=new; tn < en; tn++)
     prelink_triple(db, *tn, q);

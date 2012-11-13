@@ -2836,6 +2836,9 @@ resize_triple_hash(rdf_db *db, int index, int resize)
 		      col_name[index], resize);
 	   });
 
+  if ( hash->created )
+    rdf_create_gc_thread(db);
+
   simpleMutexLock(&db->queries.write.lock);
   while( resize-- > 0 )
   { int i = MSB(hash->bucket_count);
@@ -3599,10 +3602,19 @@ rdf_gc_info(term_t info)
 		 *	      GC THREAD		*
 		 *******************************/
 
-static int
+int
 rdf_create_gc_thread(rdf_db *db)
-{ PL_call_predicate(NULL, PL_Q_NORMAL,
-		    PL_predicate("rdf_create_gc_thread", 0, "rdf_db"), 0);
+{ if ( db->gc.thread_started )
+    return TRUE;
+
+  simpleMutexLock(&db->locks.misc);
+  if ( !db->gc.thread_started )
+  { db->gc.thread_started = TRUE;
+
+    PL_call_predicate(NULL, PL_Q_NORMAL,
+		      PL_predicate("rdf_create_gc_thread", 0, "rdf_db"), 0);
+  }
+  simpleMutexUnlock(&db->locks.misc);
 
   return TRUE;
 }
@@ -3637,9 +3649,7 @@ rdf_current_db(void)
 
   simpleMutexLock(&rdf_lock);
   if ( !RDF_DB )
-  { RDF_DB = new_db();
-    rdf_create_gc_thread(RDF_DB);
-  }
+    RDF_DB = new_db();
   simpleMutexUnlock(&rdf_lock);
 
   return RDF_DB;
