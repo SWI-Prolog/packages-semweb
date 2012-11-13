@@ -38,7 +38,6 @@
 #include "debug.h"
 #include <string.h>
 #include <assert.h>
-#include <gc/gc.h>
 #ifdef __WINDOWS__
 #define inline __inline
 #endif
