@@ -5870,7 +5870,9 @@ update_duplicates(rdf_db *db)
 
 static void
 start_duplicate_admin(rdf_db *db)
-{ PL_call_predicate(NULL, PL_Q_NORMAL,
+{ db->maintain_duplicates = TRUE;
+
+  PL_call_predicate(NULL, PL_Q_NORMAL,
 		    PL_predicate("rdf_update_duplicates_thread", 0, "rdf_db"), 0);
 }
 
@@ -6173,7 +6175,8 @@ free_search_state(search_state *state)
 
   free_triple(state->db, &state->pattern, FALSE);
   destroy_triple_walker(state->db, &state->cursor);
-  if ( state->dup_answers.count > state->db->duplicate_admin_threshold )
+  if ( !state->db->maintain_duplicates &&
+       state->dup_answers.count > state->db->duplicate_admin_threshold )
     start_duplicate_admin(state->db);
   destroy_tripleset(&state->dup_answers);
 
