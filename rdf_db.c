@@ -142,6 +142,9 @@ static atom_t	ATOM_error;
 static atom_t	ATOM_infinite;
 static atom_t	ATOM_snapshot;
 static atom_t	ATOM_true;
+static atom_t	ATOM_size;
+static atom_t	ATOM_optimize_threshold;
+static atom_t	ATOM_average_chain_len;
 
 static atom_t	ATOM_subPropertyOf;
 
@@ -393,15 +396,41 @@ static int col_index[INDEX_TABLES] =
 
 static const char *col_name[INDEX_TABLES] =
 { "-",
-  "S",
-  "P",
-  "SP",
-  "O",
-  "PO",
-  "SPO",
-  "G",
-  "SG",
-  "PG"
+  "s",
+  "p",
+  "sp",
+  "o",
+  "po",
+  "spo",
+  "g",
+  "sg",
+  "pg"
+};
+
+static const int col_avg_len[INDEX_TABLES] =
+{ 0,	/*BY_NONE*/
+  2,	/*BY_S*/
+  2,	/*BY_P*/
+  2,	/*BY_SP*/
+  4,	/*BY_O*/
+  2,	/*BY_PO*/
+  2,	/*BY_SPO*/
+  1,	/*BY_G*/
+  2,	/*BY_SG*/
+  2	/*BY_PG*/
+};
+
+static const int col_opt_threshold[INDEX_TABLES] =
+{ 0,	/*BY_NONE*/
+  2,	/*BY_S*/
+  2,	/*BY_P*/
+  2,	/*BY_SP*/
+  2,	/*BY_O*/
+  2,	/*BY_PO*/
+  2,	/*BY_SPO*/
+  2,	/*BY_G*/
+  2,	/*BY_SG*/
+  2	/*BY_PG*/
 };
 
 static const int alt_index[16] =
@@ -2783,6 +2812,10 @@ init_triple_hash(rdf_db *db, int index, size_t count)
 
   memset(t, 0, bytes);
   memset(h, 0, sizeof(*h));
+
+  h->optimize_threshold = col_opt_threshold[index];
+  h->avg_chain_len      = col_avg_len[index];
+
   for(i=0; i<MSB(count); i++)
     h->blocks[i] = t;
 
@@ -2810,6 +2843,8 @@ resize_triple_hash(rdf_db *db, int index, int resize)
     memset(t, 0, bytes);
     hash->blocks[i] = t-hash->bucket_count;
     hash->bucket_count *= 2;
+    if ( !db->by_none.head )		/* empty DB! */
+      hash->bucket_count_epoch = hash->bucket_count;
     DEBUG(1, Sdprintf("Resized triple index %s=%d to %ld at %d\n",
 		      col_name[index], index, (long)hash->bucket_count, i));
   }
@@ -2949,24 +2984,25 @@ TBD: Can we omit linking all  the   hashes  when adding triples? Then we
 need to materialize on the first query.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-#define SPO_FACTOR 1
-#define   O_FACTOR 4
-
 void
 consider_triple_rehash(rdf_db *db, size_t extra)
 { size_t triples = db->created - db->erased;
+  triple_hash *spo = &db->hash[ICOL(BY_SPO)];
 
-  if ( extra + triples > SPO_FACTOR*db->hash[ICOL(BY_SPO)].bucket_count )
+  if ( (extra + triples)/spo->avg_chain_len > spo->bucket_count )
   { int i;
     int resized = 0;
     int factor = ((extra+triples+100000)*16)/(triples+100000);
 
-#define SCALE(n) (((n)*factor)/16)
-#define SCALEF(n) (((n)*(float)factor)/16.0)
+#define SCALE(n) (((n)*factor)/(16*db->hash[i].avg_chain_len))
+#define SCALEF(n) (((n)*(float)factor)/(16.0*(float)db->hash[i].avg_chain_len))
 
     for(i=1; i<INDEX_TABLES; i++)
     { int resize = 0;
       size_t sizenow = db->hash[i].bucket_count;
+
+      if ( db->hash[i].user_size )
+	continue;			/* user set size */
 
       switch(col_index[i])
       { case BY_S:
@@ -2979,11 +3015,11 @@ consider_triple_rehash(rdf_db *db, size_t extra)
 	  break;
 	case BY_O:
 	  while ( SCALE(db->resources.hash.count + db->literals.count) >
-		  (O_FACTOR*sizenow)<<resize )
+		  sizenow<<resize )
 	    resize++;
 	  break;
 	case BY_SPO:
-	  while ( extra+triples > (SPO_FACTOR*sizenow)<<resize )
+	  while ( (extra+triples)/spo->avg_chain_len > sizenow<<resize )
 	    resize++;
 	  break;
 	case BY_G:
@@ -2996,7 +3032,7 @@ consider_triple_rehash(rdf_db *db, size_t extra)
 	case BY_PG:
 	{ float qexpect = triple_hash_quality(db, i, 1024);
 
-	  while ( qexpect < SCALEF(0.5) )
+	  while ( qexpect < SCALEF(1.0) )
 	  { qexpect *= 2;
 	    resize++;
 	  }
@@ -3085,6 +3121,35 @@ reindex_triple(rdf_db *db, triple *t)
 }
 
 
+static int
+optimizable_triple_hash(rdf_db *db, int icol)
+{ triple_hash *hash = &db->hash[icol];
+  int opt = 0;
+  size_t epoch;
+
+  for ( epoch=hash->bucket_count_epoch; epoch < hash->bucket_count; epoch*=2 )
+    opt++;
+
+  opt -= hash->optimize_threshold;
+  if ( opt < 0 )
+    opt = 0;
+
+  return opt;
+}
+
+
+static int
+optimizable_hashes(rdf_db *db)
+{ int icol;
+  int optimizable = 0;
+
+  for(icol=1; icol<INDEX_TABLES; icol++)
+    optimizable += optimizable_triple_hash(db, icol);
+
+  return optimizable;
+}
+
+
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 optimize_triple_hash() only doubles hash->bucket_count_epoch!  It may be
 necessary to call it multiple times, but   reindexing one step at a time
@@ -3103,7 +3168,7 @@ static int
 optimize_triple_hash(rdf_db *db, int icol, gen_t gen)
 { triple_hash *hash = &db->hash[icol];
 
-  if ( hash->bucket_count_epoch < hash->bucket_count )
+  if ( optimizable_triple_hash(db, icol) )
   { size_t b_no = 0;
     size_t upto = hash->bucket_count_epoch;
     size_t copied = 0;
@@ -3151,32 +3216,6 @@ optimize_triple_hashes(rdf_db *db, gen_t gen)
 
   return optimized;			/* # hashes optimized */
 }
-
-
-static int
-optimizable_triple_hash(rdf_db *db, int icol)
-{ triple_hash *hash = &db->hash[icol];
-  int opt = 0;
-  size_t epoch;
-
-  for ( epoch=hash->bucket_count_epoch; epoch < hash->bucket_count; epoch*=2 )
-    opt++;
-
-  return opt;
-}
-
-
-static int
-optimizable_hashes(rdf_db *db)
-{ int icol;
-  int optimizable = 0;
-
-  for(icol=1; icol<INDEX_TABLES; icol++)
-    optimizable += optimizable_triple_hash(db, icol);
-
-  return optimizable;
-}
-
 
 
 		 /*******************************
@@ -7734,6 +7773,93 @@ rdf_snapshot(term_t t)
 
 
 		 /*******************************
+		 *	    HASH CONTROL	*
+		 *******************************/
+
+/** rdf_set(+What)
+
+    Set aspect of the RDF database.  What is one of:
+
+      * hash(Which, Parameter, Value)
+
+    Where Parameter is one of =size=, =optimize_threshold= or
+    =avg_chain_len= and Which is one of =s=, =p=, etc.
+*/
+
+static int
+get_index_name(term_t t, int *index)
+{ int i;
+  char *s;
+
+  if ( !PL_get_chars(t, &s, CVT_ATOM|CVT_EXCEPTION) )
+    return FALSE;
+
+  for(i=1; i<INDEX_TABLES; i++)
+  { if ( strcmp(s, col_name[i]) == 0 )
+    { *index = i;
+      return TRUE;
+    }
+  }
+
+  PL_domain_error("index", t);
+  return FALSE;
+}
+
+
+static foreign_t
+rdf_set(term_t what)
+{ rdf_db *db = rdf_current_db();
+
+  if ( PL_is_functor(what, FUNCTOR_hash3) )
+  { term_t arg = PL_new_term_ref();
+    int index;
+    int value;
+    atom_t param;
+
+    _PL_get_arg(1, what, arg);
+    if ( !get_index_name(arg, &index) )
+      return FALSE;
+
+    _PL_get_arg(3, what, arg);
+    if ( !PL_get_integer_ex(arg, &value) )
+      return FALSE;
+
+    _PL_get_arg(2, what, arg);
+    if ( !PL_get_atom_ex(arg, &param) )
+      return FALSE;
+
+    if ( param == ATOM_size )
+    { int extra = MSB(value) - MSB(db->hash[index].bucket_count);
+
+      if ( extra >= 0 && MSB(value) < MAX_TBLOCKS )
+      { db->hash[index].user_size = MSB(value);
+	resize_triple_hash(db, index, extra);
+      } else if ( extra < 0 )
+      { return PL_permission_error("size", "hash", arg);
+      } else
+      { return PL_domain_error("hash_size", arg);
+      }
+    } else if ( param == ATOM_optimize_threshold )
+    { if ( value >= 0 && value < 20 )
+	db->hash[index].optimize_threshold = value;
+      else
+	return PL_domain_error("optimize_threshold", arg);
+    } else if ( param == ATOM_average_chain_len )
+    { if ( value >= 0 && value < 20 )
+	db->hash[index].avg_chain_len = value;
+      return PL_domain_error("average_chain_len", arg);
+    } else
+      return PL_domain_error("rdf_hash_parameter", arg);
+
+    return TRUE;
+  }
+
+  return PL_type_error("rdf_setting", what);
+}
+
+
+
+		 /*******************************
 		 *	       RESET		*
 		 *******************************/
 
@@ -7994,21 +8120,24 @@ install_rdf_db(void)
   FUNCTOR_colon2 = PL_new_functor(PL_new_atom(":"), 2);
   FUNCTOR_plus2  = PL_new_functor(PL_new_atom("+"), 2);
 
-  ATOM_user	     = PL_new_atom("user");
-  ATOM_exact	     = PL_new_atom("exact");
-  ATOM_plain	     = PL_new_atom("plain");
-  ATOM_prefix	     = PL_new_atom("prefix");
-  ATOM_like	     = PL_new_atom("like");
-  ATOM_substring     = PL_new_atom("substring");
-  ATOM_word	     = PL_new_atom("word");
-  ATOM_subPropertyOf = PL_new_atom(URL_subPropertyOf);
-  ATOM_error	     = PL_new_atom("error");
-  ATOM_begin	     = PL_new_atom("begin");
-  ATOM_end	     = PL_new_atom("end");
-  ATOM_error	     = PL_new_atom("error");
-  ATOM_infinite	     = PL_new_atom("infinite");
-  ATOM_snapshot      = PL_new_atom("snapshot");
-  ATOM_true          = PL_new_atom("true");
+  ATOM_user		  = PL_new_atom("user");
+  ATOM_exact		  = PL_new_atom("exact");
+  ATOM_plain		  = PL_new_atom("plain");
+  ATOM_prefix		  = PL_new_atom("prefix");
+  ATOM_like		  = PL_new_atom("like");
+  ATOM_substring	  = PL_new_atom("substring");
+  ATOM_word		  = PL_new_atom("word");
+  ATOM_subPropertyOf	  = PL_new_atom(URL_subPropertyOf);
+  ATOM_error		  = PL_new_atom("error");
+  ATOM_begin		  = PL_new_atom("begin");
+  ATOM_end		  = PL_new_atom("end");
+  ATOM_error		  = PL_new_atom("error");
+  ATOM_infinite		  = PL_new_atom("infinite");
+  ATOM_snapshot		  = PL_new_atom("snapshot");
+  ATOM_true		  = PL_new_atom("true");
+  ATOM_size		  = PL_new_atom("size");
+  ATOM_optimize_threshold = PL_new_atom("optimize_threshold");
+  ATOM_average_chain_len  = PL_new_atom("average_chain_len");
 
   PRED_call1         = PL_predicate("call", 1, "user");
 
@@ -8045,6 +8174,7 @@ install_rdf_db(void)
   PL_register_foreign("rdf_add_gc_time",1, rdf_add_gc_time, 0);
   PL_register_foreign("rdf_gc_info_",   1, rdf_gc_info,	    0);
   PL_register_foreign("rdf_statistics_",1, rdf_statistics,  NDET);
+  PL_register_foreign("rdf_set",        1, rdf_set,         0);
   PL_register_foreign("rdf_generation", 1, rdf_generation,  0);
   PL_register_foreign("rdf_snapshot",   1, rdf_snapshot,    0);
   PL_register_foreign("rdf_delete_snapshot", 1, rdf_delete_snapshot, 0);

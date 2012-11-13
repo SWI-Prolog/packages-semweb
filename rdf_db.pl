@@ -93,6 +93,7 @@
 
 	    rdf_source_location/2,	% +Subject, -Source
 	    rdf_statistics/1,		% -Key
+	    rdf_set/1,			% +Term
 	    rdf_generation/1,		% -Generation
 	    rdf_snapshot/1,		% -Snapshot
 	    rdf_delete_snapshot/1,	% +Snapshot

@@ -331,6 +331,9 @@ typedef struct triple_hash
   size_t	bucket_count;		/* Allocated #buckets */
   size_t	bucket_count_epoch;	/* Initial bucket count */
   size_t	bucket_preinit;		/* Pre-initializaed bucket count */
+  unsigned int	user_size;		/* User selected size as 2^N */
+  unsigned int	optimize_threshold;	/* # resizes to leave behind */
+  unsigned int	avg_chain_len;		/* Accepted average chain length */
 } triple_hash;
 
 typedef struct triple_walker
