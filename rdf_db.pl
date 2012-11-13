@@ -1000,6 +1000,24 @@ monitor_mask(all,	   0xffff).
 
 
 		 /*******************************
+		 *	    DUPLICATES		*
+		 *******************************/
+
+:- public
+	rdf_update_duplicates_thread/0.
+
+%%	rdf_update_duplicates_thread
+%
+%	Start a thread to initialize the duplicate administration.
+
+rdf_update_duplicates_thread :-
+	thread_create(rdf_update_duplicates, _,
+		      [ detached(true),
+			alias('__rdf_duplicate_detecter')
+		      ]).
+
+
+		 /*******************************
 		 *    QUICK BINARY LOAD/SAVE	*
 		 *******************************/
 

@@ -1,6 +1,4 @@
-/*  $Id$
-
-    Part of SWI-Prolog
+/*  Part of SWI-Prolog
 
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
@@ -147,6 +145,8 @@ typedef struct lifespan
 #define INITIAL_RESOURCE_TABLE_SIZE	8192
 #define INITIAL_PREDICATE_TABLE_SIZE	64
 #define INITIAL_GRAPH_TABLE_SIZE	64
+
+#define DUPLICATE_ADMIN_THRESHOLD	1024
 
 #define MAX_HASH_FACTOR 8		/* factor to trigger re-hash */
 #define MIN_HASH_FACTOR 4		/* factor after re-hash */
@@ -389,6 +389,7 @@ typedef struct rdf_db
   size_t	duplicates;		/* #duplicate triples */
   int		maintain_duplicates;	/* If TRUE, updated duplicates */
   int		duplicates_up_to_date;	/* Duplicate status is up-to-date */
+  size_t	duplicate_admin_threshold;	/* Maintain above this */
 
 #if JOINED_DEFER			/* Deferred free handling */
   defer_free	defer_all;
