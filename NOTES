@@ -3,7 +3,7 @@ Indexing
 
 Loading big data:
 
-test_ecdemo.pl
+test_ecdemo.pl (VU desktop)
 
 	RDF 2.0:
 		- Load time: 71 sec
@@ -17,3 +17,18 @@ test_ecdemo.pl
 
 	RDF 3.0:
 		- Load time: 78 sec (203%)
+
+================================================================
+test_ecdemo.pl (laptop)
+
+	RDF 2.0:
+		- Load time: 50.31
+		- dfs(1): 3=0.31; 4=4.30
+
+	RDF 3.0:
+		- Load time: 40.28
+		- dfs(1): 3=0.28; 4=4.6
+
+	RDF 3.0: (set/0: limited hash)
+		- Load time: 40.69
+		- dfs(1): 3=0.29; 4=4.05
