@@ -73,6 +73,7 @@ Measurements using old subPropetyOf indexing and none (repeated queries):
   - Test for duplicates; set flag on all of them.			[OK]
   - Avoid duplicate answers by maintaining a table, only adding		[OK]
     triples that are flagged as duplicates.
+  - Implement duplicate elimination purely on new_answer()		[OK]
 
 ---+ Hash-table design
 
@@ -82,6 +83,15 @@ Measurements using old subPropetyOf indexing and none (repeated queries):
 	- graph-db
 
   - Perform expensive tests for need to rehash in a thread.
+
+---+ Enhance loading
+
+  - Initial state: loading.  Calls to add_triples simply load
+    triples; no indexing or duplicates are maintained.
+  - First query creates the hash it requires at the appropriate size.
+  - First delete or resized hash-table starts GC.
+  - Duplicate admin is started if new_answer() finds too many
+    duplicates.  It is created using a thread.
 
 ---+ References
 

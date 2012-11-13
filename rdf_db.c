@@ -7692,7 +7692,9 @@ unify_statistics(rdf_db *db, term_t key, functor_t f)
   } else if ( f == FUNCTOR_searched_nodes1 )
   { v = db->agenda_created;
   } else if ( f == FUNCTOR_duplicates1 )
-  { v = db->duplicates;
+  { if ( db->duplicates_up_to_date == FALSE )
+      return FALSE;
+    v = db->duplicates;
   } else if ( f == FUNCTOR_literals1 )
   { v = db->literals.count;
   } else if ( f == FUNCTOR_triples2 && PL_is_functor(key, f) )

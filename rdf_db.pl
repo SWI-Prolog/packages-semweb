@@ -838,14 +838,20 @@ consider_gc(_CPU) :-
 
 rdf_statistics(sources(Count)) :-
 	rdf_statistics_(graphs(Count)).
+rdf_statistics(triples(Count)) :-
+	rdf_statistics_(triples(Count)).
+rdf_statistics(duplicates(Count)) :-
+	rdf_statistics_(duplicates(Count)).
 rdf_statistics(resources(Count)) :-
 	rdf_statistics_(resources(Count)).
 rdf_statistics(properties(Count)) :-
 	rdf_statistics_(predicates(Count)).
-rdf_statistics(triples(Count)) :-
-	rdf_statistics_(triples(Count)).
+rdf_statistics(literals(Count)) :-
+	rdf_statistics_(literals(Count)).
 rdf_statistics(gc(Count, Reclaimed, Reindexed, Time)) :-
 	rdf_statistics_(gc(Count, Reclaimed, Reindexed, Time)).
+rdf_statistics(searched_nodes(Count)) :-
+	rdf_statistics_(searched_nodes(Count)).
 rdf_statistics(lookup(Index, Count)) :-
 	functor(Indexed, indexed, 16),
 	rdf_statistics_(Indexed),
@@ -857,15 +863,9 @@ rdf_statistics(hash_quality(Index, Size, Quality,Optimize)) :-
 	rdf_statistics_(hash_quality(List)),
 	member(hash(Place,Size,Quality,Optimize), List),
 	index(Index, Place).
-rdf_statistics(searched_nodes(Count)) :-
-	rdf_statistics_(searched_nodes(Count)).
-rdf_statistics(literals(Count)) :-
-	rdf_statistics_(literals(Count)).
 rdf_statistics(triples_by_graph(Graph, Count)) :-
 	rdf_graph_(Graph, Count),
 	Count \== 0.
-rdf_statistics(duplicates(Count)) :-
-	rdf_statistics_(duplicates(Count)).
 
 index(rdf(-,-,-,-), 0).
 index(rdf(+,-,-,-), 1).
