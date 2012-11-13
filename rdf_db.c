@@ -5714,21 +5714,32 @@ mark_duplicate(rdf_db *db, triple *t, query *q)
 }
 
 
-static void
+static int
 update_duplicates(rdf_db *db)
 { triple *t;
+  int count = 0;
 
   db->duplicates_up_to_date = FALSE;
   db->duplicates	    = 0;
   db->maintain_duplicates   = TRUE;
 
   for(t=db->by_none.head; t; t=t->tp.next[ICOL(BY_NONE)])
+  { if ( ++count % 10240 == 0 &&
+	 PL_handle_signals() < 0 )
+      return FALSE;
     t->is_duplicate = FALSE;
+  }
 
   for(t=db->by_none.head; t; t=t->tp.next[ICOL(BY_NONE)])
+  { if ( ++count % 1024 == 0 &&
+	 PL_handle_signals() < 0 )
+      return FALSE;
     mark_duplicate(db, t, NULL);
+  }
 
   db->duplicates_up_to_date = TRUE;
+
+  return TRUE;
 }
 
 
@@ -7906,9 +7917,7 @@ static foreign_t
 rdf_update_duplicates(void)
 { rdf_db *db = rdf_current_db();
 
-  update_duplicates(db);
-
-  return TRUE;
+  return update_duplicates(db);
 }
 
 
