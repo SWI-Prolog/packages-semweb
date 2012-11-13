@@ -92,6 +92,7 @@ static functor_t FUNCTOR_graph1;
 static functor_t FUNCTOR_indexed16;
 static functor_t FUNCTOR_hash_quality1;
 static functor_t FUNCTOR_hash3;
+static functor_t FUNCTOR_hash4;
 
 static functor_t FUNCTOR_exact1;
 static functor_t FUNCTOR_plain1;
@@ -7639,7 +7640,7 @@ unify_statistics(rdf_db *db, term_t key, functor_t f)
   { term_t tail, list = PL_new_term_ref();
     term_t head = PL_new_term_ref();
     term_t tmp = PL_new_term_ref();
-    term_t av = PL_new_term_refs(3);
+    term_t av = PL_new_term_refs(4);
     int i;
 
     if ( !PL_unify_functor(key, FUNCTOR_hash_quality1) )
@@ -7652,7 +7653,9 @@ unify_statistics(rdf_db *db, term_t key, functor_t f)
 	   !PL_put_integer(av+0, col_index[i]) ||
 	   !PL_put_integer(av+1, db->hash[i].bucket_count) ||
 	   !PL_put_float(av+2, triple_hash_quality(db, i, 1024)) ||
-	   !PL_cons_functor_v(tmp, FUNCTOR_hash3, av) ||
+	   !PL_put_integer(av+3, MSB(db->hash[i].bucket_count)-
+			         MSB(db->hash[i].bucket_count_epoch)) ||
+	   !PL_cons_functor_v(tmp, FUNCTOR_hash4, av) ||
 	   !PL_unify(head, tmp) )
 	return FALSE;
     }
@@ -8116,6 +8119,7 @@ install_rdf_db(void)
   MKFUNCTOR(end, 1);
   MKFUNCTOR(hash_quality, 1);
   MKFUNCTOR(hash, 3);
+  MKFUNCTOR(hash, 4);
 
   FUNCTOR_colon2 = PL_new_functor(PL_new_atom(":"), 2);
   FUNCTOR_plus2  = PL_new_functor(PL_new_atom("+"), 2);
