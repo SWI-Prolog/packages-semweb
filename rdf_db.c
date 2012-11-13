@@ -187,6 +187,7 @@ static predicate_cloud *new_predicate_cloud(rdf_db *db,
 static int	unify_literal(term_t lit, literal *l);
 static int	check_predicate_cloud(predicate_cloud *c);
 static void	invalidate_is_leaf(predicate *p, query *q, int add);
+static void	create_triple_hash(rdf_db *db, int ic);
 
 
 		 /*******************************
@@ -2844,7 +2845,7 @@ resize_triple_hash(rdf_db *db, int index, int resize)
     memset(t, 0, bytes);
     hash->blocks[i] = t-hash->bucket_count;
     hash->bucket_count *= 2;
-    if ( !db->by_none.head )		/* empty DB! */
+    if ( !hash->created )
       hash->bucket_count_epoch = hash->bucket_count;
     DEBUG(1, Sdprintf("Resized triple index %s=%d to %ld at %d\n",
 		      col_name[index], index, (long)hash->bucket_count, i));
@@ -2872,6 +2873,7 @@ reset_triple_hash(rdf_db *db, triple_hash *hash)
       break;
   }
   hash->bucket_count = hash->bucket_count_epoch = hash->bucket_preinit;
+  hash->created = FALSE;
 }
 
 
@@ -3062,10 +3064,12 @@ consider_triple_rehash(rdf_db *db, size_t extra)
 static int
 init_tables(rdf_db *db)
 { int ic;
+  triple_hash *by_none = &db->hash[ICOL(BY_NONE)];
 
-  db->hash[ICOL(BY_NONE)].blocks[0] = &db->by_none;
-  db->hash[ICOL(BY_NONE)].bucket_count_epoch = 1;
-  db->hash[ICOL(BY_NONE)].bucket_count = 1;
+  by_none->blocks[0] = &db->by_none;
+  by_none->bucket_count_epoch = 1;
+  by_none->bucket_count = 1;
+  by_none->created = TRUE;
 
   for(ic=BY_S; ic<INDEX_TABLES; ic++)
   { if ( !init_triple_hash(db, ic, INITIAL_TABLE_SIZE) )
@@ -3127,6 +3131,9 @@ optimizable_triple_hash(rdf_db *db, int icol)
 { triple_hash *hash = &db->hash[icol];
   int opt = 0;
   size_t epoch;
+
+  if ( hash->created == FALSE )
+    return FALSE;
 
   for ( epoch=hash->bucket_count_epoch; epoch < hash->bucket_count; epoch*=2 )
     opt++;
@@ -3342,11 +3349,15 @@ gc_hashes(rdf_db *db, gen_t gen, gen_t reindex_gen)
     for(icol=0; icol<INDEX_TABLES; icol++)
     { size_t collected;
 
-      enter_scan(&db->defer_all);
-      collected = gc_hash(db, icol, gen, reindex_gen);
-      exit_scan(&db->defer_all);
-      if ( PL_handle_signals() < 0 )
-	return -1;
+      if ( db->hash[icol].created )
+      { enter_scan(&db->defer_all);
+	collected = gc_hash(db, icol, gen, reindex_gen);
+	exit_scan(&db->defer_all);
+
+	if ( PL_handle_signals() < 0 )
+	  return -1;
+      }
+
       if ( icol == 0 && collected == 0 )
 	break;
     }
@@ -3720,10 +3731,12 @@ triple_hash_key(triple *t, int which)
 static void
 init_triple_walker(triple_walker *tw, rdf_db *db, triple *pattern, int which)
 { tw->unbounded_hash = triple_hash_key(pattern, which);
+  tw->current	     = NULL;
   tw->icol	     = ICOL(which);
   tw->hash	     = &db->hash[tw->icol];
+  if ( !tw->hash->created )
+    create_triple_hash(db, tw->icol);
   tw->bcount	     = tw->hash->bucket_count_epoch;
-  tw->current	     = NULL;
 }
 
 
@@ -3731,10 +3744,12 @@ static void
 init_triple_literal_walker(triple_walker *tw, rdf_db *db,
 			   triple *pattern, int which, unsigned int hash)
 { tw->unbounded_hash = hash;
+  tw->current	     = NULL;
   tw->icol	     = ICOL(which);
   tw->hash	     = &db->hash[tw->icol];
+  if ( !tw->hash->created )
+    create_triple_hash(db, tw->icol);
   tw->bcount	     = tw->hash->bucket_count_epoch;
-  tw->current	     = NULL;
 }
 
 
@@ -3810,9 +3825,46 @@ static int by_inverse[8] =
 };
 
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+(*) ->linked is decremented in gc_hash_chain() for garbage triples. This
+can conflict. We must use some sort   of  synchronization with GC if the
+died generation is not the maximum and the triple might thus be garbage.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+static void
+create_triple_hash(rdf_db *db, int ic)
+{ triple_hash *hash = &db->hash[ic];
+
+  simpleMutexLock(&db->queries.write.lock);
+  if ( !hash->created )
+  { triple *t;
+
+    DEBUG(1, Sdprintf("Creating hash %s\n", col_name[ic]));
+
+    for(t=db->by_none.head; t; t=t->tp.next[ICOL(BY_NONE)])
+    { int i = col_index[ic];
+      int key = triple_hash_key(t, i) % hash->bucket_count;
+      triple_bucket *bucket = &hash->blocks[MSB(key)][key];
+
+      if ( bucket->tail )
+      { bucket->tail->tp.next[ic] = t;
+      } else
+      { bucket->head = t;
+      }
+      bucket->tail = t;
+      ATOMIC_INC(&bucket->count);
+      t->linked++;				/* (*) atomic? */
+    }
+    hash->created = TRUE;
+  }
+  simpleMutexUnlock(&db->queries.write.lock);
+}
+
+
 static void
 link_triple_hash(rdf_db *db, triple *t)
 { int ic;
+  int linked = 1;
 
   if ( db->by_none.tail )		/* non-indexed chain */
     db->by_none.tail->tp.next[ICOL(BY_NONE)] = t;
@@ -3822,20 +3874,24 @@ link_triple_hash(rdf_db *db, triple *t)
 
   for(ic=1; ic<INDEX_TABLES; ic++)
   { triple_hash *hash = &db->hash[ic];
-    int i = col_index[ic];
-    int key = triple_hash_key(t, i) % hash->bucket_count;
-    triple_bucket *bucket = &hash->blocks[MSB(key)][key];
 
-    if ( bucket->tail )
-    { bucket->tail->tp.next[ic] = t;
-    } else
-    { bucket->head = t;
+    if ( hash->created )
+    { int i = col_index[ic];
+      int key = triple_hash_key(t, i) % hash->bucket_count;
+      triple_bucket *bucket = &hash->blocks[MSB(key)][key];
+
+      if ( bucket->tail )
+      { bucket->tail->tp.next[ic] = t;
+      } else
+      { bucket->head = t;
+      }
+      bucket->tail = t;
+      ATOMIC_INC(&bucket->count);
+      linked++;
     }
-    bucket->tail = t;
-    ATOMIC_INC(&bucket->count);
   }
 
-  t->linked = INDEX_TABLES;
+  t->linked = linked;				/* safe: never garbage */
 }
 
 
