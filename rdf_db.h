@@ -376,7 +376,6 @@ typedef struct rdf_db
 { triple_bucket by_none;		/* Plain linked list of triples */
   triple_hash   hash[INDEX_TABLES];	/* Hash-tables */
   size_t	created;		/* #triples created */
-  size_t	duplicates;		/* #duplicate triples */
   size_t	erased;			/* #triples erased */
   gen_t		reindexed;		/* #triples reindexed (gc_hash_chain) */
   size_t	indexed[16];		/* Count calls (2**4 possible indices) */
@@ -387,8 +386,11 @@ typedef struct rdf_db
   graph	       *last_graph;		/* last accessed graph */
   query_admin	queries;		/* Active query administration */
 
-					/* Deferred free handling */
-#if JOINED_DEFER
+  size_t	duplicates;		/* #duplicate triples */
+  int		maintain_duplicates;	/* If TRUE, updated duplicates */
+  int		duplicates_up_to_date;	/* Duplicate status is up-to-date */
+
+#if JOINED_DEFER			/* Deferred free handling */
   defer_free	defer_all;
 #else
   defer_free	defer_triples;		/* triples */

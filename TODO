@@ -71,7 +71,7 @@ Measurements using old subPropetyOf indexing and none (repeated queries):
 ---+ Duplicates:
 
   - Test for duplicates; set flag on all of them.			[OK]
-  - Avoid duplicate answers by maintaining a table, only adding
+  - Avoid duplicate answers by maintaining a table, only adding		[OK]
     triples that are flagged as duplicates.
 
 ---+ Hash-table design

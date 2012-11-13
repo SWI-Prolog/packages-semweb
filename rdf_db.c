@@ -3850,7 +3850,8 @@ prelink_triple(rdf_db *db, triple *t, query *q)
   }
   if ( t->object_is_literal )
     t->object.literal = share_literal(db, t->object.literal);
-  mark_duplicate(db, t, q);
+  if ( db->maintain_duplicates )
+    mark_duplicate(db, t, q);
 
   return TRUE;
 }
@@ -5676,9 +5677,15 @@ mark_duplicate(rdf_db *db, triple *t, query *q)
   triple *d;
   const int indexed = BY_SPO;
   lifespan qls;
+  lifespan *ls;
 
-  qls.born = queryWriteGen(q) + 1;		/* (*) */
-  qls.died = query_max_gen(q);
+  if ( q )
+  { qls.born = queryWriteGen(q) + 1;		/* (*) */
+    qls.died = query_max_gen(q);
+    ls = &qls;
+  } else
+  { ls = &t->lifespan;
+  }
 
   init_triple_walker(&tw, db, t, indexed);
   while((d=next_triple(&tw)) && d != t)
@@ -5686,7 +5693,7 @@ mark_duplicate(rdf_db *db, triple *t, query *q)
     DEBUG(3, Sdprintf("Possible duplicate: ");
 	     print_triple(d, PRT_NL|PRT_ADR));
 
-    if ( !overlap_lifespan(&d->lifespan, &qls) )
+    if ( !overlap_lifespan(&d->lifespan, ls) )
       continue;
 
     if ( match_triples(db, d, t, q, MATCH_DUPLICATE) )
@@ -5703,6 +5710,24 @@ mark_duplicate(rdf_db *db, triple *t, query *q)
     }
   }
   destroy_triple_walker(db, &tw);
+}
+
+
+static void
+update_duplicates(rdf_db *db)
+{ triple *t;
+
+  db->duplicates_up_to_date = FALSE;
+  db->duplicates	    = 0;
+  db->maintain_duplicates   = TRUE;
+
+  for(t=db->by_none.head; t; t=t->tp.next[ICOL(BY_NONE)])
+    t->is_duplicate = FALSE;
+
+  for(t=db->by_none.head; t; t=t->tp.next[ICOL(BY_NONE)])
+    mark_duplicate(db, t, NULL);
+
+  db->duplicates_up_to_date = TRUE;
 }
 
 
@@ -6018,7 +6043,10 @@ allow_retry_state(search_state *state)
 
 static int
 new_answer(search_state *state, triple *t)
-{ return add_tripleset(state, &state->dup_answers, t);
+{ if ( !t->is_duplicate && state->db->duplicates_up_to_date )
+    return TRUE;
+
+  return add_tripleset(state, &state->dup_answers, t);
 }
 
 
@@ -6036,8 +6064,8 @@ is_candidate(search_state *state, triple *t)
   if ( !match_triples(state->db, t, &state->pattern, state->query, state->flags) )
     return NULL;
 
-  if ( t->is_duplicate && !state->src )
-  { if ( !new_answer(state, t) )
+  if ( !state->src )				/* with source, we report */
+  { if ( !new_answer(state, t) )		/* duplicates */
       return NULL;
   }
 
@@ -7776,7 +7804,7 @@ rdf_snapshot(term_t t)
 
 
 		 /*******************************
-		 *	    HASH CONTROL	*
+		 *	  CONTROL INDEXING	*
 		 *******************************/
 
 /** rdf_set(+What)
@@ -7859,6 +7887,17 @@ rdf_set(term_t what)
 
   return PL_type_error("rdf_setting", what);
 }
+
+
+static foreign_t
+rdf_update_duplicates(void)
+{ rdf_db *db = rdf_current_db();
+
+  update_duplicates(db);
+
+  return TRUE;
+}
+
 
 
 
@@ -8179,6 +8218,8 @@ install_rdf_db(void)
   PL_register_foreign("rdf_gc_info_",   1, rdf_gc_info,	    0);
   PL_register_foreign("rdf_statistics_",1, rdf_statistics,  NDET);
   PL_register_foreign("rdf_set",        1, rdf_set,         0);
+  PL_register_foreign("rdf_update_duplicates",
+					0, rdf_update_duplicates, 0);
   PL_register_foreign("rdf_generation", 1, rdf_generation,  0);
   PL_register_foreign("rdf_snapshot",   1, rdf_snapshot,    0);
   PL_register_foreign("rdf_delete_snapshot", 1, rdf_delete_snapshot, 0);
@@ -8202,7 +8243,7 @@ install_rdf_db(void)
   PL_register_foreign("rdf_graph_source_", 3, rdf_graph_source, 0);
   PL_register_foreign("rdf_estimate_complexity",
 					4, rdf_estimate_complexity, 0);
-  PL_register_foreign("rdf_transaction",3, rdf_transaction, META);
+  PL_register_foreign("rdf_transaction", 3, rdf_transaction, META);
   PL_register_foreign("rdf_active_transactions_",
 					1, rdf_active_transactions, 0);
   PL_register_foreign("rdf_monitor_",   2, rdf_monitor,     META);
