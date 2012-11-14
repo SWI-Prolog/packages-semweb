@@ -7281,8 +7281,7 @@ rdf_current_predicate(term_t name, control_t h)
       } else if ( PL_get_atom_ex(name, &a) )
       { predicate *p;
 
-	if ( (p=existing_predicate(db, a)) &&
-	     p->triple_count > 0 )
+	if ( (p=existing_predicate(db, a)) )
 	  return TRUE;
       }
       return FALSE;
