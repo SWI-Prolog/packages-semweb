@@ -2095,7 +2095,10 @@ lookup_graph(rdf_db *db, atom_t name)
 
   LOCK_MISC(db);
   if ( (g=existing_graph(db, name)) )
-  { UNLOCK_MISC(db);
+  { if ( g->erased )
+      g->erased = FALSE;
+
+    UNLOCK_MISC(db);
     return g;
   }
 
@@ -2209,7 +2212,7 @@ advance_graph_enum(rdf_db *db, enum_graph *eg)
 { if ( eg->g )
     eg->g = eg->g->next;
 
-  while ( !eg->g || eg->g->triple_count == 0 )
+  while ( !eg->g || eg->g->erased )
   { if ( !eg->g )
     { while ( ++eg->i < db->graphs.bucket_count &&
 	      !(eg->g = db->graphs.blocks[MSB(eg->i)][eg->i]) )
@@ -2241,7 +2244,7 @@ rdf_graph(term_t name, term_t triple_count, control_t h)
       } else if ( PL_get_atom_ex(name, &a) )
       { graph *g;
 
-	if ( (g=existing_graph(db, a)) )
+	if ( (g=existing_graph(db, a)) && !g->erased )
 	  return PL_unify_int64(triple_count, g->triple_count);
       }
       return FALSE;
@@ -2285,7 +2288,7 @@ rdf_graph_source(term_t graph_name, term_t source, term_t modified)
   if ( gn )
   { graph *s;
 
-    if ( (s = existing_graph(db, gn)) && s->source)
+    if ( (s = existing_graph(db, gn)) && !s->erased && s->source)
     { return ( PL_unify_atom(source, s->source) &&
 	       PL_unify_float(modified, s->modified) );
     }
@@ -2343,20 +2346,46 @@ rdf_set_graph_source(term_t graph_name, term_t source, term_t modified)
 
 
 static foreign_t
-rdf_unset_graph_source(term_t graph_name)
+rdf_create_graph(term_t graph_name)
 { atom_t gn;
   rdf_db *db = rdf_current_db();
-  graph *s;
+  graph *g;
 
   if ( !PL_get_atom_ex(graph_name, &gn) )
     return FALSE;
-  if ( (s = lookup_graph(db, gn)) )
-  { LOCK_MISC(db);
-    if ( s->source )
-    { PL_unregister_atom(s->source);
-      s->source = 0;
+
+  if ( (g = lookup_graph(db, gn)) )
+    return TRUE;
+
+  return FALSE;
+}
+
+
+static foreign_t
+rdf_destroy_graph(term_t graph_name)
+{ atom_t gn;
+  rdf_db *db = rdf_current_db();
+  graph *g;
+
+  if ( !PL_get_atom_ex(graph_name, &gn) )
+    return FALSE;
+
+  if ( (g = existing_graph(db, gn)) )
+  { atom_t a;
+
+    LOCK_MISC(db);
+    if ( g->triple_count )
+    { UNLOCK_MISC(db);
+      return PL_permission_error("destroy", "graph", graph_name);
     }
-    s->modified = 0.0;
+    if ( (a=g->source) )
+    { g->source = 0;
+      PL_unregister_atom(a);
+    }
+    memset(g->digest,            0, sizeof(g->digest));
+    memset(g->unmodified_digest, 0, sizeof(g->unmodified_digest));
+    g->modified = 0.0;
+    g->erased = TRUE;
     UNLOCK_MISC(db);
   }
 
@@ -5158,7 +5187,7 @@ rdf_md5(term_t graph_name, term_t md5)
   if ( src )
   { graph *s;
 
-    if ( (s = existing_graph(db, src)) )
+    if ( (s = existing_graph(db, src)) && !s->erased )
     { rc = md5_unify_digest(md5, s->digest);
     } else
     { md5_byte_t digest[16];
@@ -8398,8 +8427,9 @@ install_rdf_db(void)
   PL_register_foreign("rdf_current_literal",
 					1, rdf_current_literal, NDET);
   PL_register_foreign("rdf_graph_",     2, rdf_graph,       NDET);
+  PL_register_foreign("rdf_create_graph",  1, rdf_create_graph, 0);
+  PL_register_foreign("rdf_destroy_graph", 1, rdf_destroy_graph, 0);
   PL_register_foreign("rdf_set_graph_source", 3, rdf_set_graph_source, 0);
-  PL_register_foreign("rdf_unset_graph_source", 1, rdf_unset_graph_source, 0);
   PL_register_foreign("rdf_graph_source_", 3, rdf_graph_source, 0);
   PL_register_foreign("rdf_estimate_complexity",
 					4, rdf_estimate_complexity, 0);

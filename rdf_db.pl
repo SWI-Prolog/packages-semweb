@@ -82,6 +82,7 @@
 	    rdf_md5/2,			% +DB, -MD5
 	    rdf_atom_md5/3,		% +Text, +Times, -MD5
 
+	    rdf_create_graph/1,		% ?Graph
 	    rdf_graph_property/2,	% ?Graph, ?Property
 	    rdf_set_graph/2,		% +Graph, +Property
 	    rdf_graph/1,		% ?Graph
@@ -146,7 +147,6 @@
 :- use_module(library(sgml)).
 :- use_module(library(sgml_write)).
 :- use_module(library(option)).
-:- use_module(library(nb_set)).
 :- use_module(library(error)).
 :- use_module(library(uri)).
 :- use_module(library(debug)).
@@ -1546,24 +1546,25 @@ rdf_unload(_).
 
 rdf_unload_graph(Graph) :-
 	must_be(atom, Graph),
-	rdf_statistics_(triples(Graph, Triples)),
-	Triples > 0, !,
-	do_unload(Graph).
-rdf_unload_graph(_).
-
+	(   rdf_graph(Graph)
+	->  rdf_transaction(do_unload(Graph), unload(Graph))
+	;   true
+	).
 
 do_unload(Graph) :-
-	rdf_transaction(rdf_retractall(_,_,_,Graph),
-			unload(Graph)),
-	rdf_unset_graph_source(Graph).
+	(   rdf_graph_(Graph, Triples),
+	    Triples > 0
+	->  rdf_retractall(_,_,_,Graph)
+	;   true
+	),
+	rdf_destroy_graph(Graph).
 
 %%	rdf_graph(?Graph) is nondet.
 %
-%	True when Graph is an existing graph with at least one triple.
+%	True when Graph is an existing graph.
 
 rdf_graph(Graph) :-
-	rdf_graph_(Graph, Triples),
-	Triples > 0.
+	rdf_graph_(Graph, _Triples).
 
 %%	rdf_source(?Graph, ?SourceURL) is nondet.
 %

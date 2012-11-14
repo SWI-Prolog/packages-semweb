@@ -232,15 +232,16 @@ typedef struct predicate_cloud
 
 
 typedef struct graph
-{ struct graph    *next;		/* next in table */
-  atom_t	    name;		/* name of the graph */
-  atom_t	    source;		/* URL graph was loaded from */
-  double	    modified;		/* Modified time of source URL */
-  int		    triple_count;	/* # triples associated to it */
+{ struct graph *next;			/* next in table */
+  atom_t	name;			/* name of the graph */
+  atom_t	source;			/* URL graph was loaded from */
+  double	modified;		/* Modified time of source URL */
+  int		triple_count;		/* # triples associated to it */
+  unsigned	erased;			/* Graph is destroyed */
 #ifdef WITH_MD5
-  unsigned	    md5 : 1;		/* do/don't record MD5 */
-  md5_byte_t	    digest[16];		/* MD5 digest */
-  md5_byte_t	    unmodified_digest[16]; /* MD5 digest when unmodified */
+  unsigned	md5 : 1;		/* do/don't record MD5 */
+  md5_byte_t	digest[16];		/* MD5 digest */
+  md5_byte_t	unmodified_digest[16];	/* MD5 digest when unmodified */
 #endif
 } graph;
 
