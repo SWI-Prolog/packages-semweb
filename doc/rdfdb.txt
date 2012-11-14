@@ -1,15 +1,18 @@
 The central module is called library(semweb/rdf_db). It provides storage
 and indexed querying of RDF triples. RDF data is stored as quintuples.
-The first three elements denote the RDF triple. The extra \arg{Graph}
-and \arg{Line} elements provide information about the origin of the
-triple.
+The first three elements denote the RDF triple. The extra _Graph_ and
+_Line_ elements provide information about the origin of the triple.
 
-The actual storage is provided by the \jargon{foreign language (C)}
-module. Using a dedicated C-based implementation we can reduced memory
-usage and improve indexing capabilities. Currently the following indexes
-are provided (S=subject, P=predicate, O=object, G=graph):
+The actual storage is provided by the _|foreign language (C)|_ module.
+Using a dedicated C-based implementation we can reduced memory usage and
+improve indexing capabilities. Currently the following indexes are
+provided (S=subject, P=predicate, O=object, G=graph):
 
   * S, P, O, SP, PO, SPO, G, SG, PG
+
+  * Additional indexes for predicates, resources and graphs allow
+    enumerating these objects without duplicates.
+
   * Predicates connect by *|rdfs:subPropertyOf|* are combined
     in a _|predicate cloud|_.  The system causes multiple
     predicates in the cloud to share the same hash.  The cloud
@@ -17,11 +20,11 @@ are provided (S=subject, P=predicate, O=object, G=graph):
     closure of all rdfs:subPropertyOf relations.  This
     index supports rdf_has/3 to query a property and all its
     children efficiently.
-  * String literal _Objects_ are combined in a \jargon{skip list}
-    after case normalization. This provides for efficient case-insensitive
-    search, prefix and range search. The plugin library
-    library(semweb/litindex) provides indexed search on tokens inside
-    literals.
+
+  * Literal _Objects_ are combined in a _|skip list|_ after case
+    normalization. This provides for efficient case-insensitive search,
+    prefix and range search. The plugin library library(semweb/litindex)
+    provides indexed search on tokens inside literals.
 
 ---++ Query the RDF database
 
@@ -72,11 +75,52 @@ loading Turtle files using rdf_load/2.
 
   * [[rdf_load/1]]
   * [[rdf_load/2]]
+  * [[rdf_unload/1]]
+  * [[rdf_save/1]]
   * [[rdf_save/2]]
+  * [[rdf_make/0]]
+
+---+++ Partial save
+
+Sometimes it is necessary to make more arbitrary selections of material
+to be saved or exchange RDF descriptions over an open network link. The
+predicates in this section provide for this. Character encoding issues
+are derived from the encoding of the _Stream_, providing support for
+=utf8=, =iso_latin_1= and =ascii=.
+
+  * [[rdf_save_header/2]]
+  * [[rdf_save_footer/1]]
+  * [[rdf_save_subject//3]]
+
+---+++ Fast loading and saving
+
+Loading and saving RDF format is relatively slow. For this reason we
+designed a binary format that is more compact, avoids the complications
+of the RDF parser and avoids repetitive lookup of (URL) identifiers.
+Especially the speed improvement of about 25 times is worth-while when
+loading large databases. These predicates are used for caching by
+rdf_load/2 under certain conditions as well as for maintaining
+persistent snapshots of the database using
+library(semweb/rdf_persistency).
+
+  * [[rdf_save_db/1]]
+  * [[rdf_save_db/2]]
+  * [[rdf_load_db/1]]
 
 
+---++ Graph manipulation
 
+Many RDF stores turned triples into quadruples. This store is no
+exception, initially using the 4th argument to store the filename from
+which the triple was loaded. Currently, the 4th argument is the RDF
+_|named graph|_. A named graph maintains some properties, notably to
+track origin, changes and modified state.
 
+  * [[rdf_graph/1]]
+  * [[rdf_create_graph/1]]
+  * [[rdf_unload_graph/1]]
+  * [[rdf_graph_property/2]]
+  * [[rdf_set_graph/2]]
 
 
 ---++ Literal matching and indexing

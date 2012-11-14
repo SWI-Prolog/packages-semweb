@@ -89,7 +89,7 @@
 	    rdf_source/1,		% ?File
 	    rdf_source/2,		% ?DB, ?SourceURL
 	    rdf_make/0,			% Reload modified databases
-	    rdf_gc/0,			% Reload modified databases
+	    rdf_gc/0,			% Garbage collection
 
 	    rdf_source_location/2,	% +Subject, -Source
 	    rdf_statistics/1,		% -Key
@@ -1244,7 +1244,13 @@ rdf_current_snapshot(Term) :-
 		 *******************************/
 
 %%	rdf_transaction(:Goal) is semidet.
+%
+%	Same as rdf_transaction(Goal, user, []).  See rdf_transaction/3.
+
 %%	rdf_transaction(:Goal, +Id) is semidet.
+%
+%	Same as rdf_transaction(Goal, Id, []).  See rdf_transaction/3.
+
 %%	rdf_transaction(:Goal, +Id, +Options) is semidet.
 %
 %	Run Goal in an RDF  transaction.   Transactions  follow the AcId
@@ -1425,6 +1431,9 @@ rdf_load_db(File) :-
 	url_protocol/1.			% ?Protocol
 
 %%	rdf_load(+FileOrList) is det.
+%
+%	Same as rdf_load(FileOrList, []).  See rdf_load/2.
+
 %%	rdf_load(+FileOrList, +Options) is det.
 %
 %	Load RDF file.  Options provides additional processing options.
@@ -1439,14 +1448,19 @@ rdf_load_db(File) :-
 %	    that are relative to the base uri.  Default is the source
 %	    URL.
 %
+%	    * format(+Format)
+%	    Specify the source format explicitly. Normally this is
+%	    deduced from the filename extension or the mime-type. The
+%	    core library understands the formats xml (RDF/XML) and
+%	    triples (internal quick load and cache format).  Plugins,
+%	    such as library)semweb/turtle) extend the set of recognised
+%	    extensions.
+%
 %	    * graph(?Graph)
 %	    Named graph in which to load the data.  It is *not* allowed
 %	    to load two sources into the same named graph.  If Graph is
 %	    unbound, it is unified to the graph into which the data is
 %	    loaded.
-%
-%	    * db(?Graph)
-%	    Deprecated.  New code must use graph(Graph).
 %
 %	    * if(Condition)
 %	    When to load the file. One of =true=, =changed= (default) or
@@ -1462,6 +1476,11 @@ rdf_load_db(File) :-
 %	    * register_namespaces(Bool)
 %	    If =true= (default =false=), register xmlns= namespace
 %	    declarations as ns/2 namespaces if there is no conflict.
+%
+%	    * silent(+Bool)
+%	    If =true=, the message reporting completion is printed using
+%	    level =silent=. Otherwise the level is =informational=. See
+%	    also print_message/2.
 %
 %	Other options are forwarded to process_rdf/3.
 
@@ -1857,22 +1876,13 @@ report_loaded(Action, Source, DB, Triples, T0, Options) :-
 
 %%	rdf_unload(+Spec) is det.
 %
-%	Remove the triples loaded from the   specified source and remove
-%	the source from the database.  Succeeds   silenly  if the target
-%	graph does not exists, but raises an  error if Spec is neither a
-%	graph, nor resolves to a SourceURL.
-%
-%	@see rdf_unload_graph/1.
+%	Identify the graph loaded from   Spec and use rdf_unload_graph/1
+%	to erase this graph.
 
-rdf_unload(Graph) :-
-	atom(Graph),
-	rdf_statistics_(triples(Graph, Triples)),
-	Triples > 0, !,
-	do_unload(Graph).
 rdf_unload(Spec) :-
 	source_url(Spec, _Protocol, SourceURL),
 	rdf_graph_source_(Graph, SourceURL, _), !,
-	do_unload(Graph).
+	rdf_unload_graph(Graph).
 rdf_unload(_).
 
 %%	rdf_unload_graph(+Graph) is det.
@@ -2035,6 +2045,9 @@ rdf_reset_db :-
 		 *******************************/
 
 %%	rdf_save(+Out) is det.
+%
+%	Same as rdf_save(Out, []).  See rdf_save/2 for details.
+
 %%	rdf_save(+Out, :Options) is det.
 %
 %	Write RDF data as RDF/XML. Options is a list of one or more of
@@ -2042,9 +2055,6 @@ rdf_reset_db :-
 %
 %		* graph(+Graph)
 %		Save only triples associated to the given named Graph.
-%
-%		* db(+DB)
-%		Deprecated synonym for graph(DB).
 %
 %		* anon(Bool)
 %		If false (default true) do not save blank nodes that do
@@ -2055,29 +2065,44 @@ rdf_reset_db :-
 %		represented relative to this base are written using
 %		their shorthand.  See also =write_xml_base= option
 %
-%		* write_xml_base(Bool)
-%		If =false=, do _not_ include the =|xml:base|=
-%		declaration that is written normally when using the
-%		=base_uri= option.
-%
 %		* convert_typed_literal(:Convertor)
 %		Call Convertor(-Type, -Content, +RDFObject), providing
 %		the opposite for the convert_typed_literal option of
 %		the RDF parser.
 %
+%		* document_language(+Lang)
+%		Initial xml:lang saved with rdf:RDF element
+%
 %		* encoding(Encoding)
 %		Encoding for the output.  Either utf8 or iso_latin_1
 %
-%		* document_language(+Lang)
-%		Initial xml:lang saved with rdf:RDF element
+%		* inline(+Bool)
+%		If =true= (default =false=), inline resources when
+%		encountered for the first time. Normally, only bnodes
+%		are handled this way.
+%
+%		* namespaces(+List)
+%		Explicitely specify saved namespace declarations. See
+%		rdf_save_header/2 option namespaces for details.
 %
 %		* sorted(+Boolean)
 %		If =true= (default =false=), emit subjects sorted on
 %		the full URI.  Useful to make file comparison easier.
 %
+%		* write_xml_base(Bool)
+%		If =false=, do _not_ include the =|xml:base|=
+%		declaration that is written normally when using the
+%		=base_uri= option.
+%
+%		* xml_attributes(+Bool)
+%		If =false= (default =true=), never use xml attributes to
+%		save plain literal attributes, i.e., always used an XML
+%		element as in =|<name>Joe</name>|=.
+%
 %	@param Out	Location to save the data.  This can also be a
 %			file-url (=|file://path|=) or a stream wrapped
 %			in a term stream(Out).
+%	@see rdf_save_db/1
 
 :- thread_local
 	named_anon/2,			% +Resource, -Id
@@ -2185,6 +2210,23 @@ graph(Options0, DB) :-
 %
 %	Save XML document header, doctype and open the RDF environment.
 %	This predicate also sets up the namespace notation.
+%
+%	Save an RDF header, with the XML header, DOCTYPE, ENTITY and
+%	opening the rdf:RDF element with appropriate namespace
+%	declarations. It uses the primitives from section 3.5 to
+%	generate the required namespaces and desired short-name. Options
+%	is one of:
+%
+%	  * graph(+URI)
+%	  Only search for namespaces used in triples that belong to the
+%	  given named graph.
+%
+%	  * namespaces(+List)
+%	  Where List is a list of namespace abbreviations. With this
+%	  option, the expensive search for all namespaces that may be
+%	  used by your data is omitted. The namespaces =rdf= and =rdfs=
+%	  are added to the provided List. If a namespace is not
+%	  declared, the resource is emitted in non-abreviated form.
 
 rdf_save_header(Out, Options) :-
 	rdf_save_header(Out, Options, _).
@@ -2459,6 +2501,8 @@ xml_code(0'-).				% Match 0'-
 %%	rdf_save_footer(Out:stream) is det.
 %
 %	Finish XML generation and write the document footer.
+%
+%	@see rdf_save_header/2, rdf_save_subject/3.
 
 rdf_save_footer(Out) :-
 	retractall(named_anon(_, _)),
@@ -2483,7 +2527,15 @@ rdf_save_non_anon_subject(Out, Subject, Options) :-
 
 %%	rdf_save_subject(+Out, +Subject:resource, +Options) is det.
 %
-%	Save the triples associated to Subject to Out.
+%	Save the triples associated to Subject to Out. Options:
+%
+%	  * graph(+Graph)
+%	  Only save properties from Graph.
+%	  * base_uri(+URI)
+%	  * convert_typed_literal(:Goal)
+%	  * document_language(+XMLLang)
+%
+%	@see rdf_save/2 for a description of these options.
 
 rdf_save_subject(Out, Subject, Options) :-
 	is_list(Options), !,
