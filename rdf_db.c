@@ -2213,7 +2213,7 @@ advance_graph_enum(rdf_db *db, enum_graph *eg)
 { if ( eg->g )
     eg->g = eg->g->next;
 
-  while ( !eg->g || eg->g->erased )
+  while ( !eg->g || (eg->g->erased && eg->g->triple_count == 0) )
   { if ( !eg->g )
     { while ( ++eg->i < db->graphs.bucket_count &&
 	      !(eg->g = db->graphs.blocks[MSB(eg->i)][eg->i]) )
@@ -2245,7 +2245,7 @@ rdf_graph(term_t name, term_t triple_count, control_t h)
       } else if ( PL_get_atom_ex(name, &a) )
       { graph *g;
 
-	if ( (g=existing_graph(db, a)) && !g->erased )
+	if ( (g=existing_graph(db, a)) && !(g->erased && g->triple_count == 0) )
 	  return PL_unify_int64(triple_count, g->triple_count);
       }
       return FALSE;
@@ -2289,7 +2289,9 @@ rdf_graph_source(term_t graph_name, term_t source, term_t modified)
   if ( gn )
   { graph *s;
 
-    if ( (s = existing_graph(db, gn)) && !s->erased && s->source)
+    if ( (s = existing_graph(db, gn)) &&
+	 !(s->erased && s->triple_count == 0) &&
+	 s->source)
     { return ( PL_unify_atom(source, s->source) &&
 	       PL_unify_float(modified, s->modified) );
     }
@@ -2380,10 +2382,6 @@ rdf_destroy_graph(term_t graph_name)
   { atom_t a;
 
     LOCK_MISC(db);
-    if ( g->triple_count )
-    { UNLOCK_MISC(db);
-      return PL_permission_error("destroy", "graph", graph_name);
-    }
     if ( (a=g->source) )
     { g->source = 0;
       PL_unregister_atom(a);
