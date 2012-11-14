@@ -37,4 +37,5 @@ rdfportray.tex
 rdflib.tex
 sparqlclient.tex
 semweb.tex
+doc/*.tex
 .gdbinit

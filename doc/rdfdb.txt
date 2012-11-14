@@ -1,0 +1,134 @@
+The central module is called library(semweb/rdf_db). It provides storage
+and indexed querying of RDF triples. RDF data is stored as quintuples.
+The first three elements denote the RDF triple. The extra \arg{Graph}
+and \arg{Line} elements provide information about the origin of the
+triple.
+
+The actual storage is provided by the \jargon{foreign language (C)}
+module. Using a dedicated C-based implementation we can reduced memory
+usage and improve indexing capabilities. Currently the following indexes
+are provided (S=subject, P=predicate, O=object, G=graph):
+
+  * S, P, O, SP, PO, SPO, G, SG, PG
+  * Predicates connect by *|rdfs:subPropertyOf|* are combined
+    in a _|predicate cloud|_.  The system causes multiple
+    predicates in the cloud to share the same hash.  The cloud
+    maintains a 2-dimensional array that expresses the
+    closure of all rdfs:subPropertyOf relations.  This
+    index supports rdf_has/3 to query a property and all its
+    children efficiently.
+  * String literal _Objects_ are combined in a \jargon{skip list}
+    after case normalization. This provides for efficient case-insensitive
+    search, prefix and range search. The plugin library
+    library(semweb/litindex) provides indexed search on tokens inside
+    literals.
+
+---++ Query the RDF database
+
+  * [[rdf/3]]
+  * [[rdf/4]]
+  * [[rdf_has/3]]
+  * [[rdf_has/4]]
+  * [[rdf_reachable/3]]
+  * [[rdf_reachable/5]]
+
+---++ Enumerating objects
+
+  * [[rdf_subject/1]]
+  * [[rdf_resource/1]]
+  * [[rdf_current_predicate/1]]
+  * [[rdf_current_literal/1]]
+  * [[rdf_current_ns/2]]
+
+---++ Modifying the RDF database
+
+  * [[rdf_assert/3]]
+  * [[rdf_assert/4]]
+  * [[rdf_retractall/3]]
+  * [[rdf_retractall/4]]
+  * [[rdf_update/4]]
+  * [[rdf_update/5]]
+
+---++ Update view, transactions and snapshots
+
+The update semantics of the RDF database follows the conventional Prolog
+_|logical update view|_. In addition, the RDF database supports
+_transactions_ and _snapshots_.
+
+  * [[rdf_transaction/1]]
+  * [[rdf_transaction/2]]
+  * [[rdf_transaction/3]]
+  * [[rdf_snapshot/1]]
+  * [[rdf_delete_snapshot/1]]
+  * [[rdf_active_transaction/1]]
+  * [[rdf_current_snapshot/1]]
+
+---++ Loading and saving to file
+
+The RDF library can read and write triples in RDF/XML and a proprietary
+binary format. There is a plugin interface defined to support additional
+formats.  The library(semweb/rdf_turtle) uses this plugin API to support
+loading Turtle files using rdf_load/2.
+
+  * [[rdf_load/1]]
+  * [[rdf_load/2]]
+  * [[rdf_save/2]]
+
+
+
+
+
+
+---++ Literal matching and indexing
+
+Literal values are ordered and indexed using a _|skip list|_ The aim of
+this index is threefold.
+
+  * Unlike hash-tables, binary trees allow for efficient
+    _prefix_ and _range_ matching. Prefix matching
+    is useful in interactive applications to provide feedback
+    while typing such as auto-completion.
+  * Having a table of unique literals we generate creation and
+    destruction events (see rdf_monitor/2).  These events can
+    be used to maintain additional indexing on literals, such
+    as `by word'.  See library(semweb/litindex).
+
+As string literal matching is most frequently used for searching
+purposes, the match is executed case-insensitive and after removal of
+diacritics. Case matching and diacritics removal is based on Unicode
+character properties and independent from the current locale. Case
+conversion is based on the `simple uppercase mapping' defined by Unicode
+and diacritic removal on the `decomposition type'. The approach is
+lightweight, but somewhat simpleminded for some languages. The tables
+are generated for Unicode characters upto 0x7fff. For more information,
+please check the source-code of the mapping-table generator
+=|unicode_map.pl|= available in the sources of this package.
+
+Currently the total order of literals is first based on the type of
+literal using the ordering _|numeric < string < term|_ Numeric values
+(integer and float) are ordered by value, integers preceed floats if
+they represent the same value. strings are sorted alphabetically after
+case-mapping and diacritic removal as described above. If they match
+equal, uppercase preceeds lowercase and diacritics are ordered on their
+unicode value. If they still compare equal literals without any
+qualifier preceeds literals with a type qualifier which preceeds
+literals with a language qualifier. Same qualifiers (both type or both
+language) are sorted alphabetically.
+
+The ordered tree is used for indexed execution of
+literal(prefix(Prefix), Literal) as well as literal(like(Like), Literal)
+if _Like_ does not start with a `*'. Note that results of queries that
+use the tree index are returned in alphabetical order.
+
+---++ Predicate properties
+
+The predicates below form an experimental interface to provide more
+reasoning inside the kernel of the rdb_db engine. Note that =symetric=,
+=inverse_of= and =transitive= are not yet supported by the rest of the
+engine. Alo note that there is no relation to defined RDF properties.
+Properties that have no triples are not reported by this predicate,
+while predicates that are involved in triples do not need to be defined
+as an instance of rdf:Property.
+
+  * [[rdf_set_predicate/2]]
+  * [[rdf_predicate_property/2]]
