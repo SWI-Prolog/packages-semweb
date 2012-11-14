@@ -128,6 +128,7 @@ static functor_t FUNCTOR_transaction2;
 static functor_t FUNCTOR_load2;
 static functor_t FUNCTOR_begin1;
 static functor_t FUNCTOR_end1;
+static functor_t FUNCTOR_create_graph1;
 
 static atom_t   ATOM_user;
 static atom_t	ATOM_exact;
@@ -2354,8 +2355,13 @@ rdf_create_graph(term_t graph_name)
   if ( !PL_get_atom_ex(graph_name, &gn) )
     return FALSE;
 
+  if ( (g = existing_graph(db, gn)) && !g->erased )
+    return TRUE;				/* already exists */
   if ( (g = lookup_graph(db, gn)) )
+  { rdf_broadcast(EV_CREATE_GRAPH, g, NULL);
+
     return TRUE;
+  }
 
   return FALSE;
 }
@@ -7078,6 +7084,16 @@ rdf_broadcast(broadcast_id id, void *a1, void *a2)
 	  return FALSE;
 	break;
       }
+      case EV_CREATE_GRAPH:
+      { graph *g = a1;
+	term_t tmp;
+
+	if ( !(tmp = PL_new_term_refs(1)) ||
+	     !(PL_put_atom(tmp, g->name)) ||
+	     !PL_cons_functor_v(term, FUNCTOR_create_graph1, tmp) )
+	  return FALSE;
+	break;
+      }
       default:
 	assert(0);
     }
@@ -8345,6 +8361,7 @@ install_rdf_db(void)
   MKFUNCTOR(load, 2);
   MKFUNCTOR(begin, 1);
   MKFUNCTOR(end, 1);
+  MKFUNCTOR(create_graph, 1);
   MKFUNCTOR(hash_quality, 1);
   MKFUNCTOR(hash, 3);
   MKFUNCTOR(hash, 4);

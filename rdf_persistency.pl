@@ -283,6 +283,7 @@ load_db :-
 	message_level(Silent, Level),
 	print_message(Level, rdf(restore(attached(GraphCount, T/Wall)))).
 
+load_sources(_, [], _, _) :- !.
 load_sources(Type, Sources, Silent, Jobs) :-
 	length(Sources, Count),
 	RunJobs is min(Count, Jobs),
@@ -342,6 +343,7 @@ find_dbs(Dir, Graphs, SnapBySize, JournalBySize) :-
 
 consider_reindex_db(Dir, Graphs, Scanned) :-
 	length(Graphs, Count),
+	Count > 0,
 	DepthNeeded is floor(log(Count)/log(256)),
 	(   maplist(depth_db(DepthNow), Scanned)
 	->  (   DepthNeeded > DepthNow
@@ -480,6 +482,7 @@ message_level(_, informational).
 %	named graph.
 
 load_journal(File, DB) :-
+	rdf_create_graph(DB),
 	setup_call_cleanup(
 	    open(File, read, In, [encoding(utf8)]),
 	    ( read(In, T0),
@@ -621,6 +624,11 @@ monitor(load(BE, Id)) :-
 	->  push_state(Id)
 	;   sync_state(Id)
 	).
+monitor(create_graph(Graph)) :-
+	\+ blocked_db(Graph, _),
+	journal_fd(Graph, Fd),
+	open_transaction(Graph, Fd),
+	sync_journal(Graph, Fd).
 monitor(transaction(BE, Id)) :-
 	monitor_transaction(Id, BE).
 
