@@ -1,17 +1,17 @@
-The central module is called library(semweb/rdf_db). It provides storage
-and indexed querying of RDF triples. RDF data is stored as quintuples.
-The first three elements denote the RDF triple. The extra _Graph_ and
-_Line_ elements provide information about the origin of the triple.
+The central module of the RDF infrastructure is library(semweb/rdf_db).
+It provides storage and indexed querying of RDF triples. RDF data is
+stored as quintuples. The first three elements denote the RDF triple.
+The extra _Graph_ and _Line_ elements provide information about the
+origin of the triple.
 
 The actual storage is provided by the _|foreign language (C)|_ module.
 Using a dedicated C-based implementation we can reduced memory usage and
-improve indexing capabilities. Currently the following indexes are
-provided (S=subject, P=predicate, O=object, G=graph):
+improve indexing capabilities, for example by providing a dedicated
+index to support entailment over =|rdfs:subPropertyOf|=. Currently the
+following indexes are provided (S=subject, P=predicate, O=object,
+G=graph):
 
   * S, P, O, SP, PO, SPO, G, SG, PG
-
-  * Additional indexes for predicates, resources and graphs allow
-    enumerating these objects without duplicates.
 
   * Predicates connect by *|rdfs:subPropertyOf|* are combined
     in a _|predicate cloud|_.  The system causes multiple
@@ -20,6 +20,12 @@ provided (S=subject, P=predicate, O=object, G=graph):
     closure of all rdfs:subPropertyOf relations.  This
     index supports rdf_has/3 to query a property and all its
     children efficiently.
+
+  * Additional indexes for predicates, resources and graphs allow
+    enumerating these objects without duplicates.  For example,
+    using rdf_resource/1 we enumerate all resources in the database
+    only once, while enumeration using e.g., =|(rdf(R,_,_);rdf(_,_,R))|=
+    normally produces many duplicate answers.
 
   * Literal _Objects_ are combined in a _|skip list|_ after case
     normalization. This provides for efficient case-insensitive search,
@@ -37,13 +43,27 @@ provided (S=subject, P=predicate, O=object, G=graph):
 
 ---++ Enumerating objects
 
+The predicates below enumerate the basic objects  of the RDF store. Most
+of these predicates also enumerate objects   that  are not associated to
+any currently visible triple. Objects are retained   as long as they are
+visible in active queries or _snapshots_. After that, some are reclaimed
+by the RDF garbage collector, while others are never reclaimed.
+
   * [[rdf_subject/1]]
   * [[rdf_resource/1]]
   * [[rdf_current_predicate/1]]
   * [[rdf_current_literal/1]]
+  * [[rdf_graph/1]]
   * [[rdf_current_ns/2]]
 
 ---++ Modifying the RDF database
+
+The predicates below modify the RDF   store  directly. In addition, data
+may be loaded using rdf_load/2  or   by  restoring a persistent database
+using rdf_attach_db/2. Modifications follow the  Prolog _|logical update
+view|_ semantics, which implies that   modifications remain invisible to
+already  running  queries.  Further  isolation  can  be  achieved  using
+rdf_transaction/3.
 
   * [[rdf_assert/3]]
   * [[rdf_assert/4]]
@@ -116,7 +136,6 @@ which the triple was loaded. Currently, the 4th argument is the RDF
 _|named graph|_. A named graph maintains some properties, notably to
 track origin, changes and modified state.
 
-  * [[rdf_graph/1]]
   * [[rdf_create_graph/1]]
   * [[rdf_unload_graph/1]]
   * [[rdf_graph_property/2]]

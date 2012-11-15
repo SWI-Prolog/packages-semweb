@@ -600,7 +600,7 @@ lang_equal(Lang1, Lang2) :-
 %	  * Atom
 %	  If the value is a simple atom it is the textual representation
 %	  of a string literal without explicit type or language
-%	  (=|xml:lang|=) qualifier.
+%	  qualifier.
 %
 %	  * lang(LangID, Atom)
 %	  Atom represents the text of a string literal qualified with
@@ -615,7 +615,7 @@ lang_equal(Lang1, Lang2) :-
 %	  and floats (native C-doubles). All other data is represented
 %	  as a Prolog record.
 %
-%	For  string  querying  purposes,  Object  can  be  of  the  form
+%	For literal querying purposes, Object can be of the form
 %	literal(+Query, -Value), where Query is one of the terms below.
 %
 %	  * plain(+Text)
@@ -623,7 +623,8 @@ lang_equal(Lang1, Lang2) :-
 %	  to match. This query is fully indexed.
 %
 %	  * exact(+Text)
-%	  Perform exact, but case-insensitive match. This query is fully indexed.
+%	  Perform exact, but case-insensitive match. This query is
+%	  fully indexed.
 %
 %	  * substring(+Text)
 %	  Match any literal that contains Text as a case-insensitive
@@ -636,7 +637,7 @@ lang_equal(Lang1, Lang2) :-
 %
 %	  * prefix(+Text)
 %	  Match any literal that starts with Text. This call is intended
-%	  for completion. The query is indexed using the binary tree of
+%	  for completion. The query is indexed using the skip list of
 %	  literals.
 %
 %	  * ge(+Literal)
@@ -674,7 +675,7 @@ lang_equal(Lang1, Lang2) :-
 %	passing an atom is the same as passing Atom:_.
 
 
-%%	rdf_has(?Subject, +Predicate, ?Object)
+%%	rdf_has(?Subject, +Predicate, ?Object) is nondet.
 %
 %	Succeeds if the triple rdf(Subject, Predicate, Object) is true
 %	exploiting the rdfs:subPropertyOf predicate.
@@ -682,7 +683,7 @@ lang_equal(Lang1, Lang2) :-
 rdf_has(Subject, Predicate, Object) :-
 	rdf_has(Subject, Predicate, Object, _).
 
-%%	rdf_has(?Subject, +Predicate, ?Object, -RealPredicate)
+%%	rdf_has(?Subject, +Predicate, ?Object, -RealPredicate) is nondet.
 %
 %	Same as rdf_has/3, but RealPredicate is   unified  to the actual
 %	predicate that makes this relation   true. RealPredicate must be
@@ -705,7 +706,7 @@ rdf_has(Subject, Predicate, Object) :-
 %	if a path can be found from  Subject to Object. Searching starts
 %	at Subject, assuming the branching factor   is normally lower. A
 %	call  with  both  Subject   and    Object   unbound   raises  an
-%	instantiation  error.5  The  following   example  generates  all
+%	instantiation  error.  The  following    example  generates  all
 %	subclasses of rdfs:Resource:
 %
 %	  ==
@@ -720,14 +721,17 @@ rdf_has(Subject, Predicate, Object) :-
 %%	rdf_reachable(?Subject, +Predicate, ?Object, +MaxD, -D) is nondet.
 %
 %	Same as rdf_reachable/3, but in addition, MaxD limits the number
-%	of relations expanded and  D  is   unified  with  the `distance'
-%	between Subject and Object. Distance 0  means Subject and Object
-%	are the same resource. MaxD can   be  the constant =infinite= to
-%	impose no distance-limit.
+%	of edges expanded and D is   unified with the `distance' between
+%	Subject and Object. Distance 0 means  Subject and Object are the
+%	same resource. MaxD can be the  constant =infinite= to impose no
+%	distance-limit.
 
 %%	rdf_subject(?Resource) is nondet.
 %
-%	True if Resource appears as a subject
+%	True if Resource appears as a   subject. This query respects the
+%	visibility rules implied by the logical update view.
+%
+%	@see rdf_resource/1.
 
 rdf_subject(Resource) :-
 	rdf_resource(Resource),
@@ -735,11 +739,13 @@ rdf_subject(Resource) :-
 
 %%	rdf_resource(?Resource) is nondet.
 %
-%	True when Resource is a known resource. Resources are created as
-%	a side-effect of adding triples. Note that the resources for all
-%	known triples are returned, also those locked by active queries,
-%	transactions, snapshots or  just  not   (yet)  reclaimed  by the
-%	garbage collector.
+%	True when Resource is a resource used as a subject or object in
+%	a triple.
+%
+%	This predicate is primarily intended  as   a  way to process all
+%	resources without processing resources twice.   The user must be
+%	aware that some of the returned resources  may not appear in any
+%	_visible_ triple.
 
 
 		 /*******************************
@@ -749,7 +755,7 @@ rdf_subject(Resource) :-
 %%	rdf_assert(+Subject, +Predicate, +Object) is det.
 %
 %	Assert a new triple into  the   database.  This is equivalent to
-%	rdf_assert/4 using SourceRef user.  Subject   and  Predicate are
+%	rdf_assert/4 using Graph  =user=.  Subject   and  Predicate  are
 %	resources. Object is either a resource or a term literal(Value).
 %	See rdf/3 for an explanation  of   Value  for typed and language
 %	qualified literals. All arguments  are   subject  to  name-space
@@ -768,7 +774,7 @@ rdf_subject(Resource) :-
 %	Remove   all   matching   triples   from    the   database.   As
 %	rdf_retractall/4 using an unbound graph.
 
-%%	rdf_retractall(?Subject, ?Predicate, ?Object, +Graph) is det.
+%%	rdf_retractall(?Subject, ?Predicate, ?Object, ?Graph) is det.
 %
 %	As rdf_retractall/3, also matching Graph.   This  is particulary
 %	useful to remove all triples coming from a loaded file. See also
@@ -787,10 +793,7 @@ rdf_subject(Resource) :-
 %	  Changes the last field of the triple to the given resource or
 %	  literal(Value).
 %	  * graph(Graph)
-%	  Moves the triple from its current named graph to Graph. Note
-%	  that updating the source has no consequences for the semantics
-%	  and therefore the generation (see rdf_generation/1) is not
-%	  updated.
+%	  Moves the triple from its current named graph to Graph.
 
 %%	rdf_update(+Subject, +Predicate, +Object, +Graph, +Action) is det
 %
@@ -1135,10 +1138,10 @@ index(rdf(+,+,+,+), 15).
 %	a property of the predicate   is  set using rdf_set_predicate/2.
 %	The predicate may (no longer) have triples associated with it.
 %
-%	Note that there is  no  relation   to  defined  RDF  properties.
-%	Properties that have  no  triples  are   not  reported  by  this
-%	predicate, while predicates that are involved  in triples do not
-%	need to be defined as an instance of rdf:Property.
+%	Note that resources that have  =|rdf:type|= =|rdf:Property|= are
+%	not automatically included in the  result-set of this predicate,
+%	while _all_ resources that appear as   the  second argument of a
+%	triple _are_ included.
 %
 %	@see rdf_predicate_property/2.
 
@@ -1258,21 +1261,24 @@ rdf_current_snapshot(Term) :-
 
 %%	rdf_transaction(:Goal, +Id, +Options) is semidet.
 %
-%	Run Goal in an RDF  transaction.   Transactions  follow the AcId
-%	model
+%	Run Goal in an RDF  transaction.   Compared to the ACID model,
+%	RDF transactions have the following properties:
 %
 %	  1. Modifications inside the transactions become all atomically
-%	  visible to the outside world if Goal succeeds or remain
-%	  invisible if Goal fails or throws an exception.
-%	  2. Consistency constraints are not (yet) implemented.
+%	     visible to the outside world if Goal succeeds or remain
+%	     invisible if Goal fails or throws an exception.  I.e.,
+%	     the _atomicy_ property is fully supported.
+%	  2. _Consistency_ is not guaranteed. Later versions may
+%	     implement consistency constraints that will be checked
+%	     serialized just before the actual commit of a transaction.
 %	  3. Concurrently executing transactions do not infuence each
-%	  other.
-%	  4. Durability can be activated by loading
-%	  library(semweb/rdf_persistency).
+%	     other.  I.e., the _isolation_ property is fully supported.
+%	  4. _Durability_ can be activated by loading
+%	     library(semweb/rdf_persistency).
 %
 %	Processed options are:
 %
-%	  - snapshot(+Snapshot)
+%	  * snapshot(+Snapshot)
 %	  Execute Goal using the state of the RDF store as stored in
 %	  Snapshot.  See rdf_snapshot/1.  Snapshot can also be the
 %	  atom =true=, which implies that an anonymous snapshot is
@@ -1286,11 +1292,12 @@ rdf_transaction(Goal, Id) :-
 
 %%	rdf_active_transaction(?Id) is nondet.
 %
-%	True if Id is the identifier of a currently open transaction. If
-%	Id  is  not  instantiated,    backtracking   yields  transaction
-%	identifiers starting with  the   innermost  nested  transaction.
-%	Transaction identifier terms are not copied,  need not be ground
-%	and can be instantiated during the transaction.
+%	True if Id is the identifier of  a transaction in the context of
+%	which  this  call  is  executed.  If  Id  is  not  instantiated,
+%	backtracking yields transaction identifiers   starting  with the
+%	innermost nested transaction. Transaction   identifier terms are
+%	not copied, need not be ground   and  can be instantiated during
+%	the transaction.
 
 rdf_active_transaction(Id) :-
 	rdf_active_transactions_(List),
