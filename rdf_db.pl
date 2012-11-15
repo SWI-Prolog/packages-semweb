@@ -149,6 +149,10 @@
 :- use_module(library(error)).
 :- use_module(library(uri)).
 :- use_module(library(debug)).
+:- use_module(library(apply)).
+:- if(exists_source(library(thread))).
+:- use_module(library(thread)).
+:- endif.
 :- use_module(rdf_cache).
 
 :- use_foreign_library(foreign(rdf_db)).
@@ -167,6 +171,7 @@
 :- predicate_options(rdf_load/2, 2,
 		     [ base_uri(atom),
 		       cache(boolean),
+		       concurrent(positive_integer),
 		       db(atom),
 		       format(oneof([xml,triples,turtle])),
 		       graph(atom),
@@ -1434,7 +1439,7 @@ rdf_load_db(File) :-
 %
 %	Same as rdf_load(FileOrList, []).  See rdf_load/2.
 
-%%	rdf_load(+FileOrList, +Options) is det.
+%%	rdf_load(+FileOrList, :Options) is det.
 %
 %	Load RDF file.  Options provides additional processing options.
 %	Currently defined options are:
@@ -1447,6 +1452,14 @@ rdf_load_db(File) :-
 %	    URI that is used for rdf:about="" and other RDF constructs
 %	    that are relative to the base uri.  Default is the source
 %	    URL.
+%
+%	    * concurrent(+Jobs)
+%	    If FileOrList is a list of files, process the input files
+%	    using Jobs threads concurrently.  Default is the mininum
+%	    of the number of cores and the number of inputs.  Higher
+%	    values can be useful when loading inputs from (slow)
+%	    network connections.  Using 1 (one) does not use
+%	    separate worker threads.
 %
 %	    * format(+Format)
 %	    Specify the source format explicitly. Normally this is
@@ -1490,19 +1503,58 @@ rdf_load_db(File) :-
 rdf_load(Spec) :-
 	rdf_load(Spec, []).
 
-rdf_load([], _) :- !.
-rdf_load([H|T], Options) :- !,
-	rdf_load(H, Options),
-	rdf_load(T, Options).
+:- if(\+current_predicate(concurrent/3)).
+concurrent(_, Goals, _) :-
+	forall(member(G, Goals), call(G)).
+:- endif.
+
+% Note that we kill atom garbage collection.  This improves performance
+% with about 15% loading the LUBM Univ_50 benchmark.
+
 rdf_load(Spec, M:Options) :-
 	must_be(list, Options),
-	must_be(ground, Spec),
+	current_prolog_flag(agc_margin, Old),
+	setup_call_cleanup(
+	    set_prolog_flag(agc_margin, 0),
+	    rdf_load_noagc(Spec, M, Options),
+	    set_prolog_flag(agc_margin, Old)).
+
+rdf_load_noagc(List, M, Options) :-
+	is_list(List), !,
+	flatten(List, Inputs),		% Compatibility: allow nested lists
+	maplist(must_be(ground), Inputs),
+	length(Inputs, Count),
+	load_jobs(Count, Jobs, Options),
+	(   Jobs =:= 1
+	->  forall(member(Spec, Inputs),
+		   rdf_load(Spec, Options))
+	;   maplist(load_goal(Options, M), Inputs, Goals),
+	    concurrent(Jobs, Goals, [])
+	).
+rdf_load_noagc(One, M, Options) :-
+	must_be(ground, One),
+	rdf_load_one(One, M, Options).
+
+load_goal(Options, M, Spec, rdf_load_one(Spec, M, Options)).
+
+load_jobs(_, Jobs, Options) :-
+	option(concurrent(Jobs), Options), !,
+	must_be(positive_integer, Jobs).
+load_jobs(Count, Jobs, _) :-
+	current_prolog_flag(cpu_count, CPUs),
+	CPUs > 0, !,
+	Jobs is max(1, min(CPUs, Count)).
+load_jobs(_, 1, _).
+
+
+rdf_load_one(Spec, M, Options) :-
 	source_url(Spec, Protocol, SourceURL),
 	load_graph(SourceURL, Graph, Options),
 	setup_call_cleanup(
 	    with_mutex(rdf_load_file,
 		       rdf_start_load(Graph, Loading, Options)),
-	    rdf_load_file(Loading, Spec, SourceURL, Protocol, Graph, M, Options),
+	    rdf_load_file(Loading, Spec, SourceURL, Protocol,
+			  Graph, M, Options),
 	    rdf_end_load(Loading)).
 
 %%	rdf_start_load(+Graph, -WhatToDo) is det.
