@@ -31,16 +31,9 @@
 :- module(test_rdf_db,
 	  [ test_rdf_db/0
 	  ]).
-
-:- asserta(user:file_search_path(foreign, '../sgml')).
-:- asserta(user:file_search_path(library, '../sgml')).
-:- asserta(user:file_search_path(library, '../plunit')).
-:- asserta(user:file_search_path(foreign, '../clib')).
-:- asserta(user:file_search_path(library, '../clib')).
-:- asserta(user:file_search_path(library, '../RDF')).
-:- asserta(user:file_search_path(foreign, '.')).
-:- use_module(rdf_db).
-:- use_module(rdfs).
+:- include(local_test).
+:- use_module(library(semweb/rdf_db)).
+:- use_module(library(semweb/rdfs)).
 :- use_module(library(xsdp_types)).
 :- use_module(library(lists)).
 :- use_module(library(plunit)).
