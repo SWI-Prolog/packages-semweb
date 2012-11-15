@@ -274,14 +274,17 @@ load_db :-
 	find_dbs(Dir, Graphs, SnapShots, Journals),
 	length(Graphs, GraphCount),
 	maplist(rdf_unload_graph, Graphs),
+	rdf_statistics(triples(Triples0)),
 	load_sources(snapshots, SnapShots, Silent, Jobs),
 	load_sources(journals, Journals, Silent, Jobs),
+	rdf_statistics(triples(Triples1)),
 	statistics(StatKey, T1),
 	get_time(Wall1),
 	T is T1 - T0,
 	Wall is Wall1 - Wall0,
+	Triples = Triples1 - Triples0,
 	message_level(Silent, Level),
-	print_message(Level, rdf(restore(attached(GraphCount, T/Wall)))).
+	print_message(Level, rdf(restore(attached(GraphCount, Triples, T/Wall)))).
 
 load_sources(_, [], _, _) :- !.
 load_sources(Type, Sources, Silent, Jobs) :-
@@ -1318,10 +1321,10 @@ prolog:message(rdf(Term)) -->
 
 message(restoring(Type, Count, Jobs)) -->
 	[ 'Restoring ~D ~w using ~D concurrent workers'-[Count, Type, Jobs] ].
-message(restore(attached(Graphs, Time/Wall))) -->
+message(restore(attached(Graphs, Triples, Time/Wall))) -->
 	{ catch(Percent is round(100*Time/Wall), _, Percent = 0) },
-	[ 'Attached ~D graphs in ~2f seconds (~d% CPU = ~2f sec.)'-
-	  [Graphs, Wall, Percent, Time] ].
+	[ 'Loaded ~D graphs (~D triples) in ~2f sec. (~d% CPU = ~2f sec.)'-
+	  [Graphs, Triples, Wall, Percent, Time] ].
 % attach_graph/2
 message(restore(true, Action)) --> !,
 	silent_message(Action).
