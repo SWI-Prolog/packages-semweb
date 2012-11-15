@@ -90,61 +90,6 @@ Figure \figref{modules} summarised the modular design.
 
 \input{rdfdb}
 
-\subsubsection{library(semweb/rdf_cache): Caching triples}
-\label{sec:rdfcache}
-
-The library \pllib{semweb/rdf_cache} defines the caching strategy for
-triples sources. When using large RDF sources, caching triples greatly
-speedup loading RDF documents. The cache library implements two caching
-strategies that are controlled by rdf_set_cache_options/1.
-
-\paragraph{Local caching} This approach applies to files only. Triples
-are cached in a sub-directory of the directory holding the source.  This
-directory is called \file{.cache} (\file{_cache} on Windows).  If the
-cache option \const{create_local_directory} is \const{true}, a cache
-directory is created if posible.
-
-\paragraph{Global caching} This approach applies to all sources, except
-for unnamed streams.  Triples are cached in directory defined by the
-cache option \const{global_directory}.
-
-When loading an RDF file, the system scans the configured cache files
-unless \term{cache}{false} is specified as option to rdf_load/2 or
-caching is disabled. If caching is enabled but no cache exists, the
-system will try to create a cache file.  First it will try to do this
-locally.  On failure it will try to configured global cache.
-
-\begin{description}
-    \predicate{rdf_set_cache_options}{1}{+Options}
-Set cache options.  Defined options are:
-
-    \begin{description}
-	\termitem{enabled}{Bool}
-If \const{true} (default), caching is enabled.
-
-	\termitem{local_directory}{Atom}
-Local directory to use for caching.  Default \const{.cache}
-(Windows: \const{_cache}).
-
-	\termitem{create_local_directory}{Bool}
-If \const{true} (default \const{false}), create a local cache
-directory if none exists and the directory can be created.
-
-	\termitem{global_directory}{Atom}
-Global directory to use for caching. The directory is created if the
-option \const{create_global_directory} is also given and set to
-\const{true}. Sub-directories are created to speedup indexing on
-filesystems that perform poorly on directories with large numbers of
-files. Initially not defined.
-
-	\termitem{create_global_directory}{Bool}
-If \const{true} (default \const{false}), create a global cache
-directory if none exists.
-
-    \end{description}
-\end{description}
-
-
 \subsection{Namespace Handling}			\label{sec:rdfns}
 
 Prolog code often contains references to constant resources in a known
@@ -604,12 +549,17 @@ described below and distributed with the package.  Please examine the
 source-code if you want to add new formats or locations.
 
 \begin{description}
-    \item[\file{rdf_turtle.pl}]
+    \item[\pllib{library(semweb/rdf_turtle)}]
 Load files in the Turtle format.  See \secref{rdfturtle}.
-    \item[\file{rdf_zlib_plugin.pl}]
+    \item[\pllib{library(semweb/rdf_zlib_plugin)}]
 Load \program{gzip} compressed files transparently.  See \secref{zlib}.
-    \item[\file{rdf_http_plugin.pl}]
+    \item[\pllib{library(semweb/rdf_http_plugin)}]
 Load RDF documents from HTTP servers.  See \secref{http}.
+    \item[\pllib{library(semweb/rdf_persistency)}]
+Provide persistent backup of the triple store.
+    \item[\pllib{library(semweb/rdf_cache)}]
+Provide caching RDF sources using fast load/safe files to speedup
+restarting an application.
 \end{description}
 
 \begin{description}
@@ -668,6 +618,9 @@ supported, the plugin uses the extension of the URL if the claimed
 mime-type is not one of the above.  In addition, it recognises
 \const{text/html} and \const{application/xhtml+xml}, scanning
 the XML content for embedded RDF.
+
+\input{rdfcache.tex}
+
 
 
 		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

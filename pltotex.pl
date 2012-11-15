@@ -29,7 +29,9 @@ pltotex(Lib, Options) :-
 			     file_type(prolog)
 			   ]),
 	tex_file(File, Out, Options),
-	user:use_module(File),		% we want the operators in user
+					% honour local_test
+	expand_term((:-use_module(Spec)), (:-UseModule)),
+	user:UseModule,			% we want the operators in user
 	doc_latex(File, Out,
 		  [ stand_alone(false)
 		  | Options

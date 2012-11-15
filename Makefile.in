@@ -85,7 +85,8 @@ query.o:	buffer.h
 ################################################################
 
 TEXEXTRA=	rdfturtle.tex rdfturtlewrite.tex rdfcompare.tex \
-                rdfportray.tex rdflib.tex sparqlclient.tex doc/rdfdb.tex
+                rdfportray.tex rdflib.tex sparqlclient.tex rdfdb.tex \
+		rdfcache.tex
 
 $(TEX):		$(TEXEXTRA)
 
@@ -97,9 +98,11 @@ rdfcompare.tex: rdf_compare.pl
 		$(PLTOTEX) --section 'library(semweb/rdf_compare)'
 rdfportray.tex: rdf_portray.pl
 		$(PLTOTEX) --section 'library(semweb/rdf_portray)'
+rdfcache.tex:	rdf_cache.pl
+		$(PLTOTEX) --subsection 'library(semweb/rdf_cache)'
 sparqlclient.tex:       sparql_client.pl
 		$(PLTOTEX) --section 'library(semweb/sparql_client)'
-doc/rdfdb.tex:	doc/rdfdb.txt
+rdfdb.tex:	doc/rdfdb.txt
 		$(PLTOTEX) --section doc/rdfdb.txt
 
 ################################################################

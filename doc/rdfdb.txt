@@ -110,7 +110,7 @@ are derived from the encoding of the _Stream_, providing support for
 
   * [[rdf_save_header/2]]
   * [[rdf_save_footer/1]]
-  * [[rdf_save_subject//3]]
+  * [[rdf_save_subject/3]]
 
 ---+++ Fast loading and saving
 

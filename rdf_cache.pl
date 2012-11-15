@@ -7,11 +7,26 @@
 
 /** <module> Cache RDF triples
 
-Triples may be cached to reduce load time   as well as access to network
-resources (e.g. HTTP). We use two caching locations: typically files may
-be cached locally (i.e. in a  .cache   sub-directory  of  the file). All
-objects can be cached  in  a  global   cache  directory.  The  policy is
-determined by rdf_cache_options/1.
+The library library(semweb/rdf_cache) defines the   caching strategy for
+triples sources. When using large RDF   sources, caching triples greatly
+speedup loading RDF documents. The cache  library implements two caching
+strategies that are controlled by rdf_set_cache_options/1.
+
+*|Local caching|* This approach  applies  to   files  only.  Triples are
+cached in a sub-directory of  the   directory  holding  the source. This
+directory is called =|.cache|= (=|_cache|=  on   Windows).  If the cache
+option =create_local_directory= is =true=, a  cache directory is created
+if posible.
+
+*|Global caching|* This approach applies  to   all  sources,  except for
+unnamed streams. Triples are cached in   directory  defined by the cache
+option =global_directory=.
+
+When loading an RDF file, the system   scans  the configured cache files
+unless cache(false) is specified as option   to rdf_load/2 or caching is
+disabled. If caching is enabled but no cache exists, the system will try
+to create a cache file. First it will try to do this locally. On failure
+it will try to configured global cache.
 */
 
 :- dynamic
@@ -73,7 +88,7 @@ expand_option(global_directory(Local), global_directory(Global)) :- !,
 expand_option(Opt, Opt).
 
 
-%%	rdf_cache_location(+URL, +ReadWrite, -File) is semidet.
+%%	rdf_cache_file(+URL, +ReadWrite, -File) is semidet.
 %
 %	File is the cache file  for  URL.   If  ReadWrite  is =read=, it
 %	returns the name of an existing file.  If =write= it returns the

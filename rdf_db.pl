@@ -153,7 +153,7 @@
 :- if(exists_source(library(thread))).
 :- use_module(library(thread)).
 :- endif.
-:- use_module(rdf_cache).
+:- use_module(library(semweb/rdf_cache)).
 
 :- use_foreign_library(foreign(rdf_db)).
 :- public rdf_print_predicate_cloud/2.	% print matrix of reachable predicates
