@@ -200,6 +200,7 @@ INIT_LOCK(rdf_db *db)
 { simpleMutexInit(&db->locks.literal);
   simpleMutexInit(&db->locks.misc);
   simpleMutexInit(&db->locks.gc);
+  simpleMutexInit(&db->locks.duplicates);
 }
 
 static simpleMutex rdf_lock;
@@ -5887,14 +5888,19 @@ update_duplicates(rdf_db *db)
 { triple *t;
   int count = 0;
 
+  simpleMutexLock(&db->locks.duplicates);
   db->duplicates_up_to_date = FALSE;
   db->duplicates	    = 0;
   db->maintain_duplicates   = TRUE;
 
   for(t=db->by_none.head; t; t=t->tp.next[ICOL(BY_NONE)])
   { if ( ++count % 10240 == 0 &&
-	 PL_handle_signals() < 0 )
-      return FALSE;
+	 (PL_handle_signals() < 0 || db->resetting) )
+
+    { db->maintain_duplicates = FALSE;
+      simpleMutexUnlock(&db->locks.duplicates);
+      return FALSE;			/* aborted */
+    }
     t->is_duplicate = FALSE;
   }
 
@@ -5906,6 +5912,7 @@ update_duplicates(rdf_db *db)
   }
 
   db->duplicates_up_to_date = TRUE;
+  simpleMutexUnlock(&db->locks.duplicates);
 
   return TRUE;
 }
@@ -8171,6 +8178,7 @@ reset_db(rdf_db *db)
   db->resetting = TRUE;
 
   suspend_gc(db);
+  simpleMutexLock(&db->locks.duplicates);
   erase_snapshots(db);
   erase_triples(db);
   erase_predicates(db);
@@ -8185,6 +8193,7 @@ reset_db(rdf_db *db)
   db->snapshots.keep = GEN_MAX;
   db->queries.generation = GEN_EPOCH;
 
+  simpleMutexUnlock(&db->locks.duplicates);
   resume_gc(db);
   db->resetting = FALSE;
 

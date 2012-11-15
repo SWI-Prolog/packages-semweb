@@ -419,6 +419,7 @@ typedef struct rdf_db
   { simpleMutex	literal;		/* threaded access to literals */
     simpleMutex misc;			/* general DB locks */
     simpleMutex gc;			/* DB garbage collection lock */
+    simpleMutex duplicates;		/* Duplicate init lock */
   } locks;
 
   struct
