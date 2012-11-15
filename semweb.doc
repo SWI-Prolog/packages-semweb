@@ -93,18 +93,13 @@ Figure \figref{modules} summarised the modular design.
 
 \subsection{Monitoring the database}		\label{sec:rdfmonitor}
 
-Considering performance and modularity, we are working on a replacement
-of the \file{rdf_edit} (see \secref{rdfedit}) layered design to deal
-with updates, journalling, transactions, etc.  Where the rdf_edit
-approach creates a single layer on top of rdf_db and code using the
-RDF database must select whether to use rdf_db.pl or rdf_edit.pl, the
-new approach allows to register \jargon{monitors}.  This allows multiple
-modules to provide additional services, while these services will be
-used regardless of how the database is modified.
-
-Monitors are used by the persistency library (\secref{persistency})
-and the literal indexing library.
-
+The predicate rdf_monitor/2 allows registrations of call-backs with the
+RDF store. These call-backs are typically used to keep other databases
+in sync with the RDF store. For example,
+\pllib{library(semweb/rdf_persistency)} monitors the RDF store for
+maintaining a persistent copy in a set of files and
+\pllib{library(semweb/rdf_litindex)} uses added and deleted literal
+values to maintain a fulltext index of literals.
 
 \begin{description}
     \predicate{rdf_monitor}{2}{:Goal, +Mask}
@@ -882,283 +877,22 @@ the match was found.
 \input{rdfportray.tex}
 
 
-		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		 %	     RDF-EDIT		%
-		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Related packages}
 
-\section{library(semweb/rdf_edit): Keep track of edits (deprecated)}
-\label{sec:rdfedit}
+\index{ClioPatria}\index{SPARQL}%
+The core infrastructure for storing and querying RDF is provided by this
+package, which is distributed as a core package with SWI-Prolog.
+\url[ClioPatria]{http://cliopatria.swi-prolog.org} provides a
+comprehensive server infrastructure on top of the \textit{semweb} and
+\textit{http} packages. ClioPatria provides a SPARQL~1.1 endpoint,
+linked open data (LOD) support, user management, a web interface and an
+extension infrastructure for programming (semantic) web applications.
 
-\begin{quote}\em
-It is anticipated that this library will eventually be superseeded by
-facilities running on top of the native rdf_transaction/2 and
-rdf_monitor/2 facilities. See \secref{rdfmonitor}.
-\end{quote}
+\index{Thea}\index{OWL2}%
+\url[Thea]{http://www.semanticweb.gr/TheaOWLLib/} provides access to OWL
+ontologies at the level of the abstract syntax. Can interact with
+external DL reasoner using DIG.
 
-\index{undo}\index{journal}\index{transactions}
-The module \file{rdf_edit.pl} is a layer than encasulates the
-modification predicates for use from a (graphical) editor of the triple
-store. It adds the following features:
-
-\begin{itemlist}
-    \item [Transaction management]
-Modifications are grouped into \emph{transactions} to safeguard
-the system from failing operations as well as provide meaningfull
-chunks for undo and journalling.
-
-    \item [Undo]
-Undo and redo-transactions using a single mechanism to support
-user-friendly editing.
-
-    \item [Journalling]
-Record all actions to support analysis, versioning, crash-recovery
-and an alternative to saving.
-\end{itemlist}
-
-\subsection{Transaction management}
-
-Transactions group low-level modification actions together.
-
-\begin{description}
-    \predicate{rdfe_transaction}{1}{:Goal}
-Run \arg{Goal}, recording all modifications to the triple store made
-through \secref{rdfeencap}.  Execution is performed as in once/1.  If
-\arg{Goal} succeeds the changes are committed.  If \arg{Goal} fails
-or throws an exception the changes are reverted.
-
-Transactions may be nested.  A failing nested transaction only reverts
-the actions performed inside the nested transaction.  If the outer
-transaction succeeds it is committed normally.  Contrary, if the
-outer transaction fails, comitted nested transactions are reverted
-as well.  If any of the modifications inside the transaction modifies
-a protected file (see rdfe_set_file_property/2) the transaction is
-reverted and rdfe_transaction/1 throws a permission error.
-
-A successful outer transaction (`level-0') may be undone using
-rdfe_undo/0.
-
-    \predicate{rdfe_transaction}{2}{:Goal, +Name}
-As rdfe_transaction/1, naming the transaction \arg{Name}.  Transaction
-naming is intended for the GUI to give the user an idea of the next undo
-action. See also rdfe_set_transaction_name/1 and
-rdfe_transaction_name/2.
-
-    \predicate{rdfe_set_transaction_name}{1}{+Name}
-Set the `name' of the current transaction to \arg{Name}.
-
-    \predicate{rdfe_transaction_name}{2}{?TID, ?Name}
-Query assigned transaction names.
-
-    \predicate{rdfe_transaction_member}{2}{+TID, -Action}
-Enumerate the actions that took place inside a transaction.  This can
-be used by a GUI to optimise the MVC (Model-View-Controller) feedback
-loop.  \arg{Action} is one of:
-
-\begin{description}
-    \termitem{assert}{Subject, Predicate, Object}
-    \termitem{retract}{Subject, Predicate, Object}
-    \termitem{update}{Subject, Predicate, Object, Action}
-    \termitem{file}{load(Path)}
-    \termitem{file}{unload(Path)}
-\end{description}
-\end{description}
-
-\subsection{File management}			\label{sec:file}
-
-\begin{description}
-    \predicate{rdfe_is_modified}{1}{?File}
-Enumerate/test whether \arg{File} is modified sinds it was loaded or
-sinds the last call to rdfe_clear_modified/1.  Whether or not a file
-is modified is determined by the MD5 checksum of all triples belonging
-to the file.
-
-    \predicate{rdfe_clear_modified}{1}{+File}
-Set the \emph{unmodified-MD5} to the current MD5 checksum.  See also
-rdfe_is_modified/1.
-
-    \predicate{rdfe_set_file_property}{2}{+File, +Property}
-Control access right and default destination of new triples.
-\arg{Property} is one of
-
-    \begin{description}
-	\termitem{access}{+Access}
-    Where access is one of \const{ro} or \const{rw}.  Access \const{ro}
-    is default when a file is loaded for which the user has no write
-    access.  If a transaction (see rdfe_transaction/1) modifies a file
-    with access \const{ro} the transaction is reversed.
-
-	\termitem{default}{+Default}
-    Set this file to be the default destination of triples.  If
-    \arg{Default} is \const{fallback} it is only the default for
-    triples that have no clear default destination. If it is \const{all}
-    all new triples are added to this file.
-    \end{description}
-
-    \predicate{rdfe_get_file_property}{2}{?File, ?Property}
-Query properties set with rdfe_set_file_property/2.
-\end{description}
-
-
-\subsection{Encapsulated predicates}		\label{sec:rdfeencap}
-
-The following predicates encapsulate predicates from the \file{rdf_db}
-module that modify the triple store. These predicates can only be called
-when inside a \emph{transaction}.  See rdfe_transaction/1.
-
-\begin{description}
-    \predicate{rdfe_assert}{3}{+Subject, +Predicate, +Object}
-Encapsulates rdf_assert/3.
-    \predicate{rdfe_retractall}{3}{?Subject, ?Predicate, ?Object}
-Encapsulates rdf_retractall/3.
-    \predicate{rdfe_update}{4}{+Subject, +Predicate, +Object, +Action}
-Encapsulates rdf_update/4.
-    \predicate{rdfe_load}{1}{+In}
-Encapsulates rdf_load/1.
-    \predicate{rdfe_unload}{1}{+In}
-Encapsulates rdf_unload/1.
-\end{description}
-
-\subsection{High-level modification predicates}	\label{sec:rdfeedit}
-
-This section describes a (yet very incomplete) set of more high-level
-operations one would like to be able to perform.  Eventually this set
-may include operations based on RDFS and OWL.
-
-\begin{description}
-    \predicate{rdfe_delete}{1}{+Resource}
-Delete all traces of \arg{resource}.  This implies all triples where
-\arg{Resource} appears as \emph{subject}, \emph{predicate} or
-\emph{object}.  This predicate starts a transation.
-\end{description}
-
-\subsection{Undo}
-
-\index{undo}%
-Undo aims at user-level undo operations from a (graphical) editor.
-
-\begin{description}
-    \predicate{rdfe_undo}{0}{}
-Revert the last outermost (`level 0') transaction (see
-rdfe_transaction/1). Successive calls go further back in history. Fails
-if there is no more undo information.
-
-    \predicate{rdfe_redo}{0}{}
-Revert the last rdfe_undo/0.  Successive calls revert more rdfe_undo/0
-operations.   Fails if there is no more redo information.
-
-    \predicate{rdfe_can_undo}{1}{-TID}
-Test if there is another transaction that can be reverted.  Used for
-activating menus in a graphical environment.  \arg{TID} is unified to
-the transaction id of the action that will be reverted.
-
-    \predicate{rdfe_can_redo}{1}{-TID}
-Test if there is another undo that can be reverted.  Used for
-activating menus in a graphical environment.  \arg{TID} is unified to
-the transaction id of the action that will be reverted.
-\end{description}
-
-\subsection{Journalling}
-
-\index{journal}%
-Optionally, every action through this module is immediately send to a
-\jargon{journal-file}. The journal provides a full log of all actions
-with a time-stamp that may be used for inspection of behaviour, version
-management, crash-recovery or an alternative to regular save operations.
-
-\begin{description}
-    \predicate{rdfe_open_journal}{2}{+File, +Mode}
-Open a existing or new journal.  If \arg{Mode} equala \const{append}
-and \arg{File} exists, the journal is first replayed. See
-rdfe_replay_journal/1.  If \arg{Mode} is \const{write} the journal is
-truncated if it exists.
-
-    \predicate{rdfe_close_journal}{0}{}
-Close the currently open journal.
-
-    \predicate{rdfe_current_journal}{1}{-Path}
-Test whether there is a journal and to which file the actions are
-journalled.
-
-    \predicate{rdfe_replay_journal}{1}{+File}
-Read a journal, replaying all actions in it.  To do so, the system
-reads the journal a transaction at a time.  If the transaction is
-closed with a \emph{commit} it executes the actions inside the journal.
-If it is closed with a \emph{rollback} or not closed at all due to a
-crash the actions inside the journal are discarded.  Using this
-predicate only makes sense to inspect the state at the end of a journal
-without modifying the journal.  Normally a journal is replayed using the
-\const{append} mode of rdfe_open_journal/2.
-\end{description}
-
-
-\subsection{Broadcasting change events}
-
-\index{event}\index{broadcast}%
-To realise a modular graphical interface for editing the triple store,
-the system must use some sort of \emph{event} mechanism. This is
-implemented by the XPCE library \pllib{broadcast} which is described
-in the \url[XPCE User
-Guide]{http://hcs.science.uva.nl/projects/xpce/UserGuide/libbroadcast.html}.
-In this section we describe the terms brodcasted by the library.
-
-\begin{description}
-    \termitem{rdf_transaction}{+Id}
-A `level-0' transaction has been committed. The system passes the
-identifier of the transaction in \arg{Id}. In the current implementation
-there is no way to find out what happened inside the transaction.  This
-is likely to change in time.
-
-If a transaction is reverted due to failure or exception \emph{no} event
-is broadcasted.  The initiating GUI element is supposed to handle this
-possibility itself and other components are not affected as the triple
-store is not changed.
-
-    \termitem{rdf_undo}{+Type, +Id}
-This event is broadcasted after an rdfe_undo/0 or rdfe_redo/0.
-\arg{Type} is one of \const{undo} or \const{redo} and \arg{Id}
-identifies the transaction as above.
-\end{description}
-
-\section{Related packages and issues}
-
-\index{Sesame}\index{SeRQL}%
-The SWI-Prolog SemWeb package is designed to provide access to the
-Semantic Web languages from Prolog.  It consists of the low level
-\file{rdf_db.pl} store with layers such as \pllib{semweb/rdfs.pl} to provide
-more high level querying of a triple set with relations such as
-rdfs_individual_of/2, rdfs_subclass_of/2, etc.
-\url[SeRQL]{http://www.openrdf.org} is a semantic web query language
-taking another route.  Instead of providing alternative relations
-SeRQL defines a graph query on de \jargon{deductive closure} of the
-triple set.  For example, under assumption of RDFS entailment rules
-this makes the query \term{rdf}{S, rdf:type, Class} equivalent to
-\term{rdfs_individual_of}{S, Class}.
-
-\index{optimising,query}%
-We developed a parser for SeRQL which compiles SeRQL path expressions
-into Prolog conjunctions of \term{rdf}{Subject, Predicate, Object}
-calls. \jargon{Entailment modules} realise a fully logical
-implementation of rdf/3 including the entailment reasoning required to
-deal with a Semantic Web language or application specific reasoning. The
-infra structure is completed with a query optimiser and an HTTP server
-compliant to the \url[Sesame]{http://www.openrdf.org} implementation of
-the SeRQL language.  The Sesame Java client can be used to access Prolog
-servers from Java, while the Prolog client can be used to access the
-Sesame SeRQL server.  For further details, see the
-\url[project
-home]{http://gollem.science.uva.nl/twiki/pl/bin/view/Library/SeRQL}.
-
-
-		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		 %	       OWL		%
-		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\section{OWL}				\label{sec:owl}
-
-\index{OWL}%
-The SWI-Prolog Semantic Web library provides no direct support for OWL.
-OWL(-2) support is provided through Thea, an OWL library for SWI-Prolog
-See \url{http://www.semanticweb.gr/TheaOWLLib/}.
 
 
 		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1168,19 +902,76 @@ See \url{http://www.semanticweb.gr/TheaOWLLib/}.
 \section{Version 3 release notes}
 
 RDF-DB version 3 is a major redesign of the SWI-Prolog RDF
-infrastructure. Notably, this version no longer demands usage of
-rdf_transaction/1 to deal with queries that both read and write the RDF
-store and this version allows for concurrent execution of transactions.
-As a consequence, many programs can be programmed much more naturally in
-version~3. Nevertheles, version~3 is almost perfectly upward compatible
-with version~2. Below are some issues to take into consideration when
-upgrading.
+infrastructure. Nevertheles, version~3 is almost perfectly upward
+compatible with version~2. Below are some issues to take into
+consideration when upgrading.
+
+Version~2 did not allow for modifications while read operations were in
+progress, for example due to an open choice point. As a consequence,
+operations that both queried and modified the database had to be wrapped
+in a transaction or the modifications had to be buffered as Prolog data
+structures. In both cases, the RDF store was not modified during the
+query phase. In version~3, modifications are allowed while read
+operations are in progress and follow the Prolog \textbf{logical update
+view} semantics. This is different from using a transaction in
+version~2, where the view for all read operations was frozen at the
+start of the transaction. In version~3, every read operation sees the
+store frozen at the moment that the operation was started.
+
+We illustrate the difference by writing a forwards entailment rule that
+adds a \jargon{sibling} relation. In \textbf{version~2}, we could
+perform this operation using one of the following:
+
+\begin{code}
+add_siblings_1 :-
+	findall(S-O,
+		( rdf(S, f:parent, P),
+		  rdf(O, f:parent, P),
+		  S \== O
+		),
+		Pairs),
+	forall(member(S-O, Pairs), rdf_assert(S,f:sibling,O)).
+
+add_siblings_2 :-
+	rdf_transaction(
+	    forall(( rdf(S, f:parent, P),
+		     rdf(O, f:parent, P),
+		     S \== O
+		   ),
+		   rdf_assert(S, f:sibling, O))).
+\end{code}
+
+In \textbf{version~3}, we can write this in the natural Prolog style
+below. In itself, this may not seem a big advantage because wrapping
+such operations in a transaction is often a good style anyway. The story
+changes with more complicated constrol structures that combine
+iterations with steps that depend on triples asserted in previous steps.
+Such scenarios can be programmed naturally in the current version.
+
+\begin{code}
+add_siblings_3 :-
+	forall(( rdf(S, f:parent, P),
+		 rdf(O, f:parent, P),
+		 S \== O
+	       ),
+	       rdf_assert(S, f:sibling, O)).
+\end{code}
+
+In version~3, code that combines queries with modification has the same
+semantics whether executed inside or outside a transaction. This
+property makes reusing such predicates predictable.
+
 
 \begin{description}
     \item [rdf_statistics/2]
-The information \const{triples_by_file} is renamed into
-\const{triples_by_graph}.  The information \const{core} is
-no longer provided.
+Various statistics have been renamed or changed:
+    \begin{shortlist}
+        \item \const{sources} is renamed into \const{graphs}
+        \item \const{triples_by_file} is renamed into
+	      \const{triples_by_graph}
+	\item \const{gc} has additional arguments
+	\item \const{core} is removed.
+    \end{shortlist}
 
     \item [rdf_generation/1]
 Generations inside a transaction are represented as
@@ -1189,6 +980,11 @@ Generations inside a transaction are represented as
 started and \arg{TransactionGeneration} expresses the generation within
 the transaction. Counting generation has changed as well. In particular,
 comitting a transaction steps the generation only by one.
+
+    \item [rdf_current_ns/1, rdf_register_ns/2, rdf_register_ns/3]
+These predicates are renamed into rdf_current_prefix/1,
+rdf_register_prefix/2, rdf_register_prefix/3.  The old predicates
+are still available as deprecated predicates.
 \end{description}
 
 
@@ -1196,8 +992,9 @@ comitting a transaction steps the generation only by one.
 
 This research was supported by the following projects: MIA and
 MultimediaN project (www.multimedian.nl) funded through the BSIK
-programme of the Dutch Government, the FP-6 project HOPS of the
-European Commission.
+programme of the Dutch Government, the FP-6 project HOPS of the European
+Commission, the COMBINE project supported by the ONR Global NICOP grant
+N62909-11-1-7060 and the Dutch national program COMMIT.
 
 
 
