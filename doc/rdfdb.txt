@@ -223,7 +223,7 @@ _Explicit_ expansion is achieved using the predicates below. The
 predicate rdf_equal/2 performs this expansion at compile time, while the
 other predicates do it at runtime.
 
-  * [[rdf_equal/1]]
+  * [[rdf_equal/2]]
   * [[rdf_global_id/2]]
   * [[rdf_global_object/2]]
   * [[rdf_global_term/2]]
