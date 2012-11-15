@@ -195,3 +195,96 @@ as an instance of rdf:Property.
 
   * [[rdf_set_predicate/2]]
   * [[rdf_predicate_property/2]]
+
+---++ Prefix Handling
+
+Prolog code often contains references to constant resources with a known
+_prefix_ (also known as XML _namespace_). For example,
+=|http://www.w3.org/2000/01/rdf-schema#Class|= refers to the most
+general notion of an RDFS class. Readability and maintability concerns
+require for abstraction here. The RDF database maintains a table of
+known _prefixes_. This table can be queried using rdf_current_ns/2 and
+can be extended using rdf_register_ns/3. The prefix database is used to
+expand =|prefix:local|= terms that appear as arguments to calls which
+are known to accept a _resource_. This expansion is achieved by Prolog
+preprocessor using expand_goal/2.
+
+  * [[rdf_current_ns/2]]
+  * [[rdf_register_ns/2]]
+  * [[rdf_register_ns/3]]
+
+_Explicit_ expansion is achieved using the predicates below. The
+predicate rdf_equal/2 performs this expansion at compile time, while the
+other predicates do it at runtime.
+
+  * [[rdf_equal/1]]
+  * [[rdf_global_id/2]]
+  * [[rdf_global_object/2]]
+  * [[rdf_global_term/2]]
+
+---+++ Namespace handling for custom predicates
+
+If we implement a new predicate based on one of the predicates of the
+semweb libraries that expands namespaces, namespace expansion is not
+automatically available to it. Consider the following code computing the
+number of distinct objects for a certain property on a certain object.
+
+  ==
+  cardinality(S, P, C) :-
+        (   setof(O, rdf_has(S, P, O), Os)
+        ->  length(Os, C)
+        ;   C = 0
+        ).
+  ==
+
+Now assume we want to write labels/2 that returns the number of distict
+labels of a resource:
+
+  ==
+  labels(S, C) :-
+        cardinality(S, rdfs:label, C).
+  ==
+
+This code will _not_ work because =|rdfs:label|= is not expanded at
+compile time. To make this work, we need to add an rdf_meta/1
+declaration.
+
+  ==
+  :- rdf_meta
+        cardinality(r,r,-).
+  ==
+
+  * [[rdf_meta/1]]
+
+The example below defines the rule concept/1.
+
+  ==
+  :- use_module(library(semweb/rdf_db)).  % for rdf_meta
+  :- use_module(library(semweb/rdfs)).    % for rdfs_individual_of
+
+  :- rdf_meta
+	  concept(r).
+
+  %%      concept(?C) is nondet.
+  %
+  %       True if C is a concept.
+
+  concept(C) :-
+	  rdfs_individual_of(C, skos:'Concept').
+  ==
+
+In addition to expanding _calls_, rdf_meta/1   also  causes expansion of
+_|clause heads|_ for predicates  that  match   a  declaration.  This  is
+typically used write Prolog statements   about  resources. The following
+example produces three clauses with expanded (single-atom) arguments:
+
+  ==
+  :- use_module(library(semweb/rdf_db)).
+
+  :- rdf_meta
+	  label_predicate(r).
+
+  label_predicate(rdfs:label).
+  label_predicate(skos:prefLabel).
+  label_predicate(skos:altLabel).
+  ==

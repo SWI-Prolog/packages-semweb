@@ -450,9 +450,48 @@ valid_arg(A) :-
 
 %%	rdf_meta(+Heads)
 %
-%	This   directive   is   expanded   using   term-expansion.   The
-%	implementation just throws an error in   case  it is called with
-%	the wrong context.
+%	This  directive  defines  the  argument    types  of  the  named
+%	predicates, which will force compile   time  namespace expansion
+%	for these predicates. Heads is a coma-separated list of callable
+%	terms. Defined argument properties are:
+%
+%	  $ : :
+%	  Argument is a goal. The goal is processed using expand_goal/2,
+%	  recursively applying goal transformation on the argument.
+%
+%	  $ + :
+%         The argument is instantiated at entry. Nothing is changed.
+%
+%	  $ - :
+%	  The argument is not instantiated at entry. Nothing is changed.
+%
+%	  $ ? :
+%	  The argument is unbound or instantiated at entry. Nothing is
+%	  changed.
+%
+%	  $ @ :
+%	  The argument is not changed.
+%
+%	  $ r :
+%         The argument must be a resource. If it is a term
+%         <prefix>:<local> it is translated.
+%
+%	  $ o :
+%	  The argument is an object or resource. See
+%	  rdf_global_object/2.
+%
+%	  $ t :
+%	  The argument is a term that must be translated. Expansion will
+%	  translate all occurences of <prefix>:<local> appearing
+%	  anywhere in the term. See rdf_global_term/2.
+%
+%	As it is subject to term_expansion/2, the rdf_meta/1 declaration
+%	can only be used as a directive. The directive must be processed
+%	before the definition of  the  predicates   as  well  as  before
+%	compiling code that  uses  the   rdf  meta-predicates.  The atom
+%	=rdf_meta=  is  declared   as   an    operator   exported   from
+%	library(semweb/rdf_db). Files using rdf_meta/1  must explicitely
+%	load this library.
 
 rdf_meta(Heads) :-
 	throw(error(context_error(nodirective, rdf_meta(Heads)), _)).
