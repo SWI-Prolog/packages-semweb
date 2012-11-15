@@ -103,7 +103,7 @@ modules to provide additional services, while these services will be
 used regardless of how the database is modified.
 
 Monitors are used by the persistency library (\secref{persistency})
-and the literal indexing library (\secref{rdflitindex}).
+and the literal indexing library.
 
 
 \begin{description}
@@ -176,151 +176,6 @@ processed strickly synchronous, even if modifications originate from
 multiple threads. In particular, the \const{transaction} \emph{begin},
 \ldots{} \emph{updates} \ldots{} \emph{end} sequence is never
 interleaved with other events. Same for \const{load} and \const{parse}.
-\end{description}
-
-
-\subsection{Miscellaneous predicates}
-
-This section describes the remaining predicates of the \file{rdf_db}
-module.
-
-\begin{description}
-    \predicate{rdf_bnode}{1}{-Id}
-Generate a unique blank node reference. The returned atom is guaranteed
-not to occur in the current database in any field of any triple and
-starts with '__bnode'.
-
-    \predicate{rdf_is_bnode}{1}{+Id}
-Succeeds if \arg{Id} is a blank node identifier (also called
-\jargon{anonymous resource}).  In the current implementation this
-implies it is an atom starting with a double underscore.
-
-    \predicate{rdf_is_resource}{1}{+Id}
-Succeeds if \arg{Id} is a resource.  Note that this resource need
-not to appear in any triple.
-
-    \predicate{rdf_is_literal}{1}{+Id}
-Succeeds if \arg{Id} is an RDF literal term. Note that this
-literal need not to appear in any triple.
-
-    \predicate{rdf_source_location}{2}{+Subject, -SourceRef}
-Return the source-location as \arg{File}:\arg{Line} of the first triple
-that is about \arg{Subject}.
-
-    \predicate{rdf_generation}{1}{-Generation}
-Returns the \arg{Generation} of the database. Each modification to the
-database increments the generation. It can be used to check the validity
-of cached results deduced from the database. Committing a non-empty
-transaction increments the generation by one.\footnote{Previous versions
-incremented by the number of changes inside the transaction. The current
-approach results in smaller numbers, but provides no clue on how much
-was changed inside the transaction.  If there are good reasons to revert
-to the old numbering, this can be achieved.}
-
-When inside a tranaction, \arg{Generation} is unified to a term
-\mbox{\arg{TransactionStartGen}+\arg{InsideTransactionGen}}. I.e.,
-\verb$4+3$ means that the transaction was started at generation 4 of the
-global database and we have created 3 new generations inside the
-transaction. Note that this choice of representation allows for
-comparing generations using Prolog arithmetic. Comparing a generation in
-one transaction with a generation in another transaction is normally
-meaningless.
-
-    \predicate{rdf_estimate_complexity}{4}{?Subject, ?Predicate, ?Object,
-					   -Complexity}
-Return the number of alternatives as indicated by the database
-internal hashed indexing.  This is a rough measure for the number
-of alternatives we can expect for an rdf_has/3 call using the
-given three arguments. When called with three variables, the total
-number of triples is returned. This estimate is used in query
-optimisation. See also rdf_predicate_property/2 and rdf_statistics/1 for
-additional information to help optimisers.
-
-    \predicate{rdf_statistics}{1}{?Statistics}
-Report statistics collected by the \file{rdf_db} module.  Defined
-values for \arg{Statistics} are:
-
-    \begin{description}
-	\termitem{lookup}{?Index, -Count}
-Number of lookups using a pattern of instantiated fields.  \arg{Index}
-is a term \term{rdf}{S,P,O}, where \arg{S}, \arg{P} and \arg{O} are
-either \const{+} or \const{-}.  For example \term{rdf}{+,+,-} returns
-the lookups with subject and predicate specified and object unbound.
-
-	\termitem{properties}{-Count}
-Number of unique values for the second field of the triple set.
-
-	\termitem{sources}{-Count}
-Number of files loaded through rdf_load/1.
-
-	\termitem{subjects}{-Count}
-Number of unique values for the first field of the triple set.
-
-	\termitem{literals}{-Count}
-Total number of unique literal values in the database.  See also
-\secref{litindex}.
-
-	\termitem{triples}{-Count}
-Total number of triples in the database.
-
-	\termitem{triples_by_graph}{?File, -Count}
-Enumerate the number of triples associated to each file.
-
-	\termitem{searched_nodes}{-Count}
-Number of nodes explored in rdf_reachable/3.
-
-	\termitem{gc}{-Count, -Time}
-Number of garbage collections and time spent in seconds represented as
-a float.
-
-	\termitem{rehash}{-Count, -Time}
-Number of times the hash-tables were enlarged and time spent in seconds
-represented as a float.
-
-	\termitem{core}{-Bytes}
-Core used by the triple store.  This includes all memory allocated on
-behalf of the library, but \emph{not} the memory allocated in
-Prolog atoms referenced (only) by the triple store.
-    \end{description}
-
-    \predicate{rdf_match_label}{3}{+Method, +Search, +Atom}
-True if \arg{Search} matches \arg{Atom} as defined by \arg{Method}.
-All matching is performed case-insensitive.  Defines methods are:
-    \begin{description}
-	\termitem{exact}{}
-	    Perform exact, but case-insensitive match.
-	\termitem{substring}{}
-	    \arg{Search} is a sub-string of \arg{Text}.
-	\termitem{word}{}
-	    \arg{Search} appears as a whole-word in \arg{Text}.
-	\termitem{prefix}{}
-	    \arg{Text} start with \arg{Search}.
-	\termitem{like}{}
-	    \arg{Text} matches \arg{Search}, case insensitively, where
-	    the `*' character in \arg{Search} matches zero or more
-	    characters.
-    \end{description}
-
-    \predicate{lang_matches}{2}{+Lang, +Pattern}
-True if \arg{Lang} matches \arg{Pattern}. This implements XML language
-matching conform RFC 4647. Both \arg{Lang} and \arg{Pattern} are
-dash-separated strings of identifiers or (for \arg{Pattern}) the
-wildcart \texttt{*}. Identifiers are matched case-insensitive and a
-\texttt{*} matches any number of identifiers.  A short pattern is the
-same as \texttt{*}.
-
-    \predicate{lang_equal}{2}{+Lang1, +Lang2}
-True if \arg{Lang1} and \arg{Lang2} specify the same language, including
-regional and other modifiers.  Language-specifiers are case-insensitive.
-
-    \predicate{rdf_reset_db}{0}{}
-Erase all triples from the database and reset all counts and statistics
-information.
-
-    \predicate{rdf_version}{1}{-Version}
-Unify \arg{Version} with the library version number.  This number is,
-like to the SWI-Prolog version flag, defined as $10,000 \times
-Major + 100 \times Minor + Patch$.
 \end{description}
 
 
@@ -569,8 +424,8 @@ no_index_token(X) :-
 create additional indexes on literals. The current implementation can
 only deal with integers and atoms (string literals). A literal map
 maintains an ordered set of \jargon{keys}. The ordering uses the same
-rules as described in \secref{litindex}. Each key is associated with an
-ordered set of \jargon{values}. Literal map objects can be shared
+rules as described in \secref{rdflitindex}. Each key is associated with
+an ordered set of \jargon{values}. Literal map objects can be shared
 between threads, using a locking strategy that allows for multiple
 concurrent readers.
 
@@ -638,10 +493,9 @@ a fast test of existence without fetching the possibly large associated
 value set as with rdf_find_literal_map/3.
 
 	\termitem{prefix}{+Prefix}
-Unify \arg{Answer} with an ordered set of all keys that have the
-given prefix.  See \secref{rdfquery} for details on prefix matching.
-\arg{Prefix} must be an atom. This call is intended for auto-completion
-in user interfaces.
+Unify \arg{Answer} with an ordered set of all keys that have the given
+prefix. \arg{Prefix} must be an atom. This call is intended for
+auto-completion in user interfaces.
 
 	\termitem{ge}{+Min}
 Unify \arg{Answer} with all keys that are larger or equal to the
@@ -992,8 +846,8 @@ Defined as \term{rdfs_label}{Resource, _, Label}.
 
     \predicate{rdfs_ns_label}{3}{?Resource, ?Language, ?Label}
 Similar to rdfs_label/2, but prefixes the result using the declared
-namespace alias (see \secref{rdfns}) to facilitate user-friendly labels
-in applications using multiple namespaces that may lead to confusion.
+namespace prefix to facilitate user-friendly labels in applications
+using multiple namespaces that may lead to confusion.
 
     \predicate{rdfs_ns_label}{2}{?Resource, ?Label}
 Defined as \term{rdfs_ns_label}{Resource, _, Label}.
@@ -1043,9 +897,8 @@ rdf_monitor/2 facilities. See \secref{rdfmonitor}.
 
 \index{undo}\index{journal}\index{transactions}
 The module \file{rdf_edit.pl} is a layer than encasulates the
-modification predicates from \secref{rdfmodify} for use from
-a (graphical) editor of the triple store.  It adds the
-following features:
+modification predicates for use from a (graphical) editor of the triple
+store. It adds the following features:
 
 \begin{itemlist}
     \item [Transaction management]

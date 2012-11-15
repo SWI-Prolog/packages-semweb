@@ -1137,11 +1137,48 @@ consider_gc(_CPU) :-
 
 %%	rdf_statistics(?KeyValue) is nondet.
 %
-%	Obtain statistics on the RDF database.
+%	Obtain statistics on the RDF database.  Defined statistics are:
 %
-%	@param KeyValue	Term of the form Key(Value).
+%	  * graphs(-Count)
+%	  Number of named graphs
+%
+%	  * triples(-Count)
+%	  Total number of triples in the database.  This is the number
+%	  of asserted triples minus the number of retracted ones.  The
+%	  number of _visible_ triples in a particular context may be
+%	  different due to visibility rules defined by the logical
+%	  update view and transaction isolation.
+%
+%	  * resources(-Count)
+%	  Number of resources that appear as subject or object in a
+%	  triple.  See rdf_resource/1.
+%
+%	  * properties(-Count)
+%	  Number of current predicates.  See rdf_current_predicate/1.
+%
+%	  * literals(-Count)
+%	  Number of current literals.  See rdf_current_literal/1.
+%
+%	  * gc(GCCount, ReclaimedTriples, ReindexedTriples, Time)
+%	  Information about the garbage collector.
+%
+%	  * searched_nodes(-Count)
+%	  Number of nodes expanded by rdf_reachable/3 and
+%	  rdf_reachable/5.
+%
+%	  * lookup(rdf(S,P,O,G), Count)
+%	  Number of queries for this particular instantiation pattern.
+%	  Each of S,P,O,G is either + or -.
+%
+%	  * hash_quality(rdf(S,P,O,G), Buckets, Quality, PendingResize)
+%	  Statistics on the index for this pattern.  Indices are created
+%	  lazily on the first relevant query.
+%
+%	  * triples_by_graph(Graph, Count)
+%	  This statistics is produced for each named graph. See
+%	  =triples= for the interpretation of this value.
 
-rdf_statistics(sources(Count)) :-
+rdf_statistics(graphs(Count)) :-
 	rdf_statistics_(graphs(Count)).
 rdf_statistics(triples(Count)) :-
 	rdf_statistics_(triples(Count)).
@@ -1433,6 +1470,17 @@ rdf_update_duplicates_thread :-
 		      [ detached(true),
 			alias('__rdf_duplicate_detecter')
 		      ]).
+
+%%	rdf_update_duplicates is det.
+%
+%	Update the duplicate administration. If   this  adminstration is
+%	up-to-date, each triples that _may_ have a duplicate is flagged.
+%	The predicate rdf/3 uses this administration to speedup checking
+%	for duplicate answers.
+%
+%	This predicate is normally  executed   from  a background thread
+%	named =__rdf_duplicate_detecter= which is created   when a query
+%	discovers that checking for duplicates becomes too expensive.
 
 
 		 /*******************************
@@ -2158,6 +2206,12 @@ assert_triples([H|_], _) :-
 %
 %	Remove all triples from the RDF database and reset all its
 %	statistics.
+%
+%	@bug	This predicate checks for active queries, but this check is
+%		not properly synchronized and therefore the use of this
+%		predicate is unsafe in multi-threaded contexts. It is
+%		mainly used to run functionality tests that need to
+%		start with an empty database.
 
 rdf_reset_db :-
 	rdf_reset_db_.
@@ -3285,8 +3339,20 @@ rdf_quote_uri(IRI, URI) :-
 
 %%	rdf_generation(-Generation) is det.
 %
-%	True when Generation is the current generation of the database.
-%	See also rdf_graph_property/2 using the =hash= property.
+%	True when Generation is the current  generation of the database.
+%	Each modification to the database  increments the generation. It
+%	can be used to check the validity of cached results deduced from
+%	the database. Committing a non-empty  transaction increments the
+%	generation by one.
+%
+%	When inside a transaction,  Generation  is   unified  to  a term
+%	_TransactionStartGen_+_InsideTransactionGen_.  E.g.,  4+3  means
+%	that the transaction was started at   generation 4 of the global
+%	database and we have  created  3   new  generations  inside  the
+%	transaction. Note that this choice  of representation allows for
+%	comparing  generations  using  Prolog  arithmetic.  Comparing  a
+%	generation in one  transaction  with   a  generation  in another
+%	transaction is meaningless.
 
 %%	rdf_estimate_complexity(?Subject, ?Predicate, ?Object, -Complexity)
 %
