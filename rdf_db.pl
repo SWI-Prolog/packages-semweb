@@ -108,6 +108,9 @@
 	    lang_equal/2,		% +Lang1, +Lang2
 	    lang_matches/2,		% +Lang, +Pattern
 
+	    rdf_current_prefix/2,	% ?Alias, ?URI
+	    rdf_register_prefix/2,	% +Alias, +URI
+	    rdf_register_prefix/3,	% +Alias, +URI, +Options
 	    rdf_current_ns/2,		% ?Alias, ?URI
 	    rdf_register_ns/2,		% +Alias, +URI
 	    rdf_register_ns/3,		% +Alias, +URI, +Options
@@ -224,15 +227,15 @@ store.
 */
 
 		 /*******************************
-		 *	     NAMESPACES		*
+		 *	     PREFIXES		*
 		 *******************************/
 
-%%	rdf_current_ns(?Alias, ?URI) is nondet.
+%%	rdf_current_prefix(?Alias, ?URI) is nondet.
 %
-%	Query  predefined  namespaces  and    namespaces   defined  with
+%	Query   predefined   prefixes   and    prefixes   defined   with
 %	rdf_register_ns/2.
 
-rdf_current_ns(Alias, URI) :-
+rdf_current_prefix(Alias, URI) :-
 	ns(Alias, URI).
 
 %%	ns(?Alias, ?URI) is nondet.
@@ -253,10 +256,10 @@ ns(eor,	    'http://dublincore.org/2000/03/13/eor#').
 ns(skos,    'http://www.w3.org/2004/02/skos/core#').
 ns(serql,   'http://www.openrdf.org/schema/serql#').
 
-%%	rdf_register_ns(+Alias, +URI) is det.
-%%	rdf_register_ns(+Alias, +URI, +Options) is det.
+%%	rdf_register_prefix(+Prefix, +URI) is det.
+%%	rdf_register_prefix(+Prefix, +URI, +Options) is det.
 %
-%	Register Alias as an abbreviateion for URI. Options:
+%	Register Prefix as an abbreviation for URI. Options:
 %
 %		* force(Boolean)
 %		If =true=, Replace existing namespace alias. Please note
@@ -271,7 +274,7 @@ ns(serql,   'http://www.openrdf.org/schema/serql#').
 %	Without options, an attempt  to  redefine   an  alias  raises  a
 %	permission error.
 %
-%	Predefined namespaces are:
+%	Predefined prefixes are:
 %
 %	| rdf	  | http://www.w3.org/1999/02/22-rdf-syntax-ns#' |
 %	| rdfs	  | http://www.w3.org/2000/01/rdf-schema#'	 |
@@ -284,12 +287,12 @@ ns(serql,   'http://www.openrdf.org/schema/serql#').
 %	| serql	  | http://www.openrdf.org/schema/serql#'	 |
 
 
-rdf_register_ns(Alias, URI) :-
-	rdf_register_ns(Alias, URI, []).
+rdf_register_prefix(Alias, URI) :-
+	rdf_register_prefix(Alias, URI, []).
 
-rdf_register_ns(Alias, URI, _) :-
+rdf_register_prefix(Alias, URI, _) :-
 	ns(Alias, URI), !.
-rdf_register_ns(Alias, URI, Options) :-
+rdf_register_prefix(Alias, URI, Options) :-
 	ns(Alias, _), !,
 	(   option(force(true), Options, false)
 	->  retractall(ns(Alias, _)),
@@ -299,8 +302,30 @@ rdf_register_ns(Alias, URI, Options) :-
 	;   throw(error(permission_error(register, namespace, Alias),
 			context(_, 'Already defined')))
 	).
-rdf_register_ns(Alias, URI, _) :-
+rdf_register_prefix(Alias, URI, _) :-
 	assert(ns(Alias, URI)).
+
+%%	rdf_current_ns(?Prefix, ?URI) is nondet.
+%
+%	@deprecated.  Use rdf_current_prefix/2.
+
+rdf_current_ns(Prefix, URI) :-
+	rdf_current_prefix(Prefix, URI).
+
+%%	rdf_register_ns(?Prefix, ?URI) is det.
+%
+%	@deprecated.  Use rdf_register_prefix/2.
+
+%%	rdf_register_ns(?Prefix, ?URI, +Options) is det.
+%
+%	@deprecated.  Use rdf_register_prefix/3.
+
+rdf_register_ns(Prefix, URI) :-
+	rdf_register_prefix(Prefix, URI).
+rdf_register_ns(Prefix, URI, Options) :-
+	rdf_register_prefix(Prefix, URI, Options).
+
+
 
 %%	register_file_ns(+Map:list(pair)) is det.
 %

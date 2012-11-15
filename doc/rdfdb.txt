@@ -199,7 +199,7 @@ as an instance of rdf:Property.
 ---++ Prefix Handling
 
 Prolog code often contains references to constant resources with a known
-_prefix_ (also known as XML _namespace_). For example,
+_prefix_ (also known as XML _namespaces_). For example,
 =|http://www.w3.org/2000/01/rdf-schema#Class|= refers to the most
 general notion of an RDFS class. Readability and maintability concerns
 require for abstraction here. The RDF database maintains a table of
@@ -209,9 +209,9 @@ expand =|prefix:local|= terms that appear as arguments to calls which
 are known to accept a _resource_. This expansion is achieved by Prolog
 preprocessor using expand_goal/2.
 
-  * [[rdf_current_ns/2]]
-  * [[rdf_register_ns/2]]
-  * [[rdf_register_ns/3]]
+  * [[rdf_current_prefix/2]]
+  * [[rdf_register_prefix/2]]
+  * [[rdf_register_prefix/3]]
 
 _Explicit_ expansion is achieved using the predicates below. The
 predicate rdf_equal/2 performs this expansion at compile time, while the
