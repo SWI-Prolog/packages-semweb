@@ -1,11 +1,10 @@
-/*  $Id$
-
-    Part of SWI-Prolog
+/*  Part of SWI-Prolog
 
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@cs.vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2007-2009, University of Amsterdam
+    Copyright (C): 2007-2012, University of Amsterdam
+			      VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License
@@ -63,25 +62,25 @@ help the user interpreting the URL. The main predicates are:
 %
 %	Set the style used to portray resources.  Style is one of:
 %
-%		* ns:id
+%		$ =|prefix:id|= :
 %		Write as NS:ID, compatible with what can be handed to
 %		the rdf predicates.  This is the default.
 %
-%		* writeq
+%		$ =writeq= :
 %		Use quoted write of the full resource.
 %
-%		* ns:label
+%		$ =|prefix:label|= :
 %		Write namespace followed by the label.  This format
 %		cannot be handed to rdf/3 and friends, but can be
 %		useful if resource-names are meaningless identifiers.
 %
-%		* ns:id=label
-%		This combines ns:id with ns:label, providing both human
+%		$ =|prefix:id=label|= :
+%		This combines prefix:id with prefix:label, providing both human
 %		readable output and output that can be pasted into the
 %		commandline.
 
 rdf_portray_as(Style) :-
-	must_be(oneof([writeq, ns:id, ns:label, ns:id=label]), Style),
+	must_be(oneof([writeq, prefix:id, prefix:label, prefix:id=label]), Style),
 	retractall(style(_)),
 	assert(style(Style)).
 
@@ -112,7 +111,7 @@ user:portray(URL) :-
 	sub_atom(URL, 0, _, _, 'http://'), !,
 	(   style(Style)
 	->  true
-	;   Style = ns:id
+	;   Style = prefix:id
 	),
 	portray_url(Style, URL).
 user:portray(URL) :-
@@ -126,12 +125,12 @@ user:portray(URL) :-
 
 portray_url(writeq, URL) :-
 	writeq(URL).
-portray_url(ns:id, URL) :-
+portray_url(prefix:id, URL) :-
 	(   rdf_global_id(NS:Id, URL)
 	->  writeq(NS:Id)
 	;   writeq(URL)
 	).
-portray_url(ns:id=label, URL) :-
+portray_url(prefix:id=label, URL) :-
 	(   rdf_global_id(NS:Id, URL)
 	->  Value = NS:Id
 	;   Value = URL
@@ -159,7 +158,7 @@ portray_url(ns:id=label, URL) :-
 	->  true
 	;   writeq(Value)
 	).
-portray_url(ns:label, URL) :-
+portray_url(prefix:label, URL) :-
 	rdfs_ns_label(URL, Label),
 	write(Label).
 
