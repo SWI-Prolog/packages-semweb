@@ -5,6 +5,8 @@
 	    remove_p/1,			% +Fraction
 	    stress/2			% SizeM, Threads
 	  ]).
+:- include(local_test).
+:- use_module(library(semweb/rdf_db)).
 :- use_module(library(apply_macros)).
 :- use_module(library(statistics)).
 :- use_module(library(random)).
