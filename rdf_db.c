@@ -169,9 +169,6 @@ static size_t	triple_hash_key(triple *t, int which);
 static size_t	object_hash(triple *t);
 static void	mark_duplicate(rdf_db *db, triple *t, query *q);
 static void	link_triple_hash(rdf_db *db, triple *t);
-static void	init_triple_walker(triple_walker *tw, rdf_db *db,
-				   triple *t, int index);
-static triple  *next_triple(triple_walker *tw);
 static void	free_triple(rdf_db *db, triple *t, int linger);
 
 static sub_p_matrix *create_reachability_matrix(rdf_db *db,
@@ -809,6 +806,100 @@ add_tripleset(search_state *state, tripleset *ts, triple *triple)
   ts->entries[i] = c;
 
   return 1;
+}
+
+		 /*******************************
+		 *	  TRIPLE WALKER		*
+		 *******************************/
+
+/* init_triple_walker() and next_triple() are the primitives to walk indexed
+   triples.  The pattern is:
+
+	triple_walker tw;
+
+	init_triple_walker(&tw, db, pattern, index);
+	while((t=next_triple(tw)))
+	  <do your job>
+
+  TBD: Get the generation into this story.  Most likely it is better to
+  deal with this in this low-level loop then outside. We will handle
+  this in the next cycle.
+*/
+
+static void
+init_triple_walker(triple_walker *tw, rdf_db *db, triple *pattern, int which)
+{ tw->unbounded_hash = triple_hash_key(pattern, which);
+  tw->current	     = NULL;
+  tw->icol	     = ICOL(which);
+  tw->hash	     = &db->hash[tw->icol];
+  if ( !tw->hash->created )
+    create_triple_hash(db, tw->icol);
+  tw->bcount	     = tw->hash->bucket_count_epoch;
+}
+
+
+static void
+init_triple_literal_walker(triple_walker *tw, rdf_db *db,
+			   triple *pattern, int which, unsigned int hash)
+{ tw->unbounded_hash = hash;
+  tw->current	     = NULL;
+  tw->icol	     = ICOL(which);
+  tw->hash	     = &db->hash[tw->icol];
+  if ( !tw->hash->created )
+    create_triple_hash(db, tw->icol);
+  tw->bcount	     = tw->hash->bucket_count_epoch;
+}
+
+
+static void
+rewind_triple_walker(triple_walker *tw)
+{ tw->bcount  = tw->hash->bucket_count_epoch;
+  tw->current = NULL;
+}
+
+
+static triple *
+next_hash_triple(triple_walker *tw)
+{ triple *rc;
+
+  if ( tw->bcount <= tw->hash->bucket_count )
+  { do
+    { int entry = tw->unbounded_hash % tw->bcount;
+      triple_bucket *bucket = &tw->hash->blocks[MSB(entry)][entry];
+
+      rc = bucket->head;
+      do
+      { tw->bcount *= 2;
+      } while ( tw->bcount <= tw->hash->bucket_count &&
+		tw->unbounded_hash % tw->bcount == entry );
+    } while(!rc && tw->bcount <= tw->hash->bucket_count );
+
+    if ( rc )
+      tw->current = rc->tp.next[tw->icol];
+  } else
+  { rc = NULL;
+  }
+
+  return rc;
+}
+
+
+static inline triple *
+next_triple(triple_walker *tw)
+{ triple *rc;
+
+  if ( (rc=tw->current) )
+  { tw->current = rc->tp.next[tw->icol];
+    return rc;
+  } else
+  { return next_hash_triple(tw);
+  }
+}
+
+
+static inline void
+destroy_triple_walker(rdf_db *db, triple_walker *tw)
+{
 }
 
 
@@ -3825,97 +3916,6 @@ triple_hash_key(triple *t, int which)
   }
 
   return v;
-}
-
-
-/* init_triple_walker() and next_triple() are the primitives to walk indexed
-   triples.  The pattern is:
-
-	triple_walker tw;
-
-	init_triple_walker(&tw, db, pattern, index);
-	while((t=next_triple(tw)))
-	  <do your job>
-
-  TBD: Get the generation into this story.  Most likely it is better to
-  deal with this in this low-level loop then outside. We will handle
-  this in the next cycle.
-*/
-
-static void
-init_triple_walker(triple_walker *tw, rdf_db *db, triple *pattern, int which)
-{ tw->unbounded_hash = triple_hash_key(pattern, which);
-  tw->current	     = NULL;
-  tw->icol	     = ICOL(which);
-  tw->hash	     = &db->hash[tw->icol];
-  if ( !tw->hash->created )
-    create_triple_hash(db, tw->icol);
-  tw->bcount	     = tw->hash->bucket_count_epoch;
-}
-
-
-static void
-init_triple_literal_walker(triple_walker *tw, rdf_db *db,
-			   triple *pattern, int which, unsigned int hash)
-{ tw->unbounded_hash = hash;
-  tw->current	     = NULL;
-  tw->icol	     = ICOL(which);
-  tw->hash	     = &db->hash[tw->icol];
-  if ( !tw->hash->created )
-    create_triple_hash(db, tw->icol);
-  tw->bcount	     = tw->hash->bucket_count_epoch;
-}
-
-
-static void
-rewind_triple_walker(triple_walker *tw)
-{ tw->bcount  = tw->hash->bucket_count_epoch;
-  tw->current = NULL;
-}
-
-
-static triple *
-next_hash_triple(triple_walker *tw)
-{ triple *rc;
-
-  if ( tw->bcount <= tw->hash->bucket_count )
-  { do
-    { int entry = tw->unbounded_hash % tw->bcount;
-      triple_bucket *bucket = &tw->hash->blocks[MSB(entry)][entry];
-
-      rc = bucket->head;
-      do
-      { tw->bcount *= 2;
-      } while ( tw->bcount <= tw->hash->bucket_count &&
-		tw->unbounded_hash % tw->bcount == entry );
-    } while(!rc && tw->bcount <= tw->hash->bucket_count );
-
-    if ( rc )
-      tw->current = rc->tp.next[tw->icol];
-  } else
-  { rc = NULL;
-  }
-
-  return rc;
-}
-
-
-static inline triple *
-next_triple(triple_walker *tw)
-{ triple *rc;
-
-  if ( (rc=tw->current) )
-  { tw->current = rc->tp.next[tw->icol];
-    return rc;
-  } else
-  { return next_hash_triple(tw);
-  }
-}
-
-
-static inline void
-destroy_triple_walker(rdf_db *db, triple_walker *tw)
-{
 }
 
 
