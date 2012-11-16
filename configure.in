@@ -33,6 +33,8 @@ EOF
   fi
 fi
 
+AC_CHECK_FUNCS(random)
+
 AC_OUTPUT(Makefile)
 
 

@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@cs.vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2011, VU University Amsterdam
+    Copyright (C): 2011-2012, VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License
@@ -27,6 +27,7 @@
     the GNU General Public License.
 */
 
+#include <config.h>
 #include <SWI-Stream.h>
 #include <SWI-Prolog.h>
 #include <assert.h>
@@ -62,6 +63,10 @@ skiplist_debug(int new)
 On some systems, RAND_MAX is small. We   assume that the C compiler will
 remove the conditional if RAND_MAX is a sufficiently large constant
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+#ifndef HAVE_RANDOM
+#define random rand
+#endif
 
 static int
 cell_height(void)
