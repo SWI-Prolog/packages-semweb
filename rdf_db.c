@@ -3158,6 +3158,7 @@ initial_size_triple_hash(rdf_db *db, int icol)
       break;
     default:
       assert(0);
+      return;
   }
 
   size /= hash->avg_chain_len;
@@ -6199,6 +6200,7 @@ init_search_state(search_state *state, query *query)
         break;
       default:
 	assert(0);
+        return FALSE;
     }
 
     if ( rlitp )
@@ -7931,7 +7933,9 @@ unify_statistics(rdf_db *db, term_t key, functor_t f)
 			   PL_INT64, (int64_t)db->reindexed,
 			   PL_FLOAT, (double)db->gc.time);	/* time spent */
   } else
-    assert(0);
+  { assert(0);
+    return FALSE;
+  }
 
   return PL_unify_term(key, PL_FUNCTOR, f, PL_INT64, v);
 }
