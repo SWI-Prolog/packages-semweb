@@ -29,13 +29,13 @@
 
 \begin{abstract}
 
-This document describes a library for dealing with standards from the
-\url[W3C]{http://www.w3c.org/} standard for the \emph{Semantic Web}.
-Like the standards themselves (RDF, RDFS and OWL) this infrastructure is
-modular. It consists of Prolog packages for reading, querying and
-storing semantic web documents. A read-to-run platform for developing
-Semantic Web applications named
-\url[ClioPatria]{http://cliopatria.swi-prolog.org} is distributed
+This document describes the SWI-Prolog \jargon{semweb} package. The core
+of this package is an efficient main-memory based RDF store that is
+tightly connected to Prolog. Additional libraries provide reading and
+writing RDF/XML and Turtle data, caching loaded RDF documents and
+persistent storage. This package is the core of a ready-to-run platform
+for developing Semantic Web applications named
+\url[ClioPatria]{http://cliopatria.swi-prolog.org}, which is distributed
 seperately. The SWI-Prolog RDF store is amoung the most memory efficient
 main-memory stores for
 RDF\footnote{\url{http://cliopatria.swi-prolog.org/help/source/doc/home/vnc/prolog/src/ClioPatria/web/help/memusage.txt}}
@@ -59,26 +59,84 @@ streaming RDF and graph manipulation tasks.
 \section{Introduction}
 
 The core of the SWI-Prolog package \file{semweb} is an efficient
-main-memory RDF store written in C and tightly integrated with Prolog.
-It provides a fully logical predicate rdf/3 to query the RDF store
-efficiently by using multiple (currently 9) indexes. In addition,
+main-memory RDF store written in C that is tightly integrated with
+Prolog. It provides a fully logical predicate rdf/3 to query the RDF
+store efficiently by using multiple (currently 9) indexes. In addition,
 SWI-Prolog provides libraries for reading and writing XML/RDF and Turtle
 and a library that provides persistency using a combination of efficient
 binary snapshots and journals.
 
+Below, we describe a few usage scenarios that guides the current design
+of this Prolog-based RDF store.
 
-\section{Provided libraries}
 
-Central to this library is the module \pllib{library(semweb/rdf_db)},
-providing storage and basic querying for RDF triples. This triple store
-is filled using the RDF parser realised by \pllib{library(rdf)}. The
-storage module can quickly save and load (partial) databases. The
-modules \pllib{library(semweb/rdfs)} and \pllib{library(semweb/owl)}
-add querying in terms of the more powerful RDFS and OWL languages.
-Figure \figref{modules} summarised the modular design.
+\paragraph{Application prototyping platform}
 
-\postscriptfig[width=0.8\linewidth]{modules}
-	{Modules for the Semantic Web library}
+Bundled with \url[ClioPatria]{http://cliopatria.swi-prolog.org}, the
+store is an efficient platform for prototyping a wide range of semantic
+web applications. Prolog, connected to the main-memory based store is a
+productive platform for writing application logic that can be made
+available through the SPARQL endpoint of ClioPatria, using an
+application specific API (typically based on JSON or XML) or as an HTML
+based end-user application. Prolog is more versatile than SPARQL, allows
+composing of the logic from small building blocks and does not suffer
+from the \jargon{Object-relational impedance mismatch}.
+
+
+\paragraph{Data integration}
+
+The SWI-Prolog store is optimized for entailment on the
+\const{rdfs:subPropertyOf} relation. The \const{rdfs:subPropertyOf}
+relation is crucial for integrating data from multiple sources while
+preserving the original richness of the sources because integration can
+be achieved by defining the native properties as sub-properties of
+properties from a unifying schema such as Dublin Core.
+
+
+\paragraph{Dynamic data}
+
+This RDF store is one of the few stores that is primarily based on
+\jargon{backward reasoning}. The big advantage of backward reasoning is
+that it can much easier deal with changes to the database because it
+does not have to take care of propagating the consequences. Backward
+reasoning reduces storage requirements. The price is more reasoning
+during querying. In many scenarios the extra reasoning using a main
+memory will outperform the fetching the precomputed results from
+external storage.
+
+
+\paragraph{Prototyping reasoning systems}
+
+Reasoning systems, not necessarily limited to entailment reasoning, can
+be prototyped efficiently on the Prolog based store. This includes
+`what-if' reasoning, which is supported by \jargon{snapshot} and
+\jargon{transaction} isolation. These features, together with the
+concurrent loading capabilities, make the platform well equiped to
+collect relevant data from large external stores for intensive
+reasoning. Finally, the
+\url[TIPC]{http://www.swi-prolog.org/pldoc/package/tipc.html} package
+can be used to create networks of cooperating RDF based agents.
+
+
+\paragraph{Streaming RDF}
+
+Transactions, snapshots, concurrent modifications and the database
+monitoring facilities (see rdf_monitor/2) make the platform well suited
+for prototyping systems that deal with streaming RDF data.
+
+
+\section{Scalability}
+
+Depending on the OS and further application restrictions, the SWI-Prolog
+RDF stores scales to about 15~million triples on 32-bit hardware. On
+64-bit hardware, the scalability is limited by the amount of physical
+memory, allowing for approximately 4~million triples per gigabyte. The
+other limiting factor for practical use is the time required to load
+data and/or restore the database from the persistent file backup.
+Performance depends highly on hardware, concurrent performance and
+whether or not the data is spread over multiple (named) graphs that can
+be loaded in parallel. Restoring over 20~million triples per minute is
+feasible on medium hardware (Intel i7/2600 running Ubuntu 12.10).
 
 
 		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -817,48 +875,6 @@ If \arg{List} is a list of resources, create an RDF list \arg{Resource}
 that reflects these resources.  \arg{Resource} and the sublist resources
 are generated with rdf_bnode/1.  The new triples are associated with the
 database \arg{DB}.
-\end{description}
-
-\subsection{Labels and textual search}
-
-Textual search is partly handled by the predicates from the
-\pllib{rdf_db} module and its underlying C-library.  For example,
-literal objects are hashed case-insensitive to speed up the commonly
-used case-insensitive search.
-
-\begin{description}
-    \predicate[multi]{rdfs_label}{3}{?Resource, ?Language, ?Label}
-Extract the label from \arg{Resource} or generate all resources with the
-given \arg{Label}. The label is either associated using a sub-property
-of \const{rdfs:label} or it is extracted from \arg{Resource} by taking
-the part after the last \chr{\#} or \chr{/}. If this too fails,
-\arg{Label} is unified with \arg{Resource}.  \arg{Language} is unified
-to the value of the \const{xml:lang} attribute of the label or a
-variable if the label has no language specified.
-
-    \predicate{rdfs_label}{2}{?Resource, ?Label}
-Defined as \term{rdfs_label}{Resource, _, Label}.
-
-    \predicate{rdfs_ns_label}{3}{?Resource, ?Language, ?Label}
-Similar to rdfs_label/2, but prefixes the result using the declared
-namespace prefix to facilitate user-friendly labels in applications
-using multiple namespaces that may lead to confusion.
-
-    \predicate{rdfs_ns_label}{2}{?Resource, ?Label}
-Defined as \term{rdfs_ns_label}{Resource, _, Label}.
-
-    \predicate{rdfs_find}{5}{+String, +Description, ?Properties, +Method, -Subject}
-\index{search}%
-Find (on backtracking) \arg{Subject}s that satisfy a search
-specification for textual attributes.  \arg{String} is the string
-searched for. \arg{Description} is an OWL description (see \secref{owl})
-specifying candidate resources. \arg{Properties} is a list of properties
-to search for literal objects, \arg{Method} defines the textual
-matching algorithm.  All textual mapping is performed case-insensitive.
-The matching-methods are described with rdf_match_label/3.  If
-\arg{Properties} is unbound, the search is performed in any property and
-\arg{Properties} is unified with a list holding the property on which
-the match was found.
 \end{description}
 
 
