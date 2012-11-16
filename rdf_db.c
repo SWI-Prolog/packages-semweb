@@ -3666,6 +3666,7 @@ new_db(void)
   memset(db, 0, sizeof(*db));
   INIT_LOCK(db);
   init_tables(db);
+  init_query_admin(db);
 
   db->duplicate_admin_threshold = DUPLICATE_ADMIN_THRESHOLD;
   db->snapshots.keep = GEN_MAX;
