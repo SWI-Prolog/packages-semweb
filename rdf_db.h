@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 1985-2012, University of Amsterdam
+    Copyright (C): 2002-2011, University of Amsterdam
 			      VU University Amsterdam
 
     This library is free software; you can redistribute it and/or
@@ -23,20 +23,92 @@
 
 #ifndef RDFDB_H_INCLUDED
 #define RDFDB_H_INCLUDED
-#include "avl.h"
+#include "atom.h"
+
+		 /*******************************
+		 *	     OPTIONS		*
+		 *******************************/
+
+#define WITH_MD5 1
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Symbols are local to shared objects  by   default  in  COFF based binary
+formats, and public in ELF based formats.   In some ELF based systems it
+is possible to make them local   anyway. This enhances encapsulation and
+avoids an indirection for calling these   functions.  Functions that are
+supposed to be local to the SWI-Prolog kernel are declared using
+
+    COMMON(<type) <function>(<args>);
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+#ifdef HAVE_VISIBILITY_ATTRIBUTE
+#define SO_LOCAL __attribute__((visibility("hidden")))
+#else
+#define SO_LOCAL
+#endif
+#define COMMON(type) SO_LOCAL type
+
+		 /*******************************
+		 *	   OTHER MODULES	*
+		 *******************************/
+
+#include <SWI-Stream.h>
+#include <SWI-Prolog.h>
+#include <assert.h>
+#include <string.h>
+#include "deferfree.h"
+#include "debug.h"
+#include "memory.h"
+#include "hash.h"
+#include "error.h"
+#include "skiplist.h"
 #ifdef WITH_MD5
 #include "md5.h"
 #endif
-#include "lock.h"
+#include "mutex.h"
+#include "resource.h"
 
-#define RDF_VERSION 20900		/* 2.9.0 */
+#define RDF_VERSION 30000		/* 3.0.0 */
 
 #define URL_subPropertyOf \
 	"http://www.w3.org/2000/01/rdf-schema#subPropertyOf"
 
 
 		 /*******************************
-		 *               C		*
+		 *	       LOCKING		*
+		 *******************************/
+
+#define MUST_HOLD(lock)			((void)0)
+#define LOCK_MISC(db)			simpleMutexLock(&db->locks.misc)
+#define UNLOCK_MISC(db)			simpleMutexUnlock(&db->locks.misc)
+
+
+		 /*******************************
+		 *	    GENERATIONS		*
+		 *******************************/
+
+typedef uint64_t gen_t;			/* Basic type for generations */
+
+typedef struct lifespan
+{ gen_t		born;			/* Generation we were born */
+  gen_t		died;			/* Generation we died */
+} lifespan;
+
+#define GEN_UNDEF	0xffffffffffffffff /* no defined generation */
+#define GEN_MAX		0x7fffffffffffffff /* Max `normal' generation */
+#define GEN_PREHIST	0x0000000000000000 /* The prehistoric generation */
+#define GEN_EPOCH	0x0000000000000001 /* The generation epoch */
+#define GEN_TBASE	0x8000000000000000 /* Transaction generation base */
+#define GEN_TNEST	0x0000000100000000 /* Max transaction nesting */
+
+					/* Generation of a transaction */
+#define T_GEN(tid,d)	(GEN_TBASE + (tid)*GEN_TNEST + (d))
+
+#include "snapshot.h"
+
+
+		 /*******************************
+		 *	       TRIPLES		*
 		 *******************************/
 
 /* Keep consistent with md5_type[] in rdf_db.c! */
@@ -70,8 +142,11 @@
 /* (*) INDEX_TABLES must be consistent with index_col[] in rdf_db.c */
 #define INDEX_TABLES		        10	/* (*)  */
 #define INITIAL_TABLE_SIZE		1024
-#define INITIAL_PREDICATE_TABLE_SIZE	1024
+#define INITIAL_RESOURCE_TABLE_SIZE	8192
+#define INITIAL_PREDICATE_TABLE_SIZE	64
 #define INITIAL_GRAPH_TABLE_SIZE	64
+
+#define DUPLICATE_ADMIN_THRESHOLD	1024
 
 #define MAX_HASH_FACTOR 8		/* factor to trigger re-hash */
 #define MIN_HASH_FACTOR 4		/* factor after re-hash */
@@ -97,6 +172,12 @@ typedef struct bitmatrix
 } bitmatrix;
 
 
+typedef struct is_leaf
+{ struct is_leaf *older;		/* Older is_leaf info */
+  lifespan	lifespan;		/* Computed for this lifespan */
+  int		is_leaf;		/* Predicate was a leaf then */
+} is_leaf;
+
 #define DISTINCT_DIRECT 0		/* for ->distinct_subjects, etc */
 #define DISTINCT_SUB    1
 
@@ -106,12 +187,11 @@ typedef struct predicate
 					/* hierarchy */
   list	            subPropertyOf;	/* the one I'm subPropertyOf */
   list	            siblings;		/* reverse of subPropertyOf */
-  int		    label;		/* Numeric label in cloud */
   struct predicate_cloud *cloud;	/* cloud I belong to */
-  size_t	    hash;		/* key used for hashing
-					   (=hash if ->cloud is up-to-date) */
-					/* properties */
+  is_leaf	   *is_leaf;		/* cached is-leaf information */
   struct predicate *inverse_of;		/* my inverse predicate */
+  unsigned int	    hash;		/* key used for hashing */
+  unsigned int	    label : 24;		/* Numeric label in cloud */
   unsigned	    transitive : 1;	/* P(a,b)&P(b,c) --> P(a,c) */
 					/* statistics */
   size_t	    triple_count;	/* # triples on this predicate */
@@ -121,30 +201,58 @@ typedef struct predicate
   size_t	    distinct_objects[2];/* # distinct object values */
 } predicate;
 
+#define MAX_PBLOCKS 32
+
+typedef struct pred_hash
+{ predicate   **blocks[MAX_PBLOCKS];	/* Dynamic array starts */
+  size_t	bucket_count;		/* Allocated #buckets */
+  size_t	bucket_count_epoch;	/* Initial bucket count */
+  size_t	count;			/* Total #predicates */
+} pred_hash;
+
+
+typedef struct sub_p_matrix
+{ struct sub_p_matrix *older;		/* Reachability for older gen */
+  lifespan      lifespan;		/* Lifespan this matrix is valid */
+  bitmatrix    *matrix;			/* Actual reachability matrix */
+} sub_p_matrix;
+
 
 typedef struct predicate_cloud
-{ predicate   **members;		/* member predicates */
-  unsigned int  hash;			/* hash-code */
+{ struct predicate_cloud *merged_into;	/* Cloud was merged into target */
+  sub_p_matrix *reachable;		/* cloud reachability matrices */
+  predicate   **members;		/* member predicates */
   size_t	size;			/* size of the cloud */
   size_t	deleted;		/* See erase_predicates() */
-  bitmatrix    *reachable;		/* cloud reachability matrix */
-  unsigned	dirty : 1;		/* predicate hash not synchronised */
+  size_t	alt_hash_count;		/* Alternative hashes */
+  unsigned int *alt_hashes;
+  unsigned int  hash;			/* hash-code */
+  int		last_gc;		/* number of last gc */
 } predicate_cloud;
 
 
 typedef struct graph
-{ struct graph    *next;		/* next in table */
-  atom_t	    name;		/* name of the graph */
-  atom_t	    source;		/* URL graph was loaded from */
-  double	    modified;		/* Modified time of source URL */
-  int		    triple_count;	/* # triples associated to it */
+{ struct graph *next;			/* next in table */
+  atom_t	name;			/* name of the graph */
+  atom_t	source;			/* URL graph was loaded from */
+  double	modified;		/* Modified time of source URL */
+  int		triple_count;		/* # triples associated to it */
+  unsigned	erased;			/* Graph is destroyed */
 #ifdef WITH_MD5
-  unsigned	    md5 : 1;		/* do/don't record MD5 */
-  md5_byte_t	    digest[16];		/* MD5 digest */
-  md5_byte_t	    unmodified_digest[16]; /* MD5 digest when unmodified */
+  unsigned	md5 : 1;		/* do/don't record MD5 */
+  md5_byte_t	digest[16];		/* MD5 digest */
+  md5_byte_t	unmodified_digest[16];	/* MD5 digest when unmodified */
 #endif
 } graph;
 
+#define MAX_GBLOCKS 32
+
+typedef struct graph_hash
+{ graph	      **blocks[MAX_GBLOCKS];	/* Dynamic array starts */
+  size_t	bucket_count;		/* Allocated #buckets */
+  size_t	bucket_count_epoch;	/* Initial bucket count */
+  size_t	count;			/* Total #predicates */
+} graph_hash;
 
 typedef struct literal
 { union
@@ -180,59 +288,29 @@ typedef struct triple
     atom_t	resource;
   } object;
   atom_t	graph;			/* where it comes from */
-  unsigned long line;			/* graph-line number */
+  lifespan	lifespan;		/* Start and end generation */
+  struct triple *reindexed;		/* Remapped by optimize_triple_hash() */
 					/* indexing */
   union
   { struct triple*next[INDEX_TABLES];	/* hash-table next links */
     literal	end;			/* end for between(X,Y) patterns */
   } tp;					/* triple or pattern */
-					/* flags */
+					/* smaller objects (e.g., flags) */
+  uint32_t      line;			/* graph-line number */
   unsigned	object_is_literal : 1;	/* Object is a literal */
   unsigned	resolve_pred : 1;	/* predicates needs to be resolved */
   unsigned	indexed : 4;		/* Partials: BY_* */
-  unsigned	erased  : 1;		/* If TRUE, triple is erased */
-  unsigned	first   : 1;		/* I'm the first on subject */
   unsigned	match   : 4;		/* How to match literals */
   unsigned	inversed : 1;		/* Partials: using inverse match */
   unsigned	is_duplicate : 1;	/* I'm a duplicate */
   unsigned	allocated : 1;		/* Triple is allocated */
   unsigned	atoms_locked : 1;	/* Atoms have been locked */
-  unsigned	duplicates : 16;	/* Duplicate count */
+  unsigned	linked : 4;		/* Linked into the hash-chains */
+  unsigned	loaded : 1;		/* for EV_ASSERT_LOAD */
+  unsigned	erased : 1;		/* Consistency of erased */
+  unsigned	lingering : 1;		/* Deleted; waiting for GC */
 					/* Total: 32 */
 } triple;
-
-
-typedef enum
-{ TR_MARK,				/* mark start for nesting */
-  TR_SUB_START,				/* start nested transaction */
-  TR_SUB_END,				/* end nested transaction */
-  TR_ASSERT,				/* rdf_assert */
-  TR_RETRACT,				/* rdf_retractall */
-  TR_UPDATE,				/* rdf_update */
-  TR_UPDATE_MD5,			/* update md5 src */
-  TR_RESET,				/* rdf_reset_db */
-  TR_VOID				/* no-op */
-} tr_type;
-
-
-typedef struct transaction_record
-{ struct transaction_record    *previous;
-  struct transaction_record    *next;
-  tr_type			type;
-  triple		       *triple;		/* new/deleted triple */
-  union
-  { triple		       *triple;		/* used for update */
-    struct
-    { atom_t			atom;
-      unsigned long		line;
-    } src;
-    struct
-    { graph		       *graph;
-      md5_byte_t	       *digest;
-    } md5;
-    record_t		       transaction_id;
-  } update;
-} transaction_record;
 
 
 typedef struct active_transaction
@@ -241,45 +319,239 @@ typedef struct active_transaction
 } active_transaction;
 
 
+typedef struct triple_bucket
+{ triple       *head;			/* head of triple-list */
+  triple       *tail;			/* Tail of triple-list */
+  unsigned int	count;			/* #Triples in bucket */
+} triple_bucket;
+
+#define MAX_TBLOCKS 32
+
+typedef struct triple_hash
+{ triple_bucket	*blocks[MAX_TBLOCKS];	/* Dynamic array starts */
+  size_t	bucket_count;		/* Allocated #buckets */
+  size_t	bucket_count_epoch;	/* Initial bucket count */
+  size_t	bucket_preinit;		/* Pre-initializaed bucket count */
+  int		created;		/* Hash has been initialized */
+  unsigned int	user_size;		/* User selected size as 2^N */
+  unsigned int	optimize_threshold;	/* # resizes to leave behind */
+  unsigned int	avg_chain_len;		/* Accepted average chain length */
+} triple_hash;
+
+typedef struct triple_walker
+{ size_t	unbounded_hash;		/* The unbounded hash-key */
+  int		icol;			/* index column */
+  size_t	bcount;			/* Current bucket count */
+  triple_hash  *hash;			/* The hash */
+  triple       *current;		/* Our current location */
+} triple_walker;
+
+#define MAX_BLOCKS 20			/* allows for 2M threads */
+
+typedef struct per_thread
+{ struct thread_info **blocks[MAX_BLOCKS];
+} per_thread;
+
+typedef struct query_admin
+{ gen_t		generation;		/* Global heart-beat */
+  struct
+  { simpleMutex	lock;			/* used to lock creation of per_thread */
+    per_thread	per_thread;
+    int		thread_max;		/* highest thread seen  */
+  } query;				/* active query administration */
+  struct
+  { simpleMutex	lock;			/* Locks writing triples */
+    simpleMutex generation_lock;	/* Interlocked fix of generations */
+  } write;				/* write administration */
+} query_admin;
+
+
+#define JOINED_DEFER 1
+
+#ifdef JOINED_DEFER
+#define defer_triples  defer_all	/* Use the same for now */
+#define defer_clouds   defer_all
+#define defer_literals defer_all
+#endif
+
 typedef struct rdf_db
-{ triple       *by_none, *by_none_tail;
-  triple      **table[INDEX_TABLES];
-  triple      **tail[INDEX_TABLES];
-  int	       *counts[INDEX_TABLES];
-  size_t	table_size[INDEX_TABLES];
+{ triple_bucket by_none;		/* Plain linked list of triples */
+  triple_hash   hash[INDEX_TABLES];	/* Hash-tables */
   size_t	created;		/* #triples created */
   size_t	erased;			/* #triples erased */
-  size_t	freed;			/* #triples actually erased */
-  size_t	subjects;		/* subjects (unique first) */
-  size_t	indexed[16];		/* Count calls */
-  int		rehash_count;		/* # rehashes */
-  int		gc_count;		/* # garbage collections */
-  double	rehash_time;		/* time spent in rehash */
-  double	gc_time;		/* time spent in GC */
-  size_t	core;			/* core in use */
-  predicate   **pred_table;		/* Hash-table of predicates */
-  int		pred_table_size;	/* #entries in the table */
-  int		pred_count;		/* #predicates */
-  int		active_queries;		/* Calls with choicepoints */
-  int		need_update;		/* We need to update */
+  gen_t		reindexed;		/* #triples reindexed (gc_hash_chain) */
+  size_t	indexed[16];		/* Count calls (2**4 possible indices) */
+  resource_db	resources;		/* admin of used resources */
+  pred_hash	predicates;		/* Predicate table */
   size_t	agenda_created;		/* #visited nodes in agenda */
-  size_t	duplicates;		/* #duplicate triples */
-  size_t	generation;		/* generation-id of the database */
-  graph       **graph_table;		/* Hash table of sources */
-  int		graph_table_size;	/* Entries in table */
-  int		graph_count;
+  graph_hash    graphs;			/* Graph table */
+  graph	       *last_graph;		/* last accessed graph */
+  query_admin	queries;		/* Active query administration */
 
-  graph	*last_graph;		/* last accessed graph */
-  active_transaction *tr_active;	/* open transactions */
-  transaction_record *tr_first;		/* first transaction record */
-  transaction_record *tr_last;		/* last transaction record */
-  int		tr_nesting;		/* nesting depth of transactions */
-  int		tr_reset;		/* transaction contains reset */
+  size_t	duplicates;		/* #duplicate triples */
+  int		maintain_duplicates;	/* If TRUE, updated duplicates */
+  int		duplicates_up_to_date;	/* Duplicate status is up-to-date */
+  size_t	duplicate_admin_threshold;	/* Maintain above this */
+
+#if JOINED_DEFER			/* Deferred free handling */
+  defer_free	defer_all;
+#else
+  defer_free	defer_triples;		/* triples */
+  defer_free	defer_clouds;		/* Predicate clouds */
+  defer_free	defer_literals;		/* Literals */
+#endif
+
   int		resetting;		/* We are in rdf_reset_db() */
 
-  rwlock	lock;			/* threaded access */
+  struct
+  { int		count;			/* # garbage collections */
+    int		busy;			/* Processing a GC */
+    int		thread_started;		/* GC thread has been started */
+    double	time;			/* time spent in GC */
+    size_t	reclaimed_triples;	/* # reclaimed triples */
+    size_t	reclaimed_reindexed;	/* # reclaimed reindexed triples */
+    size_t	uncollectable;		/* # uncollectable erased at last GC */
+    gen_t	last_gen;		/* Oldest generation at last-GC */
+    gen_t	last_reindex_gen;	/* Oldest reindexed at last GC */
+  } gc;
 
-  avl_tree      literals;
+  struct
+  { simpleMutex	literal;		/* threaded access to literals */
+    simpleMutex misc;			/* general DB locks */
+    simpleMutex gc;			/* DB garbage collection lock */
+    simpleMutex duplicates;		/* Duplicate init lock */
+  } locks;
+
+  struct
+  { snapshot *head;			/* head and tail of snapshot list */
+    snapshot *tail;
+    gen_t     keep;			/* generation to keep */
+  } snapshots;
+
+  skiplist      literals;		/* (shared) literals */
 } rdf_db;
+
+
+		 /*******************************
+		 *	       SETS		*
+		 *******************************/
+
+#define CHUNKSIZE 4000				/* normally a page */
+
+typedef struct mchunk
+{ struct mchunk *next;
+  size_t used;
+  char buf[CHUNKSIZE];
+} mchunk;
+
+
+		 /*******************************
+		 *	     TRIPLE SET		*
+		 *******************************/
+
+#define TRIPLESET_INITIAL_ENTRIES 4		/* often small */
+
+typedef struct triple_cell
+{ struct triple_cell *next;
+  triple *triple;
+} triple_cell;
+
+typedef struct
+{ triple_cell **entries;			/* Hash entries */
+  size_t      size;				/* Hash-table size */
+  size_t      count;				/* # atoms stored */
+  mchunk     *node_store;
+  mchunk      store0;
+  triple_cell *entries0[TRIPLESET_INITIAL_ENTRIES];
+} tripleset;
+
+
+		 /*******************************
+		 *	    QUERY TYPES		*
+		 *******************************/
+
+#include "buffer.h"
+
+#define LITERAL_EX_MAGIC 0x2b97e881
+
+typedef struct literal_ex
+{ literal  *literal;			/* the real literal */
+  atom_info atom;			/* prepared info on value */
+#ifdef LITERAL_EX_MAGIC
+  long	    magic;
+#endif
+} literal_ex;
+
+
+typedef struct search_state
+{ struct query *query;			/* Associated query */
+  rdf_db       *db;			/* our database */
+  term_t	subject;		/* Prolog term references */
+  term_t	object;
+  term_t	predicate;
+  term_t	src;
+  term_t	realpred;
+  unsigned	flags;			/* Misc flags controlling search */
+					/* START memset() cleared area */
+  triple_walker cursor;			/* Pointer in triple DB */
+  triple	pattern;		/* Pattern triple */
+  atom_t	prefix;			/* prefix and like search */
+  int		alt_hash_cursor;	/* Index in alternative hashes */
+  int		has_literal_state;	/* Literal state is present */
+  literal      *literal_cursor;		/* pointer in current literal */
+  literal      *restart_lit;		/* for restarting literal search */
+  skiplist_enum literal_state;		/* Literal search state */
+  skiplist_enum restart_lit_state;	/* for restarting literal search */
+  predicate_cloud *p_cloud;		/* Searched predicate cloud */
+  triple       *prefetched;		/* Prefetched triple (retry) */
+					/* END memset() cleared area */
+  literal_ex    lit_ex;			/* extended literal for fast compare */
+  triple	saved_pattern;		/* For inverse */
+  tripleset	dup_answers;		/* possible duplicate answers */
+} search_state;
+
+#include "query.h"
+
+
+		 /*******************************
+		 *	      BROADCASTS	*
+		 *******************************/
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+The ids form a mask. This must be kept consistent with monitor_mask/2 in
+rdf_db.pl!
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+typedef enum
+{ EV_ASSERT      = 0x0001,		/* triple */
+  EV_ASSERT_LOAD = 0x0002,		/* triple */
+  EV_RETRACT     = 0x0004,		/* triple */
+  EV_UPDATE      = 0x0008,		/* old, new */
+  EV_NEW_LITERAL = 0x0010,		/* literal */
+  EV_OLD_LITERAL = 0x0020,		/* literal */
+  EV_TRANSACTION = 0x0040,		/* id, begin/end */
+  EV_LOAD	 = 0x0080,		/* id, begin/end */
+  EV_CREATE_GRAPH= 0x0100		/* graph name */
+} broadcast_id;
+
+
+		 /*******************************
+		 *	      FUNCTIONS		*
+		 *******************************/
+
+COMMON(void *)	rdf_malloc(rdf_db *db, size_t size);
+COMMON(void)	rdf_free(rdf_db *db, void *ptr, size_t size);
+COMMON(int)	prelink_triple(rdf_db *db, triple *t, query *q);
+COMMON(int)	link_triple(rdf_db *db, triple *t, query *q);
+COMMON(int)	postlink_triple(rdf_db *db, triple *t, query *q);
+COMMON(void)	erase_triple(rdf_db *db, triple *t, query *q);
+COMMON(void)	add_triple_consequences(rdf_db *db, triple *t, query *q);
+COMMON(void)	del_triple_consequences(rdf_db *db, triple *t, query *q);
+COMMON(predicate *) lookup_predicate(rdf_db *db, atom_t name, query *q);
+COMMON(rdf_db*)	rdf_current_db(void);
+COMMON(int)	rdf_broadcast(broadcast_id id, void *a1, void *a2);
+COMMON(int)	rdf_is_broadcasting(broadcast_id id);
+COMMON(void)	consider_triple_rehash(rdf_db *db, size_t extra);
+COMMON(int)	rdf_create_gc_thread(rdf_db *db);
 
 #endif /*RDFDB_H_INCLUDED*/

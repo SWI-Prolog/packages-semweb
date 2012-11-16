@@ -47,8 +47,6 @@
 
 	    rdfs_find/5			% +String, +Dom, +Props, +Method, -Subj
 	  ]).
-:- use_module(library(debug)).
-:- use_module(library(rdf)).
 :- use_module(library(lists)).
 :- use_module(rdf_db).
 
@@ -434,48 +432,3 @@ globalise_list([H0|T0], [H|T]) :- !,
 	globalise_list(T0, T).
 globalise_list(X, G) :-
 	rdf_global_id(X, G).
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-TOP-DOWN
-
-
-rdfs_find(String, Domain, Fields, Method, Subject) :-
-	globalise_list(Fields, GlobalFields),
-	generate_domain(Domain, Subject),
-	member(Field, GlobalFields),
-	(   rdf_equal(Field, rdfs:label)
-	->  rdfs_label(Subject, Arg)
-	;   rdf_has(Subject, Field, literal(Arg))
-	),
-	rdf_match_label(Method, String, Arg).
-
-%%	generate_domain(+Domain, -Resource)
-%
-%	Generate all resources that satisfy some a domain specification.
-
-generate_domain(All, Subject) :-
-	rdf_equal(All, rdfs:'Resource'), !,
-	rdf_subject(Subject).
-generate_domain(class(Class), Subject) :- !,
-	rdfs_subclass_of(Subject, Class).
-generate_domain(all_values_from(Class), Individual) :-
-	(   rdf_equal(Class, rdfs:'Resource')
-	->  rdf_subject(Individual)			% this is OWL-full
-	;   rdfs_individual_of(Individual, Class)
-	).
-generate_domain(some_values_from(Class), Individual) :- % Actually this is
-	rdfs_individual_of(Individual, Class).		% anything
-generate_domain(union_of(Domains), Individual) :-
-	member(Domain, Domains),
-	generate_domain(Domain, Individual).
-generate_domain(intersection_of(Domains), Individual) :-
-	in_all_domains(Domains, Individual).
-generate_domain(one_of(Individuals), Individual) :-
-	member(Individual, Individuals).
-
-in_all_domains([], _).
-in_all_domains([H|T], Resource) :-
-	generate_domain(H, Resource),
-	in_all_domains(T, Resource).
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-

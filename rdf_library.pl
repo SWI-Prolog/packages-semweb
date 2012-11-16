@@ -309,11 +309,11 @@ guess_concurrency(Commands, Threads) :-
 count_uris([], 0, 0).
 count_uris([rdf_load(URL, _)|T], F, NF) :-
 	count_uris(T, F0, NF0),
-	(   sub_atom(URL, 0, _, _, 'file://')
-	->  F is F0 + 1,
-	    NF = NF0
-	;   NF is NF0 + 1,
+	(   web_url(URL)
+	->  NF is NF0 + 1,
 	    F = F0
+	;   F is F0 + 1,
+	    NF = NF0
 	).
 
 

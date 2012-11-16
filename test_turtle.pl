@@ -41,9 +41,19 @@
 :- asserta(user:file_search_path(foreign, '../sgml')).
 :- asserta(user:file_search_path(foreign, '../clib')).
 
-:- use_module(library(semweb/rdf_turtle)).
-:- use_module(library(semweb/rdf_db)).
-:- use_module(library(semweb/rdf_compare)).
+fix_load_path :-
+	prolog_load_context(directory, Dir),
+	file_base_name(Dir, LocalDir),
+	LocalDir \== semweb, !,
+	asserta(system:term_expansion((:- use_module(library(semweb/X))),
+				      (:- use_module(library(LocalDir/X))))).
+fix_load_path.
+
+:- fix_load_path.
+
+:- use_module(rdf_turtle).
+:- use_module(rdf_db).
+:- use_module(rdf_compare).
 :- use_module(library(rdf_ntriples)).
 :- use_module(library(apply)).
 :- use_module(library(debug)).

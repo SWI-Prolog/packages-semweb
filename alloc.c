@@ -3,8 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@cs.vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2002-2010, University of Amsterdam
-			      VU University Amsterdam
+    Copyright (C): 2011 VU University Amsterdam
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public
@@ -18,29 +17,38 @@
 
     You should have received a copy of the GNU Lesser General Public
     License along with this library; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-    02110-1301  USA
+    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#include "SWI-Prolog.h"
-#include "debug.h"
+#include "rdf_db.h"
+#include "deferfree.h"
+#include "alloc.h"
 
-#ifdef O_DEBUG
+triple *
+alloc_triple(void)
+{ triple *t = malloc(sizeof(*t));
 
-static int dbg_level;
+  if ( t )
+    memset(t, 0, sizeof(*t));
+
+  return t;
+}
+
+
+void
+unalloc_triple(rdf_db *db, triple *t, int linger)
+{ if ( t )
+  { assert(t->atoms_locked == FALSE);
+
+    if ( linger )
+      deferred_free(&db->defer_triples, t);
+    else
+      free(t);
+  }
+}
+
 
 int
-rdf_debuglevel()
-{ return dbg_level;
+init_alloc(void)
+{ return TRUE;
 }
-
-
-foreign_t
-rdf_debug(term_t level)
-{ if ( !PL_get_integer(level, &dbg_level) )
-    return FALSE;
-
-  return TRUE;
-}
-
-#endif

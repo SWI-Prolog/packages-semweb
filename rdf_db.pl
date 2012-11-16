@@ -37,6 +37,7 @@
 	    rdf_has/4,			% ?Subject, +Pred, ?Obj, -RealPred
 	    rdf_reachable/3,		% ?Subject, +Pred, ?Object
 	    rdf_reachable/5,		% ?Subject, +Pred, ?Object, +MaxD, ?D
+	    rdf_resource/1,		% ?Resource
 	    rdf_subject/1,		% ?Subject
 
 	    rdf_member_property/2,	% ?Property, ?Index
@@ -53,6 +54,7 @@
 	    rdf_current_literal/1,	% -Literal
 	    rdf_transaction/1,		% :Goal
 	    rdf_transaction/2,		% :Goal, +Id
+	    rdf_transaction/3,		% :Goal, +Id, +Options
 	    rdf_active_transaction/1,	% ?Id
 
 	    rdf_monitor/2,		% :Goal, +Options
@@ -68,26 +70,34 @@
 
 	    rdf_is_resource/1,		% +Term
 	    rdf_is_literal/1,		% +Term
+	    rdf_literal_value/2,	% +Term, -Value
 
 	    rdf_load/1,			% +File
 	    rdf_load/2,			% +File, +Options
 	    rdf_save/1,			% +File
 	    rdf_save/2,			% +File, +Options
 	    rdf_unload/1,		% +File
+	    rdf_unload_graph/1,		% +Graph
 
 	    rdf_md5/2,			% +DB, -MD5
 	    rdf_atom_md5/3,		% +Text, +Times, -MD5
 
+	    rdf_create_graph/1,		% ?Graph
 	    rdf_graph_property/2,	% ?Graph, ?Property
 	    rdf_set_graph/2,		% +Graph, +Property
 	    rdf_graph/1,		% ?Graph
 	    rdf_source/1,		% ?File
 	    rdf_source/2,		% ?DB, ?SourceURL
 	    rdf_make/0,			% Reload modified databases
+	    rdf_gc/0,			% Garbage collection
 
 	    rdf_source_location/2,	% +Subject, -Source
 	    rdf_statistics/1,		% -Key
+	    rdf_set/1,			% +Term
 	    rdf_generation/1,		% -Generation
+	    rdf_snapshot/1,		% -Snapshot
+	    rdf_delete_snapshot/1,	% +Snapshot
+	    rdf_current_snapshot/1,	% +Snapshot
 	    rdf_estimate_complexity/4,	% +S,+P,+O,-Count
 
 	    rdf_save_subject/3,		% +Stream, +Subject, +DB
@@ -98,6 +108,9 @@
 	    lang_equal/2,		% +Lang1, +Lang2
 	    lang_matches/2,		% +Lang, +Pattern
 
+	    rdf_current_prefix/2,	% ?Alias, ?URI
+	    rdf_register_prefix/2,	% +Alias, +URI
+	    rdf_register_prefix/3,	% +Alias, +URI, +Options
 	    rdf_current_ns/2,		% ?Alias, ?URI
 	    rdf_register_ns/2,		% +Alias, +URI
 	    rdf_register_ns/3,		% +Alias, +URI, +Options
@@ -136,18 +149,22 @@
 :- use_module(library(sgml)).
 :- use_module(library(sgml_write)).
 :- use_module(library(option)).
-:- use_module(library(nb_set)).
 :- use_module(library(error)).
 :- use_module(library(uri)).
 :- use_module(library(debug)).
-:- use_module(rdf_cache).
+:- use_module(library(apply)).
+:- if(exists_source(library(thread))).
+:- use_module(library(thread)).
+:- endif.
+:- use_module(library(semweb/rdf_cache)).
 
 :- use_foreign_library(foreign(rdf_db)).
-:- public rdf_print_predicate_cloud/1.	% print matrix of reachable predicates
+:- public rdf_print_predicate_cloud/2.	% print matrix of reachable predicates
 
 :- meta_predicate
 	rdf_transaction(0),
 	rdf_transaction(0, +),
+	rdf_transaction(0, +, +),
 	rdf_monitor(1, +),
 	rdf_save(+, :),
 	rdf_load(+, :).
@@ -157,6 +174,7 @@
 :- predicate_options(rdf_load/2, 2,
 		     [ base_uri(atom),
 		       cache(boolean),
+		       concurrent(positive_integer),
 		       db(atom),
 		       format(oneof([xml,triples,turtle])),
 		       graph(atom),
@@ -190,6 +208,9 @@
 		       convert_typed_literal(callable),
 		       document_language(atom)
 		     ]).
+:- predicate_options(rdf_transaction/3, 3,
+		     [ snapshot(any)
+		     ]).
 
 :- multifile
 	ns/2,
@@ -201,25 +222,29 @@
 
 /** <module> Core RDF database
 
-@see Documentation for semweb package
+The file library(semweb/rdf_db) provides the core  of the SWI-Prolog RDF
+store.
 */
 
 		 /*******************************
-		 *	     NAMESPACES		*
+		 *	     PREFIXES		*
 		 *******************************/
 
-%%	rdf_current_ns(?Alias, ?URI) is nondet.
+%%	rdf_current_prefix(?Alias, ?URI) is nondet.
 %
-%	Query  predefined  namespaces  and    namespaces   defined  with
+%	Query   predefined   prefixes   and    prefixes   defined   with
 %	rdf_register_ns/2.
 
-rdf_current_ns(Alias, URI) :-
+rdf_current_prefix(Alias, URI) :-
 	ns(Alias, URI).
 
 %%	ns(?Alias, ?URI) is nondet.
 %
-%	Dynamic  predicate  that  maintains   the  registered  namespace
-%	aliases.
+%	Dynamic and multifile predicate that   maintains  the registered
+%	namespace aliases.
+%
+%	@deprecated New code  must  modify   the  namespace  table using
+%	rdf_register_ns/3 and query using rdf_current_ns/2.
 
 ns(rdf,	    'http://www.w3.org/1999/02/22-rdf-syntax-ns#').
 ns(rdfs,    'http://www.w3.org/2000/01/rdf-schema#').
@@ -231,10 +256,10 @@ ns(eor,	    'http://dublincore.org/2000/03/13/eor#').
 ns(skos,    'http://www.w3.org/2004/02/skos/core#').
 ns(serql,   'http://www.openrdf.org/schema/serql#').
 
-%%	rdf_register_ns(+Alias, +URI) is det.
-%%	rdf_register_ns(+Alias, +URI, +Options) is det.
+%%	rdf_register_prefix(+Prefix, +URI) is det.
+%%	rdf_register_prefix(+Prefix, +URI, +Options) is det.
 %
-%	Register Alias as an abbreviateion for URI. Options:
+%	Register Prefix as an abbreviation for URI. Options:
 %
 %		* force(Boolean)
 %		If =true=, Replace existing namespace alias. Please note
@@ -248,13 +273,26 @@ ns(serql,   'http://www.openrdf.org/schema/serql#').
 %
 %	Without options, an attempt  to  redefine   an  alias  raises  a
 %	permission error.
+%
+%	Predefined prefixes are:
+%
+%	| rdf	  | http://www.w3.org/1999/02/22-rdf-syntax-ns#' |
+%	| rdfs	  | http://www.w3.org/2000/01/rdf-schema#'	 |
+%	| owl	  | http://www.w3.org/2002/07/owl#'		 |
+%	| xsd	  | http://www.w3.org/2001/XMLSchema#'		 |
+%	| dc	  | http://purl.org/dc/elements/1.1/'		 |
+%	| dcterms | http://purl.org/dc/terms/'			 |
+%	| eor	  | http://dublincore.org/2000/03/13/eor#'	 |
+%	| skos	  | http://www.w3.org/2004/02/skos/core#'	 |
+%	| serql	  | http://www.openrdf.org/schema/serql#'	 |
 
-rdf_register_ns(Alias, URI) :-
-	rdf_register_ns(Alias, URI, []).
 
-rdf_register_ns(Alias, URI, _) :-
+rdf_register_prefix(Alias, URI) :-
+	rdf_register_prefix(Alias, URI, []).
+
+rdf_register_prefix(Alias, URI, _) :-
 	ns(Alias, URI), !.
-rdf_register_ns(Alias, URI, Options) :-
+rdf_register_prefix(Alias, URI, Options) :-
 	ns(Alias, _), !,
 	(   option(force(true), Options, false)
 	->  retractall(ns(Alias, _)),
@@ -264,8 +302,30 @@ rdf_register_ns(Alias, URI, Options) :-
 	;   throw(error(permission_error(register, namespace, Alias),
 			context(_, 'Already defined')))
 	).
-rdf_register_ns(Alias, URI, _) :-
+rdf_register_prefix(Alias, URI, _) :-
 	assert(ns(Alias, URI)).
+
+%%	rdf_current_ns(?Prefix, ?URI) is nondet.
+%
+%	@deprecated.  Use rdf_current_prefix/2.
+
+rdf_current_ns(Prefix, URI) :-
+	rdf_current_prefix(Prefix, URI).
+
+%%	rdf_register_ns(?Prefix, ?URI) is det.
+%
+%	@deprecated.  Use rdf_register_prefix/2.
+
+%%	rdf_register_ns(?Prefix, ?URI, +Options) is det.
+%
+%	@deprecated.  Use rdf_register_prefix/3.
+
+rdf_register_ns(Prefix, URI) :-
+	rdf_register_prefix(Prefix, URI).
+rdf_register_ns(Prefix, URI, Options) :-
+	rdf_register_prefix(Prefix, URI, Options).
+
+
 
 %%	register_file_ns(+Map:list(pair)) is det.
 %
@@ -355,6 +415,15 @@ rdf_global_term(Term0, Term) :-
 	Term =.. [H|L].
 rdf_global_term(Term, Term).
 
+%%	rdf_global_graph(+TermIn, -GlobalTerm) is det.
+%
+%	Preforms rdf_global_id/2 on rdf/4, etc graph arguments
+
+rdf_global_graph(NS:Local, Global) :-
+	atom(NS), atom(Local), !,
+	global(NS, Local, Global).
+rdf_global_graph(G, G).
+
 
 		 /*******************************
 		 *	      EXPANSION		*
@@ -400,14 +469,54 @@ valid_arg(@).				% not modified
 valid_arg(r).				% RDF resource
 valid_arg(o).				% RDF object
 valid_arg(t).				% term with RDF resources
+valid_arg(g).				% graph argument
 valid_arg(A) :-
 	throw(error(type_error(rdf_meta_argument, A), _)).
 
 %%	rdf_meta(+Heads)
 %
-%	This   directive   is   expanded   using   term-expansion.   The
-%	implementation just throws an error in   case  it is called with
-%	the wrong context.
+%	This  directive  defines  the  argument    types  of  the  named
+%	predicates, which will force compile   time  namespace expansion
+%	for these predicates. Heads is a coma-separated list of callable
+%	terms. Defined argument properties are:
+%
+%	  $ : :
+%	  Argument is a goal. The goal is processed using expand_goal/2,
+%	  recursively applying goal transformation on the argument.
+%
+%	  $ + :
+%         The argument is instantiated at entry. Nothing is changed.
+%
+%	  $ - :
+%	  The argument is not instantiated at entry. Nothing is changed.
+%
+%	  $ ? :
+%	  The argument is unbound or instantiated at entry. Nothing is
+%	  changed.
+%
+%	  $ @ :
+%	  The argument is not changed.
+%
+%	  $ r :
+%         The argument must be a resource. If it is a term
+%         <prefix>:<local> it is translated.
+%
+%	  $ o :
+%	  The argument is an object or resource. See
+%	  rdf_global_object/2.
+%
+%	  $ t :
+%	  The argument is a term that must be translated. Expansion will
+%	  translate all occurences of <prefix>:<local> appearing
+%	  anywhere in the term. See rdf_global_term/2.
+%
+%	As it is subject to term_expansion/2, the rdf_meta/1 declaration
+%	can only be used as a directive. The directive must be processed
+%	before the definition of  the  predicates   as  well  as  before
+%	compiling code that  uses  the   rdf  meta-predicates.  The atom
+%	=rdf_meta=  is  declared   as   an    operator   exported   from
+%	library(semweb/rdf_db). Files using rdf_meta/1  must explicitely
+%	load this library.
 
 rdf_meta(Heads) :-
 	throw(error(context_error(nodirective, rdf_meta(Heads)), _)).
@@ -461,6 +570,8 @@ rdf_expand_arg(o, A, E) :- !,
 	rdf_global_object(A, E).
 rdf_expand_arg(t, A, E) :- !,
 	rdf_global_term(A, E).
+rdf_expand_arg(g, A, E) :- !,
+	rdf_global_graph(A, E).
 rdf_expand_arg(:, A, E) :- !,
 	expand_goal(A, E).
 rdf_expand_arg(_, A, A).
@@ -499,10 +610,14 @@ mk_global(NS:Local, Global) :-
 	rdf_update(r,r,o,+,t),
 	rdf_equal(r,r),
 	rdf_source_location(r,-),
+	rdf_resource(r),
 	rdf_subject(r),
+	rdf_create_graph(r),
+	rdf_graph(r),
 	rdf_set_predicate(r, t),
 	rdf_predicate_property(r, -),
-	rdf_estimate_complexity(r,r,r,-).
+	rdf_estimate_complexity(r,r,r,-),
+	rdf_print_predicate_cloud(r,+).
 
 %%	rdf_equal(?Resource1, ?Resource2)
 %
@@ -521,14 +636,232 @@ lang_equal(Lang1, Lang2) :-
 	downcase_atom(Lang1, LangCannon),
 	downcase_atom(Lang2, LangCannon).
 
+%%	lang_matches(+Lang, +Pattern) is semidet.
+%
+%	True if Lang  matches  Pattern.   This  implements  XML language
+%	matching  conform  RFC  4647.   Both    Lang   and  Pattern  are
+%	dash-separated strings of  identifiers  or   (for  Pattern)  the
+%	wildcart *. Identifiers are  matched   case-insensitive  and a *
+%	matches any number of identifiers. A   short pattern is the same
+%	as *.
 
-%%	rdf_has(?Subject, +Predicate, ?Object)
+
+		 /*******************************
+		 *     BASIC TRIPLE QUERIES	*
+		 *******************************/
+
+%%	rdf(?Subject, ?Predicate, ?Object) is nondet.
+%
+%	Elementary query for triples. Subject   and  Predicate are atoms
+%	representing the fully qualified URL of  the resource. Object is
+%	either an atom representing a resource  or literal(Value) if the
+%	object  is  a  literal  value.   If    a   value   of  the  form
+%	NameSpaceID:LocalName is provided it  is   expanded  to a ground
+%	atom  using  expand_goal/2.  This  implies   you  can  use  this
+%	construct in compiled code without paying a performance penalty.
+%	Literal values take one of the following forms:
+%
+%	  * Atom
+%	  If the value is a simple atom it is the textual representation
+%	  of a string literal without explicit type or language
+%	  qualifier.
+%
+%	  * lang(LangID, Atom)
+%	  Atom represents the text of a string literal qualified with
+%	  the given language.
+%
+%	  * type(TypeID, Value)
+%	  Used for attributes qualified using the =|rdf:datatype|=
+%	  TypeID. The Value is either the textual representation or a
+%	  natural Prolog representation. See the option
+%	  convert_typed_literal(:Convertor) of the parser. The storage
+%	  layer provides efficient handling of atoms, integers (64-bit)
+%	  and floats (native C-doubles). All other data is represented
+%	  as a Prolog record.
+%
+%	For literal querying purposes, Object can be of the form
+%	literal(+Query, -Value), where Query is one of the terms below.
+%
+%	  * plain(+Text)
+%	  Perform exact match and demand the language or type qualifiers
+%	  to match. This query is fully indexed.
+%
+%	  * exact(+Text)
+%	  Perform exact, but case-insensitive match. This query is
+%	  fully indexed.
+%
+%	  * substring(+Text)
+%	  Match any literal that contains Text as a case-insensitive
+%	  substring. The query is not indexed on Object.
+%
+%	  * word(+Text)
+%	  Match any literal that contains Text delimited by a non
+%	  alpha-numeric character, the start or end of the string. The
+%	  query is not indexed on Object.
+%
+%	  * prefix(+Text)
+%	  Match any literal that starts with Text. This call is intended
+%	  for completion. The query is indexed using the skip list of
+%	  literals.
+%
+%	  * ge(+Literal)
+%	  Match any literal that is equal or larger then Literal in the
+%	  ordered set of literals.
+%
+%	  * le(+Literal)
+%	  Match any literal that is equal or smaller then Literal in the
+%	  ordered set of literals.
+%
+%	  * between(+Literal1, +Literal2)
+%	  Match any literal that is between Literal1 and Literal2 in the
+%	  ordered set of literals. This may include both Literal1 and
+%	  Literal2.
+%
+%	  * like(+Pattern)
+%	  Match any literal that matches Pattern case insensitively,
+%	  where the `*' character in Pattern matches zero or more
+%	  characters.
+%
+%	Backtracking never returns duplicate triples.  Duplicates can be
+%	retrieved using rdf/4. The predicate   rdf/3 raises a type-error
+%	if called with improper arguments.  If   rdf/3  is called with a
+%	term  literal(_)  as  Subject  or   Predicate  object  it  fails
+%	silently.  This  allows   for   graph    matching   goals   like
+%	rdf(S,P,O),rdf(O,P2,O2) to proceed without errors.
+
+%%	rdf(?Subject, ?Predicate, ?Object, ?Source) is nondet.
+%
+%	As rdf/3 but in addition query  the   graph  to which the triple
+%	belongs. Unlike rdf/3, this predicate does not remove duplicates
+%	from the result set.
+%
+%	@param Source is a term Graph:Line.  If Source is instatiated,
+%	passing an atom is the same as passing Atom:_.
+
+
+%%	rdf_has(?Subject, +Predicate, ?Object) is nondet.
 %
 %	Succeeds if the triple rdf(Subject, Predicate, Object) is true
 %	exploiting the rdfs:subPropertyOf predicate.
 
 rdf_has(Subject, Predicate, Object) :-
 	rdf_has(Subject, Predicate, Object, _).
+
+%%	rdf_has(?Subject, +Predicate, ?Object, -RealPredicate) is nondet.
+%
+%	Same as rdf_has/3, but RealPredicate is   unified  to the actual
+%	predicate that makes this relation   true. RealPredicate must be
+%	Predicate or an rdfs:subPropertyOf Predicate.
+
+%%	rdf_reachable(?Subject, +Predicate, ?Object) is nondet.
+%
+%	Is true if Object can  be   reached  from  Subject following the
+%	transitive predicate Predicate or a  sub-property thereof, while
+%	repecting the symetric(true) or inverse_of(P2) properties.
+%
+%	If used with either Subject or  Object unbound, it first returns
+%	the origin, followed by  the   reachable  nodes  in breath-first
+%	search-order. The implementation internally   looks one solution
+%	ahead and succeeds deterministically on  the last solution. This
+%	predicate never generates the same  node   twice  and  is robust
+%	against cycles in the transitive relation.
+%
+%	With all arguments instantiated,   it succeeds deterministically
+%	if a path can be found from  Subject to Object. Searching starts
+%	at Subject, assuming the branching factor   is normally lower. A
+%	call  with  both  Subject   and    Object   unbound   raises  an
+%	instantiation  error.  The  following    example  generates  all
+%	subclasses of rdfs:Resource:
+%
+%	  ==
+%	  ?- rdf_reachable(X, rdfs:subClassOf, rdfs:'Resource').
+%	  X = 'http://www.w3.org/2000/01/rdf-schema#Resource' ;
+%	  X = 'http://www.w3.org/2000/01/rdf-schema#Class' ;
+%	  X = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#Property' ;
+%	  ...
+%	  ==
+
+
+%%	rdf_reachable(?Subject, +Predicate, ?Object, +MaxD, -D) is nondet.
+%
+%	Same as rdf_reachable/3, but in addition, MaxD limits the number
+%	of edges expanded and D is   unified with the `distance' between
+%	Subject and Object. Distance 0 means  Subject and Object are the
+%	same resource. MaxD can be the  constant =infinite= to impose no
+%	distance-limit.
+
+%%	rdf_subject(?Resource) is nondet.
+%
+%	True if Resource appears as a   subject. This query respects the
+%	visibility rules implied by the logical update view.
+%
+%	@see rdf_resource/1.
+
+rdf_subject(Resource) :-
+	rdf_resource(Resource),
+	( rdf(Resource, _, _) -> true ).
+
+%%	rdf_resource(?Resource) is nondet.
+%
+%	True when Resource is a resource used as a subject or object in
+%	a triple.
+%
+%	This predicate is primarily intended  as   a  way to process all
+%	resources without processing resources twice.   The user must be
+%	aware that some of the returned resources  may not appear in any
+%	_visible_ triple.
+
+
+		 /*******************************
+		 *     TRIPLE MODIFICATIONS	*
+		 *******************************/
+
+%%	rdf_assert(+Subject, +Predicate, +Object) is det.
+%
+%	Assert a new triple into  the   database.  This is equivalent to
+%	rdf_assert/4 using Graph  =user=.  Subject   and  Predicate  are
+%	resources. Object is either a resource or a term literal(Value).
+%	See rdf/3 for an explanation  of   Value  for typed and language
+%	qualified literals. All arguments  are   subject  to  name-space
+%	expansion.
+
+%%	rdf_assert(+Subject, +Predicate, +Object, +Graph) is det.
+%
+%	As rdf_assert/3, adding the  predicate   to  the indicated named
+%	graph.
+%
+%	@param Graph is either the name of a   graph (an atom) or a term
+%	Graph:Line, where Line is an integer that denotes a line number.
+
+%%	rdf_retractall(?Subject, ?Predicate, ?Object) is det.
+%
+%	Remove   all   matching   triples   from    the   database.   As
+%	rdf_retractall/4 using an unbound graph.
+
+%%	rdf_retractall(?Subject, ?Predicate, ?Object, ?Graph) is det.
+%
+%	As rdf_retractall/3, also matching Graph.   This  is particulary
+%	useful to remove all triples coming from a loaded file. See also
+%	rdf_unload/1.
+
+%%	rdf_update(+Subject, +Predicate, +Object, +Action) is det.
+%
+%	Replaces one of  the  three  fields   on  the  matching  triples
+%	depending on Action:
+%
+%	  * subject(Resource)
+%	  Changes the first field of the triple.
+%	  * predicate(Resource)
+%         Changes the second field of the triple.
+%	  * object(Object)
+%	  Changes the last field of the triple to the given resource or
+%	  literal(Value).
+%	  * graph(Graph)
+%	  Moves the triple from its current named graph to Graph.
+
+%%	rdf_update(+Subject, +Predicate, +Object, +Graph, +Action) is det
+%
+%	As rdf_update/4 but allows for specifying the graph.
 
 
 		 /*******************************
@@ -575,7 +908,7 @@ rdf_node(Resource) :-
 rdf_bnode(Value) :-
 	repeat,
 	gensym('__bnode', Value),
-	\+ rdf_subject(Value),
+	\+ rdf(Value, _, _),
 	\+ rdf(_, _, Value),
 	\+ rdf(_, Value, _), !.
 
@@ -615,6 +948,69 @@ rdf_is_resource(Term) :-
 rdf_is_literal(literal(Value)) :-
 	ground(Value).
 
+		 /*******************************
+		 *	       LITERALS		*
+		 *******************************/
+
+%%	rdf_current_literal(-Literal) is nondet.
+%
+%	True when Literal is a currently  known literal. Enumerates each
+%	unique literal exactly once. Note that   it is possible that the
+%	literal only appears in already deleted triples. Deleted triples
+%	may be locked due to active   queries, transactions or snapshots
+%	or may not yet be reclaimed by the garbage collector.
+
+
+%%	rdf_literal_value(+Literal, -Value) is semidet.
+%
+%	True when value is  the   appropriate  Prolog  representation of
+%	Literal in the RDF _|value space|_.  Current mapping:
+%
+%	  | Plain literals		| Atom			  |
+%	  | Language tagged literal	| Atom holding plain text |
+%	  | xsd:string			| Atom			  |
+%	  | rdf:XMLLiteral		| XML DOM Tree		  |
+%	  | Numeric XSD type		| Number		  |
+%
+%	@tbd	Well, this is the long-term idea.
+%	@tbd	Add mode (-,+)
+
+:- rdf_meta
+	typed_value(r, +, -).
+
+rdf_literal_value(literal(String), Value) :-
+	atom(String), !,
+	Value = String.
+rdf_literal_value(literal(lang(_Lang, String)), String).
+rdf_literal_value(literal(type(Type, String)), Value) :-
+	typed_value(Type, String, Value).
+
+typed_value(Numeric, String, Value) :-
+	xsdp_numeric_uri(Numeric, NumType), !,
+	numeric_value(NumType, String, Value).
+typed_value(xsd:string, String, String).
+typed_value(rdf:'XMLLiteral', Value, DOM) :-
+	(   atom(Value)
+	->  setup_call_cleanup(
+		( atom_to_memory_file(Value, MF),
+		  open_memory_file(MF, read, In, [free_on_close(true)])
+		),
+		load_structure(stream(In), DOM, [dialect(xml)]),
+		close(In))
+	;   DOM = Value
+	).
+numeric_value(integer, String, Value) :-
+	atom_number(String, Value),
+	integer(Value).
+numeric_value(float, String, Value) :-
+	atom_number(String, Number),
+	Value is float(Number).
+numeric_value(double, String, Value) :-
+	atom_number(String, Number),
+	Value is float(Number).
+numeric_value(decimal, String, Value) :-
+	atom_number(String, Value).
+
 
 		 /*******************************
 		 *	      SOURCE		*
@@ -631,29 +1027,173 @@ rdf_source_location(Subject, Source) :-
 
 
 		 /*******************************
+		 *	 GARBAGE COLLECT	*
+		 *******************************/
+
+%%	rdf_create_gc_thread
+%
+%	Create the garbage collection thread.
+
+:- public
+	rdf_create_gc_thread/0.
+
+rdf_create_gc_thread :-
+	thread_create(rdf_gc_loop, _,
+		      [ alias('__rdf_GC')
+		      ]).
+
+%%	rdf_gc_loop
+%
+%	Take care of running the RDF garbage collection.  This predicate
+%	is called from a thread started by creating the RDF DB.
+
+rdf_gc_loop :-
+	catch(rdf_gc_loop(0), E, recover_gc(E)).
+
+recover_gc('$aborted') :- !,
+	thread_self(Me),
+	thread_detach(Me).
+recover_gc(Error) :-
+	print_message(error, Error),
+	rdf_gc_loop.
+
+rdf_gc_loop(CPU) :-
+	repeat,
+	(   consider_gc(CPU)
+	->  rdf_gc(CPU1),
+	    sleep(CPU1)
+	;   sleep(0.1)
+	),
+	fail.
+
+%%	rdf_gc(-CPU) is det.
+%
+%	Run RDF GC one time. CPU is  the   amount  of CPU time spent. We
+%	update this in Prolog because portable access to thread specific
+%	CPU is really hard in C.
+
+rdf_gc(CPU) :-
+	statistics(cputime, CPU0),
+	(   rdf_gc_
+	->  statistics(cputime, CPU1),
+	    CPU is CPU1-CPU0,
+	    rdf_add_gc_time(CPU)
+	;   CPU = 0.0
+	).
+
+%%	rdf_gc is det.
+%
+%	Run the RDF-DB garbage collector until   no  garbage is left and
+%	all  tables  are  fully  optimized.  Under  normal  operation  a
+%	seperate thread with  identifier   =__rdf_GC=  performs  garbage
+%	collection as long as it is considered `useful'.
+%
+%	Using rdf_gc/0 should only be  needed   to  ensure a fully clean
+%	database for analysis purposes such as leak detection.
+
+rdf_gc :-
+	has_garbage, !,
+	rdf_gc(_),
+	rdf_gc.
+rdf_gc.
+
+%%	has_garbage is semidet.
+%
+%	True if there is something to gain using GC.
+
+has_garbage :-
+	rdf_gc_info_(Info),
+	has_garbage(Info), !.
+
+has_garbage(Info) :- arg(2, Info, Garbage),     Garbage > 0.
+has_garbage(Info) :- arg(3, Info, Reindexed),   Reindexed > 0.
+has_garbage(Info) :- arg(4, Info, Optimizable), Optimizable > 0.
+
+%%	consider_gc(+CPU) is semidet.
+%
+%	@param CPU is the amount of CPU time spent in the most recent
+%	GC.
+
+consider_gc(_CPU) :-
+	(   rdf_gc_info_(gc_info(Triples,	% Total #triples in DB
+				 Garbage,	% Garbage triples in DB
+				 Reindexed,	% Reindexed & not reclaimed
+				 Optimizable,	% Non-optimized tables
+				 _KeepGen,	% Oldest active generation
+				 _LastGCGen,    % Oldest active gen at last GC
+				 _ReindexGen,
+				 _LastGCReindexGen))
+	->  (   (Garbage+Reindexed) * 5 > Triples
+	    ;	Optimizable > 4
+	    )
+	;   print_message(error, rdf(invalid_gc_info)),
+	    sleep(10)
+	), !.
+
+
+		 /*******************************
 		 *	     STATISTICS		*
 		 *******************************/
 
 %%	rdf_statistics(?KeyValue) is nondet.
 %
-%	Obtain statistics on the RDF database.
+%	Obtain statistics on the RDF database.  Defined statistics are:
 %
-%	@param KeyValue	Term of the form Key(Value).
+%	  * graphs(-Count)
+%	  Number of named graphs
+%
+%	  * triples(-Count)
+%	  Total number of triples in the database.  This is the number
+%	  of asserted triples minus the number of retracted ones.  The
+%	  number of _visible_ triples in a particular context may be
+%	  different due to visibility rules defined by the logical
+%	  update view and transaction isolation.
+%
+%	  * resources(-Count)
+%	  Number of resources that appear as subject or object in a
+%	  triple.  See rdf_resource/1.
+%
+%	  * properties(-Count)
+%	  Number of current predicates.  See rdf_current_predicate/1.
+%
+%	  * literals(-Count)
+%	  Number of current literals.  See rdf_current_literal/1.
+%
+%	  * gc(GCCount, ReclaimedTriples, ReindexedTriples, Time)
+%	  Information about the garbage collector.
+%
+%	  * searched_nodes(-Count)
+%	  Number of nodes expanded by rdf_reachable/3 and
+%	  rdf_reachable/5.
+%
+%	  * lookup(rdf(S,P,O,G), Count)
+%	  Number of queries for this particular instantiation pattern.
+%	  Each of S,P,O,G is either + or -.
+%
+%	  * hash_quality(rdf(S,P,O,G), Buckets, Quality, PendingResize)
+%	  Statistics on the index for this pattern.  Indices are created
+%	  lazily on the first relevant query.
+%
+%	  * triples_by_graph(Graph, Count)
+%	  This statistics is produced for each named graph. See
+%	  =triples= for the interpretation of this value.
 
-rdf_statistics(sources(Count)) :-
+rdf_statistics(graphs(Count)) :-
 	rdf_statistics_(graphs(Count)).
-rdf_statistics(subjects(Count)) :-
-	rdf_statistics_(subjects(Count)).
-rdf_statistics(properties(Count)) :-
-	rdf_statistics_(predicates(Count)).
 rdf_statistics(triples(Count)) :-
 	rdf_statistics_(triples(Count)).
-rdf_statistics(gc(Count, Time)) :-
-	rdf_statistics_(gc(Count, Time)).
-rdf_statistics(rehash(Count, Time)) :-
-	rdf_statistics_(rehash(Count, Time)).
-rdf_statistics(core(Bytes)) :-
-	rdf_statistics_(core(Bytes)).
+rdf_statistics(duplicates(Count)) :-
+	rdf_statistics_(duplicates(Count)).
+rdf_statistics(resources(Count)) :-
+	rdf_statistics_(resources(Count)).
+rdf_statistics(properties(Count)) :-
+	rdf_statistics_(predicates(Count)).
+rdf_statistics(literals(Count)) :-
+	rdf_statistics_(literals(Count)).
+rdf_statistics(gc(Count, Reclaimed, Reindexed, Time)) :-
+	rdf_statistics_(gc(Count, Reclaimed, Reindexed, Time)).
+rdf_statistics(searched_nodes(Count)) :-
+	rdf_statistics_(searched_nodes(Count)).
 rdf_statistics(lookup(Index, Count)) :-
 	functor(Indexed, indexed, 16),
 	rdf_statistics_(Indexed),
@@ -661,18 +1201,13 @@ rdf_statistics(lookup(Index, Count)) :-
 	Arg is I + 1,
 	arg(Arg, Indexed, Count),
 	Count \== 0.
-rdf_statistics(searched_nodes(Count)) :-
-	rdf_statistics_(searched_nodes(Count)).
-rdf_statistics(literals(Count)) :-
-	rdf_statistics_(literals(Count)).
-rdf_statistics(triples_by_file(File, Count)) :-
-	(   var(File)
-	->  rdf_graph(File),
-	    rdf_statistics_(triples(File, Count))
-	;   rdf_statistics_(triples(File, Count))
-	).
-rdf_statistics(duplicates(Count)) :-
-	rdf_statistics_(duplicates(Count)).
+rdf_statistics(hash_quality(Index, Size, Quality,Optimize)) :-
+	rdf_statistics_(hash_quality(List)),
+	member(hash(Place,Size,Quality,Optimize), List),
+	index(Index, Place).
+rdf_statistics(triples_by_graph(Graph, Count)) :-
+	rdf_graph_(Graph, Count),
+	Count \== 0.
 
 index(rdf(-,-,-,-), 0).
 index(rdf(+,-,-,-), 1).
@@ -697,37 +1232,120 @@ index(rdf(+,+,+,+), 15).
 		 *	     PREDICATES		*
 		 *******************************/
 
-%%	rdf_current_predicate(?Predicate)
+%%	rdf_current_predicate(?Predicate) is nondet.
 %
-%	True if Predicate is a currently defined predicate.
-
-rdf_current_predicate(P) :-
-	var(P), !,
-	rdf_current_predicates(All),
-	member(P, All),
-	rdf_predicate_property_(P, triples(N)),
-	N > 0.
-rdf_current_predicate(P) :-
-	rdf_predicate_property_(P, triples(N)),
-	N > 0.
+%	True when Predicate is a   currently known predicate. Predicates
+%	are created if a triples is created  that uses this predicate or
+%	a property of the predicate   is  set using rdf_set_predicate/2.
+%	The predicate may (no longer) have triples associated with it.
+%
+%	Note that resources that have  =|rdf:type|= =|rdf:Property|= are
+%	not automatically included in the  result-set of this predicate,
+%	while _all_ resources that appear as   the  second argument of a
+%	triple _are_ included.
+%
+%	@see rdf_predicate_property/2.
 
 rdf_current_predicate(P, DB) :-
-	rdf_current_predicates(All),
-	member(P, All),
-	once(rdf(_,P,_,DB:_)).
+	rdf_current_predicate(P),
+	(   rdf(_,P,_,DB)
+	->  true
+	).
 
 %%	rdf_predicate_property(?Predicate, ?Property)
 %
-%	Enumerate predicates and their properties
-
+%	Query properties of  a  defined   predicate.  Currently  defined
+%	properties are given below.
+%
+%	  * symmetric(Bool)
+%	  True if the predicate is defined to be symetric. I.e., {A} P
+%	  {B} implies {B} P {A}. Setting symmetric is equivalent to
+%	  inverse_of(Self).
+%
+%	  * inverse_of(Inverse)
+%	  True if this predicate is the inverse of Inverse. This
+%	  property is used by rdf_has/3, rdf_has/4, rdf_reachable/3 and
+%	  rdf_reachable/5.
+%
+%	  * transitive(Bool)
+%	  True if this predicate is transitive. This predicate is
+%	  currently not used. It might be used to make rdf_has/3 imply
+%	  rdf_reachable/3 for transitive predicates.
+%
+%	  * triples(Triples)
+%	  Unify Triples with the number of existing triples using this
+%	  predicate as second argument. Reporting the number of triples
+%	  is intended to support query optimization.
+%
+%	  * rdf_subject_branch_factor(-Float)
+%	  Unify Float with the average number of triples associated with
+%	  each unique value for the subject-side of this relation. If
+%	  there are no triples the value 0.0 is returned. This value is
+%	  cached with the predicate and recomputed only after
+%	  substantial changes to the triple set associated to this
+%	  relation. This property is indented for path optimalisation
+%	  when solving conjunctions of rdf/3 goals.
+%
+%	  * rdf_object_branch_factor(-Float)
+%	  Unify Float with the average number of triples associated with
+%	  each unique value for the object-side of this relation. In
+%	  addition to the comments with the subject_branch_factor
+%	  property, uniqueness of the object value is computed from the
+%	  hash key rather than the actual values.
+%
+%	  * rdfs_subject_branch_factor(-Float)
+%	  Same as =rdf_subject_branch_factor=, but also considering
+%	  triples of `subPropertyOf' this relation. See also rdf_has/3.
+%
+%	  * rdfs_object_branch_factor(-Float)
+%	  Same as =rdf_object_branch_factor=, but also considering
+%	  triples of `subPropertyOf' this relation. See also rdf_has/3.
+%
+%	@see rdf_set_predicate/2.
 
 rdf_predicate_property(P, Prop) :-
 	var(P), !,
-	rdf_current_predicates(All),
-	member(P, All),
+	rdf_current_predicate(P),
 	rdf_predicate_property_(P, Prop).
 rdf_predicate_property(P, Prop) :-
 	rdf_predicate_property_(P, Prop).
+
+%%	rdf_set_predicate(+Predicate, +Property) is det.
+%
+%	Define a property of  the   predicate.  This predicate currently
+%	supports   the   properties   =symmetric=,    =inverse_of=   and
+%	=transitive= as defined with rdf_predicate_property/2. Adding an
+%	A inverse_of B also adds B inverse_of  A. An inverse relation is
+%	deleted using inverse_of([]).
+
+
+		 /*******************************
+		 *	      SNAPSHOTS		*
+		 *******************************/
+
+%%	rdf_snapshot(-Snapshot) is det.
+%
+%	Take a snapshot of the current state   of  the RDF store. Later,
+%	goals may be executed in the  context   of  the database at this
+%	moment using rdf_transaction/3 with  the   =snapshot=  option. A
+%	snapshot created outside  a  transaction   exists  until  it  is
+%	deleted. Snapshots taken inside a transaction   can only be used
+%	inside this transaction.
+
+%%	rdf_delete_snapshot(+Snapshot) is det.
+%
+%	Delete a snapshot as obtained   from  rdf_snapshot/1. After this
+%	call, resources used for maintaining the snapshot become subject
+%	to garbage collection.
+
+%%	rdf_current_snapshot(?Term) is nondet.
+%
+%	True when Term is a currently known snapshot.
+%
+%	@bug	Enumeration of snapshots is slow.
+
+rdf_current_snapshot(Term) :-
+	current_blob(Term, rdf_snapshot).
 
 
 		 /*******************************
@@ -735,27 +1353,52 @@ rdf_predicate_property(P, Prop) :-
 		 *******************************/
 
 %%	rdf_transaction(:Goal) is semidet.
+%
+%	Same as rdf_transaction(Goal, user, []).  See rdf_transaction/3.
+
 %%	rdf_transaction(:Goal, +Id) is semidet.
 %
-%	Backward compatibility
+%	Same as rdf_transaction(Goal, Id, []).  See rdf_transaction/3.
+
+%%	rdf_transaction(:Goal, +Id, +Options) is semidet.
+%
+%	Run Goal in an RDF  transaction.   Compared to the ACID model,
+%	RDF transactions have the following properties:
+%
+%	  1. Modifications inside the transactions become all atomically
+%	     visible to the outside world if Goal succeeds or remain
+%	     invisible if Goal fails or throws an exception.  I.e.,
+%	     the _atomicy_ property is fully supported.
+%	  2. _Consistency_ is not guaranteed. Later versions may
+%	     implement consistency constraints that will be checked
+%	     serialized just before the actual commit of a transaction.
+%	  3. Concurrently executing transactions do not infuence each
+%	     other.  I.e., the _isolation_ property is fully supported.
+%	  4. _Durability_ can be activated by loading
+%	     library(semweb/rdf_persistency).
+%
+%	Processed options are:
+%
+%	  * snapshot(+Snapshot)
+%	  Execute Goal using the state of the RDF store as stored in
+%	  Snapshot.  See rdf_snapshot/1.  Snapshot can also be the
+%	  atom =true=, which implies that an anonymous snapshot is
+%	  created at the current state of the store.  Modifications
+%	  due to executing Goal are only visible to Goal.
 
 rdf_transaction(Goal) :-
-	rdf_transaction_(Goal, user).
+	rdf_transaction(Goal, user, []).
 rdf_transaction(Goal, Id) :-
-	(   nonvar(Id),
-	    Id = log(_, DB)
-	->  must_be(atom, DB)
-	;   true
-	),
-	rdf_transaction_(Goal, Id).
+	rdf_transaction(Goal, Id, []).
 
 %%	rdf_active_transaction(?Id) is nondet.
 %
-%	True if Id is the identifier of a currently open transaction. If
-%	Id  is  not  instantiated,    backtracking   yields  transaction
-%	identifiers starting with  the   innermost  nested  transaction.
-%	Transaction identifier terms are not copied,  need not be ground
-%	and can be instantiated during the transaction.
+%	True if Id is the identifier of  a transaction in the context of
+%	which  this  call  is  executed.  If  Id  is  not  instantiated,
+%	backtracking yields transaction identifiers   starting  with the
+%	innermost nested transaction. Transaction   identifier terms are
+%	not copied, need not be ground   and  can be instantiated during
+%	the transaction.
 
 rdf_active_transaction(Id) :-
 	rdf_active_transactions_(List),
@@ -798,7 +1441,7 @@ monitor_mask(new_literal,  0x0010).
 monitor_mask(old_literal,  0x0020).
 monitor_mask(transaction,  0x0040).
 monitor_mask(load,	   0x0080).
-monitor_mask(rehash,	   0x0100).
+monitor_mask(create_graph, 0x0100).
 					% prolog defined broadcasts
 monitor_mask(parse,	   0x1000).
 monitor_mask(reset,	   0x2000).
@@ -809,6 +1452,35 @@ monitor_mask(all,	   0xffff).
 %rdf_broadcast(Term, MaskName) :-
 %%	monitor_mask(MaskName, Mask),
 %%	rdf_broadcast_(Term, Mask).
+
+
+		 /*******************************
+		 *	    DUPLICATES		*
+		 *******************************/
+
+:- public
+	rdf_update_duplicates_thread/0.
+
+%%	rdf_update_duplicates_thread
+%
+%	Start a thread to initialize the duplicate administration.
+
+rdf_update_duplicates_thread :-
+	thread_create(rdf_update_duplicates, _,
+		      [ detached(true),
+			alias('__rdf_duplicate_detecter')
+		      ]).
+
+%%	rdf_update_duplicates is det.
+%
+%	Update the duplicate administration. If   this  adminstration is
+%	up-to-date, each triples that _may_ have a duplicate is flagged.
+%	The predicate rdf/3 uses this administration to speedup checking
+%	for duplicate answers.
+%
+%	This predicate is normally  executed   from  a background thread
+%	named =__rdf_duplicate_detecter= which is created   when a query
+%	discovers that checking for duplicates becomes too expensive.
 
 
 		 /*******************************
@@ -883,7 +1555,10 @@ rdf_load_db(File) :-
 	url_protocol/1.			% ?Protocol
 
 %%	rdf_load(+FileOrList) is det.
-%%	rdf_load(+FileOrList, +Options) is det.
+%
+%	Same as rdf_load(FileOrList, []).  See rdf_load/2.
+
+%%	rdf_load(+FileOrList, :Options) is det.
 %
 %	Load RDF file.  Options provides additional processing options.
 %	Currently defined options are:
@@ -897,14 +1572,27 @@ rdf_load_db(File) :-
 %	    that are relative to the base uri.  Default is the source
 %	    URL.
 %
+%	    * concurrent(+Jobs)
+%	    If FileOrList is a list of files, process the input files
+%	    using Jobs threads concurrently.  Default is the mininum
+%	    of the number of cores and the number of inputs.  Higher
+%	    values can be useful when loading inputs from (slow)
+%	    network connections.  Using 1 (one) does not use
+%	    separate worker threads.
+%
+%	    * format(+Format)
+%	    Specify the source format explicitly. Normally this is
+%	    deduced from the filename extension or the mime-type. The
+%	    core library understands the formats xml (RDF/XML) and
+%	    triples (internal quick load and cache format).  Plugins,
+%	    such as library)semweb/turtle) extend the set of recognised
+%	    extensions.
+%
 %	    * graph(?Graph)
 %	    Named graph in which to load the data.  It is *not* allowed
 %	    to load two sources into the same named graph.  If Graph is
 %	    unbound, it is unified to the graph into which the data is
 %	    loaded.
-%
-%	    * db(?Graph)
-%	    Deprecated.  New code must use graph(Graph).
 %
 %	    * if(Condition)
 %	    When to load the file. One of =true=, =changed= (default) or
@@ -921,20 +1609,111 @@ rdf_load_db(File) :-
 %	    If =true= (default =false=), register xmlns= namespace
 %	    declarations as ns/2 namespaces if there is no conflict.
 %
+%	    * silent(+Bool)
+%	    If =true=, the message reporting completion is printed using
+%	    level =silent=. Otherwise the level is =informational=. See
+%	    also print_message/2.
+%
 %	Other options are forwarded to process_rdf/3.
+
+:- dynamic
+	rdf_loading/3.				% Graph, Queue, Thread
 
 rdf_load(Spec) :-
 	rdf_load(Spec, []).
 
-rdf_load([], _) :- !.
-rdf_load([H|T], Options) :- !,
-	rdf_load(H, Options),
-	rdf_load(T, Options).
+:- if(\+current_predicate(concurrent/3)).
+concurrent(_, Goals, _) :-
+	forall(member(G, Goals), call(G)).
+:- endif.
+
+% Note that we kill atom garbage collection.  This improves performance
+% with about 15% loading the LUBM Univ_50 benchmark.
+
 rdf_load(Spec, M:Options) :-
 	must_be(list, Options),
+	current_prolog_flag(agc_margin, Old),
+	setup_call_cleanup(
+	    set_prolog_flag(agc_margin, 0),
+	    rdf_load_noagc(Spec, M, Options),
+	    set_prolog_flag(agc_margin, Old)).
+
+rdf_load_noagc(List, M, Options) :-
+	is_list(List), !,
+	flatten(List, Inputs),		% Compatibility: allow nested lists
+	maplist(must_be(ground), Inputs),
+	length(Inputs, Count),
+	load_jobs(Count, Jobs, Options),
+	(   Jobs =:= 1
+	->  forall(member(Spec, Inputs),
+		   rdf_load(Spec, Options))
+	;   maplist(load_goal(Options, M), Inputs, Goals),
+	    concurrent(Jobs, Goals, [])
+	).
+rdf_load_noagc(One, M, Options) :-
+	must_be(ground, One),
+	rdf_load_one(One, M, Options).
+
+load_goal(Options, M, Spec, rdf_load_one(Spec, M, Options)).
+
+load_jobs(_, Jobs, Options) :-
+	option(concurrent(Jobs), Options), !,
+	must_be(positive_integer, Jobs).
+load_jobs(Count, Jobs, _) :-
+	current_prolog_flag(cpu_count, CPUs),
+	CPUs > 0, !,
+	Jobs is max(1, min(CPUs, Count)).
+load_jobs(_, 1, _).
+
+
+rdf_load_one(Spec, M, Options) :-
+	source_url(Spec, Protocol, SourceURL),
+	load_graph(SourceURL, Graph, Options),
+	setup_call_cleanup(
+	    with_mutex(rdf_load_file,
+		       rdf_start_load(Graph, Loading, Options)),
+	    rdf_load_file(Loading, Spec, SourceURL, Protocol,
+			  Graph, M, Options),
+	    rdf_end_load(Loading)).
+
+%%	rdf_start_load(+Graph, -WhatToDo) is det.
+%%	rdf_end_load(+WhatToDo) is det.
+%%	rdf_load_file(+WhatToDo, +Spec, +SourceURL, +Protocol, +Graph,
+%%		      +Module, +Options) is det.
+%
+%	Of these three predicates, rdf_load_file/7   does the real work.
+%	The others deal with the  possibility   that  the graph is being
+%	loaded by another thread. In that case,   we  wait for the other
+%	thread to complete the work.
+%
+%	@tbd	What if both threads disagree on what is loaded into the
+%		graph?
+%	@see	Code is modelled closely after how concurrent loading
+%		is handled in SWI-Prolog's boot/init.pl
+
+rdf_start_load(Graph, queue(Queue), _) :-
+	rdf_loading(Graph, Queue, LoadThread),
+	\+ thread_self(LoadThread), !,
+	debug(rdf(load), 'Graph ~w is being loaded by thread ~w; waiting ...',
+	      [ Graph, LoadThread]).
+rdf_start_load(Graph, Ref, _) :-
+	thread_self(Me),
+	message_queue_create(Queue),
+	assertz(rdf_loading(Graph, Queue, Me), Ref).
+
+rdf_end_load(queue(_)) :- !.
+rdf_end_load(Ref) :-
+	clause(rdf_loading(_, Queue, _), _, Ref),
+	erase(Ref),
+	thread_send_message(Queue, done),
+	message_queue_destroy(Queue).
+
+rdf_load_file(queue(Queue), _Spec, _SourceURL, _Protocol, _Graph, _M, _Options) :- !,
+	catch(thread_get_message(Queue, _), _, true).
+rdf_load_file(_Ref, _Spec, SourceURL, Protocol, Graph, M, Options) :-
 	statistics(cputime, T0),
-	rdf_open_input(Spec, In, Cleanup, SourceURL, Graph, Modified,
-		       Format, Options),
+	rdf_open_input(SourceURL, Protocol, Graph,
+		       In, Cleanup, Modified, Format, Options),
 	return_modified(Modified, Options),
 	(   Modified == not_modified
 	->  Action = none
@@ -1015,9 +1794,8 @@ protocols. E.g. for HTTP we want to make a single call on the server and
 use If-modified-since to verify that we need not reloading this file.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-%%	rdf_open_input(+Spec, -Stream, -Cleanup,
-%%		       -Source, -Graph, -Modified, -Format,
-%%		       +Options)
+%%	rdf_open_input(+SourceURL, +Protocol, +Graph,
+%%		       -Stream, -Cleanup, -Modified, -Format, +Options)
 %
 %	Open an input source.
 %
@@ -1032,11 +1810,8 @@ use If-modified-since to verify that we need not reloading this file.
 %	@param	Modified is one of =not_modified=, last_modified(Time),
 %		cached(CacheFile) or =unknown=
 
-rdf_open_input(Spec, Stream, Cleanup,
-	       SourceURL, Graph, Modified, Format,
-	       Options) :-
-	source_url(Spec, Protocol, SourceURL),
-	load_graph(SourceURL, Graph, Options),
+rdf_open_input(SourceURL, Protocol, Graph,
+	       Stream, Cleanup, Modified, Format, Options) :-
 	option(if(If), Options, changed),
 	(   If == true
 	->  true
@@ -1272,40 +2047,51 @@ report_loaded(Action, Source, DB, Triples, T0, Options) :-
 
 %%	rdf_unload(+Spec) is det.
 %
-%	Remove the triples loaded from the specified source and remove
-%	the source from the database.
+%	Identify the graph loaded from   Spec and use rdf_unload_graph/1
+%	to erase this graph.
 
-rdf_unload(Graph) :-
-	atom(Graph),
-	rdf_statistics_(triples(Graph, Triples)),
-	Triples > 0, !,
-	do_unload(Graph).
 rdf_unload(Spec) :-
 	source_url(Spec, _Protocol, SourceURL),
 	rdf_graph_source_(Graph, SourceURL, _), !,
-	do_unload(Graph).
+	rdf_unload_graph(Graph).
 rdf_unload(_).
 
-do_unload(DB) :-
-	rdf_transaction(rdf_retractall(_,_,_,DB),
-			unload(DB)),
-	rdf_unset_graph_source(DB).
-
-
-%%	rdf_graph(+DB) is semidet.
-%%	rdf_graph(-DB) is nondet.
+%%	rdf_unload_graph(+Graph) is det.
 %
-%	True if DB is a current named graph with at least one triple.
+%	Remove Graph from the RDF store.  Succeeds silently if the named
+%	graph does not exist.
 
-rdf_graph(DB) :-
-	atom(DB), !,
-	rdf_statistics_(triples(DB, Triples)),
-	Triples > 0.
-rdf_graph(DB) :-
-	rdf_graphs_(Sources),
-	member(DB, Sources),
-	rdf_statistics_(triples(DB, Triples)),
-	Triples > 0.
+rdf_unload_graph(Graph) :-
+	must_be(atom, Graph),
+	(   rdf_graph(Graph)
+	->  rdf_transaction(do_unload(Graph), unload(Graph))
+	;   true
+	).
+
+do_unload(Graph) :-
+	(   rdf_graph_(Graph, Triples),
+	    Triples > 0
+	->  rdf_retractall(_,_,_,Graph)
+	;   true
+	),
+	rdf_destroy_graph(Graph).
+
+		 /*******************************
+		 *	   GRAPH QUERIES	*
+		 *******************************/
+
+%%	rdf_create_graph(+Graph) is det.
+%
+%	Create an RDF graph without triples.   Succeeds  silently if the
+%	graph already exists.
+
+
+%%	rdf_graph(?Graph) is nondet.
+%
+%	True when Graph is an existing graph.
+
+rdf_graph(Graph) :-
+	rdf_graph_(Graph, _Triples).
 
 %%	rdf_source(?Graph, ?SourceURL) is nondet.
 %
@@ -1420,9 +2206,15 @@ assert_triples([H|_], _) :-
 %
 %	Remove all triples from the RDF database and reset all its
 %	statistics.
+%
+%	@bug	This predicate checks for active queries, but this check is
+%		not properly synchronized and therefore the use of this
+%		predicate is unsafe in multi-threaded contexts. It is
+%		mainly used to run functionality tests that need to
+%		start with an empty database.
 
 rdf_reset_db :-
-	rdf_transaction(rdf_reset_db_, reset).
+	rdf_reset_db_.
 
 
 		 /*******************************
@@ -1430,6 +2222,9 @@ rdf_reset_db :-
 		 *******************************/
 
 %%	rdf_save(+Out) is det.
+%
+%	Same as rdf_save(Out, []).  See rdf_save/2 for details.
+
 %%	rdf_save(+Out, :Options) is det.
 %
 %	Write RDF data as RDF/XML. Options is a list of one or more of
@@ -1437,9 +2232,6 @@ rdf_reset_db :-
 %
 %		* graph(+Graph)
 %		Save only triples associated to the given named Graph.
-%
-%		* db(+DB)
-%		Deprecated synonym for graph(DB).
 %
 %		* anon(Bool)
 %		If false (default true) do not save blank nodes that do
@@ -1450,29 +2242,44 @@ rdf_reset_db :-
 %		represented relative to this base are written using
 %		their shorthand.  See also =write_xml_base= option
 %
-%		* write_xml_base(Bool)
-%		If =false=, do _not_ include the =|xml:base|=
-%		declaration that is written normally when using the
-%		=base_uri= option.
-%
 %		* convert_typed_literal(:Convertor)
 %		Call Convertor(-Type, -Content, +RDFObject), providing
 %		the opposite for the convert_typed_literal option of
 %		the RDF parser.
 %
+%		* document_language(+Lang)
+%		Initial xml:lang saved with rdf:RDF element
+%
 %		* encoding(Encoding)
 %		Encoding for the output.  Either utf8 or iso_latin_1
 %
-%		* document_language(+Lang)
-%		Initial xml:lang saved with rdf:RDF element
+%		* inline(+Bool)
+%		If =true= (default =false=), inline resources when
+%		encountered for the first time. Normally, only bnodes
+%		are handled this way.
+%
+%		* namespaces(+List)
+%		Explicitely specify saved namespace declarations. See
+%		rdf_save_header/2 option namespaces for details.
 %
 %		* sorted(+Boolean)
 %		If =true= (default =false=), emit subjects sorted on
 %		the full URI.  Useful to make file comparison easier.
 %
+%		* write_xml_base(Bool)
+%		If =false=, do _not_ include the =|xml:base|=
+%		declaration that is written normally when using the
+%		=base_uri= option.
+%
+%		* xml_attributes(+Bool)
+%		If =false= (default =true=), never use xml attributes to
+%		save plain literal attributes, i.e., always used an XML
+%		element as in =|<name>Joe</name>|=.
+%
 %	@param Out	Location to save the data.  This can also be a
 %			file-url (=|file://path|=) or a stream wrapped
 %			in a term stream(Out).
+%	@see rdf_save_db/1
 
 :- thread_local
 	named_anon/2,			% +Resource, -Id
@@ -1580,6 +2387,23 @@ graph(Options0, DB) :-
 %
 %	Save XML document header, doctype and open the RDF environment.
 %	This predicate also sets up the namespace notation.
+%
+%	Save an RDF header, with the XML header, DOCTYPE, ENTITY and
+%	opening the rdf:RDF element with appropriate namespace
+%	declarations. It uses the primitives from section 3.5 to
+%	generate the required namespaces and desired short-name. Options
+%	is one of:
+%
+%	  * graph(+URI)
+%	  Only search for namespaces used in triples that belong to the
+%	  given named graph.
+%
+%	  * namespaces(+List)
+%	  Where List is a list of namespace abbreviations. With this
+%	  option, the expensive search for all namespaces that may be
+%	  used by your data is omitted. The namespaces =rdf= and =rdfs=
+%	  are added to the provided List. If a namespace is not
+%	  declared, the resource is emitted in non-abreviated form.
 
 rdf_save_header(Out, Options) :-
 	rdf_save_header(Out, Options, _).
@@ -1854,6 +2678,8 @@ xml_code(0'-).				% Match 0'-
 %%	rdf_save_footer(Out:stream) is det.
 %
 %	Finish XML generation and write the document footer.
+%
+%	@see rdf_save_header/2, rdf_save_subject/3.
 
 rdf_save_footer(Out) :-
 	retractall(named_anon(_, _)),
@@ -1878,7 +2704,15 @@ rdf_save_non_anon_subject(Out, Subject, Options) :-
 
 %%	rdf_save_subject(+Out, +Subject:resource, +Options) is det.
 %
-%	Save the triples associated to Subject to Out.
+%	Save the triples associated to Subject to Out. Options:
+%
+%	  * graph(+Graph)
+%	  Only save properties from Graph.
+%	  * base_uri(+URI)
+%	  * convert_typed_literal(:Goal)
+%	  * document_language(+XMLLang)
+%
+%	@see rdf_save/2 for a description of these options.
 
 rdf_save_subject(Out, Subject, Options) :-
 	is_list(Options), !,
@@ -2310,6 +3144,24 @@ rdf_value(V, _, Q, Encoding) :-
 		 *	DEPRECATED MATERIAL	*
 		 *******************************/
 
+%%	rdf_match_label(+Method, +Search, +Atom) is semidet.
+%
+%	True if Search matches Atom as   defined by Method. All matching
+%	is performed case-insensitive. Defines methods are:
+%
+%	  * exact
+%	  Perform exact, but case-insensitive match.
+%	  * substring
+%	  Search is a sub-string of Text.
+%	  * word
+%	  Search appears as a whole-word in Text.
+%	  * prefix
+%	  Text start with Search.
+%	  * like
+%	  Text matches Search, case insensitively, where the `*'
+%	  character in Search matches zero or more characters.
+
+
 %%	rdf_split_url(+Prefix, +Local, -URL) is det.
 %%	rdf_split_url(-Prefix, -Local, +URL) is det.
 %
@@ -2342,6 +3194,191 @@ rdf_url_namespace(URL, Prefix) :-
 
 rdf_quote_uri(IRI, URI) :-
 	uri_iri(URI, IRI).
+
+
+		 /*******************************
+		 *	      LITERALS		*
+		 *******************************/
+
+%%	rdf_new_literal_map(-Map) is det.
+%
+%	Create a new literal map, returning an opaque handle.
+
+%%	rdf_destroy_literal_map(+Map) is det.
+%
+%	Destroy a literal map. After this call,   further use of the Map
+%	handle is illegal. Additional synchronisation  is needed if maps
+%	that are shared between threads are   destroyed to guarantee the
+%	handle    is    no    longer    used.    In    some    scenarios
+%	rdf_reset_literal_map/1 provides a safe alternative.
+
+%%	rdf_reset_literal_map(+Map) is det.
+%
+%	Delete all content from the literal map.
+
+%%	rdf_insert_literal_map(+Map, +Key, +Value) is det.
+%
+%	Add a relation between  Key  and  Value   to  the  map.  If this
+%	relation already exists no action is performed.
+
+%%	rdf_insert_literal_map(+Map, +Key, +Value, -KeyCount) is det.
+%
+%	As rdf_insert_literal_map/3. In addition, if Key is a new key in
+%	Map, unify KeyCount with the number of  keys in Map. This serves
+%	two purposes. Derived maps, such as  the stem and metaphone maps
+%	need to know about new  keys   and  it avoids additional foreign
+%	calls for doing the progress in rdf_litindex.pl.
+
+%%	rdf_delete_literal_map(+Map, +Key) is det.
+%
+%	Delete Key and all associated values from the map.
+
+%%	rdf_delete_literal_map(+Map, +Key, +Value) is det.
+%
+%	Delete the association between Key and Value from the map.
+
+%%	rdf_find_literal_map(+Map, +KeyList, -ValueList) is det.
+%
+%	Unify ValueList with an ordered set  of values associated to all
+%	keys from KeyList. Each key in  KeyList   is  either an atom, an
+%	integer or a term not(Key).  If   not-terms  are provided, there
+%	must be at least one positive keywords. The negations are tested
+%	after establishing the positive matches.
+
+%%	rdf_keys_in_literal_map(+Map, +Spec, -Answer) is det.
+%
+%	Realises various queries on the key-set:
+%
+%	  * all
+%
+%	  Unify Answer with an ordered list of all keys.
+%	  * key(+Key)
+%
+%	  Succeeds if Key is a key in the map and unify Answer with the
+%	  number of values associated with the key. This provides a fast
+%	  test of existence without fetching the possibly large
+%	  associated value set as with rdf_find_literal_map/3.
+%
+%	  * prefix(+Prefix)
+%	  Unify Answer with an ordered set of all keys that have the
+%	  given prefix. See section 3.1 for details on prefix matching.
+%	  Prefix must be an atom. This call is intended for
+%	  auto-completion in user interfaces.
+%
+%	  * ge(+Min)
+%	  Unify Answer with all keys that are larger or equal to the
+%	  integer Min.
+%
+%	  * le(+Max)
+%	  Unify Answer with all keys that are smaller or equal to the integer
+%	  Max.
+%
+%	  * between(+Min, +Max) Unify
+%	  Answer with all keys between Min and Max (including).
+
+%%	rdf_statistics_literal_map(+Map, -KeyValue)
+%
+%	Query some statistics of the map. Provides KeyValue are:
+%
+%	  * size(-Keys, -Relations)
+%	  Unify Keys with the total key-count of the index and Relation
+%	  with the total Key-Value count.
+
+
+
+		 /*******************************
+		 *	       MISC		*
+		 *******************************/
+
+%%	rdf_version(-Version) is det.
+%
+%	True when Version is the numerical version-id of this library.
+%	The version is computed as
+%
+%		Major*10000 + Minor*100 + Patch.
+
+%%	rdf_set(+Term) is det.
+%
+%	Set properties of the RDF store.  Currently defines:
+%
+%	  * hash(+Hash, +Parameter, +Value)
+%	  Set properties for a triple index.  Hash is one of =s=,
+%	  =p=, =sp=, =o=, =po=, =spo=, =g=, =sg= or =pg=.  Parameter
+%	  is one of:
+%
+%	    - size
+%	    Value defines the number of entries in the hash-table.
+%	    Value is rounded _down_ to a power of 2.  After setting
+%	    the size explicitly, auto-sizing for this table is
+%	    disabled.  Setting the size smaller than the current
+%	    size results in a =permission_error= exception.
+%
+%	    - average_chain_len
+%	    Set maximum average collision number for the hash.
+%
+%	    - optimize_threshold
+%	    Related to resizing hash-tables.  If 0, all triples are
+%	    moved to the new size by the garbage collector.  If more
+%	    then zero, those of the last Value resize steps remain at
+%	    their current location.  Leaving cells at their current
+%	    location reduces memory fragmentation and slows down
+%	    access.
+
+%%	rdf_md5(+Graph, -MD5) is det.
+%
+%	True when MD5 is the MD5 hash for  all triples in graph. The MD5
+%	digest itself is represented as an   atom holding a 32-character
+%	hexadecimal   string.   The   library   maintains   the   digest
+%	incrementally on rdf_load/[1,2], rdf_load_db/1, rdf_assert/[3,4]
+%	and  rdf_retractall/[3,4].  Checking  whether   the  digest  has
+%	changed since the last rdf_load/[1,2]  call provides a practical
+%	means for checking whether the file needs to be saved.
+%
+%	@deprecated New code should use rdf_graph_property(Graph,
+%	hash(Hash)).
+
+%%	rdf_generation(-Generation) is det.
+%
+%	True when Generation is the current  generation of the database.
+%	Each modification to the database  increments the generation. It
+%	can be used to check the validity of cached results deduced from
+%	the database. Committing a non-empty  transaction increments the
+%	generation by one.
+%
+%	When inside a transaction,  Generation  is   unified  to  a term
+%	_TransactionStartGen_+_InsideTransactionGen_.  E.g.,  4+3  means
+%	that the transaction was started at   generation 4 of the global
+%	database and we have  created  3   new  generations  inside  the
+%	transaction. Note that this choice  of representation allows for
+%	comparing  generations  using  Prolog  arithmetic.  Comparing  a
+%	generation in one  transaction  with   a  generation  in another
+%	transaction is meaningless.
+
+%%	rdf_estimate_complexity(?Subject, ?Predicate, ?Object, -Complexity)
+%
+%	Return the number of alternatives as   indicated by the database
+%	internal hashed indexing. This is a rough measure for the number
+%	of alternatives we can expect for   an  rdf_has/3 call using the
+%	given three arguments. When  called   with  three variables, the
+%	total number of triples is returned.   This  estimate is used in
+%	query  optimisation.  See  also    rdf_predicate_property/2  and
+%	rdf_statistics/1 for additional information to help optimizers.
+
+%%	rdf_debug(+Level) is det.
+%
+%	Set debugging to Level.  Level is an integer 0..9.  Default is
+%	0 no debugging.
+
+%%	rdf_atom_md5(+Text, +Times, -MD5) is det.
+%
+%	Computes the MD5 hash from Text,  which   is  an atom, string or
+%	list of character codes. Times is an integer >= 1. When > 0, the
+%	MD5 algorithm is repeated Times  times   on  the generated hash.
+%	This can be used for  password   encryption  algorithms  to make
+%	generate-and-test loops slow.
+%
+%	@deprecated. New code should  use   the  library(crypt)  library
+%	provided by the clib package.
 
 
 		 /*******************************

@@ -3,15 +3,9 @@
 	    test/1,
 	    test/2
 	  ]).
+:- include(local_test).
 :- use_module(library(debug)).
-:- use_module(library(debug)).
-:- asserta(user:file_search_path(foreign, '../sgml')).
-:- asserta(user:file_search_path(library, '../sgml')).
-:- asserta(user:file_search_path(foreign, '../clib')).
-:- asserta(user:file_search_path(library, '../clib')).
-:- asserta(user:file_search_path(library, '../RDF')).
-:- asserta(user:file_search_path(foreign, '.')).
-:- use_module(rdf_db).
+:- use_module(library(semweb/rdf_db)).
 
 :- dynamic
 	map/1,				% the literal map
@@ -58,12 +52,14 @@ mk(N) :-
 	clear,
 	rdf_new_literal_map(Map),
 	assert(map(Map)),
-	forall(between(1, N, _), m1(Map)).
+	forall(between(1, N, _), m1(N, Map)).
 
-m1(Map) :-
-	rnd_value(1000, Key),
-	rnd_value(100, Value),
-	(   random(3, 0)
+m1(N, Map) :-
+	KeyRange is N//10,
+	ValRange is N//100,
+	rnd_value(KeyRange, Key),
+	rnd_value(ValRange, Value),
+	(   random(2, 0)
 	->  (   retract(map(Key, Value))
 	    ->  debug(delete, 'Deleted ~q --> ~q', [Key, Value]),
 		rdf_delete_literal_map(Map, Key, Value)
@@ -106,6 +102,17 @@ vk(all) :-
 	setof(X, Y^map(X, Y), Xs),
 	(   Xs == Keys
 	->  true
+	;   (   ord_subtract(Xs, Keys, Missing),
+		Missing \== []
+	    ->	format('Missing: ~p~n', [Missing])
+	    ;	true
+	    ),
+	    (   ord_subtract(Keys, Xs, TooMany),
+		TooMany \== []
+	    ->	format('TooMany: ~p~n', [TooMany])
+	    ;	true
+	    ),
+	    fail
 	).
 vk(prefix(Prefix)) :-
 	map(Map),
@@ -113,7 +120,8 @@ vk(prefix(Prefix)) :-
 	prefix_keys(Prefix, KeysOK),
 	(   KeysOK == Keys
 	->  true
-	;   format('prefix(~w): ~p (must be ~p)~n', [Prefix, Keys, KeysOK])
+	;   format('prefix(~w): ~p (must be ~p)~n', [Prefix, Keys, KeysOK]),
+	    fail
 	).
 vk(ge(Min)) :-
 	map(Map),
@@ -121,7 +129,8 @@ vk(ge(Min)) :-
 	between_keys(Min, 0x5fffffff, KeysOK),
 	(   KeysOK == Keys
 	->  true
-	;   format('ge(~w): ~p (must be ~p)~n', [Min, Keys, KeysOK])
+	;   format('ge(~w): ~p (must be ~p)~n', [Min, Keys, KeysOK]),
+	    fail
 	).
 vk(le(Max)) :-
 	map(Map),
@@ -129,7 +138,8 @@ vk(le(Max)) :-
 	between_keys(-0x60000000, Max, KeysOK),
 	(   KeysOK == Keys
 	->  true
-	;   format('le(~w): ~p (must be ~p)~n', [Max, Keys, KeysOK])
+	;   format('le(~w): ~p (must be ~p)~n', [Max, Keys, KeysOK]),
+	    fail
 	).
 vk(between(Min, Max)) :-
 	map(Map),
@@ -138,7 +148,8 @@ vk(between(Min, Max)) :-
 	(   KeysOK == Keys
 	->  true
 	;   format('between(~w, ~w): ~p (must be ~p)~n',
-		   [Min, Max, Keys, KeysOK])
+		   [Min, Max, Keys, KeysOK]),
+	    fail
 	).
 
 prefix_keys(Prefix, Keys) :-

@@ -24,6 +24,9 @@
 
 #ifndef ATOM_H_INCLUDED
 #define ATOM_H_INCLUDED
+#include <SWI-Stream.h>
+#include <SWI-Prolog.h>
+#include <wchar.h>
 
 #define MAX_LIKE_CHOICES	100	/* max *'s in like pattern */
 

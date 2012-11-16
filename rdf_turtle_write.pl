@@ -972,7 +972,7 @@ subjects(State, Subjects) :-
 	tw_state_expand(State, Expand),
 	(   Expand == lookup,
 	    atom(Graph),
-	    rdf_statistics(triples_by_file(Graph, Count)),
+	    rdf_statistics(triples_by_graph(Graph, Count)),
 	    rdf_statistics(triples(Total)),
 	    Count * 10 < Total
 	->  findall(S, rdf(S,_,_,Graph), List),

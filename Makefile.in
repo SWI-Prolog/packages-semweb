@@ -10,7 +10,7 @@
 #
 #	ln-install		Install with symbolic links
 #
-# Author: Jan Wielemaker (J.Wielemaker@cs.vu.nl)
+# Author: Jan Wielemaker (J.Wielemaker@vu.nl)
 ################################################################
 
 PACKAGE=semweb
@@ -20,10 +20,15 @@ include common.mk
 CFLAGS+= -I.
 LIBDIR=$(PLBASE)/library/semweb
 
+# Useful alternatives for debugging
+# COFLAGS+=-gdwarf-2 -g3 -fno-inline
+# COFLAGS=-gdwarf-2 -g3
+
 TARGETS=	rdf_db.@SO@ turtle.@SO@
 
-RDFDBOBJ=	rdf_db.o atom.o lock.o md5.o avl.o atom_map.o debug.o \
-		hash.o murmur.o
+RDFDBOBJ=	rdf_db.o atom.o md5.o atom_map.o debug.o alloc.o \
+		hash.o murmur.o query.o resource.o error.o skiplist.o \
+		snapshot.o
 
 all:		$(TARGETS)
 
@@ -69,14 +74,19 @@ uninstall::
 		(cd $(PLBASE)/library && rm -f $(LIBPL))
 		$(MKINDEX)
 
-rdf_db.o:	unicode_map.c
+tags::
+		etags *.[ch]
+
+rdf_db.o:	unicode_map.c buffer.h error.h
+query.o:	buffer.h
 
 ################################################################
 # Documentation
 ################################################################
 
 TEXEXTRA=	rdfturtle.tex rdfturtlewrite.tex rdfcompare.tex \
-                rdfportray.tex rdflib.tex sparqlclient.tex
+                rdfportray.tex rdflib.tex sparqlclient.tex rdfdb.tex \
+		rdfcache.tex
 
 $(TEX):		$(TEXEXTRA)
 
@@ -88,8 +98,12 @@ rdfcompare.tex: rdf_compare.pl
 		$(PLTOTEX) --section 'library(semweb/rdf_compare)'
 rdfportray.tex: rdf_portray.pl
 		$(PLTOTEX) --section 'library(semweb/rdf_portray)'
+rdfcache.tex:	rdf_cache.pl
+		$(PLTOTEX) --subsection 'library(semweb/rdf_cache)'
 sparqlclient.tex:       sparql_client.pl
 		$(PLTOTEX) --section 'library(semweb/sparql_client)'
+rdfdb.tex:	doc/rdfdb.txt
+		$(PLTOTEX) --section doc/rdfdb.txt
 
 ################################################################
 # Check
@@ -99,8 +113,9 @@ check::
 		$(PL) -q -f test_rdf_db.pl -g test_rdf_db,halt -t 'halt(1)'
 		$(PL) -q -f litmap_test.pl -g test,halt -t 'halt(1)'
 		$(PL) -q -f test.pl -g run_tests,halt -t 'halt(1)'
+		$(PL) -q -f test_con.pl -g run,halt -t 'halt(1)'
+		$(PL) -q -f test_subprop.pl -g test_subprop,halt -t 'halt(1)'
 		$(PL) -q -f test_turtle.pl -g test_turtle,halt -t 'halt(1)'
-
 
 ################################################################
 # Clean

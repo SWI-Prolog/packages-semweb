@@ -44,7 +44,6 @@
 :- use_module(library(debug)).
 :- use_module(library(error)).
 :- use_module(library(thread)).
-:- use_module(library(pairs)).
 :- use_module(library(apply)).
 
 
@@ -266,22 +265,37 @@ rdf_flush_journal(DB, Options) :-
 
 load_db :-
 	rdf_directory(Dir),
-	get_time(Wall0),
-	statistics(cputime, T0),
-	load_prefixes(Dir),
-	find_dbs(Dir, DBs),
-	length(DBs, DBCount),
-	verbosity(DBCount, Silent),
-	make_goals(DBs, Silent, 1, DBCount, Goals),
 	concurrency(Jobs),
-	concurrent(Jobs, Goals, []),
-	statistics(cputime, T1),
+	cpu_stat_key(Jobs, StatKey),
+	get_time(Wall0),
+	statistics(StatKey, T0),
+	load_prefixes(Dir),
+	verbosity(Silent),
+	find_dbs(Dir, Graphs, SnapShots, Journals),
+	length(Graphs, GraphCount),
+	maplist(rdf_unload_graph, Graphs),
+	rdf_statistics(triples(Triples0)),
+	load_sources(snapshots, SnapShots, Silent, Jobs),
+	load_sources(journals, Journals, Silent, Jobs),
+	rdf_statistics(triples(Triples1)),
+	statistics(StatKey, T1),
 	get_time(Wall1),
 	T is T1 - T0,
 	Wall is Wall1 - Wall0,
+	Triples = Triples1 - Triples0,
 	message_level(Silent, Level),
-	print_message(Level, rdf(restore(attached(DBCount, T/Wall)))).
+	print_message(Level, rdf(restore(attached(GraphCount, Triples, T/Wall)))).
 
+load_sources(_, [], _, _) :- !.
+load_sources(Type, Sources, Silent, Jobs) :-
+	length(Sources, Count),
+	RunJobs is min(Count, Jobs),
+	print_message(informational, rdf(restoring(Type, Count, RunJobs))),
+	make_goals(Sources, Silent, 1, Count, Goals),
+	concurrent(RunJobs, Goals, []).
+
+
+%%	make_goals(+DBs, +Silent, +Index, +Total, -Goals)
 
 make_goals([], _, _, _, []).
 make_goals([DB|T0], Silent, I,  Total,
@@ -289,9 +303,9 @@ make_goals([DB|T0], Silent, I,  Total,
 	I2 is I + 1,
 	make_goals(T0, Silent, I2, Total, T).
 
-verbosity(_DBCount, Silent) :-
+verbosity(Silent) :-
 	rdf_option(silent(Silent)), !.
-verbosity(_DBCount, brief).
+verbosity(brief).
 
 
 %%	concurrency(-Jobs)
@@ -305,48 +319,57 @@ concurrency(Jobs) :-
 	Jobs > 0, !.
 concurrency(1).
 
+cpu_stat_key(1, cputime) :- !.
+cpu_stat_key(_, process_cputime).
 
-%%	find_dbs(+Dir, -DBs:list(atom), -Depth) is det.
+
+%%	find_dbs(+Dir, -Graphs, -SnapBySize, -JournalBySize) is det.
 %
-%	DBs is a  list  of  database   (named  graph)  names,  sorted in
-%	increasing file-size. Small files  are   loaded  first  as these
-%	typically contain the schemas and we   want  to avoid re-hashing
-%	large databases due to added rdfs:subPropertyOf triples.
+%	Scan the persistent database and return a list of snapshots and
+%	journals, both sorted by file-size.  Each term is of the form
 %
-%	@param Depth is the depth at which all files have been found.
+%	  ==
+%	  db(Size, Ext, DB, DBFile, Depth)
+%	  ==
 
-find_dbs(Dir, DBs) :-
-	find_dbs(Dir, DBs, Depth),
-	(   var(Depth)			% empty DB
-	->  true
-	;   length(DBs, Count),
-	    LevelsRequired is floor(log(Count)/log(256)),
-	    Depth < LevelsRequired
-	->  print_message(informational, rdf(reindex(Count, LevelsRequired))),
-	    reindex_db(Dir, LevelsRequired),
-	    retractall(rdf_option(directory_levels(_))),
-	    assertz(rdf_option(directory_levels(LevelsRequired)))
-	;   retractall(rdf_option(directory_levels(_))),
-	    assertz(rdf_option(directory_levels(Depth)))
-	).
-
-find_dbs(Dir, DBs, Depth) :-
+find_dbs(Dir, Graphs, SnapBySize, JournalBySize) :-
 	directory_files(Dir, Files),
 	phrase(scan_db_files(Files, Dir, '.', 0), Scanned),
-	sort(Scanned, ByDB),
-	join_snapshot_and_journals(ByDB, BySize),
-	keysort(BySize, SortedBySize),
-	pairs_values(SortedBySize, DBs),
-	(   maplist(depth(Depth), Scanned)
-	->  true
-	;   length(DBs, Count),
-	    Levels is floor(log(Count)/log(256)),
-	    print_message(warning, rdf(fix_index(Levels))),
-	    reindex_db(Dir, Levels)
+	maplist(db_graph, Scanned, UnsortedGraphs),
+	sort(UnsortedGraphs, Graphs),
+	(   consider_reindex_db(Dir, Graphs, Scanned)
+	->  find_dbs(Dir, Graphs, SnapBySize, JournalBySize)
+	;   partition(db_is_snapshot, Scanned, Snapshots, Journals),
+	    sort(Snapshots, SnapBySize),
+	    sort(Journals, JournalBySize)
 	).
 
-depth(Depth, DB) :-
-	arg(4, DB, Depth).
+consider_reindex_db(Dir, Graphs, Scanned) :-
+	length(Graphs, Count),
+	Count > 0,
+	DepthNeeded is floor(log(Count)/log(256)),
+	(   maplist(depth_db(DepthNow), Scanned)
+	->  (   DepthNeeded > DepthNow
+	    ->	true
+	    ;	retractall(rdf_option(directory_levels(_))),
+		assertz(rdf_option(directory_levels(DepthNow))),
+		fail
+	    )
+	;   true
+	),
+	reindex_db(Dir, DepthNeeded).
+
+db_is_snapshot(Term) :-
+	arg(2, Term, trp).
+
+db_graph(Term, DB) :-
+	arg(3, Term, DB).
+
+db_file_name(Term, File) :-
+	arg(4, Term, File).
+
+depth_db(Depth, DB) :-
+	arg(5, DB, Depth).
 
 %%	scan_db_files(+Files, +Dir, +Prefix, +Depth)// is det.
 %
@@ -366,7 +389,7 @@ scan_db_files([File|T], Dir, Prefix, Depth) -->
 	  directory_file_path(Dir, DBFile, AbsFile),
 	  size_file(AbsFile, Size)
 	},
-	[ db(DB, Size, DBFile, Depth) ],
+	[ db(Size, Ext, DB, AbsFile, Depth) ],
 	scan_db_files(T, Dir, Prefix, Depth).
 scan_db_files([D|T], Dir, Prefix, Depth) -->
 	{ directory_file_path(Prefix, D, SubD),
@@ -387,32 +410,47 @@ nofollow(..).
 db_extension(trp).
 db_extension(jrn).
 
-join_snapshot_and_journals([], []).
-join_snapshot_and_journals([db(DB,S0,_,_)|T0], [S-DB|T]) :- !,
-	same_db(DB, T0, T1, S0, S),
-	join_snapshot_and_journals(T1, T).
-
-same_db(DB, [db(DB,S1,_,_)|T0], T, S0, S) :- !,
-	S2 is S0+S1,
-	same_db(DB, T0, T, S2, S).
-same_db(_, L, L, S, S).
-
-
 :- public load_source/4.		% called through make_goals/5
 
-%%	load_source(+DB, +Silent, +Nth, +Total) is det.
+load_source(DB, Silent, Nth, Total) :-
+	db_file_name(DB, File),
+	db_graph(DB, Graph),
+	message_level(Silent, Level),
+	graph_triple_count(Graph, Count0),
+	statistics(cputime, T0),
+	(   db_is_snapshot(DB)
+	->  print_message(Level, rdf(restore(Silent, snapshot(Graph, File)))),
+	    rdf_load_db(File)
+	;   print_message(Level, rdf(restore(Silent, journal(Graph, File)))),
+	    load_journal(File, Graph)
+	),
+	statistics(cputime, T1),
+	T is T1 - T0,
+	graph_triple_count(Graph, Count1),
+	Count is Count1 - Count0,
+	print_message(Level, rdf(restore(Silent,
+					 done(Graph, T, Count, Nth, Total)))).
+
+
+graph_triple_count(Graph, Count) :-
+	rdf_statistics(triples_by_graph(Graph, Count)), !.
+graph_triple_count(_, 0).
+
+
+%%	attach_graph(+Graph, +Options) is det.
 %
 %	Load triples and reload  journal   from  the  indicated snapshot
 %	file.
-%
-%	@param Silent One of =false=, =true= or =brief=
 
-load_source(DB, Silent, Nth, Total) :-
-	message_level(Silent, Level),
-	db_files(DB, SnapshotFile, JournalFile),
-	rdf_retractall(_,_,_,DB),
+attach_graph(Graph, Options) :-
+	(   option(silent(true), Options)
+	->  Level = silent
+	;   Level = informational
+	),
+	db_files(Graph, SnapshotFile, JournalFile),
+	rdf_retractall(_,_,_,Graph),
 	statistics(cputime, T0),
-	print_message(Level, rdf(restore(Silent, source(DB, Nth, Total)))),
+	print_message(Level, rdf(restore(Silent, Graph))),
 	db_file(SnapshotFile, AbsSnapShot),
 	(   exists_file(AbsSnapShot)
 	->  print_message(Level, rdf(restore(Silent, snapshot(SnapshotFile)))),
@@ -421,17 +459,17 @@ load_source(DB, Silent, Nth, Total) :-
 	),
 	(   exists_db(JournalFile)
 	->  print_message(Level, rdf(restore(Silent, journal(JournalFile)))),
-	    load_journal(JournalFile, DB)
+	    load_journal(JournalFile, Graph)
 	;   true
 	),
 	statistics(cputime, T1),
 	T is T1 - T0,
-	(   rdf_statistics(triples_by_file(DB, Count))
+	(   rdf_statistics(triples_by_graph(Graph, Count))
 	->  true
 	;   Count = 0
 	),
 	print_message(Level, rdf(restore(Silent,
-					 done(DB, T, Count, Nth, Total)))).
+					 done(Graph, T, Count)))).
 
 message_level(true, silent) :- !.
 message_level(_, informational).
@@ -447,11 +485,13 @@ message_level(_, informational).
 %	named graph.
 
 load_journal(File, DB) :-
-	open_db(File, read, In, []),
-	call_cleanup((  read(In, T0),
-			process_journal(T0, In, DB)
-		     ),
-		     close(In)).
+	rdf_create_graph(DB),
+	setup_call_cleanup(
+	    open(File, read, In, [encoding(utf8)]),
+	    ( read(In, T0),
+	      process_journal(T0, In, DB)
+	    ),
+	    close(In)).
 
 process_journal(end_of_file, _, _) :- !.
 process_journal(Term, In, DB) :-
@@ -587,6 +627,11 @@ monitor(load(BE, Id)) :-
 	->  push_state(Id)
 	;   sync_state(Id)
 	).
+monitor(create_graph(Graph)) :-
+	\+ blocked_db(Graph, _),
+	journal_fd(Graph, Fd),
+	open_transaction(Graph, Fd),
+	sync_journal(Graph, Fd).
 monitor(transaction(BE, Id)) :-
 	monitor_transaction(Id, BE).
 
@@ -1054,8 +1099,7 @@ db_abs_files(DB, Snapshot, Journal) :-
 
 rdf_journal_file(DB, Journal) :-
 	(   var(DB)
-	->  rdf_db:rdf_graphs_(All),	% also pick the empty graphs
-	    member(DB, All)
+	->  rdf_graph_(DB, _Count)	% also pick the empty graphs
 	;   true
 	),
 	db_abs_files(DB, _Snapshot, Journal),
@@ -1138,13 +1182,9 @@ no_enc_extra(0'_) --> "_".
 		 *	       REINDEX		*
 		 *******************************/
 
-%%	reindex_db(+Dir)
+%%	reindex_db(+Dir, +Levels)
 %
 %	Reindex the database by creating intermediate directories.
-
-reindex_db(Dir) :-
-	directory_levels(Levels),
-	reindex_db(Dir, Levels).
 
 reindex_db(Dir, Levels) :-
 	directory_files(Dir, Files),
@@ -1279,25 +1319,36 @@ time_stamp(Int) :-
 prolog:message(rdf(Term)) -->
 	message(Term).
 
-message(restore(attached(Graphs, Time/Wall))) -->
+message(restoring(Type, Count, Jobs)) -->
+	[ 'Restoring ~D ~w using ~D concurrent workers'-[Count, Type, Jobs] ].
+message(restore(attached(Graphs, Triples, Time/Wall))) -->
 	{ catch(Percent is round(100*Time/Wall), _, Percent = 0) },
-	[ 'Attached ~D graphs in ~2f seconds (~d% CPU = ~2f sec.)'-
-	  [Graphs, Wall, Percent, Time] ].
+	[ 'Loaded ~D graphs (~D triples) in ~2f sec. (~d% CPU = ~2f sec.)'-
+	  [Graphs, Triples, Wall, Percent, Time] ].
+% attach_graph/2
 message(restore(true, Action)) --> !,
 	silent_message(Action).
 message(restore(brief, Action)) --> !,
 	brief_message(Action).
-message(restore(_, source(DB, Nth, Total))) -->
-	{ file_base_name(DB, Base) },
-	[ 'Restoring ~w ... (~D of ~D graphs) '-[Base, Nth, Total], flush ].
+message(restore(_, Graph)) -->
+	[ 'Restoring ~p ... '-[Graph], flush ].
 message(restore(_, snapshot(_))) -->
 	[ at_same_line, '(snapshot) '-[], flush ].
 message(restore(_, journal(_))) -->
 	[ at_same_line, '(journal) '-[], flush ].
-message(restore(_, done(_, Time, Count, _Nth, _Total))) -->
+message(restore(_, done(_, Time, Count))) -->
 	[ at_same_line, '~D triples in ~2f sec.'-[Count, Time] ].
+% load_source/4
+message(restore(_, snapshot(G, _))) -->
+	[ 'Restoring ~p	(snapshot)'-[G], flush ].
+message(restore(_, journal(G, _))) -->
+	[ 'Restoring ~p	(journal)'-[G], flush ].
+message(restore(_, done(_, Time, Count))) -->
+	[ at_same_line, '~D triples in ~2f sec.'-[Count, Time] ].
+% journal handling
 message(update_failed(S,P,O,Action)) -->
 	[ 'Failed to update <~p ~p ~p> with ~p'-[S,P,O,Action] ].
+% directory reindexing
 message(reindex(Count, Depth)) -->
 	[ 'Restructuring database with ~d levels (~D graphs)'-[Depth, Count] ].
 message(reindex(Depth)) -->
@@ -1305,15 +1356,14 @@ message(reindex(Depth)) -->
 
 silent_message(_Action) --> [].
 
-brief_message(source(DB, Nth, Total)) -->
-	{ file_base_name(DB, Base) },
+brief_message(done(Graph, _Time, _Count, Nth, Total)) -->
+	{ file_base_name(Graph, Base) },
 	[ at_same_line,
-	  '\r~w~`.t ~D of ~D graphs~72|'-[Base, Nth, Total],
+	  '\r~p~`.t ~D of ~D graphs~72|'-[Base, Nth, Total],
 	  flush
 	].
-brief_message(snapshot(_File)) --> [].
-brief_message(journal(_File))  --> [].
-brief_message(done(_DB, _Time, _Count, _Nth, _Total)) --> [].
+brief_message(_) --> [].
+
 
 prolog:message_context(rdf_locked(Args)) -->
 	{ memberchk(time(Time), Args),

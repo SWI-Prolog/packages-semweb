@@ -1,0 +1,54 @@
+---+ Concurrent RDF workplan
+
+  * Establish triple-GC						[OK]
+
+  * Establish expansion of triple hash-tables			[OK]
+
+  * Remove old locking code.					[OK]
+
+  * Establish compatible broadcasting				[OK]
+
+  * Duplicate suppression by maintaining a table of duplicate
+    answers.							[OK]
+
+  * Deal with subPropertyOf predicate clouds			[OK]
+
+  * Deal with rdf_update/4,5.					[OK]
+
+  * Optimize the following tables in GC (i.e., by cloning older
+    objects into new ones):
+	- resource-db
+	- predicate-db
+	- graph-db
+
+  * Concurrent load: not that we are already loading some graph	[UNTESTED]
+    and make a concurrent load wait for completion by the other
+    thread.
+
+  * Randomized Test framework (test_subprop.pl).
+
+    - Randomly mutating graphs					[OK]
+    - Stress testing
+      - Run controlled tests concurrently in transactions?	[OK]
+
+  * rdf_gc							[OK]
+    - Erased triples that cannot really be deleted because a transaction/snapshot
+      blocks this.
+      - Nothing will change if oldest generation doesn't change.
+
+  * Reachability matrices
+    - Transaction-specific matrices must be invalidated after completion
+      of the transaction.
+      - Flag them as invalid by setting died to GEN_PREHIST?	[OK]
+    - Implement matrix-GC.					[OK]
+
+  * Ordering of literal values should be based on SPARQL literal ordering.
+
+================
+Issues
+================
+
+  * After loading P6 rewrite: old: 1209415 duplicates, now 8!?
+
+  * Deadlock: lookupAtom() --> GC --> free_node_data() --> PL_unregister_atom()
+    Can be fixed using atomic incr/decr for PL_unregister_atom(). [OK (GCC)]

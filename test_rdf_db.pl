@@ -1,11 +1,10 @@
-/*  $Id$
-
-    Part of SWI-Prolog
+/*  Part of SWI-Prolog
 
     Author:        Jan Wielemaker
-    E-mail:        wielemak@science.uva.nl
+    E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 1985-2007, University of Amsterdam
+    Copyright (C): 2009-2012, University of Amsterdam
+			      VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License
@@ -32,16 +31,9 @@
 :- module(test_rdf_db,
 	  [ test_rdf_db/0
 	  ]).
-
-:- asserta(user:file_search_path(foreign, '../sgml')).
-:- asserta(user:file_search_path(library, '../sgml')).
-:- asserta(user:file_search_path(library, '../plunit')).
-:- asserta(user:file_search_path(foreign, '../clib')).
-:- asserta(user:file_search_path(library, '../clib')).
-:- asserta(user:file_search_path(library, '../RDF')).
-:- asserta(user:file_search_path(foreign, '.')).
-:- use_module(rdf_db).
-:- use_module(rdfs).
+:- include(local_test).
+:- use_module(library(semweb/rdf_db)).
+:- use_module(library(semweb/rdfs)).
 :- use_module(library(xsdp_types)).
 :- use_module(library(lists)).
 :- use_module(library(plunit)).
@@ -328,8 +320,9 @@ lshare(1) :-
 lshare(2) :-
 	rdf_assert(a,b,literal(aap)),
 	rdf_retractall(a,b,literal(aap)),
+	rdf_gc,
 	rdf_statistics(literals(X)),
-	X == 0.
+	expect(X == 0).
 lshare(3) :-
 	rdf_assert(a,b,literal(aap)),
 	rdf_assert(a,c,literal(aap)),	% shared
@@ -339,14 +332,25 @@ lshare(4) :-
 	rdf_assert(a,c,literal(aap)),
 	rdf_retractall(a,b,literal(aap)),
 	rdf_retractall(a,c,literal(aap)),
+	rdf_gc,
 	rdf_statistics(literals(X)),
-	X == 0.
+	expect(X == 0).
 lshare(5) :-
-	rdf_assert(a,b,literal(aap)),
-	rdf_assert(a,b,literal(aap)),
+	rdf_assert(a,b,literal(aap), g1),
+	rdf_assert(a,b,literal(aap), g2),
+	rdf_statistics(literals(X1)),
+	expect(X1 == 1),
 	rdf_retractall(a,b,literal(aap)),
+	rdf_gc,
 	rdf_statistics(literals(X)),
-	X == 0.
+	expect(X == 0).
+
+expect(Goal) :-
+	Goal, !.
+expect(Goal) :-
+	print_message(error, format('FALSE: ~q', [Goal])),
+	backtrace(3),
+	fail.
 
 
 		 /*******************************
@@ -440,6 +444,11 @@ update(object-7) :-			% transaction update
 	rdf_transaction(rdf_update(x, a, literal(lang(en, hallo)),
 				   object(literal(hallo)))),
 	rdf(x, a, literal(hallo)).
+update(literal) :-
+	rdf_assert(s1, p, literal(xxx)),
+	rdf_assert(s2, p, literal(xxx)),
+	rdf_update(s1, p, literal(xxx), subject(s3)),
+	rdf(s3, p, literal(xxx)).
 
 
 		 /*******************************
@@ -628,6 +637,8 @@ rdf_retractall(term) :-
 		 *	       MONITOR		*
 		 *******************************/
 
+%do_monitor(Event) :-
+%	writeln(Event), fail.
 do_monitor(assert(S, P, O, DB)) :-
 	atom(O),
 	ip(P, IP),
@@ -646,9 +657,14 @@ monitor(transaction-1) :-
 	rdf_transaction(rdf_assert(x, a, y, db)),
 	rdf_monitor(do_monitor, [-all]),
 	findall(rdf(S,P,O), rdf(S,P,O), DB),
-	DB == [ rdf(x, a, y),
-		rdf(y, ia, x)
-	      ].
+	expect(DB == [ rdf(x, a, y),
+		       rdf(y, ia, x)
+		     ]),
+	rdf_monitor(do_monitor, []),
+	rdf_transaction(rdf_retractall(x, a, y, db)),
+	rdf_monitor(do_monitor, [-all]),
+	expect(\+rdf(_,_,_)).
+
 
 
 		 /*******************************
@@ -670,6 +686,9 @@ subproperty(1) :-
 %	Property hierarchy handling for rdf_has/3. The routines maintain
 %	clouds of connected properties and for   each  cloud a bitmatrix
 %	filled with the closure of the rdfs:subPropertyOf relation.
+%
+%	@tbd: improve tests by trying all permutations of the order in
+%	      which the graph is built.
 
 ptree(1) :-
 	rdf_assert(a, rdfs:subPropertyOf, b),
@@ -782,6 +801,28 @@ source(1) :-
 	X == 'test.rdf'.
 
 		 /*******************************
+		 *	       RETRACT		*
+		 *******************************/
+
+delete(1) :-
+	rdf_assert(s,p,o),
+	rdf_retractall(s,p,o),
+	rdf_statistics(triples(Count)),
+	expect(Count == 0).
+delete(2) :-
+	rdf_assert(s,p,o),
+	rdf_transaction(rdf_retractall(s,p,o)),
+	rdf_statistics(triples(Count)),
+	expect(Count == 0).
+delete(3) :-
+	rdf_transaction(rdf_assert(s,p,o)),
+	rdf_transaction(rdf_retractall(s,p,o)),
+	rdf_transaction(rdf_assert(s,p,o)),
+	rdf_statistics(triples(Count)),
+	expect(Count == 1).
+
+
+		 /*******************************
 		 *	        UNLOAD		*
 		 *******************************/
 
@@ -792,8 +833,8 @@ unload(1) :-
 	rdf_statistics(triples(T1)),
 	rdf_load(dc),
 	rdf_statistics(triples(T2)),
-	T0 == T2,
-	T1 == 0.
+	expect(T0 == T2),
+	expect(T1 == 0).
 
 		 /*******************************
 		 *	      SCRIPTS		*
@@ -887,6 +928,7 @@ testset(ptree).
 testset(reachable).
 testset(duplicates).
 testset(source).
+testset(delete).
 testset(unload).
 
 %	testdir(Dir)
