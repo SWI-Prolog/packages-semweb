@@ -1001,6 +1001,9 @@ comitting a transaction steps the generation only by one.
 These predicates are renamed into rdf_current_prefix/1,
 rdf_register_prefix/2, rdf_register_prefix/3.  The old predicates
 are still available as deprecated predicates.
+
+    \item [rdf_unload/1] now only accepts a source location and
+deletes the associated graph using rdf_unload_graph/1.
 \end{description}
 
 
