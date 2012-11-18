@@ -7620,6 +7620,7 @@ bf_expand(rdf_db *db, agenda *a, atom_t resource, uintptr_t d, query *q)
   state.flags   = MATCH_SUBPROPERTY|MATCH_INVERSE;
   state.p_cloud = NULL;
   state.query   = q;
+  state.db      = db;
 
   if ( state.pattern.indexed & BY_S )		/* subj ---> */
   { state.pattern.subject = resource;
