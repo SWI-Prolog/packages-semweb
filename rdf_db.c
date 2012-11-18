@@ -7613,29 +7613,33 @@ can_reach_target(rdf_db *db, agenda *a, query *q)
 
 static visited *
 bf_expand(rdf_db *db, agenda *a, atom_t resource, uintptr_t d, query *q)
-{ triple pattern = a->pattern;
+{ search_state state;
   visited *rc = NULL;
 
-  if ( pattern.indexed & BY_S )		/* subj ---> */
-  { pattern.subject = resource;
+  state.pattern = a->pattern;		/* Structure copy */
+  state.flags   = MATCH_SUBPROPERTY|MATCH_INVERSE;
+  state.p_cloud = NULL;
+  state.query   = q;
+
+  if ( state.pattern.indexed & BY_S )		/* subj ---> */
+  { state.pattern.subject = resource;
   } else
-  { pattern.object.resource = resource;
+  { state.pattern.object.resource = resource;
   }
 
   if ( a->target && can_reach_target(db, a, q) )
     return append_agenda(db, a, a->target, d);
 
   for(;;)
-  { int indexed = pattern.indexed;
-    triple_walker tw;
+  { int indexed = state.pattern.indexed;
     triple *p;
 
-    init_triple_walker(&tw, db, &pattern, indexed);
-    while((p=next_triple(&tw)))			/* TBD: alternate hashes!! */
+    init_triple_walker(&state.cursor, db, &state.pattern, indexed);
+    while((p=next_triple(&state.cursor)))
     { if ( !alive_triple(a->query, p) )
 	continue;
 
-      if ( match_triples(db, p, &pattern, a->query, MATCH_SUBPROPERTY) )
+      if ( match_triples(db, p, &state.pattern, a->query, MATCH_SUBPROPERTY) )
       { atom_t found;
 	visited *v;
 
@@ -7654,8 +7658,12 @@ bf_expand(rdf_db *db, agenda *a, atom_t resource, uintptr_t d, query *q)
 	  return rc;
       }
     }
-    if ( inverse_partial_triple(&pattern) )
+    if ( next_sub_property(&state) )
       continue;
+    if ( inverse_partial_triple(&state.pattern) )
+    { state.p_cloud = NULL;
+      continue;
+    }
     break;
   }
 					/* TBD: handle owl:sameAs */
