@@ -5830,10 +5830,11 @@ unify_triple(term_t subject, term_t pred, term_t object,
     object = subject;
     subject = tmp;
 
-    rc = PL_unify_term(pred, PL_FUNCTOR, FUNCTOR_inverse_of1,
-		               PL_ATOM, p->name);
+    rc = !pred || PL_unify_term(pred,
+				PL_FUNCTOR, FUNCTOR_inverse_of1,
+				  PL_ATOM, p->name);
   } else
-  { rc = PL_unify_atom(pred, p->name);
+  { rc = !pred || PL_unify_atom(pred, p->name);
   }
 
   if ( !rc ||
@@ -6484,9 +6485,9 @@ next_search_state(search_state *state)
   triple *p = &state->pattern;
   term_t retpred;
 
-  if ( state->realpred )
+  if ( (state->flags & MATCH_SUBPROPERTY) )
   { retpred = state->realpred;
-    if ( PL_is_variable(state->predicate) )
+    if ( retpred && PL_is_variable(state->predicate) )
     { if ( !PL_unify(state->predicate, retpred) )
 	return FALSE;
     }
@@ -6630,7 +6631,14 @@ rdf4(term_t subject, term_t predicate, term_t object,
 
 
 static foreign_t
-rdf_has(term_t subject, term_t predicate, term_t object,
+rdf_has3(term_t subject, term_t predicate, term_t object, control_t h)
+{ return rdf(subject, predicate, object, 0, 0, h,
+	     MATCH_SUBPROPERTY|MATCH_INVERSE);
+}
+
+
+static foreign_t
+rdf_has4(term_t subject, term_t predicate, term_t object,
 	term_t realpred, control_t h)
 { return rdf(subject, predicate, object, 0, realpred, h,
 	     MATCH_SUBPROPERTY|MATCH_INVERSE);
@@ -8466,7 +8474,8 @@ install_rdf_db(void)
   PL_register_foreign("rdf_retractall",	4, rdf_retractall4, 0);
   PL_register_foreign("rdf",		3, rdf3,	    NDET);
   PL_register_foreign("rdf",		4, rdf4,	    NDET);
-  PL_register_foreign("rdf_has",	4, rdf_has,	    NDET);
+  PL_register_foreign("rdf_has",	4, rdf_has4,	    NDET);
+  PL_register_foreign("rdf_has",	3, rdf_has3,	    NDET);
   PL_register_foreign("rdf_gc_",	0, rdf_gc,	    0);
   PL_register_foreign("rdf_add_gc_time",1, rdf_add_gc_time, 0);
   PL_register_foreign("rdf_gc_info_",   1, rdf_gc_info,	    0);

@@ -741,17 +741,17 @@ lang_equal(Lang1, Lang2) :-
 
 %%	rdf_has(?Subject, +Predicate, ?Object) is nondet.
 %
-%	Succeeds if the triple rdf(Subject, Predicate, Object) is true
-%	exploiting the rdfs:subPropertyOf predicate.
-
-rdf_has(Subject, Predicate, Object) :-
-	rdf_has(Subject, Predicate, Object, _).
+%	Succeeds if the triple rdf(Subject,   Predicate, Object) is true
+%	exploiting the rdfs:subPropertyOf predicate as   well as inverse
+%	predicates   declared   using   rdf_set_predicate/2   with   the
+%	=inverse_of= property.
 
 %%	rdf_has(?Subject, +Predicate, ?Object, -RealPredicate) is nondet.
 %
 %	Same as rdf_has/3, but RealPredicate is   unified  to the actual
 %	predicate that makes this relation   true. RealPredicate must be
-%	Predicate or an rdfs:subPropertyOf Predicate.
+%	Predicate or an rdfs:subPropertyOf  Predicate.   If  an  inverse
+%	match is found, RealPredicate is the term inverse_of(Pred).
 
 %%	rdf_reachable(?Subject, +Predicate, ?Object) is nondet.
 %
