@@ -5625,9 +5625,8 @@ get_partial_triple(rdf_db *db,
 
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-inverse_partial_triple(triple *t, triple *save)  inverses   a  triple by
-swapping object and  subject  and  replacing   the  predicate  with  its
-inverse.
+inverse_partial_triple(triple *t) inverses a triple   by swapping object
+and subject and replacing the predicate with its inverse.
 
 TBD: In many cases we can  compute   the  hash  more efficiently than by
 simply recomputing it:
@@ -5637,16 +5636,13 @@ simply recomputing it:
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static int
-inverse_partial_triple(triple *t, triple *save)
+inverse_partial_triple(triple *t)
 { predicate *i;
 
   if ( !t->inversed &&
        (!(i=t->predicate.r) || (i=t->predicate.r->inverse_of)) &&
        !t->object_is_literal )
-  { if ( save )
-      *save = *t;
-
-    atom_t o = t->object.resource;
+  { atom_t o = t->object.resource;
 
     t->object.resource = t->subject;
     t->subject = o;
@@ -5826,21 +5822,22 @@ static int
 unify_triple(term_t subject, term_t pred, term_t object,
 	     term_t src, triple *t, int inversed)
 { predicate *p = t->predicate.r;
-  fid_t fid;
+  fid_t fid = PL_open_foreign_frame();
+  int rc;
 
   if ( inversed )
   { term_t tmp = object;
     object = subject;
     subject = tmp;
 
-    if ( !(p = p->inverse_of) )
-      return FALSE;
+    rc = PL_unify_term(pred, PL_FUNCTOR, FUNCTOR_inverse_of1,
+		               PL_ATOM, p->name);
+  } else
+  { rc = PL_unify_atom(pred, p->name);
   }
 
-  fid = PL_open_foreign_frame();
-
-  if ( !PL_unify_atom(subject, t->subject) ||
-       !PL_unify_atom(pred, p->name) ||
+  if ( !rc ||
+       !PL_unify_atom(subject, t->subject) ||
        !unify_object(object, t) ||
        (src && !unify_graph(src, t)) )
   { if ( PL_exception(0) )
@@ -6193,11 +6190,6 @@ init_search_state(search_state *state, query *query)
     return FALSE;
   }
 
-  if ( (state->flags & MATCH_SUBPROPERTY) &&
-       p->predicate.r &&
-       is_leaf_predicate(state->db, p->predicate.r, query) )
-    state->flags &= ~MATCH_SUBPROPERTY;
-
   if ( (p->match == STR_MATCH_PREFIX ||	p->match == STR_MATCH_LIKE) &&
        p->indexed != BY_SP &&
        (state->prefix = first_atom(p->object.literal->value.string, p->match)))
@@ -6363,8 +6355,13 @@ next_sub_property(search_state *state)
     predicate_cloud *pc;
 
     if ( !(pc=state->p_cloud) )
-    { if ( p->predicate.r &&		/* no pred on rdf_has(?,-,?) */
-	   p->predicate.r->cloud->alt_hash_count )
+    { if ( !p->predicate.r )		/* no pred on rdf_has(?,-,?) */
+	return FALSE;
+
+      if ( is_leaf_predicate(state->db, p->predicate.r, state->query) )
+	return FALSE;
+
+      if ( p->predicate.r->cloud->alt_hash_count )
       { pc = state->p_cloud = p->predicate.r->cloud;
 
 	DEBUG(1, Sdprintf("%d alt hashes; first was 0x%x\n",
@@ -6415,13 +6412,6 @@ next_pattern(search_state *state)
 { triple_walker *tw = &state->cursor;
   triple *p = &state->pattern;
 
-  if ( (state->flags&MATCH_INVERSE) &&
-       inverse_partial_triple(p, &state->saved_pattern) )
-  { init_triple_walker(tw, state->db, p, p->indexed);
-
-    return TRUE;
-  }
-
   if ( state->has_literal_state )
   { literal **litp;
 
@@ -6466,13 +6456,19 @@ next_pattern(search_state *state)
   }
 
   if ( next_sub_property(state) )	/* redo search with alternative hash */
-  { if ( p->inversed )
-    { *p = state->saved_pattern;
-      init_triple_walker(tw, state->db, p, p->indexed);
-    } else if ( state->restart_lit )
+  { if ( state->restart_lit )
     { state->literal_state = state->restart_lit_state;
       init_cursor_from_literal(state, state->restart_lit);
     }
+
+    return TRUE;
+  }
+
+  if ( (state->flags&MATCH_INVERSE) &&
+       inverse_partial_triple(p) )
+  { DEBUG(1, Sdprintf("Retrying inverse: "); print_triple(p, PRT_NL));
+    state->p_cloud = NULL;
+    init_triple_walker(tw, state->db, p, p->indexed);
 
     return TRUE;
   }
@@ -7627,7 +7623,7 @@ bf_expand(rdf_db *db, agenda *a, atom_t resource, uintptr_t d, query *q)
     triple *p;
 
     init_triple_walker(&tw, db, &pattern, indexed);
-    while((p=next_triple(&tw)))
+    while((p=next_triple(&tw)))			/* TBD: alternate hashes!! */
     { if ( !alive_triple(a->query, p) )
 	continue;
 
@@ -7650,7 +7646,7 @@ bf_expand(rdf_db *db, agenda *a, atom_t resource, uintptr_t d, query *q)
 	  return rc;
       }
     }
-    if ( inverse_partial_triple(&pattern, NULL) )
+    if ( inverse_partial_triple(&pattern) )
       continue;
     break;
   }

@@ -506,7 +506,6 @@ typedef struct search_state
   triple       *prefetched;		/* Prefetched triple (retry) */
 					/* END memset() cleared area */
   literal_ex    lit_ex;			/* extended literal for fast compare */
-  triple	saved_pattern;		/* For inverse */
   tripleset	dup_answers;		/* possible duplicate answers */
 } search_state;
 
