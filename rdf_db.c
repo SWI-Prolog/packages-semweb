@@ -282,17 +282,21 @@ print_object(triple *t)
 { if ( t->object_is_literal )
   { print_literal(t->object.literal);
   } else
-  { Sdprintf("%s", PL_atom_chars(t->object.resource));
+  { Sdprintf("%s", t->object.resource ? PL_atom_chars(t->object.resource) : "?o");
   }
 }
 
 
 static void
 print_src(triple *t)
-{ if ( t->line == NO_LINE )
-    Sdprintf(" [%s]", PL_atom_chars(t->graph));
-  else
-    Sdprintf(" [%s:%ld]", PL_atom_chars(t->graph), t->line);
+{ if ( t->graph )
+  { if ( t->line == NO_LINE )
+      Sdprintf(" [%s]", PL_atom_chars(t->graph));
+    else
+      Sdprintf(" [%s:%ld]", PL_atom_chars(t->graph), t->line);
+  } else
+  { Sdprintf(" ?g");
+  }
 }
 
 
@@ -329,8 +333,8 @@ print_gen(triple *t)
 static void
 print_triple(triple *t, int flags)
 { Sdprintf("<%s %s ",
-	   PL_atom_chars(t->subject),
-	   PL_atom_chars(t->predicate.r->name));
+	   t->subject ? PL_atom_chars(t->subject) : "?s",
+	   t->predicate.r->name ? PL_atom_chars(t->predicate.r->name) : "?p");
   print_object(t);
   if ( (flags & PRT_SRC) )
     print_src(t);
