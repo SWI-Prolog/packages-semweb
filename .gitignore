@@ -40,4 +40,5 @@ semweb.tex
 rdfcache.tex
 rdfdb.tex
 doc/*.tex
+g1.rec
 .gdbinit
