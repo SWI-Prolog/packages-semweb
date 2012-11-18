@@ -3082,6 +3082,13 @@ count_different(triple_bucket *tb, int index, int *count)
 }
 
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+triple_hash_quality() computes the quality of the triple hash index. The
+return is 1.0 if the unbounded hashkey for all objects in each bucket is
+the same, and < 1.0 if there  are buckets holding objects with different
+unbounded keys.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 static float
 triple_hash_quality(rdf_db *db, int index, int sample)
 { triple_hash *hash = &db->hash[index];
@@ -3109,14 +3116,44 @@ triple_hash_quality(rdf_db *db, int index, int sample)
 		     index, i, count, tb->count));
 
     if ( count )
-    { q += (float)tb->count/(float)different;
-      total += tb->count;
+    { q += (float)count/(float)different;
+      total += count;
     }
   }
 
   return total == 0 ? 1.0 : q/(float)total;
 }
 
+
+#ifdef O_DEBUG
+void
+print_triple_hash(rdf_db *db, int index, int sample)
+{ triple_hash *hash = &db->hash[index];
+  int i, step;
+
+  if ( sample > 0 )
+    step = (hash->bucket_count+sample)/sample;	/* step >= 1 */
+  else
+    step = 1;
+
+  for(i=0; i<hash->bucket_count; i += step)
+  { int entry = MSB(i);
+    triple_bucket *tb = &hash->blocks[entry][i];
+    int count;
+    int different = count_different(tb, col_index[index], &count);
+
+    if ( count != 0 )
+    { triple *t;
+
+      Sdprintf("%d: c=%d; d=%d", i, count, different);
+      for(t=tb->head; t; t=t->tp.next[index])
+      { Sdprintf("\n\t");
+	print_triple(t, 0);
+      }
+    }
+  }
+}
+#endif /*O_DEBUG*/
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 Consider resizing the hash-tables. The argument 'extra' gives the number
@@ -3150,6 +3187,8 @@ consider_triple_rehash(rdf_db *db, size_t extra)
 
       switch(col_index[i])
       { case BY_S:
+	case BY_SG:
+	case BY_SP:
 	  while ( SCALE(db->resources.hash.count) > sizenow<<resize )
 	    resize++;
 	  break;
@@ -3158,6 +3197,7 @@ consider_triple_rehash(rdf_db *db, size_t extra)
 	    resize++;
 	  break;
 	case BY_O:
+	case BY_PO:
 	  while ( SCALE(db->resources.hash.count + db->literals.count) >
 		  sizenow<<resize )
 	    resize++;
@@ -3167,20 +3207,17 @@ consider_triple_rehash(rdf_db *db, size_t extra)
 	    resize++;
 	  break;
 	case BY_G:
-	  while ( SCALE(db->graphs.count) > (db->graphs.bucket_count)<<resize )
+	  while ( SCALE(db->graphs.count) > sizenow<<resize )
 	    resize++;
 	  break;
-	case BY_PO:
-	case BY_SG:
-	case BY_SP:
 	case BY_PG:
-	{ float qexpect = triple_hash_quality(db, i, 1024);
+	{ size_t s;
 
-	  while ( qexpect < SCALEF(1.0) )
-	  { qexpect *= 2;
+	  s = (db->graphs.count < db->predicates.count ?
+				  db->predicates.count : db->graphs.count);
+
+	  while ( SCALE(s) > sizenow<<resize )
 	    resize++;
-	  }
-
 	  break;
 	}
 	default:
