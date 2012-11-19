@@ -926,7 +926,12 @@ create_db(DB) :-
 	debug(rdf_persistency, 'Saving DB ~w', [DB]),
 	db_abs_files(DB, Snapshot, Journal),
 	atom_concat(Snapshot, '.new', NewSnapshot),
-	(   catch(rdf_save_db(NewSnapshot, DB), _, fail)
+	(   catch(( create_directory_levels(Snapshot),
+		    rdf_save_db(NewSnapshot, DB)
+		  ), Error,
+		  ( print_message(warning, Error),
+		    fail
+		  ))
 	->  (   exists_file(Journal)
 	    ->  delete_file(Journal)
 	    ;   true
@@ -1030,12 +1035,14 @@ db_file(Dir, Base, Levels, File) :-
 
 open_db(Base, Mode, Stream, Options) :-
 	db_file(Base, File),
-	(   rdf_option(directory_levels(0))
-	->  true
-	;   file_directory_name(File, Dir),
-	    make_directory_path(Dir)
-	),
+	create_directory_levels(File),
 	open(File, Mode, Stream, [encoding(utf8)|Options]).
+
+create_directory_levels(_File) :-
+	rdf_option(directory_levels(0)), !.
+create_directory_levels(File) :-
+	file_directory_name(File, Dir),
+	make_directory_path(Dir).
 
 exists_db(Base) :-
 	db_file(Base, File),
