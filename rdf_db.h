@@ -284,7 +284,9 @@ typedef unsigned int triple_id;		/* Triple identifier */
 #endif
 
 typedef struct triple
-{ atom_t	subject;
+{ lifespan	lifespan;		/* Start and end generation */
+  atom_id	subject_id;
+  atom_id	graph_id;		/* where it comes from */
   union
   { predicate*	r;			/* resolved: normal DB */
     atom_t	u;			/* used by rdf_load_db_/3 */
@@ -293,8 +295,6 @@ typedef struct triple
   { literal *	literal;
     atom_t	resource;
   } object;
-  atom_t	graph;			/* where it comes from */
-  lifespan	lifespan;		/* Start and end generation */
 #ifdef COMPACT
   triple_id	id;			/* Indentifier number */
   triple_id	reindexed;		/* Remapped by optimize_triple_hash() */
