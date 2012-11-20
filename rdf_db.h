@@ -279,7 +279,7 @@ typedef struct literal
 #define t_match next[0]
 
 #ifdef COMPACT
-#define TRIPLE_NO_ID	((triple_id)-1)
+#define TRIPLE_NO_ID	(0)
 typedef unsigned int triple_id;		/* Triple identifier */
 #endif
 
@@ -298,8 +298,12 @@ typedef struct triple
   struct triple *reindexed;		/* Remapped by optimize_triple_hash() */
 					/* indexing */
   union
-  { struct triple*next[INDEX_TABLES];	/* hash-table next links */
-    literal	end;			/* end for between(X,Y) patterns */
+  { literal	end;			/* end for between(X,Y) patterns */
+#ifdef COMPACT
+    triple_id	next[INDEX_TABLES];	/* hash-table next identifier */
+#else
+    struct triple*next[INDEX_TABLES];	/* hash-table next links */
+#endif
   } tp;					/* triple or pattern */
 					/* smaller objects (e.g., flags) */
 #ifdef COMPACT
@@ -368,8 +372,10 @@ typedef struct triple_walker
 { size_t	unbounded_hash;		/* The unbounded hash-key */
   int		icol;			/* index column */
   size_t	bcount;			/* Current bucket count */
-  triple_hash  *hash;			/* The hash */
   triple       *current;		/* Our current location */
+#ifdef COMPACT
+  struct rdf_db *db;			/* the array of triples */
+#endif
 } triple_walker;
 
 #define MAX_BLOCKS 20			/* allows for 2M threads */
