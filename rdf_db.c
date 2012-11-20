@@ -2956,19 +2956,16 @@ init_triple_hash(rdf_db *db, int index, size_t count)
 
 
 static int
-resize_triple_hash(rdf_db *db, int index, int resize)
+size_triple_hash(rdf_db *db, int index, size_t size)
 { triple_hash *hash = &db->hash[index];
-
-  DEBUG(1, if ( resize > 1 )
-	   { Sdprintf("Resized triple index %s with %d steps\n",
-		      col_name[index], resize);
-	   });
+  int extra;
 
   if ( hash->created )
     rdf_create_gc_thread(db);
 
   simpleMutexLock(&db->queries.write.lock);
-  while( resize-- > 0 )
+  extra = MSB(size) - MSB(hash->bucket_count);
+  while( extra-- > 0 )
   { int i = MSB(hash->bucket_count);
     size_t bytes  = sizeof(triple_bucket)*hash->bucket_count;
     triple_bucket *t = PL_malloc_uncollectable(bytes);
@@ -2984,19 +2981,6 @@ resize_triple_hash(rdf_db *db, int index, int resize)
   simpleMutexUnlock(&db->queries.write.lock);
 
   return TRUE;
-}
-
-
-static int
-size_triple_hash(rdf_db *db, int icol, size_t size)
-{ int extra = MSB(size) - MSB(db->hash[icol].bucket_count);
-
-  if ( extra >= 0 && MSB(size) < MAX_TBLOCKS )
-  { resize_triple_hash(db, icol, extra);
-    return TRUE;
-  }
-
-  return FALSE;
 }
 
 
@@ -3229,7 +3213,7 @@ consider_triple_rehash(rdf_db *db, size_t extra)
 
       if ( resize )
       { resized++;
-	resize_triple_hash(db, i, resize);
+	size_triple_hash(db, i, sizenow<<resize);
       }
     }
 
