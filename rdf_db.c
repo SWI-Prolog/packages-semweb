@@ -904,11 +904,6 @@ fetch_triple_element(rdf_db *db, triple_id id)
 { return &db->triple_array.blocks[MSB(id)][id];
 }
 
-static triple *
-fetch_triple(rdf_db *db, triple_id id)
-{ return id ? db->triple_array.blocks[MSB(id)][id].triple : (triple*)NULL;
-}
-
 static triple_id
 register_triple(rdf_db *db, triple *t)
 { triple_array *a = &db->triple_array;
@@ -972,7 +967,6 @@ triple_follow_hash(rdf_db *db, triple *t, int icol)
 #define register_triple(db, t) (void)0
 #define unregister_triple(db, t) (void)0
 #define triple_follow_hash(db, t, icol) ((t)->tp.next[icol])
-#define fetch_triple(db, t) (t)
 #define T_ID(t) (t)
 
 #endif /*COMPACT*/
@@ -1695,7 +1689,7 @@ matching_object_triple_until(rdf_db *db, triple *t, triple *p, query *q,
       return t2;
     }
   } else
-  { t2 = deref_triple(t);		/* Dubious */
+  { t2 = deref_triple(db, t);		/* Dubious */
 
     if ( match_triples(db, t2, p, q, 0) &&
 	 !t2->object_is_literal )
@@ -3548,7 +3542,7 @@ reindex_triple(rdf_db *db, triple *t)
   memset(&t2->tp, 0, sizeof(t2->tp));
   simpleMutexLock(&db->queries.write.lock);
   link_triple_hash(db, t2);
-  t->reindexed = t2;
+  t->reindexed = T_ID(t2);
   t->lifespan.died = db->reindexed++;
   if ( t2->object_is_literal )			/* do not deallocate lit twice */
     t2->object.literal->references++;
@@ -6097,7 +6091,7 @@ mark_duplicate(rdf_db *db, triple *t, query *q)
 
   init_triple_walker(&tw, db, t, indexed);
   while((d=next_triple(&tw)) && d != t)
-  { d = deref_triple(d);
+  { d = deref_triple(db, d);
     DEBUG(3, Sdprintf("Possible duplicate: ");
 	     print_triple(d, PRT_NL|PRT_ADR));
 

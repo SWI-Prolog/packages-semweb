@@ -544,7 +544,7 @@ del_triples(query *q, triple **triples, size_t count)
   gen = queryWriteGen(q) + 1;
 
   for(tp=triples; tp < ep; tp++)
-  { triple *t = deref_triple(*tp);
+  { triple *t = deref_triple(db, *tp);
 
     t->lifespan.died = gen;
     del_triple_consequences(db, t, q);
@@ -561,7 +561,7 @@ del_triples(query *q, triple **triples, size_t count)
 
   if ( !q->transaction && rdf_is_broadcasting(EV_RETRACT) )
   { for(tp=triples; tp < ep; tp++)
-    { triple *t = deref_triple(*tp);
+    { triple *t = deref_triple(db, *tp);
 
       if ( !rdf_broadcast(EV_RETRACT, t, NULL) )
 	return FALSE;
@@ -603,7 +603,7 @@ update_triples(query *q,
   for(to=old,tn=new; to < eo; to++,tn++)
   { if ( *tn )
     { triple *n = *tn;				/* new, cannot be reindexed */
-      triple *o = deref_triple(*to);
+      triple *o = deref_triple(db, *to);
 
       o->lifespan.died = gen;
       n->lifespan.born = gen;
@@ -686,7 +686,7 @@ close_transaction(query *q)
 
 static void
 commit_add(query *q, gen_t gen_max, gen_t gen, triple *t)
-{ t = deref_triple(t);
+{ t = deref_triple(q->db, t);
 
   if ( t->lifespan.died == gen_max )
   { t->lifespan.born = gen;
@@ -701,7 +701,7 @@ commit_add(query *q, gen_t gen_max, gen_t gen, triple *t)
 
 static void
 commit_del(query *q, gen_t gen, triple *t)
-{ t = deref_triple(t);
+{ t = deref_triple(q->db, t);
 
   if ( is_wr_transaction_gen(q, t->lifespan.died) )
   { t->lifespan.died = gen;

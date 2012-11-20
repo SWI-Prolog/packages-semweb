@@ -295,7 +295,12 @@ typedef struct triple
   } object;
   atom_t	graph;			/* where it comes from */
   lifespan	lifespan;		/* Start and end generation */
+#ifdef COMPACT
+  triple_id	id;			/* Indentifier number */
+  triple_id	reindexed;		/* Remapped by optimize_triple_hash() */
+#else
   struct triple *reindexed;		/* Remapped by optimize_triple_hash() */
+#endif
 					/* indexing */
   union
   { literal	end;			/* end for between(X,Y) patterns */
@@ -306,9 +311,6 @@ typedef struct triple
 #endif
   } tp;					/* triple or pattern */
 					/* smaller objects (e.g., flags) */
-#ifdef COMPACT
-  triple_id	id;			/* Indentifier number */
-#endif
   uint32_t      line;			/* graph-line number */
   unsigned	object_is_literal : 1;	/* Object is a literal */
   unsigned	resolve_pred : 1;	/* predicates needs to be resolved */

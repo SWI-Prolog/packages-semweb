@@ -158,6 +158,15 @@ COMMON(int)	alive_lifespan(query *q, lifespan *span);
 COMMON(int)	born_lifespan(query *q, lifespan *lifespan);
 COMMON(char *)	gen_name(gen_t gen, char *buf);
 
+#ifdef COMPACT
+static triple *
+fetch_triple(rdf_db *db, triple_id id)
+{ return id ? db->triple_array.blocks[MSB(id)][id].triple : (triple*)NULL;
+}
+#else /*COMPACT*/
+#define fetch_triple(db, t) (t)
+#endif /*COMPACT*/
+
 /* dereference `optimized' triples.  See optimize_triple_hash()
 
    FIXME: Things are generally not so easy.  See alive_triple() for
@@ -165,9 +174,9 @@ COMMON(char *)	gen_name(gen_t gen, char *buf);
 */
 
 static inline triple *
-deref_triple(triple *t)
+deref_triple(rdf_db *db, triple *t)
 { while(t->reindexed)
-    t = t->reindexed;
+    t = fetch_triple(db, t->reindexed);
 
   return t;
 }
@@ -180,7 +189,7 @@ deref_triple(triple *t)
 
 static inline triple *
 alive_triple(query *q, triple *t)
-{ for ( ; t->reindexed; t = t->reindexed )
+{ for ( ; t->reindexed; t = fetch_triple(q->db, t->reindexed) )
   { if ( t->lifespan.died < q->reindex_gen )
       return NULL;
   }
