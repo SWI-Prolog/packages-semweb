@@ -23,6 +23,7 @@
 
 #ifndef RDFDB_H_INCLUDED
 #define RDFDB_H_INCLUDED
+#include <config.h>
 
 		 /*******************************
 		 *	     OPTIONS		*
