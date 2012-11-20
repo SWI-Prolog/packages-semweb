@@ -2931,28 +2931,201 @@ share_literal(rdf_db *db, literal *from)
 		 *	      TRIPLES		*
 		 *******************************/
 
-triple *
+static void	finalize_triple(void *data, void *client);
+
+static triple *
 alloc_triple(void)
 { triple *t = malloc(sizeof(*t));
 
   if ( t )
-    memset(t, 0, sizeof(*t));
+  { memset(t, 0, sizeof(*t));
+#ifdef COMPACT
+    t->id = TRIPLE_NO_ID;
+#endif
+  }
 
   return t;
 }
 
 
-void
+static void
 unalloc_triple(rdf_db *db, triple *t, int linger)
 { if ( t )
   { assert(t->atoms_locked == FALSE);
 
     if ( linger )
+    {
+#ifdef COMPACT
+      if ( t->id != TRIPLE_NO_ID )
+	deferred_finalize(&db->defer_triples, t,
+			  finalize_triple, db);
+#else
       deferred_free(&db->defer_triples, t);
-    else
-      free(t);
+#endif
+    } else
+    { free(t);
+    }
   }
 }
+
+#ifdef COMPACT
+
+		 /*******************************
+		 *	   TRIPLE ARRAY		*
+		 *******************************/
+
+static triple_element *
+alloc_array_slice(size_t count, triple_element **last)
+{ size_t bytes = count*sizeof(triple_element);
+  triple_element *slice = malloc(bytes);
+
+  if ( slice )
+  { triple_element *end = slice+count-1;
+    triple_element *e, *n;
+
+    for(e=slice; e<end; e=n)
+    { n = e+1;
+      e->fnext = n;
+    }
+    e->fnext = NULL;
+
+    if ( last )
+      *last = e;
+  }
+
+  return slice;
+}
+
+static void
+free_array_slice(triple_array *a, triple_element *list, triple_element *last)
+{ triple_element *o;
+
+  do
+  { o = a->freelist;
+    last->fnext = o;
+  } while ( !__sync_bool_compare_and_swap(&a->freelist, o, list) );
+}
+
+static int
+init_triple_array(rdf_db *db)
+{ triple_array *a = &db->triple_array;
+  triple_element *slice = alloc_array_slice(TRIPLE_ARRAY_PREINIT, NULL);
+  int i;
+
+  for(i=0; i<MSB(TRIPLE_ARRAY_PREINIT); i++)
+    a->blocks[i] = slice;
+
+  a->freelist = slice;
+  a->preinit  = TRIPLE_ARRAY_PREINIT;
+  a->size     = TRIPLE_ARRAY_PREINIT;
+
+  return TRUE;
+}
+
+static void
+destroy_triple_array(rdf_db *db)
+{ triple_array *a = &db->triple_array;
+  int i;
+
+  free(a->blocks[0]);
+  for(i=MSB(a->preinit); i<MSB(a->size); i++)
+  { triple_element *e = a->blocks[i];
+
+    e += 1<<(i-1);
+    free(e);
+  }
+  memset(a, 0, sizeof(*a));
+}
+
+static void
+reset_triple_array(rdf_db *db)
+{ destroy_triple_array(db);
+  init_triple_array(db);
+}
+
+static void
+resize_triple_array(rdf_db *db)
+{ triple_array *a = &db->triple_array;
+  int i = MSB(a->size);
+  triple_element *last;
+  triple_element *slice = alloc_array_slice(a->size, &last);
+
+  if ( slice )
+  { a->blocks[i] = slice - a->size;
+    a->size *= 2;
+    free_array_slice(a, slice, last);
+  }
+}
+
+static triple_element *
+fetch_triple_element(rdf_db *db, triple_id id)
+{ return &db->triple_array.blocks[MSB(id)][id];
+}
+
+static triple_id
+register_triple(rdf_db *db, triple *t)
+{ triple_array *a = &db->triple_array;
+  triple_element *e;
+  int i;
+
+  do
+  { if ( !(e=a->freelist) )
+    { simpleMutexLock(&db->locks.misc);
+      while ( !(e=a->freelist) )
+	resize_triple_array(db);
+      simpleMutexUnlock(&db->locks.misc);
+    }
+  } while ( !__sync_bool_compare_and_swap(&a->freelist, e, e->fnext) );
+
+  e->triple = t;
+
+  if ( e == a->blocks[0] )
+  { t->id = 0;
+
+    assert(fetch_triple_element(db, t->id)->triple == t);
+    return t->id;
+  } else
+  { size_t slice_size;
+
+    for(i=1,slice_size=1; i<MAX_TBLOCKS; i++,slice_size*=2)
+    { if ( e >= a->blocks[i]+slice_size &&
+	   e <  a->blocks[i]+slice_size*2 )
+      { t->id = e - a->blocks[i];
+
+	assert(fetch_triple_element(db, t->id)->triple == t);
+	return t->id;
+      }
+    }
+  }
+
+  assert(0);
+  return 0;
+}
+
+static void
+unregister_triple(rdf_db *db, triple *t)
+{ if ( t->id != TRIPLE_NO_ID )
+  { triple_element *e = fetch_triple_element(db, t->id);
+
+    t->id = TRIPLE_NO_ID;
+    free_array_slice(&db->triple_array, e, e);
+  }
+}
+
+static void
+finalize_triple(void *data, void *client)
+{ unregister_triple(client, data);
+}
+
+#else /*COMPACT*/
+
+#define init_triple_array(db) (void)0
+#define reset_triple_array(db) (void)0
+#define register_triple(db, t) (void)0
+#define unregister_triple(db, t) (void)0
+
+#endif /*COMPACT*/
+
 
 		 /*******************************
 		 *	    TRIPLE HASH		*
@@ -3806,6 +3979,7 @@ new_db(void)
   memset(db, 0, sizeof(*db));
   INIT_LOCK(db);
   init_tables(db);
+  init_triple_array(db);
   init_query_admin(db);
 
   db->duplicate_admin_threshold = DUPLICATE_ADMIN_THRESHOLD;
@@ -4029,6 +4203,8 @@ static void
 link_triple_hash(rdf_db *db, triple *t)
 { int ic;
   int linked = 1;
+
+  register_triple(db, t);
 
   if ( db->by_none.tail )		/* non-indexed chain */
     db->by_none.tail->tp.next[ICOL(BY_NONE)] = t;
@@ -8194,6 +8370,7 @@ erase_triples(rdf_db *db)
 
     reset_triple_hash(db, hash);
   }
+  reset_triple_array(db);
 
   db->created = 0;
   db->erased = 0;

@@ -30,6 +30,7 @@
 		 *******************************/
 
 #define WITH_MD5 1
+#define COMPACT  1
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 Symbols are local to shared objects  by   default  in  COFF based binary
@@ -277,6 +278,11 @@ typedef struct literal
 
 #define t_match next[0]
 
+#ifdef COMPACT
+#define TRIPLE_NO_ID	((triple_id)-1)
+typedef unsigned int triple_id;		/* Triple identifier */
+#endif
+
 typedef struct triple
 { atom_t	subject;
   union
@@ -296,6 +302,9 @@ typedef struct triple
     literal	end;			/* end for between(X,Y) patterns */
   } tp;					/* triple or pattern */
 					/* smaller objects (e.g., flags) */
+#ifdef COMPACT
+  triple_id	id;			/* Indentifier number */
+#endif
   uint32_t      line;			/* graph-line number */
   unsigned	object_is_literal : 1;	/* Object is a literal */
   unsigned	resolve_pred : 1;	/* predicates needs to be resolved */
@@ -325,7 +334,24 @@ typedef struct triple_bucket
   unsigned int	count;			/* #Triples in bucket */
 } triple_bucket;
 
+
 #define MAX_TBLOCKS 32
+
+#ifdef COMPACT
+#define TRIPLE_ARRAY_PREINIT 512
+
+typedef union triple_element
+{ triple *triple;			/* points to a triple */
+  union triple_element *fnext;		/* poins to another free */
+} triple_element;
+
+typedef struct triple_array
+{ triple_element *blocks[MAX_TBLOCKS];	/* Dynamic array starts */
+  triple_element *freelist;		/* free buckets */
+  size_t	preinit;		/* Preinitialized size */
+  size_t	size;			/* current (allocated) size */
+} triple_array;
+#endif /*COMPACT*/
 
 typedef struct triple_hash
 { triple_bucket	*blocks[MAX_TBLOCKS];	/* Dynamic array starts */
@@ -377,6 +403,9 @@ typedef struct query_admin
 typedef struct rdf_db
 { triple_bucket by_none;		/* Plain linked list of triples */
   triple_hash   hash[INDEX_TABLES];	/* Hash-tables */
+#ifdef COMPACT
+  triple_array	triple_array;		/* Dynamic array of triples */
+#endif
   size_t	created;		/* #triples created */
   size_t	erased;			/* #triples erased */
   gen_t		reindexed;		/* #triples reindexed (gc_hash_chain) */
