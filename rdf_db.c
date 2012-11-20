@@ -26,7 +26,6 @@
 #include <config.h>
 #endif
 
-#define WITH_MD5 1
 #define WITH_PL_MUTEX 1
 
 #ifdef _REENTRANT
@@ -45,7 +44,6 @@
 #endif
 
 #include "rdf_db.h"
-#include "alloc.h"
 #include <wctype.h>
 #include <ctype.h>
 #ifdef WITH_MD5
@@ -2931,6 +2929,33 @@ share_literal(rdf_db *db, literal *from)
 
 		 /*******************************
 		 *	      TRIPLES		*
+		 *******************************/
+
+triple *
+alloc_triple(void)
+{ triple *t = malloc(sizeof(*t));
+
+  if ( t )
+    memset(t, 0, sizeof(*t));
+
+  return t;
+}
+
+
+void
+unalloc_triple(rdf_db *db, triple *t, int linger)
+{ if ( t )
+  { assert(t->atoms_locked == FALSE);
+
+    if ( linger )
+      deferred_free(&db->defer_triples, t);
+    else
+      free(t);
+  }
+}
+
+		 /*******************************
+		 *	    TRIPLE HASH		*
 		 *******************************/
 
 static int
@@ -8359,7 +8384,6 @@ install_rdf_db(void)
 
   simpleMutexInit(&rdf_lock);
   init_errors();
-  init_alloc();
   register_resource_predicates();
 
   MKFUNCTOR(literal, 1);
