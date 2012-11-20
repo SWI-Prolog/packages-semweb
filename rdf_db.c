@@ -28,7 +28,6 @@
 
 #define WITH_MD5 1
 #define WITH_PL_MUTEX 1
-#define _GNU_SOURCE 1			/* get rwlocks from glibc */
 
 #ifdef _REENTRANT
 #ifdef __WINDOWS__
