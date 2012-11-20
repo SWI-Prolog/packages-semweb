@@ -958,14 +958,16 @@ triple_follow_hash(rdf_db *db, triple *t, int icol)
   return nid ? db->triple_array.blocks[MSB(nid)][nid].triple : NULL;
 }
 
+#define T_ID(t) ((t)->id)
+
 #else /*COMPACT*/
 
 #define init_triple_array(db) (void)0
 #define reset_triple_array(db) (void)0
 #define register_triple(db, t) (void)0
 #define unregister_triple(db, t) (void)0
-
 #define triple_follow_hash(db, t, icol) ((t)->tp.next[icol])
+#define T_ID(t) (t)
 
 #endif /*COMPACT*/
 
@@ -3094,8 +3096,6 @@ share_literal(rdf_db *db, literal *from)
 		 *	      TRIPLES		*
 		 *******************************/
 
-static void	finalize_triple(void *data, void *client);
-
 static triple *
 alloc_triple(void)
 { triple *t = malloc(sizeof(*t));
@@ -4190,7 +4190,7 @@ create_triple_hash(rdf_db *db, int ic)
       triple_bucket *bucket = &hash->blocks[MSB(key)][key];
 
       if ( bucket->tail )
-      { bucket->tail->tp.next[ic] = t->id;
+      { bucket->tail->tp.next[ic] = T_ID(t);
       } else
       { bucket->head = t;
       }
@@ -4212,7 +4212,7 @@ link_triple_hash(rdf_db *db, triple *t)
   register_triple(db, t);
 
   if ( db->by_none.tail )		/* non-indexed chain */
-    db->by_none.tail->tp.next[ICOL(BY_NONE)] = t->id;
+    db->by_none.tail->tp.next[ICOL(BY_NONE)] = T_ID(t);
   else
     db->by_none.head = t;
   db->by_none.tail = t;
@@ -4226,7 +4226,7 @@ link_triple_hash(rdf_db *db, triple *t)
       triple_bucket *bucket = &hash->blocks[MSB(key)][key];
 
       if ( bucket->tail )
-      { bucket->tail->tp.next[ic] = t->id;
+      { bucket->tail->tp.next[ic] = T_ID(t);
       } else
       { bucket->head = t;
       }

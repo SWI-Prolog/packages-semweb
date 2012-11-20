@@ -373,9 +373,7 @@ typedef struct triple_walker
   int		icol;			/* index column */
   size_t	bcount;			/* Current bucket count */
   triple       *current;		/* Our current location */
-#ifdef COMPACT
   struct rdf_db *db;			/* the array of triples */
-#endif
 } triple_walker;
 
 #define MAX_BLOCKS 20			/* allows for 2M threads */
