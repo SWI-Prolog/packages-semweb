@@ -23,14 +23,15 @@
 
 #ifndef RDFDB_H_INCLUDED
 #define RDFDB_H_INCLUDED
-#include "atom.h"
 
 		 /*******************************
 		 *	     OPTIONS		*
 		 *******************************/
 
 #define WITH_MD5 1
+#if SIZEOF_VOIDP > 6
 #define COMPACT  1
+#endif
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 Symbols are local to shared objects  by   default  in  COFF based binary
@@ -57,6 +58,7 @@ supposed to be local to the SWI-Prolog kernel are declared using
 #include <SWI-Prolog.h>
 #include <assert.h>
 #include <string.h>
+#include "atom.h"
 #include "deferfree.h"
 #include "debug.h"
 #include "memory.h"
