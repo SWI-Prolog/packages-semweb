@@ -333,8 +333,14 @@ typedef struct active_transaction
 
 
 typedef struct triple_bucket
-{ triple       *head;			/* head of triple-list */
+{
+#ifdef COMPACT
+  triple_id     head;			/* head of triple-list */
+  triple_id     tail;			/* Tail of triple-list */
+#else
+  triple       *head;			/* head of triple-list */
   triple       *tail;			/* Tail of triple-list */
+#endif
   unsigned int	count;			/* #Triples in bucket */
 } triple_bucket;
 

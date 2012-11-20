@@ -904,6 +904,11 @@ fetch_triple_element(rdf_db *db, triple_id id)
 { return &db->triple_array.blocks[MSB(id)][id];
 }
 
+static triple *
+fetch_triple(rdf_db *db, triple_id id)
+{ return id ? db->triple_array.blocks[MSB(id)][id].triple : (triple*)NULL;
+}
+
 static triple_id
 register_triple(rdf_db *db, triple *t)
 { triple_array *a = &db->triple_array;
@@ -927,7 +932,7 @@ register_triple(rdf_db *db, triple *t)
 	 e <  a->blocks[i]+slice_size*2 )
     { t->id = e - a->blocks[i];
 
-      assert(fetch_triple_element(db, t->id)->triple == t);
+      assert(fetch_triple(db, t->id) == t);
       return t->id;
     }
   }
@@ -955,10 +960,10 @@ static triple *
 triple_follow_hash(rdf_db *db, triple *t, int icol)
 { triple_id nid = t->tp.next[icol];
 
-  return nid ? db->triple_array.blocks[MSB(nid)][nid].triple : NULL;
+  return fetch_triple(db, nid);
 }
 
-#define T_ID(t) ((t)->id)
+#define T_ID(t) ((t) ? (t)->id : 0)
 
 #else /*COMPACT*/
 
@@ -967,6 +972,7 @@ triple_follow_hash(rdf_db *db, triple *t, int icol)
 #define register_triple(db, t) (void)0
 #define unregister_triple(db, t) (void)0
 #define triple_follow_hash(db, t, icol) ((t)->tp.next[icol])
+#define fetch_triple(db, t) (t)
 #define T_ID(t) (t)
 
 #endif /*COMPACT*/
@@ -1032,7 +1038,7 @@ next_hash_triple(triple_walker *tw)
     { int entry = tw->unbounded_hash % tw->bcount;
       triple_bucket *bucket = &hash->blocks[MSB(entry)][entry];
 
-      rc = bucket->head;
+      rc = fetch_triple(tw->db, bucket->head);
       do
       { tw->bcount *= 2;
       } while ( tw->bcount <= hash->bucket_count &&
@@ -3233,7 +3239,7 @@ count_different(rdf_db *db, triple_bucket *tb, int index, int *count)
       int different = 0;
       int found = 0;
 
-      for(t=tb->head;
+      for(t = fetch_triple(db, tb->head);
 	  t && different < COUNT_DIFF_NOHASH;	/* be careful with concurrently */
 	  t = triple_follow_hash(db, t, ICOL(index))) /* added triples */
       { size_t hash = triple_hash_key(t, index);
@@ -3258,7 +3264,7 @@ count_different(rdf_db *db, triple_bucket *tb, int index, int *count)
     int c = 0;
 
     init_atomset(&hash_set);
-    for(t=tb->head; t; t=triple_follow_hash(db, t, ICOL(index)))
+    for(t=fetch_triple(db, tb->head); t; t=triple_follow_hash(db, t, ICOL(index)))
     { c++;
       add_atomset(&hash_set, (atom_t)triple_hash_key(t, index));
     }
@@ -3336,7 +3342,7 @@ print_triple_hash(rdf_db *db, int index, int sample)
     { triple *t;
 
       Sdprintf("%d: c=%d; d=%d", i, count, different);
-      for(t=tb->head; t; t=triple_follow_hash(db, t, index))
+      for(t=fetch_triple(db, tb->head); t; t=triple_follow_hash(db, t, index))
       { Sdprintf("\n\t");
 	print_triple(t, 0);
       }
@@ -3437,7 +3443,9 @@ distinct_hash_values(rdf_db *db, int icol)
   int byx = col_index[icol];
 
   init_atomset(&hash_set);
-  for(t=db->by_none.head; t; t=triple_follow_hash(db, t, ICOL(BY_NONE)))
+  for(t=fetch_triple(db, db->by_none.head);
+      t;
+      t=triple_follow_hash(db, t, ICOL(BY_NONE)))
   { add_atomset(&hash_set, (atom_t)triple_hash_key(t, byx));
   }
   count = hash_set.count;
@@ -3608,7 +3616,7 @@ optimize_triple_hash(rdf_db *db, int icol, gen_t gen)
     { triple_bucket *bucket = &hash->blocks[MSB(b_no)][b_no];
       triple *t;
 
-      for(t=bucket->head; t; t=triple_follow_hash(db, t, icol))
+      for(t=fetch_triple(db, bucket->head); t; t=triple_follow_hash(db, t, icol))
       { if ( t->lifespan.died >= gen &&
 	     !t->reindexed &&		/* see (*) */
 	     triple_hash_key(t, col_index[icol]) % hash->bucket_count != b_no )
@@ -3693,18 +3701,20 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol,
   size_t collected = 0;
   size_t uncollectable = 0;
 
-  for(t = bucket->head; t; t=triple_follow_hash(db, t, icol))
+  for(t = fetch_triple(db, bucket->head); t; t=triple_follow_hash(db, t, icol))
   { if ( is_garbage_triple(t, gen, reindex_gen) )
     { int lock = !t->tp.next[icol];
 
       if ( lock )
 	simpleMutexLock(&db->queries.write.lock); /* (*) */
+
       if ( prev )
 	prev->tp.next[icol] = t->tp.next[icol];
       else
-	bucket->head = triple_follow_hash(db, t, icol);
-      if ( t == bucket->tail )
-	bucket->tail = prev;
+	bucket->head = t->tp.next[icol];
+      if ( T_ID(t) == bucket->tail )
+	bucket->tail = T_ID(prev);
+
       if ( lock )
 	simpleMutexUnlock(&db->queries.write.lock);
 
@@ -4184,17 +4194,19 @@ create_triple_hash(rdf_db *db, int ic)
 
     DEBUG(1, Sdprintf("Creating hash %s\n", col_name[ic]));
 
-    for(t=db->by_none.head; t; t=triple_follow_hash(db, t, ICOL(BY_NONE)))
+    for(t=fetch_triple(db, db->by_none.head);
+	t;
+	t=triple_follow_hash(db, t, ICOL(BY_NONE)))
     { int i = col_index[ic];
       int key = triple_hash_key(t, i) % hash->bucket_count;
       triple_bucket *bucket = &hash->blocks[MSB(key)][key];
 
       if ( bucket->tail )
-      { bucket->tail->tp.next[ic] = T_ID(t);
+      { fetch_triple(db, bucket->tail)->tp.next[ic] = T_ID(t);
       } else
-      { bucket->head = t;
+      { bucket->head = T_ID(t);
       }
-      bucket->tail = t;
+      bucket->tail = T_ID(t);
       ATOMIC_INC(&bucket->count);
       t->linked++;				/* (*) atomic? */
     }
@@ -4212,10 +4224,10 @@ link_triple_hash(rdf_db *db, triple *t)
   register_triple(db, t);
 
   if ( db->by_none.tail )		/* non-indexed chain */
-    db->by_none.tail->tp.next[ICOL(BY_NONE)] = T_ID(t);
+    fetch_triple(db, db->by_none.tail)->tp.next[ICOL(BY_NONE)] = T_ID(t);
   else
-    db->by_none.head = t;
-  db->by_none.tail = t;
+    db->by_none.head = T_ID(t);
+  db->by_none.tail = T_ID(t);
 
   for(ic=1; ic<INDEX_TABLES; ic++)
   { triple_hash *hash = &db->hash[ic];
@@ -4226,11 +4238,11 @@ link_triple_hash(rdf_db *db, triple *t)
       triple_bucket *bucket = &hash->blocks[MSB(key)][key];
 
       if ( bucket->tail )
-      { bucket->tail->tp.next[ic] = T_ID(t);
+      { fetch_triple(db, bucket->tail)->tp.next[ic] = T_ID(t);
       } else
-      { bucket->head = t;
+      { bucket->head = T_ID(t);
       }
-      bucket->tail = t;
+      bucket->tail = T_ID(t);
       ATOMIC_INC(&bucket->count);
       linked++;
     }
@@ -6119,7 +6131,9 @@ update_duplicates(rdf_db *db)
   db->duplicates	    = 0;
   db->maintain_duplicates   = TRUE;
 
-  for(t=db->by_none.head; t; t=triple_follow_hash(db, t, ICOL(BY_NONE)))
+  for(t=fetch_triple(db, db->by_none.head);
+      t;
+      t=triple_follow_hash(db, t, ICOL(BY_NONE)))
   { if ( ++count % 10240 == 0 &&
 	 (PL_handle_signals() < 0 || db->resetting) )
 
@@ -6130,7 +6144,9 @@ update_duplicates(rdf_db *db)
     t->is_duplicate = FALSE;
   }
 
-  for(t=db->by_none.head; t; t=triple_follow_hash(db, t, ICOL(BY_NONE)))
+  for(t=fetch_triple(db, db->by_none.head);
+      t;
+      t=triple_follow_hash(db, t, ICOL(BY_NONE)))
   { if ( ++count % 1024 == 0 &&
 	 PL_handle_signals() < 0 )
       return FALSE;
@@ -8361,12 +8377,12 @@ erase_triples(rdf_db *db)
 { triple *t, *n;
   int i;
 
-  for(t=db->by_none.head; t; t=n)
+  for(t=fetch_triple(db, db->by_none.head); t; t=n)
   { n = triple_follow_hash(db, t, ICOL(BY_NONE));
 
     free_triple(db, t, FALSE);		/* ? */
   }
-  db->by_none.head = db->by_none.tail = NULL;
+  db->by_none.head = db->by_none.tail = 0;
 
   for(i=BY_S; i<INDEX_TABLES; i++)
   { triple_hash *hash = &db->hash[i];
