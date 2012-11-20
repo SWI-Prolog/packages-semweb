@@ -4821,7 +4821,7 @@ load_triple(rdf_db *db, IOSTREAM *in, ld_context *ctx)
 { triple *t = new_triple(db);
   int c;
 
-  t->subject   = load_atom(db, in, ctx);
+  t->subject = load_atom(db, in, ctx);
   t->resolve_pred = TRUE;
   t->predicate.u = load_atom(db, in, ctx);
   if ( (c=Sgetc(in)) == 'R' )
@@ -5053,19 +5053,15 @@ rdf_load_db(term_t stream, term_t id, term_t graphs)
   }
 
   if ( (rc=prepare_loaded_triples(db, &ctx)) )
-  { if ( ctx.graph_table.count )
-    { add_graph_context gctx;
+  { add_graph_context gctx;
 
-      gctx.tail = PL_copy_term_ref(graphs);
-      gctx.head = PL_new_term_ref();
+    gctx.tail = PL_copy_term_ref(graphs);
+    gctx.head = PL_new_term_ref();
 
-      rc = ( for_atomset(&ctx.graph_table, append_graph_to_list, &gctx) &&
-	     PL_unify_nil(gctx.tail) );
+    rc = ( for_atomset(&ctx.graph_table, append_graph_to_list, &gctx) &&
+	   PL_unify_nil(gctx.tail) );
 
-      destroy_atomset(&ctx.graph_table);
-    } else
-    { rc = PL_unify_atom(graphs, ctx.graph_name);
-    }
+    destroy_atomset(&ctx.graph_table);
   }
 
   if ( rc )

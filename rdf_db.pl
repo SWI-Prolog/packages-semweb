@@ -1511,8 +1511,7 @@ rdf_save_db(File, DB) :-
 %
 %	Load triples from a  .trp  file   without  updating  the  source
 %	administration. Id is  handled  to   monitor  action.  Graphs is
-%	either an atom, indicating a single loaded   graph  or a list of
-%	graph-names encountered in File.
+%	a list of graph-names encountered in File.
 
 rdf_load_db_no_admin(File, Id, Graphs) :-
 	open(File, read, In, [type(binary)]),
@@ -1520,7 +1519,7 @@ rdf_load_db_no_admin(File, Id, Graphs) :-
 	call_cleanup(rdf_load_db_(In, Id, Graphs), close(In)).
 
 
-%%	check_loaded_cache(+DB, +Graphs, +Modified) is det.
+%%	check_loaded_cache(+Graph, +Graphs, +Modified) is det.
 %
 %	Verify the loaded cache file and optionally fix the modification
 %	time (new versions save this along with the snapshot).
@@ -1528,7 +1527,7 @@ rdf_load_db_no_admin(File, Id, Graphs) :-
 %	@tbd	What to do if there is a cache mismatch? Delete the loaded
 %		graphs and fail?
 
-check_loaded_cache(DB, DB, _Modified) :- !.
+check_loaded_cache(DB, [DB], _Modified) :- !.
 check_loaded_cache(DB, Graphs, _) :-
 	print_message(warning, rdf(inconsistent_cache(DB, Graphs))).
 
