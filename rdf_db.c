@@ -5718,11 +5718,14 @@ get_partial_triple(rdf_db *db,
 		   term_t src, triple *t)
 { int rc;
   int ipat = 0;
-  atom_t at;
 
-  if ( subject && !get_resource_or_var_ex(subject, &at) )
-    return FALSE;
-  t->subject_id = ATOM_ID(at);
+  if ( subject )
+  { atom_t at;
+
+    if ( !get_resource_or_var_ex(subject, &at) )
+      return FALSE;
+    t->subject_id = ATOM_ID(at);
+  }
   if ( !PL_is_variable(predicate) &&
        (rc=get_existing_predicate(db, predicate, &t->predicate.r)) != 1 )
     return rc;
