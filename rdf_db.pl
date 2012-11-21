@@ -101,6 +101,9 @@
 	    rdf_current_ns/2,		% ?Alias, ?URI
 	    rdf_register_ns/2,		% +Alias, +URI
 	    rdf_register_ns/3,		% +Alias, +URI, +Options
+	    rdf_current_prefix/2,	% ?Alias, ?URI
+	    rdf_register_prefix/2,	% +Alias, +URI
+	    rdf_register_prefix/3,	% +Alias, +URI, +Options
 	    rdf_global_id/2,		% ?NS:Name, ?Global
 	    rdf_global_object/2,	% ?Object, ?NSExpandedObject
 	    rdf_global_term/2,		% Term, WithExpandedNS
@@ -207,6 +210,16 @@
 		 /*******************************
 		 *	     NAMESPACES		*
 		 *******************************/
+
+%%	rdf_current_prefix(?Alias, ?URI) is nondet.
+%%	rdf_register_prefix(?Alias, ?URI) is det.
+%%	rdf_register_prefix(?Alias, ?URI, +Options) is det.
+%
+%	Forward compatibility. Version 3 deprecates the _ns versions.
+
+rdf_current_prefix(Alias, URI)           :- rdf_current_ns(Alias, URI).
+rdf_register_prefix(Alias, URI, Options) :- rdf_register_ns(Alias, URI, Options).
+rdf_register_prefix(Alias, URI)          :- rdf_register_ns(Alias, URI).
 
 %%	rdf_current_ns(?Alias, ?URI) is nondet.
 %
@@ -642,6 +655,8 @@ rdf_source_location(Subject, Source) :-
 
 rdf_statistics(sources(Count)) :-
 	rdf_statistics_(graphs(Count)).
+rdf_statistics(graphs(Count)) :-		% version 3 compatibility
+	rdf_statistics_(graphs(Count)).
 rdf_statistics(subjects(Count)) :-
 	rdf_statistics_(subjects(Count)).
 rdf_statistics(properties(Count)) :-
@@ -671,6 +686,8 @@ rdf_statistics(triples_by_file(File, Count)) :-
 	    rdf_statistics_(triples(File, Count))
 	;   rdf_statistics_(triples(File, Count))
 	).
+rdf_statistics(triples_by_graph(Graph, Count)) :- % version 3 compatibility
+	rdf_statistics(triples_by_file(Graph, Count)).
 rdf_statistics(duplicates(Count)) :-
 	rdf_statistics_(duplicates(Count)).
 

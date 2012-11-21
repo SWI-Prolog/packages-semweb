@@ -79,9 +79,15 @@ help the user interpreting the URL. The main predicates are:
 %		This combines ns:id with ns:label, providing both human
 %		readable output and output that can be pasted into the
 %		commandline.
+%
+%	@compat also accepts =prefix= instead of =ns= for compatibility
+%		with version 3 of this library.
 
 rdf_portray_as(Style) :-
-	must_be(oneof([writeq, ns:id, ns:label, ns:id=label]), Style),
+	must_be(oneof([writeq,
+		       ns:id, ns:label, ns:id=label,
+		       prefix:id, prefix:label, prefix:id=label
+		      ]), Style),
 	retractall(style(_)),
 	assert(style(Style)).
 
@@ -126,6 +132,8 @@ user:portray(URL) :-
 
 portray_url(writeq, URL) :-
 	writeq(URL).
+portray_url(prefix:How, URL) :- !,
+	portray_url(ns:How, URL).
 portray_url(ns:id, URL) :-
 	(   rdf_global_id(NS:Id, URL)
 	->  writeq(NS:Id)
