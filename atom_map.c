@@ -94,16 +94,16 @@ typedef void *datum;
 
 #define S_MAGIC 0x8734abcd
 
-typedef struct atom_hash
+typedef struct atom_chash
 { size_t allocated;
   datum  atoms[1];
-} atom_hash;
+} atom_chash;
 
-#define SIZEOF_ATOM_HASH(n)	offsetof(atom_hash, atoms[n])
+#define SIZEOF_ATOM_HASH(n)	offsetof(atom_chash, atoms[n])
 
 typedef struct atom_set
 { size_t	size;			/* # cells in use */
-  atom_hash    *entries;		/* Close hash table */
+  atom_chash    *entries;		/* Close hash table */
 #ifdef O_SECURE
   int	  magic;
 #endif
@@ -361,7 +361,7 @@ format_datum(datum d, char *buf)
 		 *******************************/
 
 static int insert_atom_set(atom_map *map, atom_set *as, datum a);
-static int insert_atom_hash(atom_hash *hash, datum add);
+static int insert_atom_hash(atom_chash *hash, datum add);
 
 #define AS_INITIAL_SIZE 4
 
@@ -399,7 +399,7 @@ hash_datum(datum d)
 
 #ifdef O_SECURE
 static int
-at_least_one_empty(atom_hash *ah)
+at_least_one_empty(atom_chash *ah)
 { datum *p = ah->atoms;
   datum *e = &ah->atoms[ah->allocated];
 
@@ -422,7 +422,7 @@ with insert/delete.
 
 static int
 in_atom_set(atom_set *as, datum a)
-{ atom_hash *snap = as->entries;
+{ atom_chash *snap = as->entries;
   unsigned int start = hash_datum(a) % snap->allocated;
   datum *d = &snap->atoms[start];
   datum *e = &snap->atoms[snap->allocated];
@@ -442,13 +442,13 @@ in_atom_set(atom_set *as, datum a)
 
 static int
 resize_atom_set(atom_map *map, atom_set *as, size_t size)
-{ atom_hash *new = malloc(SIZEOF_ATOM_HASH(size));
+{ atom_chash *new = malloc(SIZEOF_ATOM_HASH(size));
 
   if ( new )
   { size_t i;
     datum *p = as->entries->atoms;
     datum *e = &p[as->entries->allocated];
-    atom_hash *old;
+    atom_chash *old;
 
     new->allocated = size;
     for(i=0; i<size; i++)
@@ -471,7 +471,7 @@ resize_atom_set(atom_map *map, atom_set *as, size_t size)
 
 
 static int
-insert_atom_hash(atom_hash *hash, datum add)
+insert_atom_hash(atom_chash *hash, datum add)
 { datum *d = &hash->atoms[hash_datum(add) % hash->allocated];
   datum *e = &hash->atoms[hash->allocated];
 
@@ -860,7 +860,7 @@ find_atom_map_protected(atom_map  *map, term_t keys, term_t literals)
   term_t tmp = PL_new_term_ref();
   term_t tail = PL_copy_term_ref(keys);
   term_t head = PL_new_term_ref();
-  atom_hash *ah;
+  atom_chash *ah;
   size_t ca;
 
   while(PL_get_list(tail, head, tail))

@@ -251,12 +251,12 @@ typedef struct graph
 
 #define MAX_GBLOCKS 32
 
-typedef struct graph_hash
+typedef struct graph_hash_table
 { graph	      **blocks[MAX_GBLOCKS];	/* Dynamic array starts */
   size_t	bucket_count;		/* Allocated #buckets */
   size_t	bucket_count_epoch;	/* Initial bucket count */
   size_t	count;			/* Total #predicates */
-} graph_hash;
+} graph_hash_table;
 
 typedef struct literal
 { union
@@ -428,7 +428,7 @@ typedef struct rdf_db
   resource_db	resources;		/* admin of used resources */
   pred_hash	predicates;		/* Predicate table */
   size_t	agenda_created;		/* #visited nodes in agenda */
-  graph_hash    graphs;			/* Graph table */
+  graph_hash_table graphs;		/* Graph table */
   graph	       *last_graph;		/* last accessed graph */
   query_admin	queries;		/* Active query administration */
 

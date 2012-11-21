@@ -23,6 +23,7 @@
 */
 
 #include "rdf_db.h"
+#include "murmur.h"
 
 static int
 init_resource_hash(resource_db *rdb)
@@ -131,7 +132,7 @@ static void
 init_res_walker(res_walker *rw, resource_db *rdb, atom_t name)
 { rw->rdb	     = rdb;
   rw->name	     = name;
-  rw->unbounded_hash = atom_hash(name);
+  rw->unbounded_hash = atom_hash(name, MURMUR_SEED);
   rw->bcount	     = rdb->hash.bucket_count_epoch;
   rw->current	     = NULL;
 }
@@ -195,7 +196,7 @@ lookup_resource(resource_db *rdb, atom_t name)
   PL_register_atom(name);
   if ( rdb->hash.count > rdb->hash.bucket_count )
     resize_resource_table(rdb);
-  entry = atom_hash(name) % rdb->hash.bucket_count;
+  entry = atom_hash(name, MURMUR_SEED) % rdb->hash.bucket_count;
   rp = &rdb->hash.blocks[MSB(entry)][entry];
   r->next = *rp;
   *rp = r;

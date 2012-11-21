@@ -22,12 +22,9 @@
     02110-1301  USA
 */
 
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-
 #include <SWI-Stream.h>
 #include <SWI-Prolog.h>
+#include "rdf_db.h"
 #include "atom.h"
 #include "murmur.h"
 #include <wchar.h>

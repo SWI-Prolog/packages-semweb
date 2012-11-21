@@ -619,7 +619,7 @@ rehash_atom_set(atomset *as)
   { atom_cell *c, *n;
 
     for(c=as->entries[i]; c; c=n)
-    { size_t inew = atom_hash(c->atom)&(newsize-1);
+    { size_t inew = atom_hash(c->atom, MURMUR_SEED)&(newsize-1);
 
       n = c->next;
       c->next = new[inew];
@@ -641,7 +641,7 @@ rehash_atom_set(atomset *as)
 
 static int
 add_atomset(atomset *as, atom_t atom)
-{ size_t i = atom_hash(atom)&(as->size-1);
+{ size_t i = atom_hash(atom, MURMUR_SEED)&(as->size-1);
   atom_cell *c;
 
   for(c=as->entries[i]; c; c=c->next)
@@ -651,7 +651,7 @@ add_atomset(atomset *as, atom_t atom)
 
   if ( ++as->count > 2*as->size )
   { rehash_atom_set(as);
-    i = atom_hash(atom)&(as->size-1);
+    i = atom_hash(atom, MURMUR_SEED)&(as->size-1);
   }
 
   c = alloc_atomset(as, sizeof(*c));
@@ -1138,7 +1138,7 @@ static void
 init_predicate_walker(pred_walker *pw, rdf_db *db, atom_t name)
 { pw->db	     = db;
   pw->name	     = name;
-  pw->unbounded_hash = atom_hash(name);
+  pw->unbounded_hash = atom_hash(name, MURMUR_SEED);
   pw->bcount	     = db->predicates.bucket_count_epoch;
   pw->current	     = NULL;
 }
@@ -1204,7 +1204,7 @@ lookup_predicate(rdf_db *db, atom_t name, query *q)
   PL_register_atom(name);
   if ( db->predicates.count > db->predicates.bucket_count )
     resize_pred_table(db);
-  entry = atom_hash(name) % db->predicates.bucket_count;
+  entry = atom_hash(name, MURMUR_SEED) % db->predicates.bucket_count;
   pp = &db->predicates.blocks[MSB(entry)][entry];
   p->next = *pp;
   *pp = p;
@@ -1264,7 +1264,7 @@ new_predicate_cloud(rdf_db *db, predicate **p, size_t count, query *q)
 { predicate_cloud *cloud = rdf_malloc(db, sizeof(*cloud));
 
   memset(cloud, 0, sizeof(*cloud));
-  cloud->hash = rdf_murmer_hash(&cloud, sizeof(cloud), MURMUR_SEED);
+  cloud->hash = rdf_murmer_hash(&cloud, sizeof(cloud), PRED_MURMUR_SEED);
   if ( count )
   { int i;
     predicate **p2;
@@ -2298,7 +2298,7 @@ static void
 init_graph_walker(graph_walker *gw, rdf_db *db, atom_t name)
 { gw->db	     = db;
   gw->name	     = name;
-  gw->unbounded_hash = atom_hash(name);
+  gw->unbounded_hash = atom_hash(name, MURMUR_SEED);
   gw->bcount	     = db->graphs.bucket_count_epoch;
   gw->current	     = NULL;
 }
@@ -2365,7 +2365,7 @@ lookup_graph(rdf_db *db, atom_t name)
   PL_register_atom(name);
   if ( db->graphs.count > db->graphs.bucket_count )
     resize_graph_table(db);
-  entry = atom_hash(name) % db->graphs.bucket_count;
+  entry = atom_hash(name, MURMUR_SEED) % db->graphs.bucket_count;
   gp = &db->graphs.blocks[MSB(entry)][entry];
   g->next = *gp;
   *gp = g;
@@ -4086,8 +4086,19 @@ object_hash(triple *t)
 { if ( t->object_is_literal )
   { return literal_hash(t->object.literal);
   } else
-  { return atom_hash(t->object.resource);
+  { return atom_hash(t->object.resource, OBJ_MURMUR_SEED);
   }
+}
+
+
+static size_t
+subject_hash(triple *t)
+{ return atom_hash(t->subject_id, SUBJ_MURMUR_SEED);
+}
+
+static size_t
+graph_hash(triple *t)
+{ return atom_hash(t->graph_id, GRAPH_MURMUR_SEED);
 }
 
 
@@ -4103,46 +4114,14 @@ init_cursor_from_literal().
 
 static size_t
 triple_hash_key(triple *t, int which)
-{ size_t v;
+{ size_t v = 0;
 
   assert(t->resolve_pred == FALSE);
 
-  switch(which)
-  { case BY_NONE:
-      return 0;
-    case BY_S:
-      v = atom_hash(ID_ATOM(t->subject_id)); /* can gcc optimize this? */
-      break;
-    case BY_P:
-      v = predicate_hash(t->predicate.r);
-      break;
-    case BY_O:
-      v = object_hash(t);
-      break;
-    case BY_SP:
-      v = atom_hash(ID_ATOM(t->subject_id)) ^ predicate_hash(t->predicate.r);
-      break;
-    case BY_PO:
-      v = predicate_hash(t->predicate.r) ^ object_hash(t);
-      break;
-    case BY_SPO:
-      v = (atom_hash(ID_ATOM(t->subject_id))<<1) ^
-	  predicate_hash(t->predicate.r) ^
-	  object_hash(t);
-      break;
-    case BY_G:
-      v = atom_hash(ID_ATOM(t->graph_id));
-      break;
-    case BY_SG:
-      v = atom_hash(ID_ATOM(t->subject_id)) ^ atom_hash(ID_ATOM(t->graph_id));
-      break;
-    case BY_PG:
-      v = predicate_hash(t->predicate.r) ^ atom_hash(ID_ATOM(t->graph_id));
-      break;
-    default:
-      v = 0;				/* make compiler silent */
-      assert(0);
-  }
+  if ( which&BY_S ) v ^= subject_hash(t);
+  if ( which&BY_P ) v ^= predicate_hash(t->predicate.r);
+  if ( which&BY_O ) v ^= object_hash(t);
+  if ( which&BY_G ) v ^= graph_hash(t);
 
   return v;
 }
@@ -4571,7 +4550,7 @@ resize_saved(rdf_db *db, save_context *ctx)
   { saved *c, *n;
 
     for(c=*s; c; c = n)
-    { int hash = atom_hash(c->name) % newsize;
+    { int hash = atom_hash(c->name, MURMUR_SEED) % newsize;
 
       n = c->next;
       c->next = newt[hash];
@@ -4667,7 +4646,7 @@ save_double(IOSTREAM *fd, double f)
 
 static int
 save_atom(rdf_db *db, IOSTREAM *out, atom_t a, save_context *ctx)
-{ int hash = atom_hash(a) % ctx->saved_size;
+{ int hash = atom_hash(a, MURMUR_SEED) % ctx->saved_size;
   saved *s;
   size_t len;
   const char *chars;
@@ -4685,7 +4664,7 @@ save_atom(rdf_db *db, IOSTREAM *out, atom_t a, save_context *ctx)
 
   if ( ctx->saved_id/4 > ctx->saved_size )
   { resize_saved(db, ctx);
-    hash = atom_hash(a) % ctx->saved_size;
+    hash = atom_hash(a, MURMUR_SEED) % ctx->saved_size;
   }
 
   s = rdf_malloc(db, sizeof(*s));
@@ -6368,9 +6347,10 @@ init_cursor_from_literal(search_state *state, literal *cursor)
       iv = predicate_hash(p->predicate.r) ^ literal_hash(cursor);
       break;
     case BY_SPO:
-      iv = (atom_hash(ID_ATOM(p->subject_id))<<1) ^
-	   predicate_hash(p->predicate.r) ^
-	   literal_hash(cursor);
+      iv = ( subject_hash(p) ^
+	     predicate_hash(p->predicate.r) ^
+	     literal_hash(cursor)
+	   );
       break;
     default:
       iv = 0;				/* make compiler silent */
@@ -7718,7 +7698,7 @@ hash_agenda(rdf_db *db, agenda *a, int size)
     a->hash_size = size;
 
     for(v=a->head; v; v = v->next)
-    { int key = atom_hash(v->resource)&(size-1);
+    { int key = atom_hash(v->resource, MURMUR_SEED)&(size-1);
 
       v->hash_link = a->hash[key];
       a->hash[key] = v;
@@ -7732,7 +7712,7 @@ in_agenda(agenda *a, atom_t resource)
 { visited *v;
 
   if ( a->hash )
-  { int key = atom_hash(resource)&(a->hash_size-1);
+  { int key = atom_hash(resource, MURMUR_SEED)&(a->hash_size-1);
     v = a->hash[key];
 
     for( ; v; v = v->hash_link )
@@ -7779,7 +7759,7 @@ append_agenda(rdf_db *db, agenda *a, atom_t res, uintptr_t d)
   }
 
   if ( a->hash_size )
-  { int key = atom_hash(res)&(a->hash_size-1);
+  { int key = atom_hash(res, MURMUR_SEED)&(a->hash_size-1);
 
     v->hash_link = a->hash[key];
     a->hash[key] = v;

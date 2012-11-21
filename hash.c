@@ -29,20 +29,25 @@
     the GNU General Public License.
 */
 
+#include "rdf_db.h"
 #include "hash.h"
+#include "murmur.h"
 #include <SWI-Prolog.h>
 #include <string.h>
 
-#define HASHKEY(hash, ptr)	((((intptr_t)ptr)>>(hash->shift)) % (hash)->entries)
+static unsigned int
+ptr_hash_key(void *ptr)
+{ return rdf_murmer_hash(&ptr, sizeof(ptr), MURMUR_SEED);
+}
 
-ptr_hash *
-new_ptr_hash(int entries, int shift)
-{ ptr_hash *hash = PL_malloc(sizeof(*hash));
+
+ptr_hash_table *
+new_ptr_hash(int entries)
+{ ptr_hash_table *hash = PL_malloc(sizeof(*hash));
   size_t size = sizeof(*hash->chains)*entries;
 
   memset(hash, 0, sizeof(*hash));
   hash->entries = entries;
-  hash->shift   = shift;
   hash->chains  = PL_malloc(size);
   memset(hash->chains, 0, size);
 
@@ -59,7 +64,7 @@ destroy_node(ptr_hash_node *node, void *closure)
 
 
 void
-destroy_ptr_hash(ptr_hash *hash)
+destroy_ptr_hash(ptr_hash_table *hash)
 { for_ptr_hash(hash, destroy_node, NULL);
 
   PL_free(hash->chains);
@@ -68,8 +73,8 @@ destroy_ptr_hash(ptr_hash *hash)
 
 
 int
-add_ptr_hash(ptr_hash *hash, void *value)
-{ int key = HASHKEY(hash, value);
+add_ptr_hash(ptr_hash_table *hash, void *value)
+{ int key = ptr_hash_key(value)%hash->entries;
   ptr_hash_node *node;
 
   for(node = hash->chains[key]; node; node = node->next)
@@ -87,7 +92,7 @@ add_ptr_hash(ptr_hash *hash, void *value)
 
 
 int
-for_ptr_hash(ptr_hash *hash,
+for_ptr_hash(ptr_hash_table *hash,
 	     int (*func)(ptr_hash_node *node, void *closure),
 	     void *closure)
 { int key;

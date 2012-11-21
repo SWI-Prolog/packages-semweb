@@ -38,16 +38,15 @@ typedef struct ptr_hash_node
 } ptr_hash_node;
 
 
-typedef struct ptr_hash
+typedef struct ptr_hash_table
 { int entries;				/* # chains  */
-  int shift;				/* shift for pointers */
   ptr_hash_node **chains;		/* hash chains */
-} ptr_hash;
+} ptr_hash_table;
 
-ptr_hash       *new_ptr_hash(int entries, int shift);
-void		destroy_ptr_hash(ptr_hash *hash);
-int		add_ptr_hash(ptr_hash *hash, void *value);
-int		for_ptr_hash(ptr_hash *hash,
+ptr_hash_table *new_ptr_hash(int entries);
+void		destroy_ptr_hash(ptr_hash_table *hash);
+int		add_ptr_hash(ptr_hash_table *hash, void *value);
+int		for_ptr_hash(ptr_hash_table *hash,
 			     int (*func)(ptr_hash_node *node, void *closure),
 			     void *closure);
 
@@ -55,7 +54,7 @@ int		for_ptr_hash(ptr_hash *hash,
 		 *	       ATOMS		*
 		 *******************************/
 
-typedef ptr_hash atom_hash;
+typedef ptr_hash_table atom_hash_table;
 #define new_atom_hash(entries) new_ptr_hash(entries, ATOM_HASH_SHIFT)
 #define destroy_atom_hash(hash) destroy_ptr_hash(hash)
 #define add_atom_hash(hash, atom) add_ptr_hash(hash, (void*)(atom))
@@ -67,7 +66,5 @@ SWI-Prolog note: Atoms are integers shifted by LMASK_BITS (7)
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #define POINTER_HASH_SHIFT 3
-#define ATOM_HASH_SHIFT 7
-#define atom_hash(a) (((unsigned long)a)>>ATOM_HASH_SHIFT)
 
 #endif /*HASH_H_INCLUDED*/
