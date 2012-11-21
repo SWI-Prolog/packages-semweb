@@ -28,29 +28,22 @@
 
 #define WITH_PL_MUTEX 1
 
-#ifdef _REENTRANT
 #ifdef __WINDOWS__
-#include <malloc.h>			/* alloca() */
+#include <malloc.h>
 #define inline __inline
 #ifndef SIZEOF_LONG
 #define SIZEOF_LONG 4
-#endif
-#else
-#if (!defined(__GNUC__) || defined(__hpux)) && defined(HAVE_ALLOCA_H)
-#include <alloca.h>
-#endif
-#include <errno.h>
 #endif
 #endif
 
 #include "rdf_db.h"
 #include <wctype.h>
 #include <ctype.h>
-#ifdef WITH_MD5
-#include "md5.h"
 #include "murmur.h"
 #include "memory.h"
 #include "buffer.h"
+#ifdef WITH_MD5
+#include "md5.h"
 
 #undef ERROR				/* also in wingdi.h; we do not care */
 #define ERROR -1
