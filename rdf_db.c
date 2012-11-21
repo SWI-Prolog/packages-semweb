@@ -6339,23 +6339,9 @@ init_cursor_from_literal(search_state *state, literal *cursor)
     return FALSE;
   }
 
-  switch(p->indexed)			/* keep in sync with triple_hash_key() */
-  { case BY_O:
-      iv = literal_hash(cursor);
-      break;
-    case BY_PO:
-      iv = predicate_hash(p->predicate.r) ^ literal_hash(cursor);
-      break;
-    case BY_SPO:
-      iv = ( subject_hash(p) ^
-	     predicate_hash(p->predicate.r) ^
-	     literal_hash(cursor)
-	   );
-      break;
-    default:
-      iv = 0;				/* make compiler silent */
-      assert(0);
-  }
+  iv = literal_hash(cursor);		/* see also triple_hash_key() */
+  if ( p->indexed&BY_S ) iv ^= subject_hash(p);
+  if ( p->indexed&BY_P ) iv ^= predicate_hash(p->predicate.r);
 
   init_triple_literal_walker(&state->cursor, state->db, p, p->indexed, iv);
   state->has_literal_state = TRUE;
