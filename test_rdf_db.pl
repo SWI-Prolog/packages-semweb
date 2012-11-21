@@ -675,6 +675,27 @@ monitor(transaction-1) :-
 subproperty(1) :-
 	rdf_assert(a, p, b),
 	\+ rdf_has(_, p2, b, _).
+subproperty(2) :-
+	rdf_assert(s, p, o),
+	rdf_has(s,P,o),
+	P == p.
+subproperty(3) :-
+	rdf_assert(s, p, o),
+	rdf_assert(p, rdfs:subPropertyOf, sp),
+	rdf_has(s,sp,o).
+subproperty(4) :-
+	rdf_assert(s, p, o),
+	rdf_assert(p, rdfs:subPropertyOf, sp),
+	rdf_has(s,sp,o,P),
+	P == p.
+subproperty(5) :-
+	rdf_assert(s, p, o),
+	rdf_assert(p, rdfs:subPropertyOf, sp),
+	rdf_set_predicate(sp, inverse_of(ip)),
+	rdf_has(o,ip,s,P),
+	P == inverse_of(p).
+
+
 
 
 		 /*******************************

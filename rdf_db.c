@@ -6703,9 +6703,14 @@ next_search_state(search_state *state)
 
   if ( (state->flags & MATCH_SUBPROPERTY) )
   { retpred = state->realpred;
-    if ( retpred && PL_is_variable(state->predicate) )
-    { if ( !PL_unify(state->predicate, retpred) )
-	return FALSE;
+    if ( retpred )
+    { if ( PL_is_variable(state->predicate) )
+      { if ( !PL_unify(state->predicate, retpred) )
+	  return FALSE;
+      }
+    } else
+    { if ( PL_is_variable(state->predicate) )
+	retpred = state->predicate;
     }
   } else
   { retpred = state->predicate;
