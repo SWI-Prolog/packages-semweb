@@ -199,6 +199,8 @@ assert_node(Graph, Id) :-
 	show(Graph, add_node(Id)).
 
 assert_edge(Graph, Child, Parent) :-
+	edge(Child, Parent, Graph), !.
+assert_edge(Graph, Child, Parent) :-
 	assert(edge(Child, Parent, Graph)),
 	show(Graph, add_edge(Child, Parent)).
 

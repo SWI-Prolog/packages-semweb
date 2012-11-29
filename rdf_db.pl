@@ -823,7 +823,9 @@ rdf_subject(Resource) :-
 %	resources. Object is either a resource or a term literal(Value).
 %	See rdf/3 for an explanation  of   Value  for typed and language
 %	qualified literals. All arguments  are   subject  to  name-space
-%	expansion.
+%	expansion. Complete duplicates (including  the   same  graph and
+%	`line' and with a compatible `lifespan')   are  not added to the
+%	database.
 
 %%	rdf_assert(+Subject, +Predicate, +Object, +Graph) is det.
 %

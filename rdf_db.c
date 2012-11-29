@@ -6290,6 +6290,9 @@ rdf_assert4(term_t subject, term_t predicate, term_t object, term_t src)
 { rdf_db *db = rdf_current_db();
   triple *t = new_triple(db);
   query *q = open_query(db);
+  triple *d;
+  triple_walker tw;
+  lifespan qls;
 
   if ( !get_triple(db, subject, predicate, object, t, q) )
   { error:
@@ -6304,6 +6307,28 @@ rdf_assert4(term_t subject, term_t predicate, term_t object, term_t src)
   { t->graph_id = ATOM_ID(ATOM_user);
     t->line = NO_LINE;
   }
+
+  qls.born = queryWriteGen(q) + 1;		/* (*) */
+  qls.died = query_max_gen(q);
+
+  init_triple_walker(&tw, db, t, BY_SPO);
+  while((d=next_triple(&tw)))
+  { d = deref_triple(db, d);
+
+    if ( !overlap_lifespan(&d->lifespan, &qls) )
+      continue;
+
+    if ( match_triples(db, d, t, q, MATCH_DUPLICATE|MATCH_SRC) &&
+	 d->line == t->line )
+    { destroy_triple_walker(db, &tw);
+      free_triple(db, t, FALSE);
+      close_query(q);
+
+      return TRUE;
+    }
+  }
+  destroy_triple_walker(db, &tw);
+
   lock_atoms(db, t);
 
   add_triples(q, &t, 1);
