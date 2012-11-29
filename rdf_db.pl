@@ -2158,7 +2158,13 @@ save_body_literal(lang(Lang, Value),
 save_body_literal(type(Type, DOM),
 		  NameText, _BaseURI, Out, Indent, Options) :-
 	rdf_equal(Type, rdf:'XMLLiteral'), !,
-	save_xml_literal(DOM, NameText, Out, Indent, Options).
+	(   atom(DOM)
+	->  format(Out, '~N~*|<', [Indent]),
+	    rdf_write_id(Out, NameText),
+	    format(Out, ' rdf:parseType="Literal">~w</', [DOM]),
+	    rdf_write_id(Out, NameText), write(Out, '>')
+	;   save_xml_literal(DOM, NameText, Out, Indent, Options)
+	).
 save_body_literal(type(Type, Value),
 		  NameText, BaseURI, Out, Indent, _) :- !,
 	format(Out, '~N~*|<', [Indent]),
