@@ -592,9 +592,26 @@ anonid(State, _NodeId, Node) :-
 	anonid(State, Node).
 anonid(_State, NodeId, node(NodeId)).
 
-mk_object(type(TypeSpec, Value), State, literal(type(TypeIRI, Value))) :- !,
-	prefix_iri(TypeSpec, State, TypeIRI).
+mk_object(type(TypeSpec, Value0), State, literal(type(TypeIRI, Value))) :- !,
+	prefix_iri(TypeSpec, State, TypeIRI),
+	convert_literal(TypeIRI, Value0, Value).
 mk_object(Value, _State, literal(Value)).
+
+%%	convert_literal(+Type, +Text, -Value) is det.
+%
+%	Convert  rdf:XMLLiteral  values  into  the   XML  DOM.  This  is
+%	consistent with the XML based version. Unclear whether this is a
+%	good idea.
+
+:- rdf_meta
+	convert_literal(r,+,-).
+
+convert_literal(rdf:'XMLLiteral', Text, DOM) :-
+	atom_to_memory_file(Text, MF),
+	open_memory_file(MF, read, In, [free_on_close(true)]),
+	load_structure(stream(In), DOM, [dialect(xml)]),
+	close(In).
+convert_literal(_, Value, Value).
 
 syntax_rule(State, Error) -->
 	error_tokens(7, Tokens),
