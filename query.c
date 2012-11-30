@@ -84,7 +84,7 @@ rdf_thread_info(rdf_db *db, int tid)
     { ti = rdf_malloc(db, sizeof(*ti));
       memset(ti, 0, sizeof(*ti));
       init_query_stack(db, &ti->queries);
-      MemoryBarrier();
+      MEMORY_BARRIER();
       td->blocks[idx][tid] = ti;
       if ( tid > qa->query.thread_max )
 	qa->query.thread_max = tid;
@@ -212,7 +212,7 @@ alloc_query(query_stack *qs)
       preinit_query(qs->db, qs, q, parent, i);
       parent = q;
     }
-    MemoryBarrier();
+    MEMORY_BARRIER();
     qs->blocks[b] = ql;
   }
   simpleMutexUnlock(&qs->lock);

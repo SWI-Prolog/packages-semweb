@@ -1454,13 +1454,13 @@ append_clouds(rdf_db *db,
       new_hashes = rdf_malloc(db, newc*sizeof(unsigned int));
       memcpy(&new_hashes[0], c1->alt_hashes,
 	     c1->alt_hash_count*sizeof(unsigned int));
-      MemoryBarrier();
+      MEMORY_BARRIER();
       c1->alt_hashes = new_hashes;
       deferred_free(&db->defer_clouds, old_hashes);
     } else
     { c1->alt_hashes = rdf_malloc(db, newc*sizeof(unsigned int));
       c1->alt_hashes[0] = c1->hash;
-      MemoryBarrier();
+      MEMORY_BARRIER();
       c1->alt_hash_count = 1;
     }
 
@@ -1470,7 +1470,7 @@ append_clouds(rdf_db *db,
     } else
     { c1->alt_hashes[c1->alt_hash_count] = c2->hash;
     }
-    MemoryBarrier();
+    MEMORY_BARRIER();
     c1->alt_hash_count = newc;
   }
 
@@ -1798,7 +1798,7 @@ create_reachability_matrix(rdf_db *db, predicate_cloud *cloud, query *q)
   rm->matrix = m;
   simpleMutexLock(&db->locks.misc);		/* sync with gc_cloud() */
   rm->older = cloud->reachable;
-  MemoryBarrier();
+  MEMORY_BARRIER();
   cloud->reachable = rm;
   simpleMutexUnlock(&db->locks.misc);
 
@@ -1953,7 +1953,7 @@ is_leaf_predicate(rdf_db *db, predicate *p, query *q)
 
   simpleMutexLock(&db->locks.misc);
   data->older = p->is_leaf;
-  MemoryBarrier();
+  MEMORY_BARRIER();
   p->is_leaf = data;
   simpleMutexUnlock(&db->locks.misc);
 
