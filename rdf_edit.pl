@@ -740,7 +740,7 @@ uri_scheme(ftps).
 
 rdfe_is_modified(Source) :-
 	rdf_source(Graph, Source),
-	rdf_graph_property(Graph, modified(false)).
+	rdf_graph_property(Graph, modified(true)).
 
 
 rdfe_clear_modified :-
