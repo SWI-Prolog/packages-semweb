@@ -531,7 +531,7 @@ system:goal_expansion(G, Expanded) :-
 	;   debugging(rdf_meta),
 	    sub_term(G, NS:Local),
 	    atom(NS), atom(Local)
-	->  print_message(warning, rdf_meta(not_expanded(LM:G))),
+	->  print_message(warning, rdf(meta(not_expanded(LM:G)))),
 	    fail
 	),
 	rdf_expand(G, Spec, Expanded).
@@ -614,6 +614,7 @@ mk_global(NS:Local, Global) :-
 	rdf_subject(r),
 	rdf_create_graph(r),
 	rdf_graph(r),
+	rdf_unload_graph(r),
 	rdf_set_predicate(r, t),
 	rdf_predicate_property(r, -),
 	rdf_estimate_complexity(r,r,r,-),
@@ -2046,16 +2047,36 @@ report_loaded(Action, Source, DB, Triples, T0, Options) :-
 		      rdf(loaded(Action, Source, DB, Triples, Time))).
 
 
-%%	rdf_unload(+Spec) is det.
+%%	rdf_unload(+Source) is det.
 %
-%	Identify the graph loaded from   Spec and use rdf_unload_graph/1
+%	Identify the graph loaded from Source and use rdf_unload_graph/1
 %	to erase this graph.
+%
+%	@deprecated	For compatibility, this predicate also accepts a
+%			graph name instead of a source specification.
+%			Please update your code to use
+%			rdf_unload_graph/1.
 
 rdf_unload(Spec) :-
 	source_url(Spec, _Protocol, SourceURL),
 	rdf_graph_source_(Graph, SourceURL, _), !,
 	rdf_unload_graph(Graph).
+rdf_unload(Graph) :-
+	atom(Graph),
+	rdf_graph(Graph), !,
+	warn_deprecated_unload(Graph),
+	rdf_unload_graph(Graph).
 rdf_unload(_).
+
+:- dynamic
+	warned/0.
+
+warn_deprecated_unload(_) :-
+	warned, !.
+warn_deprecated_unload(Graph) :-
+	assertz(warned),
+	print_message(warning, rdf(deprecated(rdf_unload(Graph)))).
+
 
 %%	rdf_unload_graph(+Graph) is det.
 %
@@ -3395,27 +3416,33 @@ rdf_quote_uri(IRI, URI) :-
 :- multifile
 	prolog:message//1.
 
-prolog:message(rdf(loaded(How, What, BaseURI, Triples, Time))) -->
+prolog:message(rdf(Term)) -->
+	message(Term).
+
+message(loaded(How, What, BaseURI, Triples, Time)) -->
 	how(How),
 	source(What),
 	into(What, BaseURI),
 	in_time(Triples, Time).
-prolog:message(rdf(save_removed_duplicates(N, Subject))) -->
+message(save_removed_duplicates(N, Subject)) -->
 	[ 'Removed ~d duplicate triples about "~p"'-[N,Subject] ].
-prolog:message(rdf(saved(File, SavedSubjects, SavedTriples))) -->
+message(saved(File, SavedSubjects, SavedTriples)) -->
 	[ 'Saved ~D triples about ~D subjects into ~p'-
 	  [SavedTriples, SavedSubjects, File]
 	].
-prolog:message(rdf(using_namespace(Id, NS))) -->
+message(using_namespace(Id, NS)) -->
 	[ 'Using namespace id ~w for ~w'-[Id, NS] ].
-prolog:message(rdf(inconsistent_cache(DB, Graphs))) -->
+message(inconsistent_cache(DB, Graphs)) -->
 	[ 'RDF cache file for ~w contains the following graphs'-[DB], nl,
 	  '~t~8|~p'-[Graphs]
 	].
-prolog:message(rdf(guess_format(Ext))) -->
+message(guess_format(Ext)) -->
 	[ 'Unknown file-extension: ~w.  Assuming RDF/XML'-[Ext] ].
-prolog:message(rdf_meta(not_expanded(G))) -->
-	[ 'rdf_meta: ~p is not expanded'-[G] ].
+message(meta(not_expanded(G))) -->
+	[ 'rdf_meta/1: ~p is not expanded'-[G] ].
+message(deprecated(rdf_unload(Graph))) -->
+	[ 'rdf_unload/1: Use ~q'-[rdf_unload_graph(Graph)] ].
+
 
 how(load)   --> [ 'Loaded' ].
 how(parsed) --> [ 'Parsed' ].
