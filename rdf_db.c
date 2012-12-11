@@ -3060,6 +3060,8 @@ share_literal(rdf_db *db, literal *from)
   if ( is_new )
   { from->shared = TRUE;
     shared = from;
+    assert(from->references==1);
+    assert(from->atoms_locked==1);
   } else
   { shared = *data;
     shared->references++;
@@ -3080,8 +3082,6 @@ share_literal(rdf_db *db, literal *from)
 	  print_literal(from);
 	  Sdprintf("\n"));
 
-    assert(from->references==1);
-    assert(from->atoms_locked==1);
     rdf_broadcast(EV_NEW_LITERAL, from, NULL);
   }
 
