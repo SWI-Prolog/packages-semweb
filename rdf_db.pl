@@ -2193,7 +2193,7 @@ rdf_graph_property_(triples(Count), Graph) :-
 %	    Set the modified state of Graph to false.
 
 rdf_set_graph(Graph, modified(Modified)) :-
-	must_be(Modified, oneof([false])),
+	must_be(oneof([false]), Modified),
 	rdf_graph_clear_modified_(Graph).
 
 
