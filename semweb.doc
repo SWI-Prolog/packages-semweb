@@ -2314,6 +2314,30 @@ OWL(-2) support is provided through Thea, an OWL library for SWI-Prolog
 See \url{http://www.semanticweb.gr/TheaOWLLib/}.
 
 
+\section{Forward compatibility}
+
+The development version of SWI-Prolog is moving to version 3 of the RDF
+store. This version mainly improves concurrency, allowing for concurrent
+read and write, including support for the Prolog logical update view and
+properly atomic and isolated transactions. This version also
+rationalizes some of the API aspects.  Version~2 as distributed with
+SWI-Prolog 6.2.4 introduces the following forward compatibility
+predicates:
+
+\begin{description}
+    \predicate{rdf_register_prefix}{2}{+Prefix, +URL}
+\nodescription
+    \predicate{rdf_register_prefix}{2}{+Prefix, +URL, +Options}
+Replaces rdf_register_ns/2,3.  Otherwise fully compatible.  Note that
+version~3 provides rdf_register_ns/2,3 as deprecated predicates.
+    \predicate{rdf_unload_graph}{1}{+Graph}
+Version~3 rdf_unload/1 is restricted to unloading a graph loaded from
+a specific source.  New code must use rdf_unload_graph/1 if a graph
+must be deleted by name.  Version~3 provides backward compatibility
+with a warning.
+\end{description}
+
+
 \section*{Acknowledgements}
 
 This research was supported by the following projects: MIA and
