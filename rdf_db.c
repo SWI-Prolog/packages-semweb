@@ -2670,7 +2670,7 @@ rdf_graph_modified_(term_t graph_name, term_t ismodified, term_t hash)
     return FALSE;
 
   if ( (g = lookup_graph(db, gn)) )
-  { int ismod = (memcmp(g->digest, g->unmodified_digest, 16) == 0);
+  { int ismod = (memcmp(g->digest, g->unmodified_digest, 16) != 0);
 
     rc = ( PL_unify_bool(ismodified, ismod) &&
 	   md5_unify_digest(hash, g->unmodified_digest)

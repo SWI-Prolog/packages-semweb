@@ -2021,16 +2021,20 @@ rdf_storage_encoding('', plain).
 
 rdf_load_stream(xml, Stream, Options) :- !,
 	graph(Options, Graph),
-	rdf_transaction(process_rdf(Stream, assert_triples, Options),
+	rdf_transaction(load_stream(Stream, Options),
 			parse(Graph)).
 rdf_load_stream(xhtml, Stream, M:Options) :- !,
 	graph(Options, Graph),
-	rdf_transaction(process_rdf(Stream, assert_triples,
-				    M:[embedded(true)|Options]),
+	rdf_transaction(load_stream(Stream, M:[embedded(true)|Options]),
 			parse(Graph)).
 rdf_load_stream(triples, Stream, Options) :- !,
 	graph(Options, Graph),
 	rdf_load_db_(Stream, Graph, _Graphs).
+
+load_stream(Stream, M:Options) :-
+	process_rdf(Stream, assert_triples, M:Options),
+	option(graph(Graph), Options),
+	rdf_graph_clear_modified_(Graph).
 
 
 %%	report_loaded(+Action, +Source, +DB, +Triples, +StartCPU, +Options)
