@@ -974,7 +974,9 @@ stream_file_name(_, '<no file>').
 
 rdf_db:rdf_load_stream(turtle, Stream, _Module:Options) :-
 	rdf_db:graph(Options, Id),
-	rdf_transaction(rdf_process_turtle(Stream, assert_triples, Options),
+	rdf_transaction((  rdf_process_turtle(Stream, assert_triples, Options),
+			   rdf_set_graph(Id, modified(false))
+			),
 			parse(Id)).
 
 assert_triples([], _).
