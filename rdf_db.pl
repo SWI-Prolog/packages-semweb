@@ -1262,16 +1262,17 @@ rdf_storage_encoding('', plain).
 rdf_load_stream(xml, Stream, Options) :- !,
 	graph(Options, Graph),
 	rdf_transaction(process_rdf(Stream, assert_triples, Options),
-			parse(Graph)).
+			parse(Graph)),
+	rdf_graph_clear_modified_(Graph).
 rdf_load_stream(xhtml, Stream, M:Options) :- !,
 	graph(Options, Graph),
 	rdf_transaction(process_rdf(Stream, assert_triples,
 				    M:[embedded(true)|Options]),
-			parse(Graph)).
+			parse(Graph)),
+	rdf_graph_clear_modified_(Graph).
 rdf_load_stream(triples, Stream, Options) :- !,
 	graph(Options, Graph),
 	rdf_load_db_(Stream, Graph, _Graphs).
-
 
 %%	report_loaded(+Action, +Source, +DB, +Triples, +StartCPU, +Options)
 
