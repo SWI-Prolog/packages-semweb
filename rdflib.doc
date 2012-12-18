@@ -182,7 +182,7 @@ Same as \term{rdf_list_library}{Id, []}.
 
     \predicate{rdf_list_library}{2}{+Id, +Options}
 Lists the resources that will be loaded if \arg{Id} is handed to
-rdf_load_library/2. See rdf_attach_library/2 for how ontology
+rdf_load_library/2. See rdf_attach_library/1 for how ontology
 identifiers are generated. In addition it checks the existence of each
 resource to help debugging library dependencies. Before doing its work,
 rdf_list_library/2 reloads manifests that have changed since they were
@@ -203,7 +203,7 @@ Typically, a project will use a single file using the same format as a
 manifest file that defines alternative configurations that can be
 loaded. This file is loaded at program startup using
 rdf_attach_library/1.  Users can now list the available libraries
-using rdf_list_libraries/0 and rdf_list_libraries/1:
+using rdf_list_library/0 and rdf_list_library/1:
 
 \begin{code}
 1 ?- rdf_list_library.
