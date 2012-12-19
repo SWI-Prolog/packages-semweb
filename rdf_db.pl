@@ -633,9 +633,11 @@ rdf_is_literal(literal(Value)) :-
 		 *	      SOURCE		*
 		 *******************************/
 
-%%	rdf_source_location(+Subject, -File:Line)
+%%	rdf_source_location(+Subject, -Location) is nondet.
 %
-%	Return the source-locations for triples for this subject.
+%	True when triples for Subject are loaded from Location.
+%
+%	@param Location is a term File:Line.
 
 rdf_source_location(Subject, Source) :-
 	findall(Source, rdf(Subject, _, _, Source), Sources),
