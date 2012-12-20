@@ -593,9 +593,19 @@ anonid(State, _NodeId, Node) :-
 anonid(_State, NodeId, node(NodeId)).
 
 mk_object(type(TypeSpec, Value0), State, literal(type(TypeIRI, Value))) :- !,
-	prefix_iri(TypeSpec, State, TypeIRI),
+	type_iri(TypeSpec, State, TypeIRI),
 	convert_literal(TypeIRI, Value0, Value).
 mk_object(Value, _State, literal(Value)).
+
+type_iri(relative_uri(Rel), State, TypeIRI) :- !,
+	ttl_state_base_uri(State, Base),
+	(   Rel == ''			% must be in global_url?
+	->  TypeIRI = Base
+	;   uri_normalized_iri(Rel, Base, TypeIRI)
+	).
+type_iri(Spec, State, TypeIRI) :-
+	prefix_iri(Spec, State, TypeIRI).
+
 
 %%	convert_literal(+Type, +Text, -Value) is det.
 %
