@@ -222,7 +222,7 @@ is_meta(expand).
 %%	rdf_save_canonical_turtle(+Spec, +Options) is det.
 %
 %	Save triples in  a  canonical  format.   This  is  the  same  as
-%	rdf_save_turtle/3, but using different defaults. In particular:
+%	rdf_save_turtle/2, but using different defaults. In particular:
 %
 %	    * encoding(utf8),
 %	    * indent(0),
