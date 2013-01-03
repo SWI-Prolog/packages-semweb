@@ -972,7 +972,10 @@ subjects(State, Subjects) :-
 	tw_state_expand(State, Expand),
 	(   Expand == lookup,
 	    atom(Graph),
-	    rdf_statistics(triples_by_graph(Graph, Count)),
+	    (   rdf_graph_property(Graph, triples(Count))
+	    ->  true
+	    ;   Count = 0			% non-existing graph
+	    ),
 	    rdf_statistics(triples(Total)),
 	    Count * 10 < Total
 	->  findall(S, rdf(S,_,_,Graph), List),
@@ -988,7 +991,7 @@ subjects(State, Subjects) :-
 subject(State, Subject) :-
 	tw_state_graph(State, Graph),
 	(   atom(Graph)
-	->  rdf_subject(Subject),
+	->  rdf_resource(Subject),
 	    (   rdf(Subject, _, _, Graph)
 	    ->  true
 	    )
