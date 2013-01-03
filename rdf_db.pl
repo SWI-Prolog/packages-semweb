@@ -1211,8 +1211,7 @@ rdf_statistics(hash_quality(Index, Size, Quality,Optimize)) :-
 	member(hash(Place,Size,Quality,Optimize), List),
 	index(Index, Place).
 rdf_statistics(triples_by_graph(Graph, Count)) :-
-	rdf_graph_(Graph, Count),
-	Count \== 0.
+	rdf_graph_(Graph, Count).
 
 index(rdf(-,-,-,-), 0).
 index(rdf(+,-,-,-), 1).
@@ -2189,7 +2188,7 @@ rdf_graph_property_(source_last_modified(Time), Graph) :-
 	rdf_graph_source_(Graph, _, Time),
 	Time > 0.0.
 rdf_graph_property_(triples(Count), Graph) :-
-	rdf_statistics_(triples(Graph, Count)).
+	rdf_graph_(Graph, Count).
 
 %%	rdf_set_graph(+Graph, +Property) is det.
 %

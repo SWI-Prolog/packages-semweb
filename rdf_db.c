@@ -2451,10 +2451,9 @@ unregister_graph(rdf_db *db, triple *t)
 
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-rdf_graph(-Graph) is nondet.
+rdf_graph_(?Graph, ?TripleCount) is nondet.
 
-Return a list holding the names  of   all  currently defined graphs. We
-return a list to avoid the need for complicated long locks.
+True when Graph is a current graph with TripleCount triples.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 typedef struct enum_graph
