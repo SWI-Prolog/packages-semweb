@@ -174,9 +174,9 @@ read_triple(Stream, Triple, State0, State) :-
 	(   var(E)
 	->  State = State0
 	;   print_message(warning, E),
-	    nt_state_error_count(State0, E0),
-	    E is E0+1,
-	    set_error_count_of_nt_state(E, State0, State1),
+	    nt_state_error_count(State0, EC0),
+	    EC is EC0+1,
+	    set_error_count_of_nt_state(EC, State0, State1),
 	    read_triple(Stream, Triple, State1, State)
 	).
 
