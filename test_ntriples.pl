@@ -84,6 +84,8 @@ test(quote, T == triple(a,b,literal('\\'))) :-
 	atom_triple('<a> <b> "\\\\" .', T).
 test(escape, T == triple(a,b,literal('\u1234'))) :-
 	atom_triple('<a> <b> "\\u1234" .', T).
+test(escape, T == triple(a,b,literal('\uABCD'))) :-
+	atom_triple('<a> <b> "\\uABCD" .', T).
 test(escape, T == triple(a,b,literal('\U00012345'))) :-
 	atom_triple('<a> <b> "\\U00012345" .', T).
 test(eof, T == end_of_file) :-

@@ -85,9 +85,10 @@ is_eol(int c)
 
 static inline int
 hexd(int c)
-{ c -= '0';
-  if ( c >=0 && c <= 0xf )
-    return c;
+{ if ( c>='0' && c<='9' )
+    return c-'0';
+  if ( c>='A' && c<='F' )
+    return c-'A'+10;
   return -1;
 }
 
