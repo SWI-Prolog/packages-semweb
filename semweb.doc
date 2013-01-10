@@ -781,6 +781,7 @@ in the directory described by rdf_current_db/1 and has the extension
 
 \input{rdfturtle.tex}
 \input{rdfturtlewrite.tex}
+\input{rdfntriples.tex}
 
 
 		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -24,7 +24,7 @@ LIBDIR=$(PLBASE)/library/semweb
 # COFLAGS+=-gdwarf-2 -g3 -fno-inline
 # COFLAGS=-gdwarf-2 -g3
 
-TARGETS=	rdf_db.@SO@ turtle.@SO@
+TARGETS=	rdf_db.@SO@ turtle.@SO@ ntriples.@SO@
 
 RDFDBOBJ=	rdf_db.o atom.o md5.o atom_map.o debug.o \
 		hash.o murmur.o query.o resource.o error.o skiplist.o \
@@ -36,6 +36,8 @@ rdf_db.@SO@:	$(RDFDBOBJ)
 		$(LD) $(LDSOFLAGS) -o $@ $(RDFDBOBJ) $(LIBS) $(LIBPLSO)
 turtle.@SO@:	turtle.o
 		$(LD) $(LDSOFLAGS) -o $@ turtle.o $(LIBS) $(LIBPLSO)
+ntriples.@SO@:	ntriples.o
+		$(LD) $(LDSOFLAGS) -o $@ ntriples.o $(LIBS) $(LIBPLSO)
 
 turtle.o:	turtle.c turtle_chars.c
 
@@ -86,12 +88,14 @@ query.o:	buffer.h
 
 TEXEXTRA=	rdfturtle.tex rdfturtlewrite.tex rdfcompare.tex \
                 rdfportray.tex rdflib.tex sparqlclient.tex rdfdb.tex \
-		rdfcache.tex
+		rdfcache.tex rdfntriples.tex
 
 $(TEX):		$(TEXEXTRA)
 
 rdfturtle.tex:  rdf_turtle.pl
 		$(PLTOTEX) --section 'library(semweb/rdf_turtle)'
+rdfntriples.tex:  rdf_ntriples.pl
+		$(PLTOTEX) --section 'library(semweb/rdf_ntriples)'
 rdfturtlewrite.tex:     rdf_turtle_write.pl
 		$(PLTOTEX) --section 'library(semweb/rdf_turtle_write)'
 rdfcompare.tex: rdf_compare.pl
