@@ -1714,6 +1714,7 @@ rdf_end_load(Ref) :-
 rdf_load_file(queue(Queue), _Spec, _SourceURL, _Protocol, _Graph, _M, _Options) :- !,
 	catch(thread_get_message(Queue, _), _, true).
 rdf_load_file(_Ref, _Spec, SourceURL, Protocol, Graph, M, Options) :-
+	debug(rdf(load), 'RDF: Loading ~q into ~q', [SourceURL, Graph]),
 	statistics(cputime, T0),
 	rdf_open_input(SourceURL, Protocol, Graph,
 		       In, Cleanup, Modified, Format, Options),

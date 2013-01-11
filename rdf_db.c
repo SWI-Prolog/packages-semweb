@@ -5223,6 +5223,10 @@ rdf_load_db(term_t stream, term_t id, term_t graphs)
   rdf_db *db = rdf_current_db();
   IOSTREAM *in;
   int rc;
+  term_t ba_arg2;
+
+  if ( !(ba_arg2 = PL_new_term_ref()) )
+    return FALSE;
 
   if ( !PL_get_stream_handle(stream, &in) )
     return PL_type_error("stream", stream);
@@ -5234,7 +5238,8 @@ rdf_load_db(term_t stream, term_t id, term_t graphs)
   PL_release_stream(in);
 
   if ( !rc ||
-       !rdf_broadcast(EV_LOAD, (void*)id, (void*)ATOM_begin) )
+       !PL_put_atom(ba_arg2, ATOM_begin) ||
+       !rdf_broadcast(EV_LOAD, (void*)id, (void*)ba_arg2) )
   { destroy_load_context(db, &ctx, TRUE);
     return FALSE;
   }
@@ -5263,7 +5268,8 @@ rdf_load_db(term_t stream, term_t id, term_t graphs)
       }
       clear_modified(ctx.graph);
     }
-    rc = rdf_broadcast(EV_LOAD, (void*)id, (void*)ATOM_end);
+    if ( (rc=PL_cons_functor(ba_arg2, FUNCTOR_end1, graphs)) )
+      rc = rdf_broadcast(EV_LOAD, (void*)id, (void*)ba_arg2);
     destroy_load_context(db, &ctx, FALSE);
   } else
   { rdf_broadcast(EV_LOAD, (void*)id, (void*)ATOM_error);
@@ -7314,11 +7320,11 @@ rdf_broadcast(broadcast_id id, void *a1, void *a2)
       }
       case EV_LOAD:
       { term_t ctx = (term_t)a1;
-	atom_t be  = (atom_t)a2;
+	term_t be  = (term_t)a2;
 	term_t tmp;
 
 	if ( !(tmp = PL_new_term_refs(2)) ||
-	     !PL_put_atom(tmp+0, be) ||		/* begin/end */
+	     !PL_put_term(tmp+0, be) ||		/* begin/end(graphs) */
 	     !PL_put_term(tmp+1, ctx) ||
 	     !PL_cons_functor_v(term, FUNCTOR_load2, tmp) )
 	  return FALSE;

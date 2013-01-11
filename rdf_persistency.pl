@@ -622,10 +622,10 @@ monitor(update(S,P,O,DB,Action)) :-
 	    format(Fd, '~q.~n', [update(S,P,O,Action)]),
 	    sync_journal(DB, Fd)
 	).
-monitor(load(BE, Id)) :-
-	(   BE == begin
-	->  push_state(Id)
-	;   sync_state(Id)
+monitor(load(BE, _DumpFileURI)) :-
+	(   BE = end(Graphs)
+	->  sync_loaded_graphs(Graphs)
+	;   true
 	).
 monitor(create_graph(Graph)) :-
 	\+ blocked_db(Graph, _),
@@ -791,38 +791,13 @@ end_transactions([DB:Id|T], DBs, N) :-
 	end_transactions(T, DBs, N).
 
 
-%	State  handling.  We  use   this    for   trapping   changes  by
-%	rdf_load_db/1. In theory, loading such files  can add triples to
-%	multiple sources. In practice this rarely   happens. We save the
-%	current state and sync all  files   that  have changed. The only
-%	drawback of this approach is that loaded files spreading triples
-%	over multiple databases cause all these   databases  to be fully
-%	synchronised. This shouldn't happen very often.
+%%	sync_loaded_graphs(+Graphs)
+%
+%	Called after a binary triple has been loaded that added triples
+%	to the given graphs.
 
-:- dynamic
-	pre_load_state/2.
-
-push_state(Id) :-
-	get_state(State),
-	asserta(pre_load_state(Id, State)).
-
-get_state(State) :-
-	findall(DB-MD5, (rdf_graph(DB), rdf_md5(DB, MD5)), State0),
-	keysort(State0, State).
-
-sync_state(Id) :-
-	retract(pre_load_state(Id, PreState)),
-	get_state(AfterState),
-	sync_state(AfterState, PreState).
-
-sync_state([], _).
-sync_state([DB-MD5|TA], Pre) :-
-	(   memberchk(DB-MD5P, Pre),
-	    MD5P == MD5
-	->  true
-	;   create_db(DB)
-	),
-	sync_state(TA, Pre).
+sync_loaded_graphs(Graphs) :-
+	maplist(create_db, Graphs).
 
 
 		 /*******************************
