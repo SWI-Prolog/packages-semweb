@@ -6954,10 +6954,6 @@ update_triple(rdf_db *db, term_t action, triple *t, triple **updated, query *q)
   triple tmp, *new;
 					/* Create copy in local memory */
   tmp = *t;
-  tmp.allocated = FALSE;
-  tmp.atoms_locked = FALSE;
-  if ( t->object_is_literal )
-    tmp.object.literal = copy_literal(db, t->object.literal);
 
   if ( !PL_get_arg(1, action, a) )
     return PL_type_error("rdf_action", action);
@@ -6994,8 +6990,6 @@ update_triple(rdf_db *db, term_t action, triple *t, triple **updated, query *q)
       return TRUE;
     }
 
-    if ( tmp.object_is_literal )
-      free_literal(db, tmp.object.literal);
     if ( (tmp.object_is_literal = t2.object_is_literal) )
     { tmp.object.literal = t2.object.literal;
     } else
@@ -7016,20 +7010,23 @@ update_triple(rdf_db *db, term_t action, triple *t, triple **updated, query *q)
   } else
     return PL_domain_error("rdf_action", action);
 
-  memset(tmp.tp.next, 0, sizeof(tmp.tp.next));
-
   new = new_triple(db);
   new->subject_id	 = tmp.subject_id;
   new->predicate.r	 = tmp.predicate.r;
   if ( (new->object_is_literal = tmp.object_is_literal) )
-  { new->object.literal = copy_literal(db, tmp.object.literal);
+  { if ( tmp.object.literal->shared )
+    { simpleMutexLock(&db->locks.literal);
+      new->object.literal = copy_literal(db, tmp.object.literal);
+      simpleMutexUnlock(&db->locks.literal);
+    } else
+    { new->object.literal = tmp.object.literal;
+    }
   } else
   { new->object.resource = tmp.object.resource;
   }
   new->graph_id		 = tmp.graph_id;
   new->line		 = tmp.line;
 
-  free_triple(db, &tmp, FALSE);
   lock_atoms(db, new);
 
   *updated = new;
