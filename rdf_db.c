@@ -6289,6 +6289,15 @@ rdf_active_transactions(term_t list)
   return PL_unify_nil(tail);
 }
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+(*) rdf_assert(S,P,O,G) adds a triple, but does not do so if exactly the
+same quintuple is visible and not  yet   erased.  Adding  would not make
+sense as this would be a complete duplicate that cannot be distinguished
+from the original and rdf_retractall/4 will erase both.
+
+Note that full duplicates are  quite  common   as  a  result  of forward
+reasoning.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static foreign_t
 rdf_assert4(term_t subject, term_t predicate, term_t object, term_t src)
@@ -6297,7 +6306,6 @@ rdf_assert4(term_t subject, term_t predicate, term_t object, term_t src)
   query *q = open_query(db);
   triple *d;
   triple_walker tw;
-  lifespan qls;
 
   if ( !get_triple(db, subject, predicate, object, t, q) )
   { error:
@@ -6313,23 +6321,17 @@ rdf_assert4(term_t subject, term_t predicate, term_t object, term_t src)
     t->line = NO_LINE;
   }
 
-  qls.born = queryWriteGen(q) + 1;		/* (*) */
-  qls.died = query_max_gen(q);
-
   init_triple_walker(&tw, db, t, BY_SPO);
   while((d=next_triple(&tw)))
-  { d = deref_triple(db, d);
+  { if ( (d=alive_triple(q, d)) && !d->erased )		/* (*) */
+    { if ( match_triples(db, d, t, q, MATCH_DUPLICATE|MATCH_SRC) &&
+	   d->line == t->line )
+      { destroy_triple_walker(db, &tw);
+	free_triple(db, t, FALSE);
+	close_query(q);
 
-    if ( !overlap_lifespan(&d->lifespan, &qls) )
-      continue;
-
-    if ( match_triples(db, d, t, q, MATCH_DUPLICATE|MATCH_SRC) &&
-	 d->line == t->line )
-    { destroy_triple_walker(db, &tw);
-      free_triple(db, t, FALSE);
-      close_query(q);
-
-      return TRUE;
+	return TRUE;
+      }
     }
   }
   destroy_triple_walker(db, &tw);
