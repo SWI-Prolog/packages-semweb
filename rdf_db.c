@@ -3541,7 +3541,10 @@ reindex_triple(rdf_db *db, triple *t)
   t->reindexed = T_ID(t2);
   t->lifespan.died = db->reindexed++;
   if ( t2->object_is_literal )			/* do not deallocate lit twice */
+  { simpleMutexLock(&db->locks.literal);
     t2->object.literal->references++;
+    simpleMutexUnlock(&db->locks.literal);
+  }
   t->atoms_locked = FALSE;			/* same for unlock_atoms() */
   simpleMutexUnlock(&db->queries.write.lock);
 }
