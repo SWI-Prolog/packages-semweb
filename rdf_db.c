@@ -4035,7 +4035,9 @@ free_triple(rdf_db *db, triple *t, int linger)
 { unlock_atoms(db, t);
 
   if ( t->object_is_literal && t->object.literal )
+  { assert(!linger || t->object.literal->shared);
     free_literal(db, t->object.literal);
+  }
   if ( t->match == STR_MATCH_BETWEEN )
     free_literal_value(db, &t->tp.end);
 
@@ -6833,7 +6835,6 @@ rdf3(term_t subject, term_t predicate, term_t object, control_t h)
 	     MATCH_EXACT);
 }
 
-
 static foreign_t
 rdf4(term_t subject, term_t predicate, term_t object,
      term_t src, control_t h)
@@ -8514,7 +8515,45 @@ rdf_delete_snapshot(term_t t)
   return PL_type_error("rdf_snapshot", t);
 }
 
+#ifdef O_DEBUG
+static foreign_t
+rdf_checks_literal_references(term_t l)
+{ triple p, *t;
+  triple_walker tw;
+  long count = 0, refs = -1;
+  term_t var = PL_new_term_ref();
+  rdf_db *db = rdf_current_db();
 
+  memset(&p, 0, sizeof(p));
+  if ( !get_partial_triple(db, var, var, l, 0, &p) )
+    return FALSE;
+  assert(p.object_is_literal);
+
+  init_triple_walker(&tw, db, &p, BY_O);
+  while((t=next_triple(&tw)))
+  { if ( match_object(t, &p, MATCH_QUAL) )
+    { if ( count++ == 0 )
+      { refs = (long)t->object.literal->references;
+      }
+    }
+  }
+  destroy_triple_walker(db, &tw);
+
+  if ( count != refs )
+  { if ( refs == -1 )
+    { Sdprintf("Not found in triples\n");
+    } else
+    { Sdprintf("Refs: %ld; counted: %ld; lit=", refs, count);
+      print_literal(p.object.literal);
+      Sdprintf("\n");
+    }
+
+    return FALSE;
+  }
+
+  return TRUE;
+}
+#endif
 
 		 /*******************************
 		 *	       MATCH		*
@@ -8738,12 +8777,17 @@ install_rdf_db(void)
 
 #ifdef O_DEBUG
   PL_register_foreign("rdf_debug",      1, rdf_debug,       0);
-  PL_register_foreign("rdf_print_predicate_cloud", 2, rdf_print_predicate_cloud, 0);
+  PL_register_foreign("rdf_print_predicate_cloud", 2,
+		      rdf_print_predicate_cloud, 0);
+  PL_register_foreign("rdf_checks_literal_references", 1,
+		      rdf_checks_literal_references, 0);
 #endif
+
 #ifdef O_SECURE
   PL_register_foreign("rdf_dump_literals", 0, dump_literals, 0);
   PL_register_foreign("rdf_check_literals", 0, check_transitivity, 0);
 #endif
+
   PL_register_foreign("lang_matches", 2, lang_matches, 0);
 
   install_atom_map();
