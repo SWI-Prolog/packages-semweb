@@ -1,11 +1,9 @@
-/*  $Id$
-
-    Part of SWI-Prolog
+/*  Part of SWI-Prolog
 
     Author:        Jan Wielemaker
-    E-mail:        J.Wielemaker@cs.vu.nl
+    E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 1985-2010, University of Amsterdam
+    Copyright (C): 1985-2013, University of Amsterdam
 			      VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
@@ -37,6 +35,7 @@
 :- use_module(library(semweb/rdf_db), []). % we define hooks for this
 :- use_module(library(date)).
 :- use_module(library(error)).
+:- use_module(library(lists)).
 
 
 /** <module> RDF HTTP Plugin
@@ -152,13 +151,19 @@ major_content_type(ContentType, Major) :-
 	sub_atom(ContentType, 0, Pre, _, Major).
 major_content_type(Major, Major).
 
-%%	rdf_content_type(+ContentType, +URL)
+%%	rdf_content_type(+ContentType, -URL) is semidet.
 %
-%	Deduce the RDF encoding from the mime-type.
+%	Deduce the RDF encoding from the   mime-type.  This predicate is
+%	defined as multifile such that the user can associate additional
+%	content types to RDF formats.
 %
 %	@bug	The turtle parser only parses a subset of n3.
 
+:- multifile
+	rdf_content_type/2.
+
 rdf_content_type('text/rdf',		  xml).
+rdf_content_type('text/xml',		  xml).
 rdf_content_type('text/rdf+xml',	  xml).
 rdf_content_type('application/rdf+xml',	  xml).
 rdf_content_type('application/x-turtle',  turtle).
