@@ -590,7 +590,7 @@ COMMON(int)	postlink_triple(rdf_db *db, triple *t, query *q);
 COMMON(void)	erase_triple(rdf_db *db, triple *t, query *q);
 COMMON(void)	add_triple_consequences(rdf_db *db, triple *t, query *q);
 COMMON(void)	del_triple_consequences(rdf_db *db, triple *t, query *q);
-COMMON(predicate *) lookup_predicate(rdf_db *db, atom_t name, query *q);
+COMMON(predicate *) lookup_predicate(rdf_db *db, atom_t name);
 COMMON(rdf_db*)	rdf_current_db(void);
 COMMON(int)	rdf_broadcast(broadcast_id id, void *a1, void *a2);
 COMMON(int)	rdf_is_broadcasting(broadcast_id id);

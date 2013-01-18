@@ -1492,23 +1492,27 @@ rdf_update_duplicates_thread :-
 		 *******************************/
 
 %%	rdf_save_db(+File) is det.
-%%	rdf_save_db(+File, +DB) is det.
+%%	rdf_save_db(+File, +Graph) is det.
 %
-%	Save triples into File in a   quick-to-load binary format. If DB
+%	Save triples into File in a   quick-to-load binary format. If Graph
 %	is supplied only triples flagged to originate from that database
 %	are  added.  Files  created  this  way    can  be  loaded  using
 %	rdf_load_db/1.
 
+:- create_prolog_flag(rdf_triple_format, 3, [type(integer)]).
+
 rdf_save_db(File) :-
+	current_prolog_flag(rdf_triple_format, Version),
 	open(File, write, Out, [type(binary)]),
 	set_stream(Out, record_position(false)),
-	call_cleanup(rdf_save_db_(Out, _), close(Out)).
+	call_cleanup(rdf_save_db_(Out, _, Version), close(Out)).
 
 
-rdf_save_db(File, DB) :-
+rdf_save_db(File, Graph) :-
+	current_prolog_flag(rdf_triple_format, Version),
 	open(File, write, Out, [type(binary)]),
 	set_stream(Out, record_position(false)),
-	call_cleanup(rdf_save_db_(Out, DB), close(Out)).
+	call_cleanup(rdf_save_db_(Out, Graph, Version), close(Out)).
 
 
 %%	rdf_load_db_no_admin(+File, +Id, -Graphs) is det.

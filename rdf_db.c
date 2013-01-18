@@ -170,8 +170,7 @@ static int	get_predicate(rdf_db *db, term_t t, predicate **p, query *q);
 static int	get_existing_predicate(rdf_db *db, term_t t, predicate **p);
 static void	free_bitmatrix(rdf_db *db, bitmatrix *bm);
 static predicate_cloud *new_predicate_cloud(rdf_db *db,
-					    predicate **p, size_t count,
-					    query *q);
+					    predicate **p, size_t count);
 static int	unify_literal(term_t lit, literal *l);
 static int	check_predicate_cloud(predicate_cloud *c);
 static void	invalidate_is_leaf(predicate *p, query *q, int add);
@@ -1182,7 +1181,7 @@ existing_predicate(rdf_db *db, atom_t name)
 
 
 predicate *
-lookup_predicate(rdf_db *db, atom_t name, query *q)
+lookup_predicate(rdf_db *db, atom_t name)
 { predicate *p, **pp;
   predicate_cloud *cp;
   int entry;
@@ -1199,7 +1198,7 @@ lookup_predicate(rdf_db *db, atom_t name, query *q)
   p = rdf_malloc(db, sizeof(*p));
   memset(p, 0, sizeof(*p));
   p->name = name;
-  cp = new_predicate_cloud(db, &p, 1, q);
+  cp = new_predicate_cloud(db, &p, 1);
   p->hash = cp->hash;
   PL_register_atom(name);
   if ( db->predicates.count > db->predicates.bucket_count )
@@ -1260,7 +1259,7 @@ unregister_predicate(rdf_db *db, triple *t)
 		 *******************************/
 
 static predicate_cloud *
-new_predicate_cloud(rdf_db *db, predicate **p, size_t count, query *q)
+new_predicate_cloud(rdf_db *db, predicate **p, size_t count)
 { predicate_cloud *cloud = rdf_malloc(db, sizeof(*cloud));
 
   memset(cloud, 0, sizeof(*cloud));
@@ -1528,8 +1527,8 @@ predicate_hash(predicate *p)
 
 static void
 addSubPropertyOf(rdf_db *db, triple *t, query *q)
-{ predicate *sub   = lookup_predicate(db, ID_ATOM(t->subject_id), q);
-  predicate *super = lookup_predicate(db, t->object.resource, q);
+{ predicate *sub   = lookup_predicate(db, ID_ATOM(t->subject_id));
+  predicate *super = lookup_predicate(db, t->object.resource);
 
   DEBUG(3, Sdprintf("addSubPropertyOf(%s, %s)\n",
 		    pname(sub), pname(super)));
@@ -1561,8 +1560,8 @@ addSubPropertyOf(rdf_db *db, triple *t, query *q)
 
 static void
 delSubPropertyOf(rdf_db *db, triple *t, query *q)
-{ predicate *sub   = lookup_predicate(db, ID_ATOM(t->subject_id), q);
-  predicate *super = lookup_predicate(db, t->object.resource, q);
+{ predicate *sub   = lookup_predicate(db, ID_ATOM(t->subject_id));
+  predicate *super = lookup_predicate(db, t->object.resource);
   predicate_cloud *cloud;
 
   DEBUG(3, Sdprintf("delSubPropertyOf(%s, %s)\n",
@@ -1736,7 +1735,7 @@ fill_reachable(rdf_db *db,
       if ( (t2=matching_object_triple_until(db, t, &pattern, q, 0, valid)) )
       { predicate *super;
 
-	super = lookup_predicate(db, t2->object.resource, q);
+	super = lookup_predicate(db, t2->object.resource);
 	assert(super->cloud == cloud);
 	fill_reachable(db, cloud, bm, p0, super, q, valid);
       }
@@ -4230,7 +4229,7 @@ link_triple_hash(rdf_db *db, triple *t)
 int
 prelink_triple(rdf_db *db, triple *t, query *q)
 { if ( t->resolve_pred )
-  { t->predicate.r = lookup_predicate(db, t->predicate.u, q);
+  { t->predicate.r = lookup_predicate(db, t->predicate.u);
     t->resolve_pred = FALSE;
   }
   if ( t->object_is_literal )
@@ -4513,45 +4512,55 @@ Quick Load Format (implemented in pl-wic.c).
 #define SAVE_VERSION 2
 
 typedef struct saved
-{ atom_t name;
+{ union
+  { atom_t     atom;
+    predicate *pred;
+    literal   *lit;
+    void      *any;
+  } value;
   size_t as;
   struct saved *next;
 } saved;
 
 
-typedef struct save_context
+typedef struct saved_table
 { saved ** saved_table;
   size_t   saved_size;
   size_t   saved_id;
-} save_context;
+} saved_table;
 
 
-static void
-init_saved(rdf_db *db, save_context *ctx)
-{ size_t size = 64;
-  size_t bytes = size * sizeof(*ctx->saved_table);
-
-  ctx->saved_table = rdf_malloc(db, bytes);
-  memset(ctx->saved_table, 0, bytes);
-  ctx->saved_size = size;
-  ctx->saved_id = 0;
+static inline int
+saved_hash(void *value, unsigned int seed)
+{ return rdf_murmer_hash(&value, sizeof(value), seed);
 }
 
 
 static void
-resize_saved(rdf_db *db, save_context *ctx)
-{ size_t newsize = ctx->saved_size * 2;
-  size_t newbytes = sizeof(*ctx->saved_table) * newsize;
+init_saved_table(rdf_db *db, saved_table *tab)
+{ size_t size = 64;
+  size_t bytes = size * sizeof(*tab->saved_table);
+
+  tab->saved_table = rdf_malloc(db, bytes);
+  memset(tab->saved_table, 0, bytes);
+  tab->saved_size = size;
+  tab->saved_id = 0;
+}
+
+static void
+resize_saved(rdf_db *db, saved_table *tab)
+{ size_t newsize = tab->saved_size * 2;
+  size_t newbytes = sizeof(*tab->saved_table) * newsize;
   saved **newt = rdf_malloc(db, newbytes);
-  saved **s = ctx->saved_table;
+  saved **s = tab->saved_table;
   int i;
 
   memset(newt, 0, newbytes);
-  for(i=0; i<ctx->saved_size; i++, s++)
+  for(i=0; i<tab->saved_size; i++, s++)
   { saved *c, *n;
 
     for(c=*s; c; c = n)
-    { int hash = atom_hash(c->name, MURMUR_SEED) % newsize;
+    { int hash = saved_hash(c->value.any, MURMUR_SEED) % newsize;
 
       n = c->next;
       c->next = newt[hash];
@@ -4559,19 +4568,19 @@ resize_saved(rdf_db *db, save_context *ctx)
     }
   }
 
-  rdf_free(db, ctx->saved_table, ctx->saved_size*sizeof(*ctx->saved_table));
-  ctx->saved_table = newt;
-  ctx->saved_size  = newsize;
+  rdf_free(db, tab->saved_table, tab->saved_size*sizeof(*tab->saved_table));
+  tab->saved_table = newt;
+  tab->saved_size  = newsize;
 }
 
 
 static void
-destroy_saved(rdf_db *db, save_context *ctx)
-{ if ( ctx->saved_table )
-  { saved **s = ctx->saved_table;
+destroy_saved_table(rdf_db *db, saved_table *tab)
+{ if ( tab->saved_table )
+  { saved **s = tab->saved_table;
     int i;
 
-    for(i=0; i<ctx->saved_size; i++, s++)
+    for(i=0; i<tab->saved_size; i++, s++)
     { saved *c, *n;
 
       for(c=*s; c; c = n)
@@ -4580,9 +4589,99 @@ destroy_saved(rdf_db *db, save_context *ctx)
       }
     }
 
-    rdf_free(db, ctx->saved_table, ctx->saved_size*sizeof(*ctx->saved_table));
+    rdf_free(db, tab->saved_table, tab->saved_size*sizeof(*tab->saved_table));
   }
 }
+
+static saved *
+lookup_saved(saved_table *tab, void *value)
+{ int hash = saved_hash(value, MURMUR_SEED) % tab->saved_size;
+  saved *s;
+
+  for(s=tab->saved_table[hash]; s; s= s->next)
+  { if ( s->value.any == value )
+      return s;
+  }
+
+  return NULL;
+}
+
+static saved *
+add_saved(rdf_db *db, saved_table *tab, void *value)
+{ int hash;
+  saved *s;
+
+  if ( tab->saved_id/4 > tab->saved_size )
+    resize_saved(db, tab);
+
+  hash = saved_hash(value, MURMUR_SEED) % tab->saved_size;
+  if ( (s = rdf_malloc(db, sizeof(*s))) )
+  { s->value.any = value;
+    s->as = tab->saved_id++;
+    s->next = tab->saved_table[hash];
+    tab->saved_table[hash] = s;
+  }
+
+  return s;
+}
+
+
+typedef struct save_context
+{ saved_table	atoms;
+  saved_table	literals;
+  saved_table	predicates;
+  int		version;			/* current save version */
+} save_context;
+
+static void
+init_saved(rdf_db *db, save_context *ctx, int version)
+{ init_saved_table(db, &ctx->atoms);
+  if ( version > 2 )
+  { init_saved_table(db, &ctx->literals);
+    init_saved_table(db, &ctx->predicates);
+  }
+  ctx->version = version;
+}
+
+static void
+destroy_saved(rdf_db *db, save_context *ctx)
+{ destroy_saved_table(db, &ctx->atoms);
+  if ( ctx->version > 2 )
+  { destroy_saved_table(db, &ctx->literals);
+    destroy_saved_table(db, &ctx->predicates);
+  }
+}
+
+static saved *
+lookup_saved_atom(save_context *ctx, atom_t a)
+{ return lookup_saved(&ctx->atoms, (void*)a);
+}
+
+static saved *
+add_saved_atom(rdf_db *db, save_context *ctx, atom_t a)
+{ return add_saved(db, &ctx->atoms, (void*)a);
+}
+
+static saved *
+lookup_saved_literal(save_context *ctx, literal *l)
+{ return lookup_saved(&ctx->literals, l);
+}
+
+static saved *
+add_saved_literal(rdf_db *db, save_context *ctx, literal *l)
+{ return add_saved(db, &ctx->literals, l);
+}
+
+static saved *
+lookup_saved_predicate(save_context *ctx, predicate *p)
+{ return lookup_saved(&ctx->predicates, p);
+}
+
+static saved *
+add_saved_predicate(rdf_db *db, save_context *ctx, predicate *p)
+{ return add_saved(db, &ctx->predicates, p);
+}
+
 
 #define INT64BITSIZE (sizeof(int64_t)*8)
 #define PLMINLONG   ((int64_t)((uint64_t)1<<(INT64BITSIZE-1)))
@@ -4647,32 +4746,20 @@ save_double(IOSTREAM *fd, double f)
 
 static int
 save_atom(rdf_db *db, IOSTREAM *out, atom_t a, save_context *ctx)
-{ int hash = atom_hash(a, MURMUR_SEED) % ctx->saved_size;
-  saved *s;
+{ saved *s;
   size_t len;
   const char *chars;
   unsigned int i;
   const wchar_t *wchars;
 
-  for(s=ctx->saved_table[hash]; s; s= s->next)
-  { if ( s->name == a )
-    { Sputc('X', out);
-      save_int(out, s->as);
+  if ( (s=lookup_saved_atom(ctx, a)) )
+  { Sputc('X', out);
+    save_int(out, s->as);
 
-      return TRUE;
-    }
+    return TRUE;
+  } else
+  { s = add_saved_atom(db, ctx, a);
   }
-
-  if ( ctx->saved_id/4 > ctx->saved_size )
-  { resize_saved(db, ctx);
-    hash = atom_hash(a, MURMUR_SEED) % ctx->saved_size;
-  }
-
-  s = rdf_malloc(db, sizeof(*s));
-  s->name = a;
-  s->as = ctx->saved_id++;
-  s->next = ctx->saved_table[hash];
-  ctx->saved_table[hash] = s;
 
   if ( (chars = PL_atom_nchars(a, &len)) )
   { Sputc('A', out);
@@ -4699,50 +4786,89 @@ save_atom(rdf_db *db, IOSTREAM *out, atom_t a, save_context *ctx)
 }
 
 
+static int
+save_predicate(rdf_db *db, IOSTREAM *out, predicate *p, save_context *ctx)
+{ if ( ctx->version > 2 )
+  { saved *s;
+
+    if ( (s=lookup_saved_predicate(ctx, p)) )
+    { Sputc('X', out);
+      save_int(out, s->as);
+
+      return TRUE;
+    } else
+    { s = add_saved_predicate(db, ctx, p);
+      Sputc('P', out);
+    }
+  }
+
+  return save_atom(db, out, p->name, ctx);
+}
+
+static int
+save_literal(rdf_db *db, IOSTREAM *out, literal *lit, save_context *ctx)
+{ if ( ctx->version > 2 )
+  { saved *s;
+
+    if ( (s=lookup_saved_literal(ctx, lit)) )
+    { Sputc('X', out);
+      save_int(out, s->as);
+
+      return TRUE;
+    } else
+    { s = add_saved_literal(db, ctx, lit);
+    }
+  }
+
+  if ( lit->qualifier )
+  { assert(lit->type_or_lang);
+    Sputc(lit->qualifier == Q_LANG ? 'l' : 't', out);
+    save_atom(db, out, lit->type_or_lang, ctx);
+  }
+
+  switch(lit->objtype)
+  { case OBJ_STRING:
+      Sputc('L', out);
+      save_atom(db, out, lit->value.string, ctx);
+      break;
+    case OBJ_INTEGER:
+      Sputc('I', out);
+      save_int(out, lit->value.integer);
+      break;
+    case OBJ_DOUBLE:
+    {	Sputc('F', out);
+      save_double(out, lit->value.real);
+      break;
+    }
+    case OBJ_TERM:
+    { const char *s = lit->value.term.record;
+      size_t len = lit->value.term.len;
+
+      Sputc('T', out);
+      save_int(out, len);
+      while(len-- > 0)
+	Sputc(*s++, out);
+
+      break;
+    }
+    default:
+      assert(0);
+  }
+
+  return TRUE;
+}
+
+
+
 static void
 write_triple(rdf_db *db, IOSTREAM *out, triple *t, save_context *ctx)
 { Sputc('T', out);
 
   save_atom(db, out, ID_ATOM(t->subject_id), ctx);
-  save_atom(db, out, t->predicate.r->name, ctx);
+  save_predicate(db, out, t->predicate.r, ctx);
 
   if ( t->object_is_literal )
-  { literal *lit = t->object.literal;
-
-    if ( lit->qualifier )
-    { assert(lit->type_or_lang);
-      Sputc(lit->qualifier == Q_LANG ? 'l' : 't', out);
-      save_atom(db, out, lit->type_or_lang, ctx);
-    }
-
-    switch(lit->objtype)
-    { case OBJ_STRING:
-	Sputc('L', out);
-	save_atom(db, out, lit->value.string, ctx);
-	break;
-      case OBJ_INTEGER:
-	Sputc('I', out);
-	save_int(out, lit->value.integer);
-	break;
-      case OBJ_DOUBLE:
-      {	Sputc('F', out);
-	save_double(out, lit->value.real);
-	break;
-      }
-      case OBJ_TERM:
-      { const char *s = lit->value.term.record;
-	size_t len = lit->value.term.len;
-
-	Sputc('T', out);
-	save_int(out, len);
-	while(len-- > 0)
-	  Sputc(*s++, out);
-
-	break;
-      }
-      default:
-	assert(0);
-    }
+  { save_literal(db, out, t->object.literal, ctx);
   } else
   { Sputc('R', out);
     save_atom(db, out, t->object.resource, ctx);
@@ -4782,17 +4908,17 @@ write_md5(rdf_db *db, IOSTREAM *out, atom_t src)
 
 
 static int
-save_db(query *q, IOSTREAM *out, atom_t src)
+save_db(query *q, IOSTREAM *out, atom_t src, int version)
 { rdf_db *db = q->db;
   triple *t, p;
   save_context ctx;
   triple_walker tw;
 
   memset(&p, 0, sizeof(p));
-  init_saved(db, &ctx);
+  init_saved(db, &ctx, version);
 
   Sfprintf(out, "%s", SAVE_MAGIC);
-  save_int(out, SAVE_VERSION);
+  save_int(out, version);
   if ( src )
   { Sputc('S', out);			/* start of graph header */
     save_atom(db, out, src, &ctx);
@@ -4828,20 +4954,25 @@ save_db(query *q, IOSTREAM *out, atom_t src)
 
 
 static foreign_t
-rdf_save_db(term_t stream, term_t graph)
+rdf_save_db(term_t stream, term_t graph, term_t version)
 { rdf_db *db = rdf_current_db();
   query *q;
   IOSTREAM *out;
   atom_t src;
   int rc;
+  int v;
 
   if ( !PL_get_stream_handle(stream, &out) )
     return PL_type_error("stream", stream);
   if ( !get_atom_or_var_ex(graph, &src) )
     return FALSE;
+  if ( !PL_get_integer(version, &v) )
+    return FALSE;
+  if ( v < 2 || v > 3 )
+    return PL_domain_error("rdf_db_save_version", version);
 
   q = open_query(db);
-  rc = save_db(q, out, src);
+  rc = save_db(q, out, src, v);
   close_query(q);
 
   return rc;
@@ -4911,46 +5042,70 @@ load_double(IOSTREAM *fd, double *fp)
 }
 
 
+typedef struct ld_array
+{ size_t	loaded_id;
+  size_t	allocated_size;
+  void	      **loaded_objects;
+} ld_array;
+
 typedef struct ld_context
-{ long		loaded_id;		/* keep track of atoms */
-  atom_t       *loaded_atoms;
-  long		atoms_size;
+{ ld_array	atoms;
+  ld_array	predicates;
+  ld_array	literals;
   atom_t	graph_name;		/* for single-graph files */
   graph	       *graph;
   atom_t	graph_source;
   double	modified;
   int		has_digest;
+  int		version;
   md5_byte_t    digest[16];
   atomset       graph_table;		/* multi-graph file */
   triple_buffer	triples;
 } ld_context;
 
 
-static void
-add_atom(rdf_db *db, atom_t a, ld_context *ctx)
-{ if ( ctx->loaded_id >= ctx->atoms_size )
-  { if ( ctx->atoms_size == 0 )
-    { ctx->atoms_size = 1024;
-      ctx->loaded_atoms = malloc(sizeof(atom_t)*ctx->atoms_size);
+static int
+add_object(rdf_db *db, void *obj, ld_array *ar)
+{ if ( ar->loaded_id >= ar->allocated_size )
+  { if ( ar->allocated_size == 0 )
+    { ar->allocated_size = 1024;
+      ar->loaded_objects = malloc(sizeof(void*)*ar->allocated_size);
     } else
     { size_t  bytes;
+      void *new;
 
-      ctx->atoms_size *= 2;
-      bytes = sizeof(atom_t)*ctx->atoms_size;
-      ctx->loaded_atoms = realloc(ctx->loaded_atoms, bytes);
+      ar->allocated_size *= 2;
+      bytes = sizeof(void*)*ar->allocated_size;
+      if ( (new = realloc(ar->loaded_objects, bytes)) )
+	ar->loaded_objects = new;
+      else
+	return FALSE;
     }
   }
 
-  ctx->loaded_atoms[ctx->loaded_id++] = a;
+  ar->loaded_objects[ar->loaded_id++] = obj;
+  return TRUE;
 }
 
+static int
+add_atom(rdf_db *db, atom_t a, ld_context *ctx)
+{ return add_object(db, (void*)a, &ctx->atoms);
+}
+
+static atom_t
+fetch_atom(ld_context *ctx, size_t idx)
+{ if ( idx < ctx->atoms.loaded_id )
+    return (atom_t)ctx->atoms.loaded_objects[idx];
+
+  return (atom_t)0;
+}
 
 static atom_t
 load_atom(rdf_db *db, IOSTREAM *in, ld_context *ctx)
 { switch(Sgetc(in))
   { case 'X':
-    { intptr_t idx = (intptr_t)load_int(in);
-      return ctx->loaded_atoms[idx];
+    { size_t idx = (size_t)load_int(in);
+      return fetch_atom(ctx, idx);
     }
     case 'A':
     { size_t len = (size_t)load_int(in);
@@ -5005,22 +5160,70 @@ load_atom(rdf_db *db, IOSTREAM *in, ld_context *ctx)
 }
 
 
-static triple *
-load_triple(rdf_db *db, IOSTREAM *in, ld_context *ctx)
-{ triple *t = new_triple(db);
-  int c;
+static int
+add_predicate(rdf_db *db, predicate *p, ld_context *ctx)
+{ return add_object(db, p, &ctx->predicates);
+}
 
-  t->subject_id = ATOM_ID(load_atom(db, in, ctx));
-  t->resolve_pred = TRUE;
-  t->predicate.u = load_atom(db, in, ctx);
-  if ( (c=Sgetc(in)) == 'R' )
-  { t->object.resource = load_atom(db, in, ctx);
-  } else
-  { literal *lit = new_literal(db);
+static predicate *
+fetch_predicate(ld_context *ctx, size_t idx)
+{ if ( idx < ctx->predicates.loaded_id )
+    return ctx->predicates.loaded_objects[idx];
 
-    t->object_is_literal = TRUE;
-    t->object.literal = lit;
+  return NULL;
+}
 
+static predicate *
+load_predicate(rdf_db *db, IOSTREAM *in, ld_context *ctx)
+{ switch(Sgetc(in))
+  { case 'X':
+    { size_t idx = (size_t)load_int(in);
+      return fetch_predicate(ctx, idx);
+    }
+    case 'P':
+    { atom_t a;
+
+      if ( (a=load_atom(db, in, ctx)) )
+      { predicate *p;
+
+	if ( (p=lookup_predicate(db, a)) &&
+	     add_predicate(db, p, ctx) )
+	  return p;
+      }
+      return NULL;			/* no memory */
+    }
+    default:
+      assert(0);
+      return NULL;
+  }
+}
+
+
+static int
+add_literal(rdf_db *db, literal *lit, ld_context *ctx)
+{ return add_object(db, lit, &ctx->literals);
+}
+
+static literal *
+fetch_literal(ld_context *ctx, size_t idx)
+{ if ( idx < ctx->literals.loaded_id )
+    return ctx->literals.loaded_objects[idx];
+
+  return NULL;
+}
+
+static literal *
+load_literal(rdf_db *db, IOSTREAM *in, ld_context *ctx, int c)
+{ literal *lit;
+
+  if ( c == 'X' && ctx->version >= 3 )
+  { size_t idx = (size_t)load_int(in);
+    lit = fetch_literal(ctx, idx);
+    simpleMutexLock(&db->locks.literal);
+    lit->references++;
+    simpleMutexUnlock(&db->locks.literal);
+  } else if ( (lit=new_literal(db)) )
+  {
   value:
     switch(c)
     { case 'L':
@@ -5064,6 +5267,36 @@ load_triple(rdf_db *db, IOSTREAM *in, ld_context *ctx)
 	assert(0);
         return NULL;
     }
+
+    if ( ctx->version >= 3 )
+    { lock_atoms_literal(lit);
+      lit = share_literal(db, lit);
+
+      add_literal(db, lit, ctx);
+    }
+  }
+
+  return lit;
+}
+
+
+static triple *
+load_triple(rdf_db *db, IOSTREAM *in, ld_context *ctx)
+{ triple *t = new_triple(db);
+  int c;
+
+  t->subject_id = ATOM_ID(load_atom(db, in, ctx));
+  if ( ctx->version < 3 )
+  { t->resolve_pred = TRUE;
+    t->predicate.u = load_atom(db, in, ctx);
+  } else
+  { t->predicate.r = load_predicate(db, in, ctx);
+  }
+  if ( (c=Sgetc(in)) == 'R' )
+  { t->object.resource = load_atom(db, in, ctx);
+  } else
+  { t->object_is_literal = TRUE;
+    t->object.literal = load_literal(db, in, ctx, c);
   }
   t->graph_id = ATOM_ID(load_atom(db, in, ctx));
   t->line  = (unsigned long)load_int(in);
@@ -5094,13 +5327,19 @@ graphs and one holding the content of exactly one named graph.
 
 static int
 load_db(rdf_db *db, IOSTREAM *in, ld_context *ctx)
-{ int version;
-  int c;
+{ int c;
 
   if ( !load_magic(in) )
     return FALSE;
-  version = (int)load_int(in);
-  (void)version;
+  ctx->version = (int)load_int(in);
+  if ( ctx->version < 2 || ctx->version > 3 )
+  { term_t v = PL_new_term_ref();
+
+    if ( PL_put_integer(v, ctx->version) )
+      return PL_domain_error("rdf_db_save_version", v);
+    else
+      return FALSE;
+  }
 
   while((c=Sgetc(in)) != EOF)
   { switch(c)
@@ -5140,9 +5379,7 @@ load_db(rdf_db *db, IOSTREAM *in, ld_context *ctx)
     }
   }
 
-  PL_warning("Illegal RDF triple file");
-
-  return FALSE;
+  return PL_warning("Illegal RDF triple file");
 }
 
 
@@ -5194,14 +5431,21 @@ destroy_load_context(rdf_db *db, ld_context *ctx, int delete_triples)
 
   free_triple_buffer(&ctx->triples);
 
-  if ( ctx->loaded_atoms )
+  if ( ctx->atoms.loaded_objects )
   { atom_t *ap, *ep;
 
-    for(ap=ctx->loaded_atoms, ep=ap+ctx->loaded_id; ap<ep; ap++)
-      PL_unregister_atom(*ap);
+    for( ap=(atom_t*)ctx->atoms.loaded_objects, ep=ap+ctx->atoms.loaded_id;
+	 ap<ep;
+	 ap++)
+    { PL_unregister_atom(*ap);
+    }
 
-    free(ctx->loaded_atoms);
+    free(ctx->atoms.loaded_objects);
   }
+  if ( ctx->predicates.loaded_objects )
+    free(ctx->predicates.loaded_objects);
+  if ( ctx->literals.loaded_objects )
+    free(ctx->literals.loaded_objects);
 }
 
 typedef struct
@@ -5656,7 +5900,7 @@ get_predicate(rdf_db *db, term_t t, predicate **p, query *q)
   if ( !PL_get_atom_ex(t, &name ) )
     return FALSE;
 
-  *p = lookup_predicate(db, name, q);
+  *p = lookup_predicate(db, name);
   return TRUE;
 }
 
@@ -8742,7 +8986,7 @@ install_rdf_db(void)
   PL_register_foreign("rdf_snapshot",   1, rdf_snapshot,    0);
   PL_register_foreign("rdf_delete_snapshot", 1, rdf_delete_snapshot, 0);
   PL_register_foreign("rdf_match_label",3, match_label,     0);
-  PL_register_foreign("rdf_save_db_",   2, rdf_save_db,     0);
+  PL_register_foreign("rdf_save_db_",   3, rdf_save_db,     0);
   PL_register_foreign("rdf_load_db_",   3, rdf_load_db,     0);
   PL_register_foreign("rdf_reachable",  3, rdf_reachable3,  NDET);
   PL_register_foreign("rdf_reachable",  5, rdf_reachable5,  NDET);
