@@ -3041,6 +3041,8 @@ share_literal(rdf_db *db, literal *from)
 { literal **data, *shared;
   literal_ex lex;
   int is_new;
+  static float existing = 0.0;
+  static float new      = 0.0;
 
   if ( from->shared )
     return from;				/* already shared */
@@ -3048,8 +3050,10 @@ share_literal(rdf_db *db, literal *from)
   lex.literal = from;
   prepare_literal_ex(&lex);
 
-  if ( (data = skiplist_find(&db->literals, &lex)) )
+  if ( existing*2 > new &&
+      (data = skiplist_find(&db->literals, &lex)) )
   { simpleMutexLock(&db->locks.literal);
+    existing = existing*0.99+1.0;
     if ( !skiplist_erased_payload(&db->literals, data) )
     { shared = *data;
       shared->references++;
@@ -3067,12 +3071,14 @@ share_literal(rdf_db *db, literal *from)
   data = skiplist_insert(&db->literals, &lex, &is_new);
   sl_check(db, FALSE);
   if ( is_new )
-  { from->shared = TRUE;
+  { new = new*0.99+1.0;
+    from->shared = TRUE;
     shared = from;
     assert(from->references==1);
     assert(from->atoms_locked==1);
   } else
-  { shared = *data;
+  { existing = existing*0.99+1.0;
+    shared = *data;
     shared->references++;
   }
   simpleMutexUnlock(&db->locks.literal);
