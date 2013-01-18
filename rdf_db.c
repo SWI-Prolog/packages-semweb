@@ -3034,10 +3034,7 @@ is destroyed. Without a match it adds   the  literal to the database and
 returns it.
 
 Called from add_triples() and update_triples() outside the locked areas.
-We must hold queries.write.lock for updating the literal database.
-
-TBD: Use a separate lock for this   task.  This both simplifies avoiding
-deadlocks and reduces collisions.
+We must hold db->locks.literal for updating the literal database.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static literal *
