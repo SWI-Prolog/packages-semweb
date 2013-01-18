@@ -3048,6 +3048,20 @@ share_literal(rdf_db *db, literal *from)
   lex.literal = from;
   prepare_literal_ex(&lex);
 
+  if ( (data = skiplist_find(&db->literals, &lex)) )
+  { simpleMutexLock(&db->locks.literal);
+    if ( !skiplist_erased_payload(&db->literals, data) )
+    { shared = *data;
+      shared->references++;
+
+      simpleMutexUnlock(&db->locks.literal);
+      free_literal(db, from);
+
+      return shared;
+    }
+    simpleMutexUnlock(&db->locks.literal);
+  }
+
   simpleMutexLock(&db->locks.literal);
   sl_check(db, FALSE);
   data = skiplist_insert(&db->literals, &lex, &is_new);
