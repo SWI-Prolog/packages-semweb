@@ -710,32 +710,15 @@ for_atomset(atomset *as,
 
 static void *
 alloc_tripleset(void *ptr, size_t size)
-{ void *p;
-  tripleset *ts = ptr;
+{ tripleset *ts = ptr;
 
-  assert(size < CHUNKSIZE);
-
-  if ( ts->node_store->used + size > CHUNKSIZE )
-  { mchunk *ch = malloc(sizeof(mchunk));
-
-    ch->used = 0;
-    ch->next = ts->node_store;
-    ts->node_store = ch;
-  }
-
-  p = &ts->node_store->buf[ts->node_store->used];
-  ts->node_store->used += size;
-
-  return p;
+  return alloc_tmp_store(&ts->store, size);
 }
 
 
 static void
 init_tripleset(tripleset *ts)
-{ ts->node_store = &ts->store0;
-  ts->node_store->next = NULL;
-  ts->node_store->used = 0;
-
+{ init_tmp_store(&ts->store);
   memset(ts->entries0, 0, sizeof(ts->entries0));
   ts->entries = ts->entries0;
   ts->size = TRIPLESET_INITIAL_ENTRIES;
@@ -746,12 +729,7 @@ init_tripleset(tripleset *ts)
 static void
 destroy_tripleset(tripleset *ts)
 { if ( ts->entries )
-  { mchunk *ch, *next;
-
-    for(ch=ts->node_store; ch != &ts->store0; ch = next)
-    { next = ch->next;
-      free(ch);
-    }
+  { destroy_tmp_store(&ts->store);
 
     if ( ts->entries != ts->entries0 )
       free(ts->entries);

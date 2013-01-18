@@ -498,7 +498,7 @@ typedef struct tmp_store
 		 *	     TRIPLE SET		*
 		 *******************************/
 
-#define TRIPLESET_INITIAL_ENTRIES 4		/* often small */
+#define TRIPLESET_INITIAL_ENTRIES 4	/* often small */
 
 typedef struct triple_cell
 { struct triple_cell *next;
@@ -506,11 +506,10 @@ typedef struct triple_cell
 } triple_cell;
 
 typedef struct
-{ triple_cell **entries;			/* Hash entries */
-  size_t      size;				/* Hash-table size */
-  size_t      count;				/* # atoms stored */
-  mchunk     *node_store;
-  mchunk      store0;
+{ triple_cell **entries;		/* Hash entries */
+  size_t      size;			/* Hash-table size */
+  size_t      count;			/* # atoms stored */
+  tmp_store   store;			/* temporary store */
   triple_cell *entries0[TRIPLESET_INITIAL_ENTRIES];
 } tripleset;
 
