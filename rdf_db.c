@@ -4544,6 +4544,7 @@ typedef struct saved_table
 { saved ** saved_table;
   size_t   saved_size;
   size_t   saved_id;
+  tmp_store *store;
 } saved_table;
 
 
@@ -4554,7 +4555,7 @@ saved_hash(void *value, unsigned int seed)
 
 
 static void
-init_saved_table(rdf_db *db, saved_table *tab)
+init_saved_table(rdf_db *db, saved_table *tab, tmp_store *store)
 { size_t size = 64;
   size_t bytes = size * sizeof(*tab->saved_table);
 
@@ -4562,6 +4563,7 @@ init_saved_table(rdf_db *db, saved_table *tab)
   memset(tab->saved_table, 0, bytes);
   tab->saved_size = size;
   tab->saved_id = 0;
+  tab->store = store;
 }
 
 static void
@@ -4594,20 +4596,7 @@ resize_saved(rdf_db *db, saved_table *tab)
 static void
 destroy_saved_table(rdf_db *db, saved_table *tab)
 { if ( tab->saved_table )
-  { saved **s = tab->saved_table;
-    int i;
-
-    for(i=0; i<tab->saved_size; i++, s++)
-    { saved *c, *n;
-
-      for(c=*s; c; c = n)
-      { n = c->next;
-	rdf_free(db, c, sizeof(saved));
-      }
-    }
-
     rdf_free(db, tab->saved_table, tab->saved_size*sizeof(*tab->saved_table));
-  }
 }
 
 static saved *
@@ -4632,7 +4621,7 @@ add_saved(rdf_db *db, saved_table *tab, void *value)
     resize_saved(db, tab);
 
   hash = saved_hash(value, MURMUR_SEED) % tab->saved_size;
-  if ( (s = rdf_malloc(db, sizeof(*s))) )
+  if ( (s = alloc_tmp_store(tab->store, sizeof(*s))) )
   { s->value.any = value;
     s->as = tab->saved_id++;
     s->next = tab->saved_table[hash];
@@ -4647,15 +4636,17 @@ typedef struct save_context
 { saved_table	atoms;
   saved_table	literals;
   saved_table	predicates;
+  tmp_store	store;
   int		version;			/* current save version */
 } save_context;
 
 static void
 init_saved(rdf_db *db, save_context *ctx, int version)
-{ init_saved_table(db, &ctx->atoms);
+{ init_tmp_store(&ctx->store);
+  init_saved_table(db, &ctx->atoms, &ctx->store);
   if ( version > 2 )
-  { init_saved_table(db, &ctx->literals);
-    init_saved_table(db, &ctx->predicates);
+  { init_saved_table(db, &ctx->literals, &ctx->store);
+    init_saved_table(db, &ctx->predicates, &ctx->store);
   }
   ctx->version = version;
 }
@@ -4667,6 +4658,7 @@ destroy_saved(rdf_db *db, save_context *ctx)
   { destroy_saved_table(db, &ctx->literals);
     destroy_saved_table(db, &ctx->predicates);
   }
+  destroy_tmp_store(&ctx->store);
 }
 
 static saved *
