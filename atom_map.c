@@ -88,6 +88,8 @@ typedef struct atom_map
   simpleMutex	lock;			/* Multi-threaded access */
   skiplist	list;			/* Skip list */
   defer_free	defer;			/* Concurrent free handling */
+  float		existing;		/* Locking policy */
+  float		new;			/* Locking policy */
 } atom_map;
 
 typedef void *datum;
@@ -729,15 +731,25 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
       return PL_resource_error("memory");
     }
 
+    if ( map->existing*2 > map->new &&
+	 (data=skiplist_find(&map->list, &search)) )
+    { LOCK(map);
+      if ( !skiplist_erased_payload(&map->list, data) )
+	goto found;
+    }
+
     LOCK(map);
     data = skiplist_insert(&map->list, &search, &is_new);
     SECURE(data->magic = ND_MAGIC);
     if ( is_new )
-    { map->value_count++;
+    { map->new = map->new*0.99+1.0;
+      map->value_count++;
       lock_datum(search.data.key);
     } else
     { int rc;
 
+    found:
+      map->existing = map->existing*0.99+1.0;
       if ( (rc = insert_atom_set(map, &data->values, a2)) > 0 )
       { map->value_count++;
 	lock_datum(a2);
