@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2002-2012, University of Amsterdam
+    Copyright (C): 2002-2013, University of Amsterdam
 			      VU University Amsterdam
 
     This library is free software; you can redistribute it and/or
@@ -537,6 +537,50 @@ free_list(rdf_db *db, list *list)
 
 
 		 /*******************************
+		 *	      TMP STORE		*
+		 *******************************/
+
+static void
+init_tmp_store(tmp_store *s)
+{ s->chunks = &s->store0;
+  s->chunks->next = NULL;
+  s->chunks->used = 0;
+}
+
+
+static void *
+alloc_tmp_store(tmp_store *s, size_t size)
+{ void *p;
+
+  assert(size < CHUNKSIZE);
+
+  if ( s->chunks->used + size > CHUNKSIZE )
+  { mchunk *ch = malloc(sizeof(mchunk));
+
+    ch->used = 0;
+    ch->next = s->chunks;
+    s->chunks = ch;
+  }
+
+  p = &s->chunks->buf[s->chunks->used];
+  s->chunks->used += size;
+
+  return p;
+}
+
+
+static void
+destroy_tmp_store(tmp_store *s)
+{ mchunk *ch, *next;
+
+  for(ch=s->chunks; ch != &s->store0; ch = next)
+  { next = ch->next;
+    free(ch);
+  }
+}
+
+
+		 /*******************************
 		 *	     ATOM SETS		*
 		 *******************************/
 
@@ -548,43 +592,23 @@ typedef struct atom_cell
 } atom_cell;
 
 typedef struct
-{ atom_cell **entries;				/* Hash entries */
-  size_t      size;				/* Hash-table size */
-  size_t      count;				/* # atoms stored */
-  mchunk     *node_store;
-  mchunk      store0;
+{ atom_cell **entries;			/* Hash entries */
+  size_t      size;			/* Hash-table size */
+  size_t      count;			/* # atoms stored */
+  tmp_store   store;			/* Temporary storage */
   atom_cell  *entries0[ATOMSET_INITIAL_ENTRIES];
 } atomset;
 
 
 static void *
-alloc_atomset(void *ptr, size_t size)
-{ void *p;
-  atomset *as = ptr;
-
-  assert(size < CHUNKSIZE);
-
-  if ( as->node_store->used + size > CHUNKSIZE )
-  { mchunk *ch = malloc(sizeof(mchunk));
-
-    ch->used = 0;
-    ch->next = as->node_store;
-    as->node_store = ch;
-  }
-
-  p = &as->node_store->buf[as->node_store->used];
-  as->node_store->used += size;
-
-  return p;
+alloc_atomset(atomset *as, size_t size)
+{ return alloc_tmp_store(&as->store, size);
 }
 
 
 static void
 init_atomset(atomset *as)
-{ as->node_store = &as->store0;
-  as->node_store->next = NULL;
-  as->node_store->used = 0;
-
+{ init_tmp_store(&as->store);
   memset(as->entries0, 0, sizeof(as->entries0));
   as->entries = as->entries0;
   as->size = ATOMSET_INITIAL_ENTRIES;
@@ -594,12 +618,7 @@ init_atomset(atomset *as)
 
 static void
 destroy_atomset(atomset *as)
-{ mchunk *ch, *next;
-
-  for(ch=as->node_store; ch != &as->store0; ch = next)
-  { next = ch->next;
-    free(ch);
-  }
+{ destroy_tmp_store(&as->store);
 
   if ( as->entries != as->entries0 )
     free(as->entries);

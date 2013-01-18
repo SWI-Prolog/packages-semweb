@@ -488,6 +488,11 @@ typedef struct mchunk
   char buf[CHUNKSIZE];
 } mchunk;
 
+typedef struct tmp_store
+{ mchunk     *chunks;
+  mchunk      store0;
+} tmp_store;
+
 
 		 /*******************************
 		 *	     TRIPLE SET		*
