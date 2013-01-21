@@ -30,12 +30,13 @@
 
 :- module(rdf_persistency,
 	  [ rdf_attach_db/2,		% +Directory, +Options
-	    rdf_detach_db/0,		% +Detach current DB
+	    rdf_detach_db/0,		% +Detach current Graph
 	    rdf_current_db/1,		% -Directory
-	    rdf_persistency/2,		% +DB, +Bool
+	    rdf_persistency/2,		% +Graph, +Bool
 	    rdf_flush_journals/1,	% +Options
-	    rdf_journal_file/2,		% ?DB, ?JournalFile
-	    rdf_db_to_file/2		% ?DB, ?FileBase
+	    rdf_journal_file/2,		% ?Graph, ?JournalFile
+	    rdf_snapshot_file/2,	% ?Graph, ?SnapshotFile
+	    rdf_db_to_file/2		% ?Graph, ?FileBase
 	  ]).
 :- use_module(library(semweb/rdf_db)).
 :- use_module(library(filesex)).
@@ -1071,21 +1072,32 @@ db_abs_files(DB, Snapshot, Journal) :-
 	db_file(Journal0, Journal).
 
 
-%%	rdf_journal_file(+DB, -File) is semidet.
-%%	rdf_journal_file(-DB, -File) is nondet.
+%%	rdf_journal_file(+Graph, -File) is semidet.
+%%	rdf_journal_file(-Graph, -File) is nondet.
 %
-%	True if File is the absolute  file   name  of  an existing named
-%	graph DB.
-%
-%	@tbd	Avoid using private rdf_db:rdf_graphs_/1.
+%	True if File the name of the existing journal file for Graph.
 
-rdf_journal_file(DB, Journal) :-
-	(   var(DB)
-	->  rdf_graph_(DB, _Count)	% also pick the empty graphs
+rdf_journal_file(Graph, Journal) :-
+	(   var(Graph)
+	->  rdf_graph(Graph)
 	;   true
 	),
-	db_abs_files(DB, _Snapshot, Journal),
+	db_abs_files(Graph, _Snapshot, Journal),
 	exists_file(Journal).
+
+
+%%	rdf_snapshot_file(+Graph, -File) is semidet.
+%%	rdf_snapshot_file(-Graph, -File) is nondet.
+%
+%	True if File the name of the existing snapshot file for Graph.
+
+rdf_snapshot_file(Graph, Snapshot) :-
+	(   var(Graph)
+	->  rdf_graph(Graph)	% also pick the empty graphs
+	;   true
+	),
+	db_abs_files(Graph, Snapshot, _Journal),
+	exists_file(Snapshot).
 
 
 %%	rdf_db_to_file(+DB, -File) is det.
