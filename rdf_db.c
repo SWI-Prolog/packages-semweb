@@ -6375,28 +6375,33 @@ update_duplicates(rdf_db *db)
 
   simpleMutexLock(&db->locks.duplicates);
   db->duplicates_up_to_date = FALSE;
-  db->duplicates	    = 0;
-  db->maintain_duplicates   = TRUE;
+  db->maintain_duplicates = FALSE;
 
-  for(t=fetch_triple(db, db->by_none.head);
-      t;
-      t=triple_follow_hash(db, t, ICOL(BY_NONE)))
-  { if ( ++count % 10240 == 0 &&
-	 (PL_handle_signals() < 0 || db->resetting) )
+  if ( db->duplicates )
+  { for(t=fetch_triple(db, db->by_none.head);
+	t;
+	t=triple_follow_hash(db, t, ICOL(BY_NONE)))
+    { if ( ++count % 10240 == 0 &&
+	   (PL_handle_signals() < 0 || db->resetting) )
 
-    { db->maintain_duplicates = FALSE;
-      simpleMutexUnlock(&db->locks.duplicates);
-      return FALSE;			/* aborted */
+      { simpleMutexUnlock(&db->locks.duplicates);
+	return FALSE;			/* aborted */
+      }
+      t->is_duplicate = FALSE;
     }
-    t->is_duplicate = FALSE;
+
+    db->duplicates = 0;
   }
+
+  db->maintain_duplicates = TRUE;
 
   for(t=fetch_triple(db, db->by_none.head);
       t;
       t=triple_follow_hash(db, t, ICOL(BY_NONE)))
   { if ( ++count % 1024 == 0 &&
 	 PL_handle_signals() < 0 )
-    { simpleMutexUnlock(&db->locks.duplicates);
+    { db->maintain_duplicates = FALSE;		/* no point anymore */
+      simpleMutexUnlock(&db->locks.duplicates);
       return FALSE;
     }
     mark_duplicate(db, t, NULL);
