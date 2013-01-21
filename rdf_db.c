@@ -6396,7 +6396,9 @@ update_duplicates(rdf_db *db)
       t=triple_follow_hash(db, t, ICOL(BY_NONE)))
   { if ( ++count % 1024 == 0 &&
 	 PL_handle_signals() < 0 )
+    { simpleMutexUnlock(&db->locks.duplicates);
       return FALSE;
+    }
     mark_duplicate(db, t, NULL);
   }
 
