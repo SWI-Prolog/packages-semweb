@@ -374,6 +374,7 @@ typedef struct triple_hash
   size_t	bucket_count_epoch;	/* Initial bucket count */
   size_t	bucket_preinit;		/* Pre-initializaed bucket count */
   int		created;		/* Hash has been initialized */
+  int		icol;			/* ICOL of hash */
   unsigned int	user_size;		/* User selected size as 2^N */
   unsigned int	optimize_threshold;	/* # resizes to leave behind */
   unsigned int	avg_chain_len;		/* Accepted average chain length */

@@ -174,7 +174,7 @@ static predicate_cloud *new_predicate_cloud(rdf_db *db,
 static int	unify_literal(term_t lit, literal *l);
 static int	check_predicate_cloud(predicate_cloud *c);
 static void	invalidate_is_leaf(predicate *p, query *q, int add);
-static void	create_triple_hash(rdf_db *db, int ic);
+static void	create_triple_hash(rdf_db *db, int count, int *ic);
 
 
 		 /*******************************
@@ -986,7 +986,7 @@ init_triple_walker(triple_walker *tw, rdf_db *db, triple *pattern, int which)
   tw->icol	     = ICOL(which);
   tw->db	     = db;
   if ( !tw->db->hash[tw->icol].created )
-    create_triple_hash(db, tw->icol);
+    create_triple_hash(db, 1, &tw->icol);
   tw->bcount	     = tw->db->hash[tw->icol].bucket_count_epoch;
 }
 
@@ -999,7 +999,7 @@ init_triple_literal_walker(triple_walker *tw, rdf_db *db,
   tw->icol	     = ICOL(which);
   tw->db	     = db;
   if ( !tw->db->hash[tw->icol].created )
-    create_triple_hash(db, tw->icol);
+    create_triple_hash(db, 1, &tw->icol);
   tw->bcount	     = tw->db->hash[tw->icol].bucket_count_epoch;
 }
 
@@ -3157,6 +3157,7 @@ init_triple_hash(rdf_db *db, int index, size_t count)
 
   h->optimize_threshold = col_opt_threshold[index];
   h->avg_chain_len      = col_avg_len[index];
+  h->icol		= index;
 
   for(i=0; i<MSB(count); i++)
     h->blocks[i] = t;
@@ -4171,35 +4172,61 @@ died generation is not the maximum and the triple might thus be garbage.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static void
-create_triple_hash(rdf_db *db, int ic)
-{ triple_hash *hash = &db->hash[ic];
+create_triple_hash(rdf_db *db, int count, int *ic)
+{ triple_hash *hashes[16];
+  int i, mx=0;
 
-  initial_size_triple_hash(db, ic);
-  simpleMutexLock(&db->queries.write.lock);
-  if ( !hash->created )
-  { triple *t;
-
-    DEBUG(1, Sdprintf("Creating hash %s\n", col_name[ic]));
-
-    for(t=fetch_triple(db, db->by_none.head);
-	t;
-	t=triple_follow_hash(db, t, ICOL(BY_NONE)))
-    { int i = col_index[ic];
-      int key = triple_hash_key(t, i) % hash->bucket_count;
-      triple_bucket *bucket = &hash->blocks[MSB(key)][key];
-
-      if ( bucket->tail )
-      { fetch_triple(db, bucket->tail)->tp.next[ic] = T_ID(t);
-      } else
-      { bucket->head = T_ID(t);
-      }
-      bucket->tail = T_ID(t);
-      ATOMIC_INC(&bucket->count);
-      t->linked++;				/* (*) atomic? */
+  for(i=0; i<count; i++)
+  { hashes[mx] = &db->hash[ic[i]];
+    if ( !hashes[mx]->created )
+    { initial_size_triple_hash(db, hashes[mx]->icol);
+      mx++;
     }
-    hash->created = TRUE;
   }
-  simpleMutexUnlock(&db->queries.write.lock);
+  hashes[mx] = NULL;
+
+  if ( mx > 0 )
+  { simpleMutexLock(&db->queries.write.lock);
+
+    for(i=0; i<mx; i++)
+    { if ( hashes[i]->created )
+      { mx--;
+	memmove(&hashes[i], &hashes[i+1], sizeof(hashes[0])*(mx-i));
+      } else
+      { DEBUG(1, Sdprintf("Creating hash %s\n", col_name[hashes[i]->icol]));
+      }
+    }
+
+    if ( mx > 0 )
+    { triple *t;
+
+      for(t=fetch_triple(db, db->by_none.head);
+	  t;
+	  t=triple_follow_hash(db, t, ICOL(BY_NONE)))
+      { for(i=0; i<mx; i++)
+	{ triple_hash *hash = hashes[i];
+	  int i = col_index[hash->icol];
+	  int key = triple_hash_key(t, i) % hash->bucket_count;
+	  triple_bucket *bucket = &hash->blocks[MSB(key)][key];
+
+	  if ( bucket->tail )
+	  { fetch_triple(db, bucket->tail)->tp.next[hash->icol] = T_ID(t);
+	  } else
+	  { bucket->head = T_ID(t);
+	  }
+	  bucket->tail = T_ID(t);
+	  ATOMIC_INC(&bucket->count);
+	  t->linked++;				/* (*) atomic? */
+	}
+      }
+
+      for(i=0; i<mx; i++)
+      { triple_hash *hash = hashes[i];
+	hash->created = TRUE;
+      }
+    }
+    simpleMutexUnlock(&db->queries.write.lock);
+  }
 }
 
 
