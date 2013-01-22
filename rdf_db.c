@@ -174,7 +174,7 @@ static predicate_cloud *new_predicate_cloud(rdf_db *db,
 static int	unify_literal(term_t lit, literal *l);
 static int	check_predicate_cloud(predicate_cloud *c);
 static void	invalidate_is_leaf(predicate *p, query *q, int add);
-static void	create_triple_hash(rdf_db *db, int count, int *ic);
+static void	create_triple_hashes(rdf_db *db, int count, int *ic);
 
 
 		 /*******************************
@@ -893,6 +893,9 @@ fetch_triple_element(rdf_db *db, triple_id id)
 { return &db->triple_array.blocks[MSB(id)][id];
 }
 
+/* assign a new triple a place in the triple array
+*/
+
 static triple_id
 register_triple(rdf_db *db, triple *t)
 { triple_array *a = &db->triple_array;
@@ -986,7 +989,7 @@ init_triple_walker(triple_walker *tw, rdf_db *db, triple *pattern, int which)
   tw->icol	     = ICOL(which);
   tw->db	     = db;
   if ( !tw->db->hash[tw->icol].created )
-    create_triple_hash(db, 1, &tw->icol);
+    create_triple_hashes(db, 1, &tw->icol);
   tw->bcount	     = tw->db->hash[tw->icol].bucket_count_epoch;
 }
 
@@ -999,7 +1002,7 @@ init_triple_literal_walker(triple_walker *tw, rdf_db *db,
   tw->icol	     = ICOL(which);
   tw->db	     = db;
   if ( !tw->db->hash[tw->icol].created )
-    create_triple_hash(db, 1, &tw->icol);
+    create_triple_hashes(db, 1, &tw->icol);
   tw->bcount	     = tw->db->hash[tw->icol].bucket_count_epoch;
 }
 
@@ -4165,6 +4168,18 @@ static int by_inverse[8] =
 };
 
 
+static inline void
+append_triple_bucket(rdf_db *db, triple_bucket *bucket, int icol, triple *t)
+{ if ( bucket->tail )
+  { fetch_triple(db, bucket->tail)->tp.next[icol] = T_ID(t);
+  } else
+  { bucket->head = T_ID(t);
+  }
+  bucket->tail = T_ID(t);
+  ATOMIC_INC(&bucket->count);
+}
+
+
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 (*) ->linked is decremented in gc_hash_chain() for garbage triples. This
 can conflict. We must use some sort   of  synchronization with GC if the
@@ -4172,7 +4187,7 @@ died generation is not the maximum and the triple might thus be garbage.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static void
-create_triple_hash(rdf_db *db, int count, int *ic)
+create_triple_hashes(rdf_db *db, int count, int *ic)
 { triple_hash *hashes[16];
   int i, mx=0;
 
@@ -4209,13 +4224,7 @@ create_triple_hash(rdf_db *db, int count, int *ic)
 	  int key = triple_hash_key(t, i) % hash->bucket_count;
 	  triple_bucket *bucket = &hash->blocks[MSB(key)][key];
 
-	  if ( bucket->tail )
-	  { fetch_triple(db, bucket->tail)->tp.next[hash->icol] = T_ID(t);
-	  } else
-	  { bucket->head = T_ID(t);
-	  }
-	  bucket->tail = T_ID(t);
-	  ATOMIC_INC(&bucket->count);
+	  append_triple_bucket(db, bucket, hash->icol, t);
 	  t->linked++;				/* (*) atomic? */
 	}
       }
@@ -4236,12 +4245,7 @@ link_triple_hash(rdf_db *db, triple *t)
   int linked = 1;
 
   register_triple(db, t);
-
-  if ( db->by_none.tail )		/* non-indexed chain */
-    fetch_triple(db, db->by_none.tail)->tp.next[ICOL(BY_NONE)] = T_ID(t);
-  else
-    db->by_none.head = T_ID(t);
-  db->by_none.tail = T_ID(t);
+  append_triple_bucket(db, &db->by_none, ICOL(BY_NONE), t);
 
   for(ic=1; ic<INDEX_TABLES; ic++)
   { triple_hash *hash = &db->hash[ic];
@@ -4251,13 +4255,7 @@ link_triple_hash(rdf_db *db, triple *t)
       int key = triple_hash_key(t, i) % hash->bucket_count;
       triple_bucket *bucket = &hash->blocks[MSB(key)][key];
 
-      if ( bucket->tail )
-      { fetch_triple(db, bucket->tail)->tp.next[ic] = T_ID(t);
-      } else
-      { bucket->head = T_ID(t);
-      }
-      bucket->tail = T_ID(t);
-      ATOMIC_INC(&bucket->count);
+      append_triple_bucket(db, bucket, ic, t);
       linked++;
     }
   }
@@ -8705,7 +8703,7 @@ rdf_warm_indexes(term_t indexes)
   if ( !PL_get_nil_ex(tail) )
     return FALSE;
 
-  create_triple_hash(db, ic, il);
+  create_triple_hashes(db, ic, il);
 
   return TRUE;
 }
