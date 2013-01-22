@@ -4244,7 +4244,6 @@ link_triple_hash(rdf_db *db, triple *t)
 { int ic;
   int linked = 1;
 
-  register_triple(db, t);
   append_triple_bucket(db, &db->by_none, ICOL(BY_NONE), t);
 
   for(ic=1; ic<INDEX_TABLES; ic++)
@@ -4270,7 +4269,8 @@ link_triple_hash(rdf_db *db, triple *t)
 
 int
 prelink_triple(rdf_db *db, triple *t, query *q)
-{ if ( t->resolve_pred )
+{ register_triple(db, t);
+  if ( t->resolve_pred )
   { t->predicate.r = lookup_predicate(db, t->predicate.u);
     t->resolve_pred = FALSE;
   }
