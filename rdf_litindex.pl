@@ -510,7 +510,8 @@ thread_monitor_literal(new_literal(Literal)) :- !,
 thread_monitor_literal(Action) :- !,
 	monitor_literal(Action).
 
-check_index_workers(Queue) :-
+check_index_workers(Alias) :-
+	message_queue_property(Queue, alias(Alias)),
 	message_queue_property(Queue, size(Size)),
 	Size > 5000, !,
 	with_mutex(create_index_worker, create_index_worker(extra)).
