@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@cs.vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 1985-2012, University of Amsterdam
+    Copyright (C): 1985-2013, University of Amsterdam
 			      VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
@@ -122,6 +122,10 @@
 	    rdf_split_url/3,		% ?Base, ?Local, ?URL
 	    rdf_url_namespace/2,	% +URL, ?Base
 	    rdf_quote_uri/2,		% +URI, -Quoted
+
+	    rdf_warm_indexes/0,
+	    rdf_warm_indexes/1,		% +Indexed
+	    rdf_update_duplicates/0,
 
 	    rdf_debug/1,		% Set verbosity
 
@@ -1459,8 +1463,53 @@ monitor_mask(all,	   0xffff).
 
 
 		 /*******************************
+		 *	      WARM		*
+		 *******************************/
+
+%%	rdf_warm_indexes
+%
+%	Warm all indexes.  See rdf_warm_indexes/1.
+
+rdf_warm_indexes :-
+	findall(Index, rdf_index(Index), Indexes),
+	rdf_warm_indexes(Indexes).
+
+rdf_index(s).
+rdf_index(p).
+rdf_index(o).
+rdf_index(sp).
+rdf_index(o).
+rdf_index(po).
+rdf_index(spo).
+rdf_index(g).
+rdf_index(sg).
+rdf_index(pg).
+
+%%	rdf_warm_indexes(+Indexes) is det.
+%
+%	Create the named indexes.  Normally,   the  RDF database creates
+%	indexes on lazily the first time they are needed. This predicate
+%	serves two purposes: it provides an   explicit  way to make sure
+%	that the required indexes  are   present  and  creating multiple
+%	indexes at the same time is more efficient.
+
+
+		 /*******************************
 		 *	    DUPLICATES		*
 		 *******************************/
+
+%%	rdf_update_duplicates is det.
+%
+%	Update the duplicate administration of the RDF store. This marks
+%	every triple that is potentionally  a   duplicate  of another as
+%	duplicate. Being potentially a  duplicate   means  that subject,
+%	predicate and object are equivalent and   the  life-times of the
+%	two triples overlap.
+%
+%	The duplicates marks are used to  reduce the administrative load
+%	of avoiding duplicate answers.  Normally,   the  duplicates  are
+%	marked using a background thread that   is  started on the first
+%	query that produces a substantial amount of duplicates.
 
 :- public
 	rdf_update_duplicates_thread/0.

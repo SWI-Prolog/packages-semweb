@@ -8662,6 +8662,53 @@ rdf_update_duplicates(void)
 }
 
 
+/** rdf_warm_indexes(+List) is det.
+*/
+
+static foreign_t
+rdf_warm_indexes(term_t indexes)
+{ int il[16];
+  int ic = 0;
+  term_t tail = PL_copy_term_ref(indexes);
+  term_t head = PL_new_term_ref();
+  rdf_db *db = rdf_current_db();
+
+  while(PL_get_list_ex(tail, head, tail))
+  { char *s;
+
+    if ( PL_get_chars(head, &s, CVT_ATOM|CVT_EXCEPTION) )
+    { int by = 0;
+      int i;
+
+      for(; *s; s++)
+      { switch(*s)
+	{ case 's': by |= BY_S; break;
+	  case 'p': by |= BY_P; break;
+	  case 'o': by |= BY_O; break;
+	  case 'g': by |= BY_G; break;
+	  default: return PL_domain_error("rdf_index", head);
+	}
+      }
+
+      if ( index_col[by] == ~0 )
+	return PL_existence_error("rdf_index", head);
+
+      for(i=0; i<ic; i++)
+      { if ( il[i] == by )
+	  break;
+      }
+      if ( i == ic )
+	il[ic++] = by;
+    } else
+      return 0;
+  }
+  if ( !PL_get_nil_ex(tail) )
+    return FALSE;
+
+  create_triple_hash(db, ic, il);
+
+  return TRUE;
+}
 
 
 		 /*******************************
@@ -9025,6 +9072,8 @@ install_rdf_db(void)
   PL_register_foreign("rdf_set",        1, rdf_set,         0);
   PL_register_foreign("rdf_update_duplicates",
 					0, rdf_update_duplicates, 0);
+  PL_register_foreign("rdf_warm_indexes",
+					1, rdf_warm_indexes,0);
   PL_register_foreign("rdf_generation", 1, rdf_generation,  0);
   PL_register_foreign("rdf_snapshot",   1, rdf_snapshot,    0);
   PL_register_foreign("rdf_delete_snapshot", 1, rdf_delete_snapshot, 0);
