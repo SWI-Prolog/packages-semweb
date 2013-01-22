@@ -6385,8 +6385,6 @@ mark_duplicate(rdf_db *db, triple *t, query *q)
       { d->is_duplicate = TRUE;
 	db->duplicates++;
       }
-
-      return;
     }
   }
   destroy_triple_walker(db, &tw);
