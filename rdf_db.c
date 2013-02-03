@@ -3553,6 +3553,7 @@ reindex_triple(rdf_db *db, triple *t)
 
   *t2 = *t;
   memset(&t2->tp, 0, sizeof(t2->tp));
+  register_triple(db, t2);
   simpleMutexLock(&db->queries.write.lock);
   link_triple_hash(db, t2);
   t->reindexed = T_ID(t2);
