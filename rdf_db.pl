@@ -1552,16 +1552,22 @@ rdf_update_duplicates_thread :-
 
 rdf_save_db(File) :-
 	current_prolog_flag(rdf_triple_format, Version),
-	open(File, write, Out, [type(binary)]),
-	set_stream(Out, record_position(false)),
-	call_cleanup(rdf_save_db_(Out, _, Version), close(Out)).
+	setup_call_cleanup(
+	    open(File, write, Out, [type(binary)]),
+	    ( set_stream(Out, record_position(false)),
+	      rdf_save_db_(Out, _, Version)
+	    ),
+	    close(Out)).
 
 
 rdf_save_db(File, Graph) :-
 	current_prolog_flag(rdf_triple_format, Version),
-	open(File, write, Out, [type(binary)]),
-	set_stream(Out, record_position(false)),
-	call_cleanup(rdf_save_db_(Out, Graph, Version), close(Out)).
+	setup_call_cleanup(
+	    open(File, write, Out, [type(binary)]),
+	    ( set_stream(Out, record_position(false)),
+	      rdf_save_db_(Out, Graph, Version)
+	    ),
+	    close(Out)).
 
 
 %%	rdf_load_db_no_admin(+File, +Id, -Graphs) is det.
@@ -2261,9 +2267,11 @@ rdf_set_graph(Graph, modified(Modified)) :-
 %	Save triples belonging to DB in the file Cache.
 
 save_cache(DB, Cache) :-
-	catch(open(Cache, write, CacheStream, [type(binary)]), _, fail), !,
-	call_cleanup(rdf_save_db_(CacheStream, DB),
-		     close(CacheStream)).
+	current_prolog_flag(rdf_triple_format, Version),
+	setup_call_cleanup(
+	    catch(open(Cache, write, CacheStream, [type(binary)]), _, fail),
+	    rdf_save_db_(CacheStream, DB, Version),
+	    close(CacheStream)).
 
 %%	assert_triples(+Triples, +Source)
 %
