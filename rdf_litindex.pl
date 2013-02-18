@@ -662,11 +662,13 @@ fill_porter_index(PorterMap) :-
 stem([], _).
 stem([Token|T], Map) :-
 	(   atom(Token)
-	->  porter_stem(Token, Stem),
-	    rdf_insert_literal_map(Map, Stem, Token, Keys),
-	    (	integer(Keys),
-		Keys mod 1000 =:= 0
-	    ->  progress(Map, 'Porter')
+	->  (   porter_stem(Token, Stem)
+	    ->	rdf_insert_literal_map(Map, Stem, Token, Keys),
+		(   integer(Keys),
+		    Keys mod 1000 =:= 0
+		->  progress(Map, 'Porter')
+		;   true
+		)
 	    ;	true
 	    )
 	;   true
