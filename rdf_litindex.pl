@@ -515,6 +515,7 @@ check_index_workers(Alias) :-
 	message_queue_property(Queue, size(Size)),
 	Size > 5000, !,
 	with_mutex(create_index_worker, create_index_worker(extra)).
+check_index_workers(_).
 
 
 		 /*******************************
