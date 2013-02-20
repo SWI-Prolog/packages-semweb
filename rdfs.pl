@@ -1,11 +1,10 @@
-/*  $Id$
-
-    Part of SWI-Prolog
+/*  Part of SWI-Prolog
 
     Author:        Jan Wielemaker
-    E-mail:        wielemak@science.uva.nl
+    E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 1985-2005, University of Amsterdam
+    Copyright (C): 1985-2013, University of Amsterdam
+			      VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License
@@ -61,7 +60,7 @@ for languages on top of RDF:
 	  level language (used in this module)
 
 	* Extend rdf/3 relation with triples _implied_ by the high-level
-	  semantics.  This approach is taken by the SeRQL system.
+	  semantics.  This approach is taken by ClioPatria.
 */
 
 		 /*******************************
