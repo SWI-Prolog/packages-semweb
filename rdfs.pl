@@ -106,10 +106,7 @@ rdfs_subproperty_of(SubProperty, Property) :-
 rdfs_subclass_of(Class, Super) :-
 	rdf_equal(rdfs:'Resource', Resource),
 	Super == Resource, !,
-	(   nonvar(Class)
-	->  true			% must check for being a class?
-	;   rdfs_individual_of(Class, rdfs:'Class')
-	).
+	rdfs_individual_of(Class, rdfs:'Class').
 rdfs_subclass_of(Class, Super) :-
 	rdf_reachable(Class, rdfs:subClassOf, Super).
 rdfs_subclass_of(Class, Super) :-
@@ -169,13 +166,15 @@ rdfs_individual_of(Resource, Class) :-
 rdfs_individual_of(_Resource, _Class) :-
 	throw(error(instantiation_error, _)).
 
+%%	rdfs_individual_of_r_c(+Resource, +Class) is semidet.
+
 rdfs_individual_of_r_c(literal(_), Class) :- !,
 	rdfs_subclass_of(Class, rdfs:'Literal').
+rdfs_individual_of_r_c(_, Class) :-		% every resource is an instance of
+	rdf_equal(Class, rdfs:'Resource'), !.	% rdfs:Resource
 rdfs_individual_of_r_c(Resource, Class) :-
 	rdf_has(Resource, rdf:type, MyClass),
 	rdfs_subclass_of(MyClass, Class).
-rdfs_individual_of_r_c(_, Class) :-
-	rdf_equal(Class, rdfs:'Resource').
 
 
 %%	rdfs_label(+Resource, -Label).
