@@ -593,7 +593,11 @@ update_triples(query *q,
     rdf_create_gc_thread(db);
 
   for(tn=new; tn < en; tn++)
-    prelink_triple(db, *tn, q);
+  { triple *t = *tn;
+
+    if ( t )
+      prelink_triple(db, t, q);
+  }
 
   simpleMutexLock(&db->queries.write.generation_lock);
   simpleMutexLock(&db->queries.write.lock);
@@ -629,14 +633,22 @@ update_triples(query *q,
 
   if ( !q->transaction && rdf_is_broadcasting(EV_UPDATE) )
   { for(to=old,tn=new; to < eo; to++,tn++)
-    { postlink_triple(db, *tn, q);
+    { triple *t = *tn;
 
-      if ( !rdf_broadcast(EV_UPDATE, *to, *tn) )
-	return FALSE;
+      if ( t )
+      { postlink_triple(db, *tn, q);
+
+	if ( !rdf_broadcast(EV_UPDATE, *to, *tn) )
+	  return FALSE;
+      }
     }
   } else
   { for(tn=new; tn < en; tn++)
-      postlink_triple(db, *tn, q);
+    { triple *t = *tn;
+
+      if ( t )
+	postlink_triple(db, t, q);
+    }
   }
 
   return TRUE;
