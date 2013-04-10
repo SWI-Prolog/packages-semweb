@@ -97,7 +97,8 @@ delete the journals.
 	no_agc(0).
 
 :- predicate_options(rdf_attach_db/2, 2,
-		     [ concurrency(positive_integer),
+		     [ access(oneof([read_write,read_only])),
+		       concurrency(positive_integer),
 		       max_open_journals(positive_integer),
 		       silent(oneof([true,false,brief])),
 		       log_nested_transactions(boolean)
@@ -115,6 +116,15 @@ delete the journals.
 %		Create snapshots for all sources in directory
 %
 %	Options:
+%
+%		* access(+AccessMode)
+%		One of =auto= (default), =read_write= or
+%		=read_only=. Read-only access implies that the RDF
+%		store is not locked. It is read at startup and all
+%		modifications to the data are temporary. The default
+%		=auto= mode is =read_write= if the directory is
+%		writeable and the lock can be acquired.  Otherwise
+%		it reverts to =read_only=.
 %
 %		* concurrency(+Jobs)
 %		Number of threads to use for loading the initial
@@ -143,6 +153,44 @@ delete the journals.
 %	@error permission_error(write, directory, Directory)
 
 rdf_attach_db(DirSpec, Options) :-
+	option(access(read_only), Options), !,
+	absolute_file_name(DirSpec,
+			   Directory,
+			   [ access(read),
+			     file_type(directory)
+			   ]),
+	rdf_detach_db,
+	assert(rdf_directory(Directory)),
+	assert_options(Options),
+	stop_monitor,		% make sure not to register load
+	no_agc(load_db).
+rdf_attach_db(DirSpec, Options) :-
+	option(access(read_write), Options), !,
+	rdf_attach_db_rw(DirSpec, Options).
+rdf_attach_db(DirSpec, Options) :-
+	absolute_file_name(DirSpec,
+			   Directory,
+			   [ access(read),
+			     file_type(directory)
+			   ]),
+	(   access_file(Directory, write)
+	->  catch(rdf_attach_db_rw(Directory, Options), E, true),
+	    (	var(E)
+	    ->  true
+	    ;	E = error(permission_error(lock, rdf_db, _), _)
+	    ->	print_message(warning, E),
+		print_message(warning, rdf(read_only)),
+		rdf_attach_db(DirSpec, [access(read_only)|Options])
+	    ;	throw(E)
+	    )
+	;   print_message(warning,
+			  error(permission_error(write, directory, Directory))),
+	    print_message(warning, rdf(read_only)),
+	    rdf_attach_db_rw(Directory, Options)
+	).
+
+
+rdf_attach_db_rw(DirSpec, Options) :-
 	absolute_file_name(DirSpec,
 			   Directory,
 			   [ access(write),
@@ -161,7 +209,7 @@ rdf_attach_db(DirSpec, Options) :-
 	    at_halt(rdf_detach_db),
 	    start_monitor
 	).
-rdf_attach_db(DirSpec, Options) :-
+rdf_attach_db_rw(DirSpec, Options) :-
 	absolute_file_name(DirSpec,
 			   Directory,
 			   [ solutions(all)
@@ -171,8 +219,8 @@ rdf_attach_db(DirSpec, Options) :-
 	;   catch(make_directory(Directory), _, fail)
 	), !,
 	rdf_attach_db(Directory, Options).
-rdf_attach_db(DirSpec, _) :-		% Generate an existence or permission error
-	absolute_file_name(DirSpec,
+rdf_attach_db_rw(DirSpec, _) :-		% Generate an existence or
+	absolute_file_name(DirSpec,	% permission error
 			   Directory,
 			   [ access(exist),
 			     file_type(directory)
@@ -194,6 +242,7 @@ option_type(max_open_journals(X),	must_be(positive_integer, X)).
 option_type(directory_levels(X),	must_be(positive_integer, X)).
 option_type(silent(X),	       must_be(oneof([true,false,brief]), X)).
 option_type(log_nested_transactions(X),	must_be(boolean, X)).
+option_type(access(X),	       must_be(oneof([read_write,read_only]), X)).
 
 
 %%	no_agc(:Goal)
@@ -960,8 +1009,8 @@ delete_db_(DB) :-
 lock_db(Dir) :-
 	lockfile(Dir, File),
 	catch(open(File, update, Out, [lock(write), wait(false)]),
-	      error(permission_error(lock, _, _), _),
-	      locked_error(Dir)),
+	      error(permission_error(Access, _, _), _),
+	      locked_error(Access, Dir)),
 	(   current_prolog_flag(pid, PID)
 	->  true
 	;   PID = 0			% TBD: Fix in Prolog
@@ -979,7 +1028,7 @@ lock_db(Dir) :-
 	assert(rdf_lock(Dir, lock(Out, File))),
 	at_halt(unlock_db(Out, File)).
 
-locked_error(Dir) :-
+locked_error(lock, Dir) :-
 	lockfile(Dir, File),
 	(   catch(read_file_to_terms(File, Terms, []), _, fail),
 	    Terms = [locked(Args)]
@@ -987,6 +1036,9 @@ locked_error(Dir) :-
 	;   Context = context(_, 'Database is in use')
 	),
 	throw(error(permission_error(lock, rdf_db, Dir), Context)).
+locked_error(open, Dir) :-
+	throw(error(permission_error(lock, rdf_db, Dir),
+		    context(_, 'Lock file cannot be opened'))).
 
 %%	unlock_db(+Dir) is det.
 %%	unlock_db(+Stream, +File) is det.
@@ -1357,6 +1409,10 @@ message(reindex(Count, Depth)) -->
 	[ 'Restructuring database with ~d levels (~D graphs)'-[Depth, Count] ].
 message(reindex(Depth)) -->
 	[ 'Fixing database directory structure (~d levels)'-[Depth] ].
+message(read_only) -->
+	[ 'Cannot write persistent store; continuing in read-only mode.', nl,
+	  'All changes to the RDF store will be lost if this process terminates.'
+	].
 
 silent_message(_Action) --> [].
 
