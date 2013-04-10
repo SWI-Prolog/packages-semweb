@@ -103,7 +103,7 @@ delete the journals.
 		       log_nested_transactions(boolean)
 		     ]).
 
-%%	rdf_attach_db(+Directory, +Options)
+%%	rdf_attach_db(+Directory, +Options) is det.
 %
 %	Start persistent operations using Directory   as  place to store
 %	files.   There are several cases:
@@ -137,7 +137,10 @@ delete the journals.
 %		* log_nested_transactions(+Boolean)
 %		If =true=, nested _log_ transactions are added to the
 %		journal information.  By default (=false=), no log-term
-%		is added for nested transactions.
+%		is added for nested transactions.\\
+%
+%	@error existence_error(source_sink, Directory)
+%	@error permission_error(write, directory, Directory)
 
 rdf_attach_db(DirSpec, Options) :-
 	absolute_file_name(DirSpec,
@@ -168,6 +171,13 @@ rdf_attach_db(DirSpec, Options) :-
 	;   catch(make_directory(Directory), _, fail)
 	), !,
 	rdf_attach_db(Directory, Options).
+rdf_attach_db(DirSpec, _) :-		% Generate an existence or permission error
+	absolute_file_name(DirSpec,
+			   Directory,
+			   [ access(exist),
+			     file_type(directory)
+			   ]),
+	permission_error(write, directory, Directory).
 
 
 assert_options([]).
