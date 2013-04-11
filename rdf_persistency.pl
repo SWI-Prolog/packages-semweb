@@ -365,6 +365,9 @@ make_goals([DB|T0], Silent, I,  Total,
 
 verbosity(Silent) :-
 	rdf_option(silent(Silent)), !.
+verbosity(Silent) :-
+	current_prolog_flag(verbose, silent), !,
+	Silent = true.
 verbosity(brief).
 
 
