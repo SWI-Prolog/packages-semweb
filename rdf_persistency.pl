@@ -170,9 +170,10 @@ rdf_attach_db(DirSpec, Options) :-
 rdf_attach_db(DirSpec, Options) :-
 	absolute_file_name(DirSpec,
 			   Directory,
-			   [ access(read),
-			     file_type(directory)
-			   ]),
+			   [ access(exist),
+			     file_type(directory),
+			     file_errors(fail)
+			   ]), !,
 	(   access_file(Directory, write)
 	->  catch(rdf_attach_db_rw(Directory, Options), E, true),
 	    (	var(E)
@@ -187,6 +188,14 @@ rdf_attach_db(DirSpec, Options) :-
 			  error(permission_error(write, directory, Directory))),
 	    print_message(warning, rdf(read_only)),
 	    rdf_attach_db_rw(Directory, Options)
+	).
+rdf_attach_db(DirSpec, Options) :-
+	catch(rdf_attach_db_rw(DirSpec, Options), E, true),
+	(   var(E)
+	->  true
+	;   print_message(warning, E),
+	    print_message(warning, rdf(read_only)),
+	    rdf_attach_db(DirSpec, [access(read_only)|Options])
 	).
 
 
