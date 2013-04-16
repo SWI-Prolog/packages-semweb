@@ -3441,7 +3441,7 @@ rdf_quote_uri(IRI, URI) :-
 %	generation by one.
 %
 %	When inside a transaction,  Generation  is   unified  to  a term
-%	_TransactionStartGen_+_InsideTransactionGen_.  E.g.,  4+3  means
+%	_TransactionStartGen_ + _InsideTransactionGen_. E.g.,  4+3 means
 %	that the transaction was started at   generation 4 of the global
 %	database and we have  created  3   new  generations  inside  the
 %	transaction. Note that this choice  of representation allows for
