@@ -1,11 +1,10 @@
-/*  $Id$
-
-    Part of SWI-Prolog
+/*  Part of SWI-Prolog
 
     Author:        Jan Wielemaker
-    E-mail:        wielemak@science.uva.nl
+    E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 1985-2006, University of Amsterdam
+    Copyright (C): 1985-2013, University of Amsterdam
+			      VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License
@@ -33,6 +32,9 @@
 	  [ mkclassify/1,
 	    run/0
 	  ]).
+
+/** <module> Generate turtle_chars.c
+*/
 
 run :-
 	mkclassify('turtle_chars.c', 'static ').
@@ -104,9 +106,8 @@ indent(N) :-
 
 
 
-list(name_start_char,
+list(pn_chars_base,
      [ 0'A-0'Z,
-       0'_,
        0'a-0'z,
        0x00C0-0x00D6,
        0x00D8-0x00F6,
@@ -122,7 +123,7 @@ list(name_start_char,
        0x10000-0xEFFFF
      ]).
 
-list(name_extender_char,
+list(pn_chars_extra,
      [ 0'-,
        0'0-0'9,
        0x00B7,

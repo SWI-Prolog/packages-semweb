@@ -38,27 +38,8 @@
 
 static atom_t	 ATOM_;
 static functor_t FUNCTOR_error2;
-static functor_t FUNCTOR_type_error2;
 static functor_t FUNCTOR_syntax_error1;
 static functor_t FUNCTOR_stream4;
-static functor_t FUNCTOR_representation_error1;
-
-static int
-type_error(term_t actual, const char *expected)
-{ term_t ex;
-
-  if ( (ex = PL_new_term_ref()) &&
-       PL_unify_term(ex,
-		     PL_FUNCTOR, FUNCTOR_error2,
-		       PL_FUNCTOR, FUNCTOR_type_error2,
-		         PL_CHARS, expected,
-		         PL_TERM, actual,
-		       PL_VARIABLE) )
-    return PL_raise_exception(ex);
-
-  return FALSE;
-}
-
 
 /* Error context: stream(Stream, Line, LinePos, CharNo)
 */
@@ -89,20 +70,22 @@ syntax_error(const char *culprit, IOSTREAM *in)
   return FALSE;
 }
 
+		 /*******************************
+		 *	CHARACTER CLASSES	*
+		 *******************************/
 
-static int
-representation_error(const char *culprit)
-{ term_t ex;
+static inline int
+wcis_pn_chars_u(int c)			/* 164s */
+{ return ( wcis_pn_chars_base(c) ||
+	   c == '_'
+	 );
+}
 
-  if ( (ex = PL_new_term_ref()) &&
-       PL_unify_term(ex,
-		     PL_FUNCTOR, FUNCTOR_error2,
-		       PL_FUNCTOR, FUNCTOR_representation_error1,
-		         PL_CHARS, culprit,
-		       PL_VARIABLE) )
-    return PL_raise_exception(ex);
-
-  return FALSE;
+static inline int
+wcis_pn_chars(int c)
+{ return ( wcis_pn_chars_u(c) ||
+	   wcis_pn_chars_extra(c)
+	 );
 }
 
 
@@ -110,38 +93,42 @@ representation_error(const char *culprit)
 		 *	       PROLOG		*
 		 *******************************/
 
-/** turtle_name(+Atom) is semidet.
+/** turtle_pn_local(+Atom) is semidet.
 
 True if Atom is a valid Turtle identifier
 */
 
 static inline int
-wcis_name_char(int c)
-{ return wcis_name_start_char(c) ||
-         wcis_name_extender_char(c);
+wcis_pn_local_char(int c)
+{ return wcis_pn_chars(c);
 }
 
-/** turtle_name_start_char(+Int) is semidet.
+static inline int
+wcis_pn_local_start_char(int c)
+{ return wcis_pn_chars_u(c);
+}
+
+
+/** turtle_pn_local_start_char(+Int) is semidet.
 */
 
 static foreign_t
-turtle_name_start_char(term_t Code)
+turtle_pn_local_start_char(term_t Code)
 { int c;
 
-  if ( !PL_get_integer(Code, &c) )
-    return type_error(Code, "code");
-  if ( !wcis_name_start_char(c) )
+  if ( !PL_get_integer_ex(Code, &c) ||
+       !wcis_pn_local_start_char(c) )
     return FALSE;
 
   return TRUE;
 }
 
 
-/** turtle_name(+Atom) is semidet.
+/** turtle_pn_local(+Atom) is semidet.
 */
 
 static foreign_t
-turtle_name(term_t name)
+turtle_pn_local(term_t name)
 { char *s;
   pl_wchar_t *w;
   size_t len;
@@ -149,20 +136,20 @@ turtle_name(term_t name)
   if ( PL_get_nchars(name, &len, &s, CVT_ATOM) )
   { const char *e = &s[len];
 
-    if ( !wcis_name_start_char(s[0]&0xff) )
+    if ( !wcis_pn_local_start_char(s[0]&0xff) )
       return FALSE;
     for(s++; s<e; s++)
-    { if ( !wcis_name_char(s[0]&0xff) )
+    { if ( !wcis_pn_local_char(s[0]&0xff) )
 	return FALSE;
     }
     return TRUE;
   } else if ( PL_get_wchars(name, &len, &w, CVT_ATOM|CVT_EXCEPTION) )
   { const pl_wchar_t *e = &w[len];
 
-    if ( !wcis_name_start_char(w[0]) )
+    if ( !wcis_pn_local_start_char(w[0]) )
       return FALSE;
     for(w++; w<e; w++)
-    { if ( !wcis_name_char(w[0]) )
+    { if ( !wcis_pn_local_char(w[0]) )
 	return FALSE;
     }
     return TRUE;
@@ -216,21 +203,18 @@ free_charbuf(charbuf *cb)
 }
 
 
-/** turtle_read_name(+C0, +Stream, -C, -Name) is semidet.
+/** turtle_read_pn_local(+C0, +Stream, -C, -Name) is semidet.
 */
 
 static foreign_t
-turtle_read_name(term_t C0, term_t Stream, term_t C, term_t Name)
+turtle_read_pn_local(term_t C0, term_t Stream, term_t C, term_t Name)
 { int c;
   charbuf b;
   IOSTREAM *in;
 
-  if ( !PL_get_integer(C0, &c) )
-    return type_error(C0, "code");
-  if ( !wcis_name_start_char(c) )
-    return FALSE;
-
-  if ( !PL_get_stream_handle(Stream, &in) )
+  if ( !PL_get_integer_ex(C0, &c) ||
+       !wcis_pn_local_start_char(c) ||
+       !PL_get_stream_handle(Stream, &in) )
     return FALSE;
 
   init_charbuf(&b);
@@ -239,7 +223,7 @@ turtle_read_name(term_t C0, term_t Stream, term_t C, term_t Name)
   for(;;)
   { int c = Sgetcode(in);
 
-    if ( wcis_name_char(c) )
+    if ( wcis_pn_local_char(c) )
     { add_charbuf(&b, c);
     } else
     { int rc = ( PL_unify_integer(C, c) &&
@@ -318,12 +302,9 @@ turtle_read_string(term_t C0, term_t Stream, term_t C, term_t Value)
   IOSTREAM *in;
   int endlen = 1;
 
-  if ( !PL_get_integer(C0, &c) )
-    return type_error(C0, "code");
-  if ( c != '"' )
-    return FALSE;
-
-  if ( !PL_get_stream_handle(Stream, &in) )
+  if ( !PL_get_integer_ex(C0, &c) ||
+       c != '"' ||
+       !PL_get_stream_handle(Stream, &in) )
     return FALSE;
 
   init_charbuf(&b);
@@ -396,12 +377,9 @@ turtle_read_relative_uri(term_t C0, term_t Stream, term_t C, term_t Value)
   charbuf b;
   IOSTREAM *in;
 
-  if ( !PL_get_integer(C0, &c) )
-    return type_error(C0, "code");
-  if ( c != '<' )
-    return FALSE;
-
-  if ( !PL_get_stream_handle(Stream, &in) )
+  if ( !PL_get_integer_ex(C0, &c) ||
+       c != '<' ||
+       !PL_get_stream_handle(Stream, &in) )
     return FALSE;
 
   init_charbuf(&b);
@@ -466,7 +444,7 @@ ttl_put_character(IOSTREAM *s, int c)
     return Sputcode(c, s);
   }
 
-  representation_error("turtle_character");
+  PL_representation_error("turtle_character");
   return -1;
 }
 
@@ -607,16 +585,14 @@ turtle_write_uri(term_t Stream, term_t Value)
 install_t
 install_turtle()
 { MKFUNCTOR(error, 2);
-  MKFUNCTOR(type_error, 2);
   MKFUNCTOR(syntax_error, 1);
   MKFUNCTOR(stream, 4);
-  MKFUNCTOR(representation_error, 1);
   ATOM_ = PL_new_atom("");
 
-  PL_register_foreign("turtle_name_start_char",
-					    1, turtle_name_start_char, 0);
-  PL_register_foreign("turtle_name",        1, turtle_name,        0);
-  PL_register_foreign("turtle_read_name",   4, turtle_read_name,   0);
+  PL_register_foreign("turtle_pn_local_start_char",
+					    1, turtle_pn_local_start_char, 0);
+  PL_register_foreign("turtle_pn_local",        1, turtle_pn_local,        0);
+  PL_register_foreign("turtle_read_pn_local",   4, turtle_read_pn_local,   0);
   PL_register_foreign("turtle_read_string", 4, turtle_read_string, 0);
   PL_register_foreign("turtle_read_relative_uri",
 					    4, turtle_read_relative_uri, 0);

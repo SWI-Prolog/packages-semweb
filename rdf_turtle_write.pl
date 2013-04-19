@@ -394,7 +394,7 @@ propose_abbrev(_, Len, URI, Abbrev) :-
 	atomic_list_concat(Use, -, Abbrev).
 
 abbrev_part(X) :-
-	turtle_name(X),
+	turtle_pn_local(X),
 	\+ well_known_ns(X, _),
 	\+ well_known_extension(X).
 
@@ -1101,7 +1101,7 @@ tw_resource(Resource, State, Out) :-
 	tw_state_prefix_map(State, PrefixMap),
 	member(Prefix-Full, PrefixMap),
 	atom_concat(Full, Name, Resource),
-	turtle_name(Name), !,
+	turtle_pn_local(Name), !,
 	format(Out, '~w:~w', [Prefix, Name]).
 tw_resource(Resource, State, Out) :-
 	tw_relative_uri(Resource, State, Out).

@@ -1,38 +1,35 @@
 static int
-wcis_name_start_char(int c)
-{ if ( c <= 0x037d )
-  { if ( c <= 0x007a )
+wcis_pn_chars_base(int c)
+{ if ( c <= 0x1fff )
+  { if ( c <= 0x00d6 )
     { if ( c <= 0x005a )
       { return (c >= 0x0041 && c <= 0x005a);
       } else
-      { if ( c <= 0x005f )
-        { return (c == 0x005f);} else
+      { if ( c <= 0x007a )
         { return (c >= 0x0061 && c <= 0x007a);
+        } else
+        { return (c >= 0x00c0 && c <= 0x00d6);
         }
       }
     } else
-    { if ( c <= 0x00f6 )
-      { if ( c <= 0x00d6 )
-        { return (c >= 0x00c0 && c <= 0x00d6);
-        } else
+    { if ( c <= 0x02ff )
+      { if ( c <= 0x00f6 )
         { return (c >= 0x00d8 && c <= 0x00f6);
+        } else
+        { return (c >= 0x00f8 && c <= 0x02ff);
         }
       } else
-      { if ( c <= 0x02ff )
-        { return (c >= 0x00f8 && c <= 0x02ff);
-        } else
+      { if ( c <= 0x037d )
         { return (c >= 0x0370 && c <= 0x037d);
+        } else
+        { return (c >= 0x037f && c <= 0x1fff);
         }
       }
     }
   } else
   { if ( c <= 0x2fef )
     { if ( c <= 0x200d )
-      { if ( c <= 0x1fff )
-        { return (c >= 0x037f && c <= 0x1fff);
-        } else
-        { return (c >= 0x200c && c <= 0x200d);
-        }
+      { return (c >= 0x200c && c <= 0x200d);
       } else
       { if ( c <= 0x218f )
         { return (c >= 0x2070 && c <= 0x218f);
@@ -59,7 +56,7 @@ wcis_name_start_char(int c)
 }
 
 static int
-wcis_name_extender_char(int c)
+wcis_pn_chars_extra(int c)
 { if ( c <= 0x0039 )
   { if ( c <= 0x002d )
     { return (c == 0x002d);} else

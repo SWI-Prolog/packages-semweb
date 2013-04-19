@@ -29,10 +29,10 @@
 
 :- module(turtle_base,
 	  [				% Tests
-	    turtle_name_start_char/1,	% +Integer
-	    turtle_name/1,		% +Atom
+	    turtle_pn_local_start_char/1,	% +Integer
+	    turtle_pn_local/1,		% +Atom
 					% Input
-	    turtle_read_name/4,		% +C0, +Stream, -C, -Atom
+	    turtle_read_pn_local/4,	% +C0, +Stream, -C, -Atom
 	    turtle_read_string/4,	% +C0, +Stream, -C, -Atom
 	    turtle_read_relative_uri/4,	% +C0, +Stream, -C, -Atom
 					% Output
@@ -51,17 +51,17 @@ based on:
 
 :- use_foreign_library(foreign(turtle)).
 
-%%	turtle_name_start_char(+Code) is semidet.
+%%	turtle_pn_local(+Code) is semidet.
 %
 %	True if Code is a valid character code to start a Turtle name.
 
-%%	turtle_name(+Atom:atom) is semidet.
+%%	turtle_pn_local(+Atom:atom) is semidet.
 %
 %	True if Atom is a valid Turtle name.
 %
 %	@see xml_name/2.
 
-%%	turtle_read_name(+C0, +Stream, -C, -Atom) is semidet.
+%%	turtle_read_pn_local(+C0, +Stream, -C, -Atom) is semidet.
 %
 %	Read a Turtle name starting with C0 from Stream. If successfull,
 %	C is unified with the first character after the name and Atom is

@@ -796,19 +796,19 @@ turtle_token(0'_, In, C, nodeId(NodeID)) :-
 	peek_code(In, 0':), !,
 	get_code(In, _),
 	get_code(In, C1),
-	turtle_read_name(C1, In, C, NodeID).
+	turtle_read_pn_local(C1, In, C, NodeID).
 turtle_token(0'<, In, C, URI) :- !,
 	resource_token(0'<, In, C, URI).
 turtle_token(0':, In, C, URI) :- !,
 	resource_token(0':, In, C, URI).
 turtle_token(C0, In, C, Token) :-
-	turtle_read_name(C0, In, C1, Name), !,
+	turtle_read_pn_local(C0, In, C1, Name), !,
 	(   C1 == 0':,
 	    \+ sub_atom(Name, 0, _, _, '_'),
 	    peek_code(In, C2),
-	    turtle_name_start_char(C2)
+	    turtle_pn_local_start_char(C2)
 	->  get_code(In, C2),
-	    turtle_read_name(C2, In, C, Name2),
+	    turtle_read_pn_local(C2, In, C, Name2),
 	    Token = (Name:Name2)
 	;   Token = name(Name),
 	    C = C1
@@ -913,17 +913,17 @@ resource_token(0'<, In, C, relative_uri(URI)) :- !,
 	turtle_read_relative_uri(0'<, In, C, URI).
 resource_token(0':, In, C, Token) :- !,
 	get_code(In, C0),
-	(   turtle_read_name(C0, In, C, Name)
+	(   turtle_read_pn_local(C0, In, C, Name)
 	->  Token = :(Name)
 	;   Token = :,
 	    C = C0
 	).
 resource_token(C0, In, C, Prefix:Name) :-
-	turtle_read_name(C0, In, C1, Prefix),
+	turtle_read_pn_local(C0, In, C1, Prefix),
 	\+ sub_atom(Prefix, 0, _, _, '_'), !,
 	C1 == 0':,
 	get_code(In, C2),
-	turtle_read_name(C2, In, C, Name).
+	turtle_read_pn_local(C2, In, C, Name).
 
 
 punctuation(0'(, '(').
