@@ -1708,7 +1708,7 @@ rdf_load_noagc(List, M, Options) :-
 	load_jobs(Count, Jobs, Options),
 	(   Jobs =:= 1
 	->  forall(member(Spec, Inputs),
-		   rdf_load(Spec, Options))
+		   rdf_load_one(Spec, M, Options))
 	;   maplist(load_goal(Options, M), Inputs, Goals),
 	    concurrent(Jobs, Goals, [])
 	).
