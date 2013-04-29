@@ -121,7 +121,6 @@
 	    rdf_match_label/3,		% +How, +String, +Label
 	    rdf_split_url/3,		% ?Base, ?Local, ?URL
 	    rdf_url_namespace/2,	% +URL, ?Base
-	    rdf_quote_uri/2,		% +URI, -Quoted
 
 	    rdf_warm_indexes/0,
 	    rdf_warm_indexes/1,		% +Indexed
@@ -2507,8 +2506,7 @@ rdf_save_header(Out, Options, OptionsOut) :-
 	nsmap(NSIdList, NsMap),
 	append(Options, [nsmap(NsMap)], OptionsOut),
 	forall(member(Id=URI, NsMap),
-	       (   rdf_quote_uri(URI, QURI),
-		   xml_quote_attribute(QURI, NSText0, Enc),
+	       (   xml_quote_attribute(URI, NSText0, Enc),
 		   xml_escape_parameter_entity(NSText0, NSText),
 		   format(Out, '~N    <!ENTITY ~w \'~w\'>', [Id, NSText])
 	       )),
@@ -2521,8 +2519,7 @@ rdf_save_header(Out, Options, OptionsOut) :-
 	),
 	(   option(base_uri(Base), Options),
 	    option(write_xml_base(true), Options, true)
-	->  rdf_quote_uri(Base, QBase),
-	    xml_quote_attribute(QBase, BaseText, Enc),
+	->  xml_quote_attribute(Base, BaseText, Enc),
 	    format(Out, '~N    xml:base="~w"~n', [BaseText])
 	;   true
 	),
@@ -3222,17 +3219,14 @@ rdf_value(Base, Base, '', _) :- !.
 rdf_value(V, Base, Text, Encoding) :-
 	atom_concat(Base, Local, V),
 	sub_atom(Local, 0, _, _, #), !,
-	rdf_quote_uri(Local, Q0),
-	xml_quote_attribute(Q0, Text, Encoding).
+	xml_quote_attribute(Local, Text, Encoding).
 rdf_value(V, _, Text, Encoding) :-
 	ns(NS, Full),
 	atom_concat(Full, Local, V), !,
-	rdf_quote_uri(Local, QLocal0),
-	xml_quote_attribute(QLocal0, QLocal, Encoding),
+	xml_quote_attribute(Local, QLocal, Encoding),
 	atomic_list_concat(['&', NS, (';'), QLocal], Text).
 rdf_value(V, _, Q, Encoding) :-
-	rdf_quote_uri(V, Q0),
-	xml_quote_attribute(Q0, Q, Encoding).
+	xml_quote_attribute(V, Q, Encoding).
 
 
 		 /*******************************
@@ -3279,16 +3273,6 @@ rdf_split_url(Prefix, Local, URL) :-
 
 rdf_url_namespace(URL, Prefix) :-
 	iri_xml_namespace(URL, Prefix).
-
-%%	rdf_quote_uri(IRI, URI) is det.
-%
-%	Quote an IRI as a URI by using %-encoding where needed.
-%
-%	@deprecated	Quoting is moved to library(uri). This predicate is
-%			mapped to uri_iri/2 (with reversed arguments).
-
-rdf_quote_uri(IRI, URI) :-
-	uri_iri(URI, IRI).
 
 
 		 /*******************************
