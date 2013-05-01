@@ -1957,18 +1957,20 @@ compat_input(http, SourceURL, url(http, SourceURL)).
 
 %%	load_graph(+SourceURL, -Graph, +Options) is det.
 %
-%	Graph is the graph into which we load the data.  Processes
-%	the graph(?Graph) option.
+%	Graph is the graph into which  we   load  the  data. Tries these
+%	options:
+%
+%	  1. The graph(Graph) option
+%	  2. The db(Graph) option (backward compatibility)
+%	  3. The base_uri(BaseURI) option
+%	  4. The source URL
 
-load_graph(Source, Graph, Options) :-
-	(   option(graph(Graph), Options)
-	->  true
-	;   option(db(Graph), Options)
-	), !,
-	(   ground(Graph)
-	->  true
-	;   load_graph(Source, Graph)
-	).
+load_graph(_Source, Graph, Options) :-
+	(   option(graph(Graph),    Options)
+	;   option(db(Graph),       Options)
+	;   option(base_uri(Graph), Options)
+	),
+	ground(Graph), !.
 load_graph(Source, Graph, _) :-
 	load_graph(Source, Graph).
 
