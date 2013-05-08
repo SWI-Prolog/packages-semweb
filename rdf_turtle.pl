@@ -143,7 +143,7 @@ rdf_read_turtle(In, Triples, Options) :-
 			   [ parse(document)
 			   | Options
 			   ]),
-	      post_options(Options, Parser)
+	      post_options(Parser, Options)
 	    ),
 	    ( destroy_turtle_parser(Parser),
 	      call(Close)
@@ -175,7 +175,7 @@ rdf_process_turtle(In, OnObject, Options) :-
 	    ( process_turtle(Parser, Stream, OnObject, Graph,
 			     [ parse(statement)
 			     ]),
-	      post_options(Options, Parser)
+	      post_options(Parser, Options)
 	    ),
 	    ( destroy_turtle_parser(Parser),
 	      call(Close)
