@@ -758,19 +758,16 @@ static int	read_predicate_object_list(turtle_state *ts);
 static int	read_object(turtle_state *ts);
 
 static turtle_state *
-new_turtle_parser(IOSTREAM *s, const wchar_t *base_uri)
+new_turtle_parser(IOSTREAM *s)
 { turtle_state *ts = malloc(sizeof(*ts));
 
   if ( ts )
   { memset(ts, 0, sizeof(*ts));
 
     ts->input	 = s;
-    if ( (ts->base_uri = wcsdup(base_uri)) &&
-	 init_hash_map(&ts->prefix_map,     INIT_PREFIX_SIZE) &&
+    if ( init_hash_map(&ts->prefix_map, INIT_PREFIX_SIZE) &&
 	 next(ts) )			/* read first character */
-    { init_base_uri(ts);
-
-      ts->rdf_type.type = R_RESOURCE;
+    { ts->rdf_type.type = R_RESOURCE;
       ts->rdf_type.v.r.name = RDF_TYPE;
 
       return ts;
@@ -2382,16 +2379,71 @@ unify_turtle_parser(term_t parser, turtle_state *ts)
 
 
 static foreign_t
-create_turtle_parser(term_t parser, term_t in, term_t base)
-{ wchar_t *base_uri;
-  IOSTREAM *stream;
+create_turtle_parser(term_t parser, term_t in, term_t options)
+{ IOSTREAM *stream;
 
-  if ( PL_get_stream_handle(in, &stream) &&
-       PL_get_wchars(base, NULL, &base_uri, CVT_ATOM|CVT_EXCEPTION) )
+  if ( PL_get_stream_handle(in, &stream) )
   { turtle_state *ts;
 
-    if ( (ts=new_turtle_parser(stream, base_uri)) )
-    { if ( unify_turtle_parser(parser, ts) )
+    if ( (ts=new_turtle_parser(stream)) )
+    { term_t opt   = PL_new_term_ref();
+      term_t arg   = PL_new_term_ref();
+      term_t opts  = PL_copy_term_ref(options);
+
+      while(PL_get_list_ex(opts, opt, opts))
+      { atom_t name;
+	int arity;
+
+	if ( PL_get_name_arity(opt, &name, &arity) )
+	{ if ( arity == 1 )
+	  { _PL_get_arg(1, opt, arg);
+
+	    if ( name == ATOM_base_uri )		/* BASE_URI */
+	    { wchar_t *base_uri;
+	      resource *r;
+
+	      if ( PL_get_wchars(arg, NULL, &base_uri, CVT_ATOM|CVT_EXCEPTION) &&
+		   (r=new_resource(ts, base_uri)) &&
+		   set_base_uri(ts, r) )
+	      { free_resource(ts, r);
+		continue;
+	      }
+
+	      return FALSE;
+	    }
+	    if ( name == ATOM_anon_prefix )		/* ANON_PREFIX */
+	    { wchar_t *prefix;
+
+	      if ( PL_get_wchars(arg, NULL, &prefix, CVT_ATOM|CVT_EXCEPTION) )
+	      { if ( (ts->bnode.prefix = wcsdup(prefix)) )
+		  continue;
+		return PL_resource_error("memory");
+	      }
+	      return FALSE;
+	    }
+	    if ( name == ATOM_on_error )
+	    { atom_t mode;
+
+	      if ( PL_get_atom_ex(arg, &mode) )
+	      { if ( mode == ATOM_error )
+		  ts->on_error = E_ERROR;
+		else if ( mode == ATOM_warning )
+		  ts->on_error = E_WARNING;
+		else
+		  return PL_domain_error("on_error_option", arg);
+
+		continue;
+	      }
+	      return FALSE;
+	    }
+	  }
+	}
+	return PL_type_error("option", opt);
+      }
+      if ( PL_exception(0) || !PL_get_nil_ex(opts) )
+	return FALSE;
+
+      if ( unify_turtle_parser(parser, ts) )
 	return TRUE;
       free_turtle_parser(ts);
       return FALSE;
@@ -2426,7 +2478,6 @@ turtle_parse(term_t parser, term_t triples, term_t options)
     term_t arg   = PL_new_term_ref();
     term_t opts  = PL_copy_term_ref(options);
     term_t count = 0;
-    term_t error_count = 0;
     int	parse_document = TRUE;
 
     while(PL_get_list_ex(opts, opt, opts))
@@ -2437,29 +2488,6 @@ turtle_parse(term_t parser, term_t triples, term_t options)
       { if ( arity == 1 )
 	{ _PL_get_arg(1, opt, arg);
 
-	  if ( name == ATOM_base_uri )			/* BASE_URI */
-	  { wchar_t *base_uri;
-	    resource *r;
-
-	    if ( PL_get_wchars(arg, NULL, &base_uri, CVT_ATOM|CVT_EXCEPTION) &&
-		 (r=new_resource(ts, base_uri)) &&
-		 set_base_uri(ts, r) )
-	    { free_resource(ts, r);
-	      continue;
-	    }
-
-	    return FALSE;
-	  }
-	  if ( name == ATOM_anon_prefix )		/* ANON_PREFIX */
-	  { wchar_t *prefix;
-
-	    if ( PL_get_wchars(arg, NULL, &prefix, CVT_ATOM|CVT_EXCEPTION) )
-	    { if ( (ts->bnode.prefix = wcsdup(prefix)) )
-		continue;
-	      return PL_resource_error("memory");
-	    }
-	    return FALSE;
-	  }
 	  if ( name == ATOM_parse )			/* PARSE */
 	  { atom_t what;
 
@@ -2475,27 +2503,7 @@ turtle_parse(term_t parser, term_t triples, term_t options)
 	    }
 	    return FALSE;
 	  }
-	  if ( name == ATOM_on_error )
-	  { atom_t mode;
-
-	    if ( PL_get_atom_ex(arg, &mode) )
-	    { if ( mode == ATOM_error )
-		ts->on_error = E_ERROR;
-	      else if ( mode == ATOM_warning )
-		ts->on_error = E_WARNING;
-	      else
-		return PL_domain_error("on_error_option", arg);
-
-	      continue;
-	    }
-	    return FALSE;
-
-	  }
 	  if ( name == ATOM_count )			/* COUNT */
-	  { count = PL_copy_term_ref(arg);
-	    continue;
-	  }
-	  if ( name == ATOM_error_count )		/* ERROR_COUNT */
 	  { count = PL_copy_term_ref(arg);
 	    continue;
 	  }
@@ -2504,14 +2512,13 @@ turtle_parse(term_t parser, term_t triples, term_t options)
 
       return PL_type_error("option", opt);
     }
+    if ( PL_exception(0) || !PL_get_nil_ex(opts) )
+      return FALSE;
 
     if ( !count )
     { ts->head = PL_new_term_ref();
       ts->tail = tail;
     }
-
-    if ( PL_exception(0) || !PL_get_nil_ex(opts) )
-      return FALSE;
 
     if ( parse_document )
     { do
@@ -2529,8 +2536,6 @@ turtle_parse(term_t parser, term_t triples, term_t options)
     ts->tail = 0;
 
     if ( count && !PL_unify_int64(count, (int64_t)ts->count) )
-      return FALSE;
-    if ( error_count && !PL_unify_int64(error_count, (int64_t)ts->error_count) )
       return FALSE;
 
     return PL_unify_nil(tail);
@@ -2582,6 +2587,18 @@ turtle_base(term_t parser, term_t base)
 }
 
 
+static foreign_t
+turtle_error_count(term_t parser, term_t count)
+{ turtle_state *ts;
+
+  if ( get_turtle_parser(parser, &ts) )
+  { return PL_unify_int64(count, ts->error_count);
+  }
+
+  return FALSE;
+}
+
+
 		 /*******************************
 		 *	      REGISTER		*
 		 *******************************/
@@ -2622,4 +2639,5 @@ install_turtle_parser(void)
   PL_register_foreign("turtle_parse",          3, turtle_parse,          0);
   PL_register_foreign("turtle_prefixes",       2, turtle_prefixes,       0);
   PL_register_foreign("turtle_base",           2, turtle_base,           0);
+  PL_register_foreign("turtle_error_count",    2, turtle_error_count,    0);
 }
