@@ -67,7 +67,7 @@ static atom_t ATOM_warning;
 
 #define RDF_TYPE    (RDF_NS L"type")
 #define RDF_FIRST   (RDF_NS L"first")
-#define RDF_NEXT    (RDF_NS L"next")
+#define RDF_REST    (RDF_NS L"rest")
 #define RDF_NIL     (RDF_NS L"nil")
 #define XSD_INTEGER (XSD_NS L"integer")
 #define XSD_DECIMAL (XSD_NS L"decimal")
@@ -149,7 +149,7 @@ typedef struct turtle_state
   resource     *current_predicate;
   resource      rdf_type;		/* built-in "a" */
   resource      rdf_first;		/* rdf:first for collections */
-  resource      rdf_next;		/* rdf:next for collections */
+  resource      rdf_rest;		/* rdf:rest for collections */
   resource      rdf_nil;		/* rdf:nil for collections */
   resource      xsd_integer;		/* xsd:integer for numerical literals */
   resource      xsd_decimal;		/* xsd:integer for decimal literals */
@@ -712,13 +712,13 @@ resolve_iri(turtle_state *ts, wchar_t *prefix, wchar_t *local)
 static resource *
 make_absolute_resource(turtle_state *ts, const wchar_t *uri)
 { const wchar_t *s;
-  size_t len;
+  size_t len, plen;
   wchar_t *name;
 
-  if ( !uri[0] )
+  if ( !uri[0] )			/* <> */
     return new_resource(ts, ts->base_uri);
 
-  if ( is_scheme_char(uri[0]) )
+  if ( is_scheme_char(uri[0]) )		/* absolute uri */
   { for(s=&uri[1]; *s && is_scheme_char(*s); s++)
       ;
     if ( *s == ':' )
@@ -726,12 +726,18 @@ make_absolute_resource(turtle_state *ts, const wchar_t *uri)
   }
 
   len = wcslen(uri);
-  if ( (name = malloc((ts->base_uri_base_len+len+1)*sizeof(wchar_t))) )
+
+  if ( uri[0] == '#' )			/* relative to file */
+    plen = ts->base_uri_len;
+  else
+    plen = ts->base_uri_base_len;
+
+  if ( (name = malloc((plen+len+1)*sizeof(wchar_t))) )
   { resource *r;
 
     if ( (r=malloc(sizeof(*r))) )
-    { wcsncpy(name, ts->base_uri, ts->base_uri_base_len);
-      wcscpy(name+ts->base_uri_base_len, uri);
+    { wcsncpy(name, ts->base_uri, plen);
+      wcscpy(name+plen, uri);
 
       r->type = R_RESOURCE;
       r->v.r.name = name;
@@ -754,7 +760,7 @@ make_absolute_resource(turtle_state *ts, const wchar_t *uri)
 
 static void	clear_turtle_parser(turtle_state *ts);
 static int	init_base_uri(turtle_state *ts);
-static int	read_predicate_object_list(turtle_state *ts);
+static int	read_predicate_object_list(turtle_state *ts, int end);
 static int	read_object(turtle_state *ts);
 
 static turtle_state *
@@ -789,12 +795,14 @@ clear_turtle_parser(turtle_state *ts)
   clear_hash_table(&ts->blank_node_map);
   clear_handle_resource(&ts->rdf_type);
   clear_handle_resource(&ts->rdf_first);
-  clear_handle_resource(&ts->rdf_next);
+  clear_handle_resource(&ts->rdf_rest);
   clear_handle_resource(&ts->rdf_nil);
   clear_handle_resource(&ts->xsd_integer);
   clear_handle_resource(&ts->xsd_decimal);
   clear_handle_resource(&ts->xsd_double);
   clear_handle_resource(&ts->xsd_boolean);
+
+  memset(ts, 0, sizeof(*ts));
 }
 
 
@@ -1081,7 +1089,7 @@ got_next_triple(turtle_state *ts, resource *prev, resource *next)
   o.type = O_RESOURCE;
   o.value.r = next;
 
-  return got_triple(ts, prev, &ts->rdf_next, &o);
+  return got_triple(ts, prev, &ts->rdf_rest, &o);
 }
 
 
@@ -1357,7 +1365,7 @@ read_pn_prefix(turtle_state *ts, string_buffer *b)
 
 static int
 pn_local_start(int c)
-{ return ( wcis_pn_chars_base(c) ||
+{ return ( wcis_pn_chars_u(c) ||
 	   c == ':' ||
 	   is_digit(c) );
 }
@@ -1408,8 +1416,8 @@ static void
 init_collection_resources(turtle_state *ts)
 { ts->rdf_first.type	 = R_RESOURCE;
   ts->rdf_first.v.r.name = RDF_FIRST;
-  ts->rdf_next.type	 = R_RESOURCE;
-  ts->rdf_next.v.r.name	 = RDF_NEXT;
+  ts->rdf_rest.type	 = R_RESOURCE;
+  ts->rdf_rest.v.r.name	 = RDF_REST;
   ts->rdf_nil.type	 = R_RESOURCE;
   ts->rdf_nil.v.r.name	 = RDF_NIL;
 }
@@ -1478,7 +1486,7 @@ read_blank_node_property_list(turtle_state *ts)
 
   rc = ( set_anon_subject(ts, &olds) &&
 	 set_predicate(ts, NULL, &oldp) &&
-	 read_predicate_object_list(ts)
+	 read_predicate_object_list(ts, ']')
        );
   set_subject(ts, olds, &bnode);
   set_predicate(ts, oldp, NULL);
@@ -1614,9 +1622,9 @@ read_iri(turtle_state *ts, int flags)
 	} else if ( (flags&IRI_VERB) && wcscmp(baseBuf(&pn_prefix), L"a") == 0 )
 	{ return &ts->rdf_type;
 	} else if ( (flags&IRI_BOOL) )
-	{ if ( wcscmp(baseBuf(&pn_prefix), L"true") )
+	{ if ( wcscmp(baseBuf(&pn_prefix), L"true") == 0 )
 	    return LITERAL_TRUE;
-	  else if ( wcscmp(baseBuf(&pn_prefix), L"false") )
+	  else if ( wcscmp(baseBuf(&pn_prefix), L"false") == 0 )
 	    return LITERAL_FALSE;
 	}
       }
@@ -1639,7 +1647,7 @@ read_verb(turtle_state *ts)
 
 
 static int
-read_echar(turtle_state *ts, int *cp)
+read_echar_or_uchar(turtle_state *ts, int *cp)
 { if ( next(ts) )
   { switch(ts->current_char)
     { case 't':   *cp = '\t'; return TRUE;
@@ -1650,6 +1658,8 @@ read_echar(turtle_state *ts, int *cp)
       case '\\':  *cp = '\\'; return TRUE;
       case '"':   *cp = '\"'; return TRUE;
       case '\'':  *cp = '\''; return TRUE;
+      case 'u':   return read_hex(ts, 4, cp);
+      case 'U':   return read_hex(ts, 8, cp);
       default:
 	return syntax_error(ts, "Illegal \\-escape in string");
     }
@@ -1666,23 +1676,23 @@ read_short_string(turtle_state *ts, int q, string_buffer *text)
     { case 0x0a:
       case 0x0d:
 	return syntax_error(ts, "Illegal character in string");
+      case -1:
+	return syntax_error(ts, "End-of-file in string");
       case '\\':
       { int c;
 
-	if ( read_echar(ts, &c) )
+	if ( read_echar_or_uchar(ts, &c) )
 	{ addBuf(text, c);
 	  continue;
 	}
 	return FALSE;
       }
       default:
-	if ( wcis_pn_chars_u(ts->current_char) )
-	{ addBuf(text, ts->current_char);
-	} else if ( ts->current_char == q )
+	if ( ts->current_char == q )
 	{ addBuf(text, EOS);
 	  return next(ts);
 	} else
-	{ return syntax_error(ts, "Illegal character in string");
+	{ addBuf(text, ts->current_char);
 	}
     }
   } while(next(ts));
@@ -1698,16 +1708,16 @@ read_long_string(turtle_state *ts, int q, string_buffer *text)
     { case '\\':
       { int c;
 
-	if ( read_echar(ts, &c) )
+	if ( read_echar_or_uchar(ts, &c) )
 	{ addBuf(text, c);
 	  continue;
 	}
 	return FALSE;
       }
+      case -1:
+	return syntax_error(ts, "End-of-file in long string");
       default:
-	if ( wcis_pn_chars_u(ts->current_char) )
-	{ addBuf(text, ts->current_char);
-	} else if ( ts->current_char == q )	/* one */
+	if ( ts->current_char == q )		/* one */
 	{ if ( !next(ts) ) return FALSE;
 	  if ( ts->current_char == q )		/* two */
 	  { if ( !next(ts) ) return FALSE;
@@ -1724,7 +1734,7 @@ read_long_string(turtle_state *ts, int q, string_buffer *text)
 
 	  addBuf(text, ts->current_char);
 	} else
-	{ return syntax_error(ts, "Illegal character in long string");
+	{ addBuf(text, ts->current_char);
 	}
     }
   } while(next(ts));
@@ -1892,7 +1902,7 @@ read_object(turtle_state *ts)
       if ( !(next(ts) && skip_ws(ts)) )
 	return FALSE;
       if ( ts->current_char == ']' )
-	return got_anon_triple(ts);
+	return next(ts) && got_anon_triple(ts);
       else if ( (r=read_blank_node_property_list(ts)) )
 	return got_resource_triple(ts, r);
       return FALSE;
@@ -2002,7 +2012,7 @@ read_object_list(turtle_state *ts)
 
 
 static int
-read_predicate_object_list(turtle_state *ts)
+read_predicate_object_list(turtle_state *ts, int end)
 { for(;;)
   { if ( !read_verb(ts)	||
 	 !read_object_list(ts) ||
@@ -2010,9 +2020,11 @@ read_predicate_object_list(turtle_state *ts)
       return FALSE;
 
     if ( ts->current_char == ';' )
-    { if ( next(ts) )
+    { if ( next(ts) && skip_ws(ts) )
+      { if ( ts->current_char == end )
+	  return TRUE;
 	continue;
-      else
+      } else
 	return FALSE;
     }
 
@@ -2157,7 +2169,7 @@ sparql_prefix_directive(turtle_state *ts)
 
 static int
 final_predicate_object_list(turtle_state *ts)
-{ return ( read_predicate_object_list(ts) &&
+{ return ( read_predicate_object_list(ts, '.') &&
 	   read_end_of_clause(ts) );
 }
 
@@ -2182,11 +2194,20 @@ statement(turtle_state *ts)
       return FALSE;
     }
     case '[':
-    { if ( !skip_ws(ts) )
+    { resource *r;
+
+      if ( !next(ts) || !skip_ws(ts) )
 	return FALSE;
       if ( ts->current_char == ']' )
       { if ( !set_anon_subject(ts, NULL) )
 	  return FALSE;
+	return next(ts) && final_predicate_object_list(ts);
+      } else if ( (r=read_blank_node_property_list(ts)) )
+      { if ( !skip_ws(ts) )
+	  return FALSE;
+	if ( ts->current_char == '.' )
+	  return read_end_of_clause(ts);
+	set_subject(ts, r, NULL);
 	return final_predicate_object_list(ts);
       }
       return syntax_error(ts, "Illegal subject (expected \"]\")");
@@ -2469,7 +2490,7 @@ destroy_turtle_parser(term_t parser)
 { turtle_state *ts;
 
   if ( get_turtle_parser(parser, &ts) )
-  { free_turtle_parser(ts);
+  { clear_turtle_parser(ts);
 
     return TRUE;
   }
