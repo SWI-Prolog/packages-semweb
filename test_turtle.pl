@@ -89,14 +89,12 @@ test_turtle(File) :-
 
 %%	blocked(?Test)
 %
-%	True if Test is blocked.  Currently blocked:
-%
-%	    $ test-28.ttl :
-%	    Test numbers.  I don't understand this test and I don't
-%	    understand the *three* files: test-28.ttl, test-28.out
-%	    and test-28.out.ttl.
+%	True if Test is blocked.
 
-blocked('test-28.ttl').
+:- dynamic
+	blocked/1.
+
+%blocked('test-28.ttl').
 
 
 %:- debug(test_turtle).
