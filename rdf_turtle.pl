@@ -31,7 +31,11 @@
 :- module(rdf_turtle,
 	  [ rdf_load_turtle/3,		% +Input, -Triples, +Options
 	    rdf_read_turtle/3,		% +Input, -Triples, +Options
-	    rdf_process_turtle/3	% +Input, :OnObject, +Options
+	    rdf_process_turtle/3,	% +Input, :OnObject, +Options
+
+	    turtle_pn_local/1,		% +Atom
+	    turtle_write_uri/2,		% +Stream, +IRI
+	    turtle_write_quoted_string/2 % +Stream, +Atom
 	  ]).
 :- use_module(library(option)).
 :- use_module(library(semweb/rdf_db)).
@@ -66,7 +70,7 @@
 		       resources(oneof([uri,iri]))
 		     ]).
 
-:- use_foreign_library(foreign(turtle_parser)).
+:- use_foreign_library(foreign(turtle)).
 
 /** <module> Turtle: Terse RDF Triple Language
 
@@ -287,6 +291,26 @@ name_uri(Name, BaseURI) :-
 	uri_normalized(Name, BaseURI).
 name_uri(Name, BaseURI) :-
 	uri_file_name(BaseURI, Name).
+
+
+		 /*******************************
+		 *	    WRITE SUPPORT	*
+		 *******************************/
+
+%%	turtle_pn_local(+Atom:atom) is semidet.
+%
+%	True if Atom is a valid Turtle name.
+%
+%	@see xml_name/2.
+
+%%	turtle_write_quoted_string(+Out, +Value) is det.
+%
+%	Write a string as =|"..."|=
+
+
+%%	turtle_write_uri(+Out, +Value) is det.
+%
+%	Write a URI as =|<...>|=
 
 
 		 /*******************************

@@ -33,7 +33,7 @@
 	    rdf_save_canonical_turtle/2	% +File, +Options
 	  ]).
 :- use_module(library(semweb/rdf_db)).
-:- use_module(library(semweb/turtle_base)).
+:- use_module(library(semweb/rdf_turtle)).
 :- use_module(library(option)).
 :- use_module(library(record)).
 :- use_module(library(error)).
