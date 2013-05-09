@@ -91,18 +91,12 @@ test_turtle(File) :-
 %
 %	True if Test is blocked.  Currently blocked:
 %
-%	    $ test-29.ttl :
-%	    URI test.  Contains ...%&...  Should or shouldn't we
-%	    do %-decoding!?  Surely there are datasets our there
-%	    that expect us to do so.
-%
 %	    $ test-28.ttl :
 %	    Test numbers.  I don't understand this test and I don't
 %	    understand the *three* files: test-28.ttl, test-28.out
 %	    and test-28.out.ttl.
 
 blocked('test-28.ttl').
-blocked('test-29.ttl').
 
 
 %:- debug(test_turtle).
