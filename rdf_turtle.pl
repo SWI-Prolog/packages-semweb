@@ -29,13 +29,14 @@
 */
 
 :- module(rdf_turtle,
-	  [ rdf_load_turtle/3,		% +Input, -Triples, +Options
-	    rdf_read_turtle/3,		% +Input, -Triples, +Options
-	    rdf_process_turtle/3,	% +Input, :OnObject, +Options
+	  [ rdf_load_turtle/3,			% +Input, -Triples, +Options
+	    rdf_read_turtle/3,			% +Input, -Triples, +Options
+	    rdf_process_turtle/3,		% +Input, :OnObject, +Options
 
-	    turtle_pn_local/1,		% +Atom
-	    turtle_write_uri/2,		% +Stream, +IRI
-	    turtle_write_quoted_string/2 % +Stream, +Atom
+	    turtle_pn_local/1,			% +Atom
+	    turtle_write_uri/2,			% +Stream, +IRI
+	    turtle_write_quoted_string/2,	% +Stream, +Atom
+	    turtle_write_quoted_string/3	% +Stream, +Atom, +WriteLong
 	  ]).
 :- use_module(library(option)).
 :- use_module(library(semweb/rdf_db)).
@@ -299,14 +300,39 @@ name_uri(Name, BaseURI) :-
 
 %%	turtle_pn_local(+Atom:atom) is semidet.
 %
-%	True if Atom is a valid Turtle name.
+%	True if Atom is a  valid   Turtle  _PN_LOCAL_ name. The PN_LOCAL
+%	name is what can follow the : in  a resource. In the new Turtle,
+%	this can be anything and this   function becomes meaningless. In
+%	the old turtle, PN_LOCAL is defined   similar (but not equal) to
+%	an XML name. This predicate  is   used  by  rdf_save_turtle/2 to
+%	write files such that can be read by old parsers.
 %
 %	@see xml_name/2.
 
+%%	turtle_write_quoted_string(+Out, +Value, ?WriteLong) is det.
+%
+%	Write Value (an atom)  as  a   valid  Turtle  string.  WriteLong
+%	determines wether the string is written   as a _short_ or _long_
+%	string.  It takes the following values:
+%
+%	  * true
+%	  Use Turtle's long string syntax. Embeded newlines and
+%	  single or double quotes are are emitted verbatim.
+%	  * false
+%	  Use Turtle's shotr string syntax.
+%	  * Var
+%	  If WriteLong is unbound, this predicate uses long syntax
+%	  if newlines appear in the string and short otherwise.  WriteLong
+%	  is unified with the decision taken.
+
 %%	turtle_write_quoted_string(+Out, +Value) is det.
 %
-%	Write a string as =|"..."|=
+%	Same as turtle_write_quoted_string(Out, Value, false), writing a
+%	string with only a single =|"|=.   Embedded newlines are escapes
+%	as =|\n|=.
 
+turtle_write_quoted_string(Out, Text) :-
+	turtle_write_quoted_string(Out, Text, false).
 
 %%	turtle_write_uri(+Out, +Value) is det.
 %

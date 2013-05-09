@@ -2887,35 +2887,108 @@ ttl_put_scharacter(IOSTREAM *s, int c)
 }
 
 
-static foreign_t
-turtle_write_quoted_string(term_t Stream, term_t Value)
-{ size_t len;
-  char *s;
-  pl_wchar_t *w;
-  IOSTREAM *out;
+static void
+write_long_q(IOSTREAM *out)
+{ Sputcode('"', out);
+  Sputcode('"', out);
+  Sputcode('"', out);
+}
 
+static foreign_t
+turtle_write_quoted_string(term_t Stream, term_t Value, term_t wlong)
+{ size_t len;
+  char *textA;
+  pl_wchar_t *textW;
+  IOSTREAM *out;
+  int vwlong;
+  int write_long = -1;
+
+  if ( !(vwlong=PL_is_variable(wlong)) && !PL_get_bool_ex(wlong, &write_long) )
+    return FALSE;
   if ( !PL_get_stream_handle(Stream, &out) )
     return FALSE;
 
-  if ( PL_get_nchars(Value, &len, &s, CVT_ATOM|CVT_STRING) )
-  { const char *e = &s[len];
+  if ( PL_get_nchars(Value, &len, &textA, CVT_ATOM|CVT_STRING) )
+  { const char *e = &textA[len];
+    const char *s;
 
-    Sputcode('"', out);
-    for(; s<e; s++)
-    { if ( ttl_put_scharacter(out, s[0]&0xff) < 0 )
-	break;
+    if ( write_long == -1 )
+    { for(s=textA; s<e; s++)
+      { if ( *s == '\r' || *s == '\n' )
+	{ write_long = TRUE;
+	  break;
+	}
+      }
+      if ( write_long == -1 )
+	write_long = FALSE;
     }
-    Sputcode('"', out);
+
+    if ( vwlong && !PL_unify_bool(wlong, write_long) )
+    { PL_release_stream(out);
+      return FALSE;
+    }
+
+    if ( write_long )
+    { write_long_q(out);
+      for(s=textA; s<e; s++)
+      { if ( *s == '"' && ((s+1<e && s[1] != '"') || (s+2<e && s[2] != '"')) )
+	  Sputcode('"', out);
+	else if ( *s == '\n' || *s == '\r' )
+	  Sputcode(*s, out);
+	else if ( ttl_put_scharacter(out, s[0]&0xff) < 0 )
+	  break;
+      }
+      write_long_q(out);
+    } else
+    { Sputcode('"', out);
+      for(s=textA; s<e; s++)
+      { if ( ttl_put_scharacter(out, s[0]&0xff) < 0 )
+	  break;
+      }
+      Sputcode('"', out);
+    }
+
     return PL_release_stream(out);
-  } else if ( PL_get_wchars(Value, &len, &w, CVT_ATOM|CVT_EXCEPTION) )
-  { const pl_wchar_t *e = &w[len];
+  } else if ( PL_get_wchars(Value, &len, &textW, CVT_ATOM|CVT_EXCEPTION) )
+  { const pl_wchar_t *e = &textW[len];
+    const pl_wchar_t *w;
 
-    Sputcode('"', out);
-    for(; w<e; w++)
-    { if ( ttl_put_scharacter(out, w[0]) < 0 )
-	break;
+    if ( write_long == -1 )
+    { for(w=textW; w<e; w++)
+      { if ( *w == '\r' || *w == '\n' )
+	{ write_long = TRUE;
+	  break;
+	}
+      }
+      if ( write_long == -1 )
+	write_long = FALSE;
     }
-    Sputcode('"', out);
+
+    if ( vwlong && !PL_unify_bool(wlong, write_long) )
+    { PL_release_stream(out);
+      return FALSE;
+    }
+
+    if ( write_long )
+    { write_long_q(out);
+      for(w=textW; w<e; w++)
+      { if ( *w == '"' && ((w+1<e && w[1] != '"') || (w+2<e && w[2] != '"')) )
+	  Sputcode('"', out);
+	else if ( *w == '\n' || *w == '\r' )
+	  Sputcode(*w, out);
+	else if ( ttl_put_scharacter(out, w[0]) < 0 )
+	  break;
+      }
+      write_long_q(out);
+    } else
+    { Sputcode('"', out);
+      for(w=textW; w<e; w++)
+      { if ( ttl_put_scharacter(out, w[0]) < 0 )
+	  break;
+      }
+      Sputcode('"', out);
+    }
+
     return PL_release_stream(out);
   } else
   { PL_release_stream(out);
@@ -3022,5 +3095,5 @@ install_turtle(void)
   PL_register_foreign("turtle_pn_local",       1, turtle_pn_local,       0);
   PL_register_foreign("turtle_write_uri",      2, turtle_write_uri,      0);
   PL_register_foreign("turtle_write_quoted_string",
-					    2, turtle_write_quoted_string, 0);
+					    3, turtle_write_quoted_string, 0);
 }
