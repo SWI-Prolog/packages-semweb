@@ -134,39 +134,34 @@ syntax_error(IOSTREAM *in, const char *msg)
 }
 
 
-
 		 /*******************************
 		 *	       BUFFER		*
 		 *******************************/
 
+#ifdef STRING_BUF_DEBUG
+#define FAST_BUF_SIZE 1
+#else
 #define FAST_BUF_SIZE 512
+#endif
 
 typedef struct string_buffer
-{ pl_wchar_t fast[FAST_BUF_SIZE];
-  pl_wchar_t *buf;
-  pl_wchar_t *in;
-  pl_wchar_t *end;
+{ wchar_t fast[FAST_BUF_SIZE];
+  wchar_t *buf;
+  wchar_t *in;
+  wchar_t *end;
+#ifdef STRING_BUF_DEBUG
+  int	   discarded;
+#endif
 } string_buffer;
 
-#define initBuf(b)   { (b)->buf = (b)->fast; \
-		       (b)->in  = (b)->buf; \
-		       (b)->end = &(b)->fast[FAST_BUF_SIZE]; \
-		     }
-#define addBuf(b,c)  ( (b)->in < (b)->end ? (*(b)->in++ = (c)) \
-					  : growBuffer(b, c) )
-
-#define bufSize(b)   ( (b)->in - (b)->buf )
-#define baseBuf(b)   ( (b)->buf )
-
-#define discardBuf(b) if ( (b)->buf != (b)->fast ) free((b)->buf)
 
 static int
 growBuffer(string_buffer *b, int c)
 { if ( b->buf == b->fast )
-  { pl_wchar_t *new = malloc((FAST_BUF_SIZE*2)*sizeof(pl_wchar_t));
+  { wchar_t *new = malloc((FAST_BUF_SIZE*2)*sizeof(wchar_t));
 
     if ( new )
-    { memcpy(new, b->fast, (FAST_BUF_SIZE*2)*sizeof(pl_wchar_t));
+    { memcpy(new, b->fast, sizeof(b->fast));
       b->buf = new;
       b->in  = b->buf+FAST_BUF_SIZE;
       b->end = b->in+FAST_BUF_SIZE;
@@ -176,12 +171,13 @@ growBuffer(string_buffer *b, int c)
     }
   } else
   { size_t sz = b->end - b->buf;
-    pl_wchar_t *new = realloc(b->buf, sz*sizeof(pl_wchar_t)*2);
+    wchar_t *new = realloc(b->buf, sz*sizeof(wchar_t)*2);
 
     if ( new )
     { b->buf = new;
       b->in  = new+sz;
       b->end = b->in+sz;
+      *b->in++ = c;
 
       return c;
     }
@@ -192,6 +188,46 @@ growBuffer(string_buffer *b, int c)
 }
 
 
+static inline void
+initBuf(string_buffer *b)
+{ b->buf = b->fast;
+  b->in  = b->buf;
+  b->end = &b->fast[FAST_BUF_SIZE];
+#ifdef STRING_BUF_DEBUG
+  b->discarded = FALSE;
+#endif
+}
+
+
+static inline void
+discardBuf(string_buffer *b)
+{
+#ifdef STRING_BUF_DEBUG
+  assert(b->discarded == FALSE);
+  b->discarded = TRUE;
+#endif
+  if ( b->buf != b->fast )
+    free(b->buf);
+}
+
+
+static inline int
+addBuf(string_buffer *b, int c)
+{ if ( b->in < b->end )
+  { *b->in++ = c;
+    return c;
+  }
+
+  return growBuffer(b, c);
+}
+
+
+static inline int
+bufSize(string_buffer *b)
+{ return b->in - b->buf;
+}
+
+#define baseBuf(b)   ( (b)->buf )
 
 
 		 /*******************************
