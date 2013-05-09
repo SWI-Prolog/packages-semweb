@@ -74,6 +74,7 @@ test_turtle :-
 	this_dir(Dir),
 	atom_concat(Dir, '/Tests/Turtle', TestDir),
 	test_dir(TestDir),
+	garbage_collect_atoms,			% leak checks
 	(   error(_)
 	->  fail
 	;   aggregate_all(count, passed(_), Passed),
