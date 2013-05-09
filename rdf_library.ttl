@@ -47,8 +47,8 @@ lib:blankNodes
 	a owl:OntologyProperty ;
 	rdfs:domain lib:Ontology ;
 	rdfs:range rdfs:Literal ;
-	rdfs:comment "How to handle identical blank notes.
-		      One of 'share' or 'noshare'" .
+	rdfs:comment """How to handle identical blank notes.
+		        One of 'share' or 'noshare'""" .
 
 lib:source
 	a owl:OntologyProperty ;
@@ -86,5 +86,5 @@ lib:namespace
 	a rdfs:Property ;
 	rdfs:subPropertyOf vann:preferredNamespaceUri ;
 	rdfs:domain lib:Namespace ;
-	rdfs:comment "lib:namespace is a resource; vann:preferredNamespaceUri
-		      is a literal" .
+	rdfs:comment """lib:namespace is a resource; vann:preferredNamespaceUri
+		        is a literal""" .
