@@ -79,6 +79,8 @@ static atom_t ATOM_warning;
 		 *	 DATA STRUCTURES	*
 		 *******************************/
 
+#define FAST_URI 128			/* Avoid malloc for shorted ones */
+
 typedef enum resource_type
 { R_BNODE,
   R_RESOURCE
@@ -96,12 +98,15 @@ typedef enum error_mode
 
 typedef struct resource
 { resource_type  type;
+  int		 constant;		/* read-only constant */
   union
   { struct
     { wchar_t   *name;			/* Name of the IRI */
-      atom_t	 handle;		/* handle to Prolog atom */
+      atom_t	 handle;		/* Handle to Prolog atom */
+      wchar_t	 fast[FAST_URI];	/* Buffer for short URIs */
     } r;
     size_t bnode_id;
+    struct resource *next;		/* Next in free list */
   } v;
 } resource;
 
@@ -134,9 +139,9 @@ typedef struct hash_map
 
 typedef struct turtle_state
 { wchar_t      *base_uri;		/* Base URI for <> */
-  wchar_t      *empty_prefix;		/* Empty :local */
   size_t	base_uri_len;		/* Length of base uri */
   size_t	base_uri_base_len;	/* Length upto last / */
+  wchar_t      *empty_prefix;		/* Empty :local */
   hash_map	prefix_map;		/* Prefix --> IRI */
   hash_map	blank_node_map;		/* Name --> resource */
   size_t	bnode_id;		/* Blank node identifiers */
@@ -147,14 +152,7 @@ typedef struct turtle_state
   } bnode;
   resource     *current_subject;
   resource     *current_predicate;
-  resource      rdf_type;		/* built-in "a" */
-  resource      rdf_first;		/* rdf:first for collections */
-  resource      rdf_rest;		/* rdf:rest for collections */
-  resource      rdf_nil;		/* rdf:nil for collections */
-  resource      xsd_integer;		/* xsd:integer for numerical literals */
-  resource      xsd_decimal;		/* xsd:integer for decimal literals */
-  resource      xsd_double;		/* xsd:integer for double literals */
-  resource      xsd_boolean;		/* xsd:boolean for true/false */
+  resource     *free_resources;		/* Recycle resources */
   IOSTREAM     *input;			/* Our input */
   int		current_char;		/* Current character */
   error_mode	on_error;		/* E_* */
@@ -171,31 +169,50 @@ typedef enum
   NUM_DOUBLE
 } number_type;
 
+#define RES_CONST(uri) { R_RESOURCE, TRUE, {{ uri, 0, {0} }} }
+
+#define	RDF_TYPE_INDEX	  0
+#define	RDF_FIRST_INDEX	  1
+#define	RDF_REST_INDEX	  2
+#define	RDF_NIL_INDEX	  3
+#define	XSD_INTEGER_INDEX 4
+#define	XSD_DECIMAL_INDEX 5
+#define	XSD_DOUBLE_INDEX  6
+#define	XSD_BOOLEAN_INDEX 7
+
+#define RESOURCE(name) (&resource_constants[name ## _INDEX])
+
+static resource resource_constants[] =
+{ RES_CONST(RDF_TYPE),		/* 0 */
+  RES_CONST(RDF_FIRST),		/* 1 */
+  RES_CONST(RDF_REST),		/* 2 */
+  RES_CONST(RDF_NIL),		/* 3 */
+  RES_CONST(XSD_INTEGER),	/* 4 */
+  RES_CONST(XSD_DECIMAL),	/* 5 */
+  RES_CONST(XSD_DOUBLE),	/* 6 */
+  RES_CONST(XSD_BOOLEAN)	/* 7 */
+};
 
 		 /*******************************
 		 *	       BUFFER		*
 		 *******************************/
 
+#ifdef STRING_BUF_DEBUG
+#define FAST_BUF_SIZE 1
+#else
 #define FAST_BUF_SIZE 512
+#endif
 
 typedef struct string_buffer
 { wchar_t fast[FAST_BUF_SIZE];
   wchar_t *buf;
   wchar_t *in;
   wchar_t *end;
+#ifdef STRING_BUF_DEBUG
+  int	   discarded;
+#endif
 } string_buffer;
 
-#define initBuf(b)   { (b)->buf = (b)->fast; \
-		       (b)->in  = (b)->buf; \
-		       (b)->end = &(b)->fast[FAST_BUF_SIZE]; \
-		     }
-#define addBuf(b,c)  ( (b)->in < (b)->end ? (*(b)->in++ = (c)) \
-					  : growBuffer(b, c) )
-
-#define bufSize(b)   ( (b)->in - (b)->buf )
-#define baseBuf(b)   ( (b)->buf )
-
-#define discardBuf(b) if ( (b)->buf != (b)->fast ) free((b)->buf)
 
 static int
 growBuffer(string_buffer *b, int c)
@@ -203,7 +220,7 @@ growBuffer(string_buffer *b, int c)
   { wchar_t *new = malloc((FAST_BUF_SIZE*2)*sizeof(wchar_t));
 
     if ( new )
-    { memcpy(new, b->fast, (FAST_BUF_SIZE*2)*sizeof(wchar_t));
+    { memcpy(new, b->fast, sizeof(b->fast));
       b->buf = new;
       b->in  = b->buf+FAST_BUF_SIZE;
       b->end = b->in+FAST_BUF_SIZE;
@@ -219,6 +236,7 @@ growBuffer(string_buffer *b, int c)
     { b->buf = new;
       b->in  = new+sz;
       b->end = b->in+sz;
+      *b->in++ = c;
 
       return c;
     }
@@ -227,6 +245,49 @@ growBuffer(string_buffer *b, int c)
   PL_resource_error("memory");
   return 0;
 }
+
+
+static inline void
+initBuf(string_buffer *b)
+{ b->buf = b->fast;
+  b->in  = b->buf;
+  b->end = &b->fast[FAST_BUF_SIZE];
+#ifdef STRING_BUF_DEBUG
+  b->discarded = FALSE;
+#endif
+}
+
+
+static inline void
+discardBuf(string_buffer *b)
+{
+#ifdef STRING_BUF_DEBUG
+  assert(b->discarded == FALSE);
+  b->discarded = TRUE;
+#endif
+  if ( b->buf != b->fast )
+    free(b->buf);
+}
+
+
+static inline int
+addBuf(string_buffer *b, int c)
+{ if ( b->in < b->end )
+  { *b->in++ = c;
+    return c;
+  }
+
+  return growBuffer(b, c);
+}
+
+
+static inline int
+bufSize(string_buffer *b)
+{ return b->in - b->buf;
+}
+
+#define baseBuf(b)   ( (b)->buf )
+
 
 		 /*******************************
 		 *	CHARACTER CLASSES	*
@@ -374,6 +435,8 @@ clear_hash_table(hash_map *hm)
       free_hash_cell(c);
     }
   }
+
+  free(hm->entries);
 }
 
 
@@ -570,21 +633,54 @@ next(turtle_state *ts)
 		 *	     RESOURCES		*
 		 *******************************/
 
+static void	free_resource(turtle_state *ts, resource *r);
+
+static resource *
+alloc_resource(turtle_state *ts)
+{ resource *r;
+
+  if ( (r=ts->free_resources) )
+  { ts->free_resources = r->v.next;
+    return r;
+  }
+
+  if ( (r=malloc(sizeof(*r))) )
+    r->constant = FALSE;
+  else
+    PL_resource_error("memory");
+
+  return r;
+}
+
+
+static resource *
+set_uri_resource(turtle_state *ts, resource *r, const wchar_t *iri)
+{ size_t len = wcslen(iri);
+
+  r->type = R_RESOURCE;
+  r->v.r.handle = 0;
+
+  if ( len < FAST_URI )
+  { wcscpy(r->v.r.fast, iri);
+    r->v.r.name = r->v.r.fast;
+  } else
+  { if ( !(r->v.r.name = wcsdup(iri)) )
+    { free_resource(ts, r);
+      PL_resource_error("memory");
+      return NULL;
+    }
+  }
+
+  return r;
+}
+
+
 static resource *
 new_resource(turtle_state *ts, const wchar_t *iri)
 { resource *r;
 
-  if ( (r=malloc(sizeof(*r))) )
-  { r->type = R_RESOURCE;
-
-    if ( (r->v.r.name = wcsdup(iri)) )
-    { r->v.r.handle = 0;
-
-      return r;
-    }
-
-    free(r);
-  }
+  if ( (r=alloc_resource(ts)) )
+    return set_uri_resource(ts, r, iri);
 
   PL_resource_error("memory");
   return NULL;
@@ -595,7 +691,7 @@ static resource *
 new_bnode_from_id(turtle_state *ts, size_t id)
 { resource *r;
 
-  if ( (r=malloc(sizeof(*r))) )
+  if ( (r=alloc_resource(ts)) )
   { r->type = R_BNODE;
     r->v.bnode_id = id;
 
@@ -615,22 +711,36 @@ new_bnode(turtle_state *ts)
 
 static void
 clear_handle_resource(resource *r)
-{ if ( r->v.r.handle ) PL_unregister_atom(r->v.r.handle);
+{ if ( !r->constant && r->v.r.handle )
+    PL_unregister_atom(r->v.r.handle);
 }
 
 static void
 clear_resource(resource *r)
-{ if ( r->v.r.name ) free(r->v.r.name);
-  clear_handle_resource(r);
+{ if ( !r->constant && r->type == R_RESOURCE )
+  { if ( r->v.r.name && r->v.r.name != r->v.r.fast )
+      free(r->v.r.name);
+    clear_handle_resource(r);
+  }
 }
 
 static void
 free_resource(turtle_state *ts, resource *r)
-{ if ( r->type == R_RESOURCE )
+{ if ( !r->constant )
   { clear_resource(r);
+    r->v.next = ts->free_resources;
+    ts->free_resources = r;
   }
+}
 
-  free(r);
+static void
+free_resources(turtle_state *ts)
+{ resource *r, *n;
+
+  for(r=ts->free_resources; r; r=n)
+  { n = r->v.next;
+    free(r);
+  }
 }
 
 
@@ -684,24 +794,30 @@ resolve_iri(turtle_state *ts, wchar_t *prefix, wchar_t *local)
   if ( local )
   { size_t plen = wcslen(prefix_iri);
     size_t llen = wcslen(local);
-    wchar_t *name = malloc((plen+llen+1)*sizeof(wchar_t));
+    resource *r;
 
-    if ( name )
-    { resource *r;
+    if ( (r=alloc_resource(ts)) )
+    { wchar_t *name;
 
-      if ( (r=malloc(sizeof(*r))) )
-      { wcscpy(name, prefix_iri);
-	wcscpy(name+plen, local);
-
-	r->type = R_RESOURCE;
-	r->v.r.name = name;
-	r->v.r.handle = 0;
-
-	return r;
+      if ( plen+llen < FAST_URI )
+      { name = r->v.r.fast;
+      } else
+      { if ( !(name = malloc((plen+llen+1)*sizeof(wchar_t))) )
+	{ free_resource(ts, r);
+	  PL_resource_error("memory");
+	  return NULL;
+	}
       }
-      free(name);
+
+      wcscpy(name, prefix_iri);
+      wcscpy(name+plen, local);
+      r->type = R_RESOURCE;
+      r->v.r.name = name;
+      r->v.r.handle = 0;
+
+      return r;
     }
-    PL_resource_error("memory");
+
     return NULL;
   } else
   { return new_resource(ts, prefix_iri);
@@ -713,7 +829,7 @@ static resource *
 make_absolute_resource(turtle_state *ts, const wchar_t *uri)
 { const wchar_t *s;
   size_t len, plen;
-  wchar_t *name;
+  resource *r;
 
   if ( !uri[0] )			/* <> */
     return new_resource(ts, ts->base_uri);
@@ -732,24 +848,29 @@ make_absolute_resource(turtle_state *ts, const wchar_t *uri)
   else
     plen = ts->base_uri_base_len;
 
-  if ( (name = malloc((plen+len+1)*sizeof(wchar_t))) )
-  { resource *r;
+  if ( (r=alloc_resource(ts)) )
+  { wchar_t *name;
 
-    if ( (r=malloc(sizeof(*r))) )
-    { wcsncpy(name, ts->base_uri, plen);
-      wcscpy(name+plen, uri);
-
-      r->type = R_RESOURCE;
-      r->v.r.name = name;
-      r->v.r.handle = 0;
-
-      return r;
+    if ( plen+len < FAST_URI )
+    { name = r->v.r.fast;
+    } else
+    { if ( !(name = malloc((plen+len+1)*sizeof(wchar_t))) )
+      { free_resource(ts, r);
+	PL_resource_error("memory");
+	return NULL;
+      }
     }
 
-    free(name);
+    wcsncpy(name, ts->base_uri, plen);
+    wcscpy(name+plen, uri);
+
+    r->type = R_RESOURCE;
+    r->v.r.name = name;
+    r->v.r.handle = 0;
+
+    return r;
   }
 
-  PL_resource_error("memory");
   return NULL;
 }
 
@@ -762,6 +883,9 @@ static void	clear_turtle_parser(turtle_state *ts);
 static int	init_base_uri(turtle_state *ts);
 static int	read_predicate_object_list(turtle_state *ts, int end);
 static int	read_object(turtle_state *ts);
+static int	set_subject(turtle_state *ts, resource *r, resource **old);
+static int	set_predicate(turtle_state *ts, resource *r, resource **old);
+
 
 static turtle_state *
 new_turtle_parser(IOSTREAM *s)
@@ -773,10 +897,7 @@ new_turtle_parser(IOSTREAM *s)
     ts->input	 = s;
     if ( init_hash_map(&ts->prefix_map, INIT_PREFIX_SIZE) &&
 	 next(ts) )			/* read first character */
-    { ts->rdf_type.type = R_RESOURCE;
-      ts->rdf_type.v.r.name = RDF_TYPE;
-
-      return ts;
+    { return ts;
     }
 
     clear_turtle_parser(ts);
@@ -789,20 +910,21 @@ new_turtle_parser(IOSTREAM *s)
 
 static void
 clear_turtle_parser(turtle_state *ts)
-{ if ( ts->base_uri )
-    free(ts->base_uri);
+{ if ( ts->base_uri )	     free(ts->base_uri);
+  if ( ts->empty_prefix )    free(ts->empty_prefix);
+  if ( ts->bnode.buffer )    free(ts->bnode.buffer);
+
+  if ( ts->input ) PL_release_stream(ts->input);
+
+  set_subject(ts, NULL, NULL);
+  set_predicate(ts, NULL, NULL);
+
+  free_resources(ts);
+
   clear_hash_table(&ts->prefix_map);
   clear_hash_table(&ts->blank_node_map);
-  clear_handle_resource(&ts->rdf_type);
-  clear_handle_resource(&ts->rdf_first);
-  clear_handle_resource(&ts->rdf_rest);
-  clear_handle_resource(&ts->rdf_nil);
-  clear_handle_resource(&ts->xsd_integer);
-  clear_handle_resource(&ts->xsd_decimal);
-  clear_handle_resource(&ts->xsd_double);
-  clear_handle_resource(&ts->xsd_boolean);
 
-  memset(ts, 0, sizeof(*ts));
+  memset(ts, 0, sizeof(*ts));			/* second call does nothing */
 }
 
 
@@ -846,9 +968,7 @@ set_predicate(turtle_state *ts, resource *r, resource **old)
 { if ( old )
   { *old = ts->current_predicate;
   } else
-  { if ( ts->current_predicate &&
-	 ts->current_predicate != &ts->rdf_type &&
-	 ts->current_predicate != &ts->rdf_first )
+  { if ( ts->current_predicate )
       free_resource(ts, ts->current_predicate);
   }
   ts->current_predicate = r;
@@ -858,7 +978,7 @@ set_predicate(turtle_state *ts, resource *r, resource **old)
 
 
 static int
-set_empty_prefix(turtle_state *ts, resource *r)
+set_empty_prefix(turtle_state *ts, const resource *r)
 { wchar_t *d;
 
   assert(r->type == R_RESOURCE);
@@ -891,7 +1011,7 @@ init_base_uri(turtle_state *ts)
 
 
 static int
-set_base_uri(turtle_state *ts, resource *r)
+set_base_uri(turtle_state *ts, const resource *r)
 { wchar_t *old = ts->base_uri;
 
   assert(r->type == R_RESOURCE);
@@ -1089,7 +1209,7 @@ got_next_triple(turtle_state *ts, resource *prev, resource *next)
   o.type = O_RESOURCE;
   o.value.r = next;
 
-  return got_triple(ts, prev, &ts->rdf_rest, &o);
+  return got_triple(ts, prev, RESOURCE(RDF_REST), &o);
 }
 
 
@@ -1137,32 +1257,13 @@ got_plain_triple(turtle_state *ts, const wchar_t *text)
 }
 
 static resource *
-numeric_type(turtle_state *ts, number_type type)
-{ resource *r;
-
-  switch(type)
-  { case NUM_INTEGER:
-      r = &ts->xsd_integer;
-      break;
-    case NUM_DECIMAL:
-      r = &ts->xsd_decimal;
-      break;
-    case NUM_DOUBLE:
-      r = &ts->xsd_double;
-      break;
+numeric_type(number_type type)
+{ switch(type)
+  { case NUM_INTEGER: return RESOURCE(XSD_INTEGER);
+    case NUM_DECIMAL: return RESOURCE(XSD_DECIMAL);
+    case NUM_DOUBLE:  return RESOURCE(XSD_DOUBLE);
+    default:	      assert(0); return NULL;
   }
-
-  if ( !r->v.r.name )
-  { r->type = R_RESOURCE;
-
-    switch(type)
-    { case NUM_INTEGER: r->v.r.name = XSD_INTEGER; break;
-      case NUM_DECIMAL: r->v.r.name = XSD_DECIMAL; break;
-      case NUM_DOUBLE:  r->v.r.name = XSD_DOUBLE;  break;
-    }
-  }
-
-  return r;
 }
 
 static int
@@ -1172,7 +1273,7 @@ got_numeric_triple(turtle_state *ts, const wchar_t *text, number_type type)
   o.type = O_LITERAL;
   o.value.l.string = (wchar_t*)text;
   o.value.l.lang   = NULL;
-  o.value.l.type   = numeric_type(ts, type);
+  o.value.l.type   = numeric_type(type);
 
   return got_literal_triple(ts, &o);
 }
@@ -1181,17 +1282,11 @@ got_numeric_triple(turtle_state *ts, const wchar_t *text, number_type type)
 static int
 got_boolean_triple(turtle_state *ts, int istrue)
 { object o;
-  resource *type = &ts->xsd_boolean;
-
-  if ( !type->v.r.name )
-  { type->v.r.name = XSD_BOOLEAN;
-    type->type = R_RESOURCE;
-  }
 
   o.type = O_LITERAL;
   o.value.l.string = istrue ? L"true" : L"false";
   o.value.l.lang   = NULL;
-  o.value.l.type   = type;
+  o.value.l.type   = RESOURCE(XSD_BOOLEAN);
 
   return got_literal_triple(ts, &o);
 }
@@ -1231,7 +1326,7 @@ read_hex(turtle_state *ts, int count, int *cp)
       else
 	return syntax_error(ts, "Illegal UCHAR");
     } else
-      return syntax_error(ts, "Unexpected EOF in UCHAR");
+      return FALSE;
   }
 
   *cp = c;
@@ -1293,10 +1388,15 @@ read_plx(turtle_state *ts, string_buffer *b)
 static resource *
 read_iri_ref(turtle_state *ts)
 { string_buffer b;
+
   initBuf(&b);
 
   for(;;)
-  { int c = Sgetcode(ts->input);
+  { int c;
+
+    if ( !next(ts) )
+      return FALSE;
+    c = ts->current_char;
 
     if ( is_iri_char(c) )
     { addBuf(&b, c);
@@ -1318,6 +1418,7 @@ read_iri_ref(turtle_state *ts)
 	  { discardBuf(&b);
 	    return NULL;
 	  }
+	  break;
 	}
 	default:
 	{ discardBuf(&b);
@@ -1332,10 +1433,9 @@ read_iri_ref(turtle_state *ts)
 
 static int
 read_pn_prefix(turtle_state *ts, string_buffer *b)
-{ initBuf(b);
-
-  if ( wcis_pn_chars_base(ts->current_char) )
-  { addBuf(b, ts->current_char);
+{ if ( wcis_pn_chars_base(ts->current_char) )
+  { initBuf(b);
+    addBuf(b, ts->current_char);
   } else
   { return syntax_error(ts, "PN_PREFIX expected");
   }
@@ -1358,7 +1458,9 @@ read_pn_prefix(turtle_state *ts, string_buffer *b)
       addBuf(b, EOS);
       return TRUE;
     } else
+    { discardBuf(b);
       return FALSE;
+    }
   }
 }
 
@@ -1373,12 +1475,15 @@ pn_local_start(int c)
 
 static int
 read_pn_local(turtle_state *ts, string_buffer *b)
-{ initBuf(b);
-
-  if ( pn_local_start(ts->current_char) )
-  { addBuf(b, ts->current_char);
-  } else if ( starts_plx(ts->current_char) && !read_plx(ts, b) )
-  { return FALSE;
+{ if ( pn_local_start(ts->current_char) )
+  { initBuf(b);
+    addBuf(b, ts->current_char);
+  } else if ( starts_plx(ts->current_char) )
+  { initBuf(b);
+    if ( !read_plx(ts, b) )
+    { discardBuf(b);
+      return FALSE;
+    }
   } else
   { return syntax_error(ts, "PN_LOCAL expected");
   }
@@ -1412,22 +1517,9 @@ read_pn_local(turtle_state *ts, string_buffer *b)
 }
 
 
-static void
-init_collection_resources(turtle_state *ts)
-{ ts->rdf_first.type	 = R_RESOURCE;
-  ts->rdf_first.v.r.name = RDF_FIRST;
-  ts->rdf_rest.type	 = R_RESOURCE;
-  ts->rdf_rest.v.r.name	 = RDF_REST;
-  ts->rdf_nil.type	 = R_RESOURCE;
-  ts->rdf_nil.v.r.name	 = RDF_NIL;
-}
-
-
 static resource *
 read_collection(turtle_state *ts)
 { resource *olds, *oldp, *collection = NULL;
-
-  init_collection_resources(ts);
 
   if ( !next(ts) || !skip_ws(ts) )
     return FALSE;
@@ -1435,21 +1527,21 @@ read_collection(turtle_state *ts)
   for(;;)
   { if ( ts->current_char == ')' )
     { if ( !next(ts) )
-	return FALSE;
+	goto error_out;
 
       if ( collection )
       { resource *prev;
+	int rc;
 
 	set_subject(ts, olds, &prev);
 	set_predicate(ts, oldp, NULL);
-	if ( !got_next_triple(ts, prev, &ts->rdf_nil) )
-	  return FALSE;
-	if ( prev != collection )
+	rc = got_next_triple(ts, prev, RESOURCE(RDF_NIL));
+	if ( !rc || prev != collection )
 	  free_resource(ts, prev);
 
-	return collection;
+	return rc ? collection : NULL;
       } else
-      { return &ts->rdf_nil;
+      { return RESOURCE(RDF_NIL);
       }
     }
 
@@ -1458,19 +1550,25 @@ read_collection(turtle_state *ts)
 
       if ( !set_anon_subject(ts, &prev) ||
 	   !got_next_triple(ts, prev, ts->current_subject) )
-	return FALSE;
+	goto error_out;
       if ( prev != collection )
 	free_resource(ts, prev);
     } else
     { if ( !set_anon_subject(ts, &olds) ||
-	   !set_predicate(ts, &ts->rdf_first, &oldp) )
+	   !set_predicate(ts, RESOURCE(RDF_FIRST), &oldp) )
 	return FALSE;
       collection = ts->current_subject;
     }
 
     if ( !read_object(ts) ||
 	 !skip_ws(ts) )
-      return FALSE;
+    { error_out:
+      if ( collection )
+      { set_subject(ts, olds, NULL);		/* restore */
+	set_predicate(ts, oldp, NULL);
+      }
+      return NULL;
+    }
   }
 }
 
@@ -1597,7 +1695,11 @@ read_iri(turtle_state *ts, int flags)
       { string_buffer pn_local;
 
 	if ( read_pn_local(ts, &pn_local) )
-	  return resolve_iri(ts, NULL, baseBuf(&pn_local));
+	{ resource *r;
+	  r = resolve_iri(ts, NULL, baseBuf(&pn_local));
+	  discardBuf(&pn_local);
+	  return r;
+	}
       } else
       { return resolve_iri(ts, NULL, NULL);
       }
@@ -1608,25 +1710,31 @@ read_iri(turtle_state *ts, int flags)
     { string_buffer pn_prefix;
 
       if ( read_pn_prefix(ts, &pn_prefix) )
-      { if ( ts->current_char == ':' )
-	{ if ( !next(ts) )
-	    return FALSE;
+      { resource *r = NULL;
 
-	  if ( pn_local_start(ts->current_char) )
+	if ( ts->current_char == ':' )
+	{ if ( !next(ts) )
+	  { r = NULL;
+	  } else if ( pn_local_start(ts->current_char) )
 	  { string_buffer pn_local;
 
 	    if ( read_pn_local(ts, &pn_local) )
-	      return resolve_iri(ts, baseBuf(&pn_prefix), baseBuf(&pn_local));
+	    { r = resolve_iri(ts, baseBuf(&pn_prefix), baseBuf(&pn_local));
+	      discardBuf(&pn_local);
+	    }
 	  } else
-	    return resolve_iri(ts, baseBuf(&pn_prefix), NULL);
+	    r = resolve_iri(ts, baseBuf(&pn_prefix), NULL);
 	} else if ( (flags&IRI_VERB) && wcscmp(baseBuf(&pn_prefix), L"a") == 0 )
-	{ return &ts->rdf_type;
+	{ r = RESOURCE(RDF_TYPE);
 	} else if ( (flags&IRI_BOOL) )
 	{ if ( wcscmp(baseBuf(&pn_prefix), L"true") == 0 )
-	    return LITERAL_TRUE;
+	    r = LITERAL_TRUE;
 	  else if ( wcscmp(baseBuf(&pn_prefix), L"false") == 0 )
-	    return LITERAL_FALSE;
+	    r = LITERAL_FALSE;
 	}
+
+	discardBuf(&pn_prefix);
+	return r;
       }
 
       return FALSE;
@@ -1675,8 +1783,10 @@ read_short_string(turtle_state *ts, int q, string_buffer *text)
   { switch(ts->current_char)
     { case 0x0a:
       case 0x0d:
+	discardBuf(text);
 	return syntax_error(ts, "Illegal character in string");
       case -1:
+	discardBuf(text);
 	return syntax_error(ts, "End-of-file in string");
       case '\\':
       { int c;
@@ -1685,6 +1795,7 @@ read_short_string(turtle_state *ts, int q, string_buffer *text)
 	{ addBuf(text, c);
 	  continue;
 	}
+	discardBuf(text);
 	return FALSE;
       }
       default:
@@ -1697,6 +1808,7 @@ read_short_string(turtle_state *ts, int q, string_buffer *text)
     }
   } while(next(ts));
 
+  discardBuf(text);
   return FALSE;
 }
 
@@ -1712,9 +1824,11 @@ read_long_string(turtle_state *ts, int q, string_buffer *text)
 	{ addBuf(text, c);
 	  continue;
 	}
+	discardBuf(text);
 	return FALSE;
       }
       case -1:
+	discardBuf(text);
 	return syntax_error(ts, "End-of-file in long string");
       default:
 	if ( ts->current_char == q )		/* one */
@@ -1739,6 +1853,7 @@ read_long_string(turtle_state *ts, int q, string_buffer *text)
     }
   } while(next(ts));
 
+  discardBuf(text);
   return FALSE;
 }
 
@@ -1775,9 +1890,9 @@ static int
 read_string(turtle_state *ts, string_buffer *text)
 { int q = ts->current_char;
 
-  initBuf(text);
   if ( !next(ts) )
     return FALSE;
+  initBuf(text);
   if ( ts->current_char == q )
   { if ( Speekcode(ts->input) == q )
     { next(ts);
@@ -1894,7 +2009,10 @@ read_object(turtle_state *ts)
     { resource *r;
 
       if ( (r=read_iri_ref(ts)) )
-	return got_resource_triple(ts, r);
+      { int rc = got_resource_triple(ts, r);
+	free_resource(ts, r);
+	return rc;
+      }
     }
     case '[':
     { resource *r;
@@ -1904,21 +2022,30 @@ read_object(turtle_state *ts)
       if ( ts->current_char == ']' )
 	return next(ts) && got_anon_triple(ts);
       else if ( (r=read_blank_node_property_list(ts)) )
-	return got_resource_triple(ts, r);
+      { int rc = got_resource_triple(ts, r);
+	free_resource(ts, r);
+	return rc;
+      }
       return FALSE;
     }
     case '(':
     { resource *r;
 
       if ( (r=read_collection(ts)) )
-	return got_resource_triple(ts, r);
+      { int rc = got_resource_triple(ts, r);
+	free_resource(ts, r);
+	return rc;
+      }
       return FALSE;
     }
     case '_':
     { resource *r;
 
       if ( (r=read_blank_node_label(ts)) )
-	return got_resource_triple(ts, r);
+      { int rc = got_resource_triple(ts, r);
+	free_resource(ts, r);
+	return rc;
+      }
 
       return FALSE;
     }
@@ -1982,7 +2109,9 @@ read_object(turtle_state *ts)
 	{ if ( r == LITERAL_TRUE || r == LITERAL_FALSE )
 	  { return got_boolean_triple(ts, r == LITERAL_TRUE);
 	  } else
-	  { return got_resource_triple(ts, r);
+	  { int rc = got_resource_triple(ts, r);
+	    free_resource(ts, r);
+	    return rc;
 	  }
 	}
 
@@ -2078,7 +2207,9 @@ prefix_directive(turtle_state *ts, int needs_end_of_statement)
 	 skip_ws(ts) &&
 	 (r=read_iri_ref(ts)) &&
 	 (!needs_end_of_statement || read_end_of_clause(ts)) )
-    { return set_empty_prefix(ts, r);
+    { int rc = set_empty_prefix(ts, r);
+      free_resource(ts, r);
+      return rc;
     }
     if ( r )
       free_resource(ts, r);
@@ -2115,25 +2246,31 @@ static int
 directive(turtle_state *ts)
 { string_buffer b;
 
-  initBuf(&b);
   if ( read_directive_name(ts, &b) )
   { if ( !skip_ws(ts) )
+    { discardBuf(&b);
       return FALSE;
+    }
 
     if ( wcscmp(baseBuf(&b), L"base") == 0 )
     { resource *r = NULL;
       int rc;
 
-      rc = ((r=read_iri_ref(ts)) &&
-	    read_end_of_clause(ts) );
-      if ( rc )
-	return set_base_uri(ts, r);
+      discardBuf(&b);
+
+      rc = ( (r=read_iri_ref(ts)) &&
+	     read_end_of_clause(ts) &&
+	     set_base_uri(ts, r)
+	   );
       if ( r )
 	free_resource(ts, r);
+      if ( rc )
+	return TRUE;
 
       return syntax_error(ts, "Invalid @base directive");
     } else if ( wcscmp(baseBuf(&b), L"prefix") == 0 )
-    { return prefix_directive(ts, TRUE);
+    { discardBuf(&b);
+      return prefix_directive(ts, TRUE);
     } else
     { discardBuf(&b);
       return syntax_error(ts, "Unknown directive");
@@ -2237,11 +2374,12 @@ statement(turtle_state *ts)
       if ( pn_local_start(ts->current_char) )
       { string_buffer pn_local;
 
-	initBuf(&pn_local);
 	if ( read_pn_local(ts, &pn_local) )
 	{ resource *r;
 
-	  if ( (r=resolve_iri(ts, NULL, baseBuf(&pn_local))) )
+	  r = resolve_iri(ts, NULL, baseBuf(&pn_local));
+	  discardBuf(&pn_local);
+	  if ( r )
 	  { set_subject(ts, r, NULL);
 	    return final_predicate_object_list(ts);
 	  }
@@ -2265,13 +2403,19 @@ statement(turtle_state *ts)
 
       if ( read_pn_prefix(ts, &pn_prefix) )
       { if ( wcscasecmp(baseBuf(&pn_prefix), L"BASE") == 0 )
+	{ discardBuf(&pn_prefix);
 	  return sparql_base_directive(ts);
+	}
 	if ( wcscasecmp(baseBuf(&pn_prefix), L"PREFIX") == 0 )
+	{ discardBuf(&pn_prefix);
 	  return sparql_prefix_directive(ts);
+	}
 
 	if ( ts->current_char == ':' )
 	{ if ( !next(ts) )
+	  { discardBuf(&pn_prefix);
 	    return FALSE;
+	  }
 
 	  if ( pn_local_start(ts->current_char) )
 	  { string_buffer pn_local;
@@ -2279,15 +2423,21 @@ statement(turtle_state *ts)
 	    if ( read_pn_local(ts, &pn_local) )
 	    { resource *r;
 
-	      if ( (r=resolve_iri(ts, baseBuf(&pn_prefix), baseBuf(&pn_local))) )
-	      { set_subject(ts, r, NULL);
+	      r = resolve_iri(ts, baseBuf(&pn_prefix), baseBuf(&pn_local));
+	      discardBuf(&pn_local);
+	      if ( r )
+	      { discardBuf(&pn_prefix);
+		set_subject(ts, r, NULL);
 		return final_predicate_object_list(ts);
 	      }
 	    }
 	  } else
 	  { resource *r;
 
-	    if ( (r=resolve_iri(ts, baseBuf(&pn_prefix), NULL)) )
+	    r = resolve_iri(ts, baseBuf(&pn_prefix), NULL);
+	    discardBuf(&pn_prefix);
+
+	    if ( r )
 	    { set_subject(ts, r, NULL);
 	      return final_predicate_object_list(ts);
 	    }
