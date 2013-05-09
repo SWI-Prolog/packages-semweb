@@ -170,7 +170,7 @@ rdf_process_turtle(In, OnObject, Options) :-
 	option(graph(Graph), Options, BaseURI),
 	setup_call_cleanup(
 	    ( open_input(In, Stream, Close),
-	      create_turtle_parser(Parser, Stream, BaseURI)
+	      create_turtle_parser(Parser, Stream, Options)
 	    ),
 	    ( process_turtle(Parser, Stream, OnObject, Graph,
 			     [ parse(statement)
