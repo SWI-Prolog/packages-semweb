@@ -58,7 +58,7 @@ rdf_load/2, making this predicate support the format =ntriples=.
 */
 
 :- predicate_options(rdf_read_ntriples/3, 3,
-		     [ anon_prefix(atom),
+		     [ anon_prefix(any), % atom or node(_)
 		       base_uri(atom),
 		       error_count(-integer),
 		       on_error(oneof([warning,error]))
@@ -94,8 +94,9 @@ rdf_load/2, making this predicate support the format =ntriples=.
 %
 %	True when Triples is a list of triples from Input.  Options:
 %
-%	  * anon_prefix(+Atom)
-%	  Prefix nodeIDs with this atom.
+%	  * anon_prefix(+AtomOrNode)
+%	  Prefix nodeIDs with this atom.  If AtomOrNode is the term
+%	  node(_), bnodes are returned as node(Id).
 %	  * base_uri(+Atom)
 %	  Defines the default anon_prefix as __<baseuri>_
 %	  * on_error(Action)
@@ -185,8 +186,9 @@ map_nodes(triple(S0,P0,O0), rdf(S,P,O), State0, State) :-
 	map_node(P0, P, State1, State2),
 	map_node(O0, O, State2, State).
 
-map_node(node(NodeId), BNode, State, State) :- !,
+map_node(node(NodeId), BNode, State, State) :-
 	nt_state_anon_prefix(State, Prefix),
+	atom(Prefix), !,
 	atom_concat(Prefix, NodeId, BNode).
 map_node(Node, Node, State, State).
 
