@@ -111,11 +111,9 @@ test(escape, error(syntax_error('illegal unicode escape'))) :-
 	atom_triple('<a> <b> "\\u123" .', _).
 test(escape, error(syntax_error('illegal escape'))) :-
 	atom_triple('<a> <b> "\\x" .', _).
-test(lang, error(syntax_error('language tag must start with a-z'))) :-
+test(lang, error(syntax_error('language tag must start with a-zA-Z'))) :-
 	atom_triple('<a> <b> "hello"@1 .', _).
 test(lang, error(syntax_error('fullstop (.) expected'))) :-
 	atom_triple('<a> <b> "hello"@e$ .', _).
-test(lang, error(syntax_error('illegal character'))) :-
-	atom_triple('<a> <b> "\u00A0" .', _).
 
 :- end_tests(negative).
