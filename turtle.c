@@ -1972,7 +1972,11 @@ read_number(turtle_state *ts, string_buffer *num, number_type *numtype)
 					/* +-[0-9]* */
   switch(ts->current_char)
   { case '.':
-    { *numtype = NUM_DECIMAL;
+    { int c = Speekcode(ts->input);
+      if ( !is_digit(c) && c != 'e' && c != 'E' )
+	goto done;
+
+      *numtype = NUM_DECIMAL;
       addBuf(num, '.');
       if ( !next(ts) ) return FALSE;
       if ( (rc=read_digits(ts, num)) < 0 )
@@ -1984,6 +1988,7 @@ read_number(turtle_state *ts, string_buffer *num, number_type *numtype)
 	  return read_exponent(ts, num);
 	}
         default:
+        done:
 	  addBuf(num, EOS);
 	  return TRUE;
       }
@@ -2052,6 +2057,7 @@ read_object(turtle_state *ts)
     }
     case '+':
     case '-':				/* Signed INTEGER|DECIMAL|DOUBLE */
+    case '.':				/* Decimal */
     { string_buffer num;
       number_type numtype;
 
@@ -2150,9 +2156,12 @@ read_predicate_object_list(turtle_state *ts, int end)
       return FALSE;
 
     if ( ts->current_char == ';' )
-    { if ( next(ts) && skip_ws(ts) )
+    { empty:
+      if ( next(ts) && skip_ws(ts) )
       { if ( ts->current_char == end )
 	  return TRUE;
+	if ( ts->current_char == ';' )
+	  goto empty;
 	continue;
       } else
 	return FALSE;
