@@ -115,7 +115,8 @@ typedef struct object
   union
   { resource *r;
     struct
-    { wchar_t  *string;
+    { size_t	len;
+      wchar_t  *string;
       wchar_t  *lang;
       resource *type;
     } l;
@@ -226,7 +227,7 @@ growBuffer(string_buffer *b, int c)
       b->end = b->in+FAST_BUF_SIZE;
       *b->in++ = c;
 
-      return c;
+      return TRUE;
     }
   } else
   { size_t sz = b->end - b->buf;
@@ -238,12 +239,11 @@ growBuffer(string_buffer *b, int c)
       b->end = b->in+sz;
       *b->in++ = c;
 
-      return c;
+      return TRUE;
     }
   }
 
-  PL_resource_error("memory");
-  return 0;
+  return PL_resource_error("memory");
 }
 
 
@@ -274,7 +274,7 @@ static inline int
 addBuf(string_buffer *b, int c)
 { if ( b->in < b->end )
   { *b->in++ = c;
-    return c;
+    return TRUE;
   }
 
   return growBuffer(b, c);
@@ -1127,19 +1127,19 @@ put_object(turtle_state *ts, term_t t, object *o)
     { term_t av = PL_new_term_refs(2);
 
       if ( !PL_unify_wchars(av+0, PL_ATOM, (size_t)-1, o->value.l.lang) ||
-	   !PL_unify_wchars(av+1, PL_ATOM, (size_t)-1, o->value.l.string) ||
+	   !PL_unify_wchars(av+1, PL_ATOM, o->value.l.len, o->value.l.string) ||
 	   !PL_cons_functor_v(t, FUNCTOR_lang2, av) )
 	return FALSE;
     } else if ( o->value.l.type )
     { term_t av = PL_new_term_refs(2);
 
       if ( !put_resource(ts, av+0, o->value.l.type) ||
-	   !PL_unify_wchars(av+1, PL_ATOM, (size_t)-1, o->value.l.string) ||
+	   !PL_unify_wchars(av+1, PL_ATOM, o->value.l.len, o->value.l.string) ||
 	   !PL_cons_functor_v(t, FUNCTOR_type2, av) )
 	return FALSE;
     } else
     { PL_put_variable(t);
-      if ( !PL_unify_wchars(t, PL_ATOM, (size_t)-1, o->value.l.string) )
+      if ( !PL_unify_wchars(t, PL_ATOM, o->value.l.len, o->value.l.string) )
 	return FALSE;
     }
 
@@ -1220,10 +1220,12 @@ got_literal_triple(turtle_state *ts, object *o)
 
 
 static int
-got_lang_triple(turtle_state *ts, const wchar_t *text, const wchar_t *lang)
+got_lang_triple(turtle_state *ts, size_t len, const wchar_t *text,
+		const wchar_t *lang)
 { object o;
 
   o.type = O_LITERAL;
+  o.value.l.len	   = len;
   o.value.l.string = (wchar_t*)text;
   o.value.l.lang   = (wchar_t*)lang;
   o.value.l.type   = NULL;
@@ -1233,10 +1235,12 @@ got_lang_triple(turtle_state *ts, const wchar_t *text, const wchar_t *lang)
 
 
 static int
-got_typed_triple(turtle_state *ts, const wchar_t *text, resource *type)
+got_typed_triple(turtle_state *ts, size_t len, const wchar_t *text,
+		 resource *type)
 { object o;
 
   o.type = O_LITERAL;
+  o.value.l.len	   = len;
   o.value.l.string = (wchar_t*)text;
   o.value.l.lang   = NULL;
   o.value.l.type   = type;
@@ -1245,10 +1249,11 @@ got_typed_triple(turtle_state *ts, const wchar_t *text, resource *type)
 }
 
 static int
-got_plain_triple(turtle_state *ts, const wchar_t *text)
+got_plain_triple(turtle_state *ts, size_t len, const wchar_t *text)
 { object o;
 
   o.type = O_LITERAL;
+  o.value.l.len	   = len;
   o.value.l.string = (wchar_t*)text;
   o.value.l.lang   = NULL;
   o.value.l.type   = NULL;
@@ -1271,6 +1276,7 @@ got_numeric_triple(turtle_state *ts, const wchar_t *text, number_type type)
 { object o;
 
   o.type = O_LITERAL;
+  o.value.l.len    = (size_t)-1;
   o.value.l.string = (wchar_t*)text;
   o.value.l.lang   = NULL;
   o.value.l.type   = numeric_type(type);
@@ -1284,6 +1290,7 @@ got_boolean_triple(turtle_state *ts, int istrue)
 { object o;
 
   o.type = O_LITERAL;
+  o.value.l.len    = (size_t)-1;
   o.value.l.string = istrue ? L"true" : L"false";
   o.value.l.lang   = NULL;
   o.value.l.type   = RESOURCE(XSD_BOOLEAN);
@@ -2083,7 +2090,9 @@ read_object(turtle_state *ts)
 	{ string_buffer lang;
 
 	  if ( (rc = next(ts) && read_lang(ts, &lang)) )
-	  { rc = got_lang_triple(ts, baseBuf(&text), baseBuf(&lang));
+	  { rc = got_lang_triple(ts,
+				 bufSize(&text)-1, baseBuf(&text),
+				 baseBuf(&lang));
 	    discardBuf(&lang);
 	  }
 	} else if ( ts->current_char == '^' )
@@ -2091,7 +2100,7 @@ read_object(turtle_state *ts)
 	  { resource *r;
 
 	    if ( next(ts) && (r=read_iri(ts, 0)) )
-	    { rc = got_typed_triple(ts, baseBuf(&text), r);
+	    { rc = got_typed_triple(ts, bufSize(&text)-1, baseBuf(&text), r);
 	    } else
 	    { rc = FALSE;
 	    }
@@ -2099,7 +2108,7 @@ read_object(turtle_state *ts)
 	  { rc = syntax_error(ts, "Invalid literal, expected ^");
 	  }
 	} else
-	{ rc = got_plain_triple(ts, baseBuf(&text));
+	{ rc = got_plain_triple(ts, bufSize(&text)-1, baseBuf(&text));
 	}
 
 	discardBuf(&text);
