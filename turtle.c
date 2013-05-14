@@ -313,7 +313,7 @@ static const short char_type0[] =
      NI, WS|NI, EL|NI,	  NI,	 NI, EL|NI,    NI,    NI,   /* 08-0f */
      NI,    NI,    NI,    NI,    NI,    NI,    NI,    NI,   /* 10-17 */
      NI,    NI,    NI,    NI,    NI,    NI,    NI,    NI,   /* 18-1F */
-     WS,    EC,    NI,	  EC,	 EC,	EC,    EC,    EC,   /* 20-27 */
+  NI|WS,    EC,    NI,	  EC,	 EC,	EC,    EC,    EC,   /* 20-27 */
      EC,    EC,	   EC,	  EC,	 EC,	EC,    EC,    EC,   /* 28-2F */
      DI,    DI,    DI,    DI,    DI,    DI,    DI,    DI,   /* 30-37 */
      DI,    DI,     0,	  EC,    NI,	EC,    NI,    EC,   /* 38-3F */
@@ -1593,7 +1593,7 @@ read_blank_node_property_list(turtle_state *ts)
     return bnode;
 
   if ( rc )
-    syntax_error(ts, "Expected ]");
+    syntax_error(ts, "Expected \"]\"");
 
   return NULL;
 }
@@ -1733,8 +1733,9 @@ read_iri(turtle_state *ts, int flags)
 	  else if ( wcscmp(baseBuf(&pn_prefix), L"false") == 0 )
 	    r = LITERAL_FALSE;
 	}
-
 	discardBuf(&pn_prefix);
+	if ( !r )
+	  syntax_error(ts, "Expected \":\"");
 	return r;
       }
 
@@ -2452,6 +2453,9 @@ statement(turtle_state *ts)
 	      return final_predicate_object_list(ts);
 	    }
 	  }
+	} else
+	{ discardBuf(&pn_prefix);
+	  return syntax_error(ts, "Expected \":\"");
 	}
       }
 
