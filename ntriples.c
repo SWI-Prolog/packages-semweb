@@ -298,6 +298,8 @@ skip_eol(IOSTREAM *in, int *cp)
 		 *	      READING		*
 		 *******************************/
 
+#define ESCAPED_CODE (-1)
+
 static int
 read_hex(IOSTREAM *in, int *cp, int len)
 { int c = 0;
@@ -314,10 +316,8 @@ read_hex(IOSTREAM *in, int *cp, int len)
   }
 
   *cp = c;
-  return TRUE;
+  return ESCAPED_CODE;
 }
-
-#define ESCAPED_CODE (-1)
 
 static int
 get_code(IOSTREAM *in, int *cp)
