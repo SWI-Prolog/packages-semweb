@@ -1099,9 +1099,9 @@ put_resource(turtle_state *ts, term_t t, resource *r)
 	  ts->bnode.buffer = malloc((plen+64)*sizeof(wchar_t));
 	  if ( !ts->bnode.buffer )
 	    return PL_resource_error("memory");
+	  wcscpy(ts->bnode.buffer, ts->bnode.prefix);
 	  ts->bnode.prefix_end = &ts->bnode.buffer[plen];
 	}
-
 	swprintf(ts->bnode.prefix_end, 64, L"%d", r->v.bnode_id);
 	PL_put_variable(t);
 	return PL_unify_wchars(t, PL_ATOM, (size_t)-1, ts->bnode.buffer);
@@ -2583,7 +2583,7 @@ create_turtle_parser(term_t parser, term_t in, term_t options)
 	      return FALSE;
 	    }
 	    if ( name == ATOM_anon_prefix )		/* ANON_PREFIX */
-	    { wchar_t *old, *prefix;
+	    { wchar_t *prefix;
 
 	      if ( PL_is_functor(arg, FUNCTOR_node1) )
 	      { if ( ts->bnode.prefix )
@@ -2593,10 +2593,10 @@ create_turtle_parser(term_t parser, term_t in, term_t options)
 		continue;
 	      } else if ( PL_get_wchars(arg, NULL, &prefix,
 					CVT_ATOM|CVT_EXCEPTION) )
-	      { old = ts->bnode.prefix;
+	      { if ( ts->bnode.prefix )
+		  free(ts->bnode.prefix);
 		if ( (ts->bnode.prefix = wcsdup(prefix)) )
 		  continue;
-		if ( old ) free(old);
 		return PL_resource_error("memory");
 	      }
 	      return FALSE;

@@ -348,11 +348,15 @@ turtle_write_quoted_string(Out, Text) :-
 	rdf_db:rdf_file_type/2.
 
 rdf_db:rdf_load_stream(turtle, Stream, _Module:Options) :-
-	rdf_db:graph(Options, Id),
-	rdf_transaction((  rdf_process_turtle(Stream, assert_triples, Options),
-			   rdf_set_graph(Id, modified(false))
+	rdf_db:graph(Options, Graph),
+	atom_concat('__', Graph, BNodePrefix),
+	rdf_transaction((  rdf_process_turtle(Stream, assert_triples,
+					      [ anon_prefix(BNodePrefix)
+					      | Options
+					      ]),
+			   rdf_set_graph(Graph, modified(false))
 			),
-			parse(Id)).
+			parse(Graph)).
 
 assert_triples([], _).
 assert_triples([rdf(S,P,O)|T], Location) :-
