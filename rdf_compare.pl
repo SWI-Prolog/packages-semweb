@@ -65,7 +65,10 @@ rdf_equal_graphs(A, B, Substitutions) :-
 	sort(B, SB),
 	partition(contains_bnodes, SA, VA, GA),
 	partition(contains_bnodes, SB, VB, GB),
-	GA == GB,
+	(   GA == GB
+	->  true
+	;   maplist(compare_triple, GA, GB)
+	),
 	compare_list(VA, VB, [], Substitutions), !.
 
 contains_bnodes(rdf(S,P,O)) :-
@@ -80,6 +83,9 @@ compare_list([H1|T1], In2, S0, S) :-
 	compare_triple(H1, H2, S0, S1),
 	compare_list(T1, T2, S1, S).
 
+compare_triple(T1, T2) :-
+	compare_triple(T1,T2,[],[]).
+
 compare_triple(rdf(Subj1,P1,O1), rdf(Subj2, P2, O2), S0, S) :-
 	compare_field(Subj1, Subj2, S0, S1),
 	compare_field(P1, P2, S1, S2),
@@ -87,6 +93,8 @@ compare_triple(rdf(Subj1,P1,O1), rdf(Subj2, P2, O2), S0, S) :-
 
 compare_field(X, X, S, S) :- !.
 compare_field(literal(X), xml(X), S, S) :- !. % TBD
+compare_field(literal(lang(L1,X)), literal(lang(L2,X)), S, S) :- !,
+	lang_equal(L1, L2).
 compare_field(X, Id, S, S) :-
 	memberchk(X=Id, S), !.
 compare_field(X, Y, S, [X=Y|S]) :-
