@@ -34,7 +34,7 @@ EOF
   fi
 fi
 
-AC_CHECK_FUNCS(random)
+AC_CHECK_FUNCS(random wcsdup)
 
 AC_OUTPUT(Makefile)
 

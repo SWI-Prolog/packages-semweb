@@ -76,6 +76,24 @@ static atom_t ATOM_warning;
 
 
 		 /*******************************
+		 *	    PORTABILITY		*
+		 *******************************/
+
+#ifndef HAVE_WCSDUP
+static wchar_t *
+my_wcsdup(const wchar_t *in)
+{ wchar_t *copy = malloc((wcslen(in)+1)*sizeof(wchar_t));
+
+  if ( copy )
+    return wcscpy(copy, in);
+
+  return NULL;
+}
+#define wcsdup(ws) my_wcsdup(ws)
+#endif
+
+
+		 /*******************************
 		 *	 DATA STRUCTURES	*
 		 *******************************/
 
