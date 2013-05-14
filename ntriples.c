@@ -83,13 +83,21 @@ is_eol(int c)
 { return char_type[c] == EL;
 }
 
+static const char hexval0[] =
+{/*0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F  */
+  -1,
+  -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, /* 00-0f */
+  -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, /* 10-1F */
+  -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, /* 20-2F */
+   0,  1,  2,  3,  4,  5,  6,  7,  8,  9, -1, -1, -1, -1, -1, -1, /* 30-3F */
+  -1, 10, 11, 12, 13, 14, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1  /* 40-4F */
+};
+
+static const char* hexval = &hexval0[1];
+
 static inline int
 hexd(int c)
-{ if ( c>='0' && c<='9' )
-    return c-'0';
-  if ( c>='A' && c<='F' )
-    return c-'A'+10;
-  return -1;
+{ return (c <= 'F' ? hexval[c] : -1);
 }
 
 
@@ -167,7 +175,7 @@ growBuffer(string_buffer *b, int c)
       b->end = b->in+FAST_BUF_SIZE;
       *b->in++ = c;
 
-      return c;
+      return TRUE;
     }
   } else
   { size_t sz = b->end - b->buf;
@@ -179,12 +187,12 @@ growBuffer(string_buffer *b, int c)
       b->end = b->in+sz;
       *b->in++ = c;
 
-      return c;
+      return TRUE;
     }
   }
 
   PL_resource_error("memory");
-  return 0;
+  return FALSE;
 }
 
 
@@ -215,7 +223,7 @@ static inline int
 addBuf(string_buffer *b, int c)
 { if ( b->in < b->end )
   { *b->in++ = c;
-    return c;
+    return TRUE;
   }
 
   return growBuffer(b, c);
