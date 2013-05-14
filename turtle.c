@@ -1715,7 +1715,8 @@ read_iri(turtle_state *ts, int flags)
 	if ( ts->current_char == ':' )
 	{ if ( !next(ts) )
 	  { r = NULL;
-	  } else if ( pn_local_start(ts->current_char) )
+	  } else if ( pn_local_start(ts->current_char) ||
+		      starts_plx(ts->current_char))
 	  { string_buffer pn_local;
 
 	    if ( read_pn_local(ts, &pn_local) )
