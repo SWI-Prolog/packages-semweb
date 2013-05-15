@@ -92,6 +92,27 @@ my_wcsdup(const wchar_t *in)
 #define wcsdup(ws) my_wcsdup(ws)
 #endif
 
+#ifndef HAVE_WCSCASECMP
+#include <wctype.h>
+static int
+my_wcscasecmp(const wchar_t *s1, const wchar_t *s2)
+{ wint_t n1, n2;
+
+  if (s1 == s2)
+    return 0;
+
+  do
+  { n1 = towlower(*s1++);
+    n2 = towlower(*s2++);
+    if (n1 == L'\0')
+      break;
+  } while (n1 == n2);
+
+  return n1 - n2;
+}
+#define wcscasecmp(s1, s2) my_wcscasecmp(s1, s2)
+#endif
+
 
 		 /*******************************
 		 *	 DATA STRUCTURES	*
