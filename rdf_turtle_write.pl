@@ -33,7 +33,7 @@
 	    rdf_save_canonical_turtle/2	% +File, +Options
 	  ]).
 :- use_module(library(semweb/rdf_db)).
-:- use_module(library(semweb/rdf_turtle)).
+:- use_module(library(semweb/turtle), []). % we make calls to public preds here
 :- use_module(library(option)).
 :- use_module(library(record)).
 :- use_module(library(error)).
@@ -394,7 +394,7 @@ propose_abbrev(_, Len, URI, Abbrev) :-
 	atomic_list_concat(Use, -, Abbrev).
 
 abbrev_part(X) :-
-	turtle_pn_local(X),
+	turtle:turtle_pn_local(X),
 	\+ well_known_ns(X, _),
 	\+ well_known_extension(X).
 
@@ -525,7 +525,7 @@ tw_base(Col, State, Out) :-
 	tw_state_base(State, Base),
 	atom(Base), !,
 	format(Out, '@base ~t~*|', [Col]),
-	turtle_write_uri(Out, Base),
+	turtle:turtle_write_uri(Out, Base),
 	format(Out, ' .~n', []).
 tw_base(_, _, _).
 
@@ -1101,7 +1101,7 @@ tw_resource(Resource, State, Out) :-
 	tw_state_prefix_map(State, PrefixMap),
 	member(Prefix-Full, PrefixMap),
 	atom_concat(Full, Name, Resource),
-	turtle_pn_local(Name), !,
+	turtle:turtle_pn_local(Name), !,
 	format(Out, '~w:~w', [Prefix, Name]).
 tw_resource(Resource, State, Out) :-
 	tw_relative_uri(Resource, State, Out).
@@ -1114,9 +1114,9 @@ tw_relative_uri(Resource, State, Out) :-
 	sub_atom(ResPath, 0, _, _, /),
 	tw_state_base_path(State, BasePath),
 	relative_path(ResPath, BasePath, RelPath), !,
-	turtle_write_uri(Out, RelPath).
+	turtle:turtle_write_uri(Out, RelPath).
 tw_relative_uri(Resource, _, Out) :-
-	turtle_write_uri(Out, Resource).
+	turtle:turtle_write_uri(Out, Resource).
 
 relative_path(Path, RelTo, RelPath) :-
 	atomic_list_concat(PL, /, Path),
@@ -1223,7 +1223,7 @@ tw_abbreviated_literal(xsd:boolean, Value, _, Out) :-
 %	single-"..." representation.
 
 tw_quoted_string(Atom, _, Out) :-
-	turtle_write_quoted_string(Out, Atom).
+	turtle:turtle_write_quoted_string(Out, Atom).
 
 
 		 /*******************************
