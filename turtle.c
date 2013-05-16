@@ -2531,7 +2531,7 @@ graph_or_final_predicate_object_list(turtle_state *ts, resource *r)
       case D_TRIG:
 	if ( !ts->current_graph )
 	{ set_graph(ts, r, NULL);
-	  return next(ts) && statement(ts);
+	  return next(ts) && statement(ts); /* TBD: Return graph(Parser, Graph)? */
 	} else
 	{ return syntax_error(ts,
 			      "TriG: Unexpected \"{\" (nested graphs "
