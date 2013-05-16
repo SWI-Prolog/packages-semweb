@@ -2010,7 +2010,10 @@ read_number(turtle_state *ts, string_buffer *num, number_type *numtype)
 
   if ( ts->current_char == '-' || ts->current_char == '+' )
   { addBuf(num, ts->current_char);
-    if ( !next(ts) ) return FALSE;
+    if ( !next(ts) )
+    { discardBuf(num);
+      return FALSE;
+    }
   }
 					/* +- */
   if ( (rc=read_digits(ts, num)) < 0 )
@@ -2020,7 +2023,10 @@ read_number(turtle_state *ts, string_buffer *num, number_type *numtype)
   { case '.':
     { int c = Speekcode(ts->input);
       if ( !is_digit(c) && c != 'e' && c != 'E' )
+      { if ( rc == 0 )			/* lone ., +., -. */
+	  return FALSE;
 	goto done;
+      }
 
       *numtype = NUM_DECIMAL;
       addBuf(num, '.');
@@ -2101,9 +2107,14 @@ read_object(turtle_state *ts)
 
       return FALSE;
     }
+    case '.':				/* Decimal */
+    { int c = Speekcode(ts->input);
+      if ( !is_digit(c) )
+	return syntax_error(ts, "Unexpected \".\" (missing object)");
+    }
+    /*FALLTHROUGH*/
     case '+':
     case '-':				/* Signed INTEGER|DECIMAL|DOUBLE */
-    case '.':				/* Decimal */
     { string_buffer num;
       number_type numtype;
 
