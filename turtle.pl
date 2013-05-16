@@ -362,9 +362,15 @@ rdf_db:rdf_load_stream(turtle, Stream, _Module:Options) :-
 			parse(Graph)).
 
 assert_triples([], _).
-assert_triples([rdf(S,P,O)|T], Location) :-
-	rdf_assert(S,P,O,Location),
+assert_triples([H|T], Location) :-
+	assert_triple(H, Location),
 	assert_triples(T, Location).
+
+assert_triple(rdf(S,P,O), Location) :-
+	rdf_assert(S,P,O,Location).
+assert_triple(rdf(S,P,O,G), _) :-
+	rdf_assert(S,P,O,G).
+
 
 rdf_db:rdf_file_type(ttl, turtle).
 rdf_db:rdf_file_type(n3,  turtle).	% not really, but good enough

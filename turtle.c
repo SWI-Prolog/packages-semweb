@@ -50,6 +50,7 @@ static functor_t FUNCTOR_literal1;
 static functor_t FUNCTOR_lang2;
 static functor_t FUNCTOR_type2;
 static functor_t FUNCTOR_pair2;
+static functor_t FUNCTOR_colon2;
 
 static atom_t ATOM_parse;
 static atom_t ATOM_statement;
@@ -61,6 +62,11 @@ static atom_t ATOM_base_uri;
 static atom_t ATOM_on_error;
 static atom_t ATOM_error;
 static atom_t ATOM_warning;
+static atom_t ATOM_format;
+static atom_t ATOM_turtle;
+static atom_t ATOM_trig;
+static atom_t ATOM_graph;
+static atom_t ATOM_auto;
 
 #define RDF_NS L"http://www.w3.org/1999/02/22-rdf-syntax-ns#"
 #define XSD_NS L"http://www.w3.org/2001/XMLSchema#"
@@ -135,6 +141,12 @@ typedef enum error_mode
   E_ERROR
 } error_mode;
 
+typedef enum format
+{ D_AUTO = 0,
+  D_TURTLE,
+  D_TRIG
+} format;
+
 typedef struct resource
 { resource_type  type;
   int		 constant;		/* read-only constant */
@@ -192,10 +204,13 @@ typedef struct turtle_state
   } bnode;
   resource     *current_subject;
   resource     *current_predicate;
+  resource     *current_graph;
+  resource     *default_graph;
   resource     *free_resources;		/* Recycle resources */
   IOSTREAM     *input;			/* Our input */
   int		current_char;		/* Current character */
   error_mode	on_error;		/* E_* */
+  format	format;			/* D_AUTO, D_TURTLE or D_TRIG */
   size_t	error_count;		/* Number of syntax errors */
   size_t	count;			/* Counted triples */
   term_t	head;			/* Head of triple list */
@@ -731,6 +746,35 @@ new_resource(turtle_state *ts, const wchar_t *iri)
 }
 
 
+static int
+set_atom_resource(resource *r, atom_t handle)
+{ if ( r->v.r.handle )
+  { if ( r->v.r.handle == handle )
+      return TRUE;
+    PL_unregister_atom(r->v.r.handle);
+  }
+  r->v.r.handle = handle;
+
+  return TRUE;
+}
+
+
+static resource *
+atom_resource(turtle_state *ts, atom_t handle)
+{ resource *r;
+
+  if ( (r=alloc_resource(ts)) )
+  { PL_register_atom(handle);
+    r->v.r.handle = handle;
+    r->v.r.name = NULL;
+
+    return r;
+  }
+
+  return NULL;
+}
+
+
 static resource *
 new_bnode_from_id(turtle_state *ts, size_t id)
 { resource *r;
@@ -929,7 +973,9 @@ static int	read_predicate_object_list(turtle_state *ts, int end);
 static int	read_object(turtle_state *ts);
 static int	set_subject(turtle_state *ts, resource *r, resource **old);
 static int	set_predicate(turtle_state *ts, resource *r, resource **old);
-
+static int	set_graph(turtle_state *ts, resource *r, resource **old);
+static int	set_default_graph(turtle_state *ts, resource *r, resource **old);
+static int	statement(turtle_state *ts);
 
 static turtle_state *
 new_turtle_parser(IOSTREAM *s)
@@ -962,6 +1008,8 @@ clear_turtle_parser(turtle_state *ts)
 
   set_subject(ts, NULL, NULL);
   set_predicate(ts, NULL, NULL);
+  set_graph(ts, NULL, NULL);
+  set_default_graph(ts, NULL, NULL);
 
   free_resources(ts);
 
@@ -1016,6 +1064,55 @@ set_predicate(turtle_state *ts, resource *r, resource **old)
       free_resource(ts, ts->current_predicate);
   }
   ts->current_predicate = r;
+
+  return TRUE;
+}
+
+
+static int
+set_format(turtle_state *ts, format fmt)
+{ if ( ts->format != fmt )
+  { switch(fmt)
+    { case D_TRIG:
+	ts->default_graph = ts->current_graph;
+        ts->current_graph = NULL;
+	/*FALLTHROUGH*/
+      case D_TURTLE:
+	ts->format = fmt;
+	return TRUE;
+      default:
+	assert(0);
+        return FALSE;
+    }
+  }
+
+  return TRUE;
+}
+
+
+static int
+set_graph(turtle_state *ts, resource *r, resource **old)
+{ if ( old )
+  { *old = ts->current_graph;
+  } else
+  { if ( ts->current_graph && ts->current_graph != ts->default_graph )
+      free_resource(ts, ts->current_graph);
+  }
+  ts->current_graph = r;
+
+  return TRUE;
+}
+
+
+static int
+set_default_graph(turtle_state *ts, resource *r, resource **old)
+{ if ( old )
+  { *old = ts->default_graph;
+  } else
+  { if ( ts->default_graph )
+      free_resource(ts, ts->default_graph);
+  }
+  ts->default_graph = r;
 
   return TRUE;
 }
@@ -1193,16 +1290,44 @@ put_object(turtle_state *ts, term_t t, object *o)
 
 
 static int
+put_graph(turtle_state *ts, term_t g)
+{ resource *cg;
+
+  if ( (cg=ts->current_graph) )
+  { IOPOS *pos;
+
+    if ( !cg->v.r.handle )
+    { cg->v.r.handle = PL_new_atom_wchars(wcslen(cg->v.r.name), cg->v.r.name);
+    }
+
+    if ( (pos=ts->input->position) )
+    { PL_put_variable(g);
+      return PL_unify_term(g, PL_FUNCTOR, FUNCTOR_colon2,
+			        PL_ATOM, cg->v.r.handle,
+			        PL_INT,  (int)pos->lineno);
+    } else
+    { return PL_put_atom(g, cg->v.r.handle);
+    }
+  } else
+  { return TRUE;
+  }
+}
+
+
+static int
 got_triple(turtle_state *ts, resource *s, resource *p, object *o)
-{ ts->count++;
+{ if ( ts->count++ == 0 && ts->format == D_AUTO )
+    set_format(ts, D_TURTLE);
 
   if ( ts->tail )
-  { term_t av = PL_new_term_refs(3);
+  { term_t av = PL_new_term_refs(4);
+    functor_t rdff = (ts->current_graph ? FUNCTOR_rdf4 : FUNCTOR_rdf3);
 
     if ( put_resource(ts, av+0, s) &&
 	 put_resource(ts, av+1, p) &&
 	 put_object(  ts, av+2, o) &&
-	 PL_cons_functor_v(av+0, FUNCTOR_rdf3, av) &&
+	 put_graph(   ts, av+3)    &&
+	 PL_cons_functor_v(av+0, rdff, av) &&
 	 PL_unify_list(ts->tail, ts->head, ts->tail) &&
 	 PL_unify(ts->head, av+0) )
     { PL_reset_term_refs(av+0);
@@ -2381,6 +2506,11 @@ sparql_prefix_directive(turtle_state *ts)
 }
 
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+final_predicate_object_list() is called from statement() after resolving
+the subject.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 static int
 final_predicate_object_list(turtle_state *ts)
 { return ( read_predicate_object_list(ts, '.') &&
@@ -2389,22 +2519,83 @@ final_predicate_object_list(turtle_state *ts)
 
 
 static int
-statement(turtle_state *ts)
+graph_or_final_predicate_object_list(turtle_state *ts, resource *r)
 { if ( !skip_ws(ts) )
+    return FALSE;
+
+  if ( ts->current_char == '{' )
+  { switch ( ts->format )
+    { case D_AUTO:
+	set_format(ts, D_TRIG);
+	/*FALLTHROUGH*/
+      case D_TRIG:
+	if ( !ts->current_graph )
+	{ set_graph(ts, r, NULL);
+	  return next(ts) && statement(ts);
+	} else
+	{ return syntax_error(ts,
+			      "TriG: Unexpected \"{\" (nested graphs "
+			      "are not allowed)");
+	}
+      case D_TURTLE:
+	return syntax_error(ts, "Unexpected \"{\" in Turtle format "
+			        "(try format(trig))");
+      default:
+	assert(0);
+        return FALSE;
+    }
+  } else
+  { set_subject(ts, r, NULL);
+
+    return final_predicate_object_list(ts);
+  }
+}
+
+
+static int
+statement(turtle_state *ts)
+{ retry:
+
+  if ( !skip_ws(ts) )
     return FALSE;
 
   switch ( ts->current_char )
   { case '@':				/* directive */
     { return next(ts) && directive(ts);
     }
+    case '}':
+    { if ( ts->format == D_TRIG )
+      { set_graph(ts, NULL, NULL);
+	return next(ts);			/* return } as empty triple set */
+      } else
+	return syntax_error(ts, "Unexpected \"}\" in Turtle format");
+    }
+    case '{':
+    { switch( ts->format )
+      { case D_AUTO:
+	  set_format(ts, D_TRIG);
+	  /*FALLTHROUGH*/
+        case D_TRIG:
+	  if ( !ts->current_graph )
+	  { if ( !next(ts) )
+	      return FALSE;
+	    set_graph(ts, ts->default_graph, NULL);
+	    goto retry;
+	  } else
+	  { return syntax_error(ts,
+				"TriG: Unexpected \"{\" (nested graphs "
+				"are not allowed)");
+	  }
+	case D_TURTLE:
+	  return syntax_error(ts, "Unexpected \"{\" in Turtle format "
+			          "(try format(trig))");
+      }
+    }
     case '<':
     { resource *r;
 
       if ( (r=read_iri_ref(ts)) )
-      { set_subject(ts, r, NULL);
-
-	return final_predicate_object_list(ts);
-      }
+	return graph_or_final_predicate_object_list(ts, r);
       return FALSE;
     }
     case '[':
@@ -2457,17 +2648,13 @@ statement(turtle_state *ts)
 	  r = resolve_iri(ts, NULL, baseBuf(&pn_local));
 	  discardBuf(&pn_local);
 	  if ( r )
-	  { set_subject(ts, r, NULL);
-	    return final_predicate_object_list(ts);
-	  }
+	    return graph_or_final_predicate_object_list(ts, r);
 	}
       } else
       { resource *r;
 
 	if ( (r=resolve_iri(ts, NULL, NULL)) )
-	{ set_subject(ts, r, NULL);
-	  return final_predicate_object_list(ts);
-	}
+	  return graph_or_final_predicate_object_list(ts, r);
       }
 
       return FALSE;
@@ -2504,8 +2691,7 @@ statement(turtle_state *ts)
 	      discardBuf(&pn_local);
 	      if ( r )
 	      { discardBuf(&pn_prefix);
-		set_subject(ts, r, NULL);
-		return final_predicate_object_list(ts);
+		return graph_or_final_predicate_object_list(ts, r);
 	      }
 	    }
 	  } else
@@ -2515,9 +2701,7 @@ statement(turtle_state *ts)
 	    discardBuf(&pn_prefix);
 
 	    if ( r )
-	    { set_subject(ts, r, NULL);
-	      return final_predicate_object_list(ts);
-	    }
+	      return graph_or_final_predicate_object_list(ts, r);
 	  }
 	} else
 	{ discardBuf(&pn_prefix);
@@ -2681,6 +2865,33 @@ create_turtle_parser(term_t parser, term_t in, term_t options)
 	      }
 	      return FALSE;
 	    }
+	    if ( name == ATOM_graph )			/* GRAPH */
+	    { atom_t g;
+	      resource *r;
+
+	      if ( PL_get_atom_ex(arg, &g) &&
+		   (r=atom_resource(ts,g)) &&
+		   set_graph(ts, r, NULL) )
+		continue;
+	      return FALSE;
+	    }
+	    if ( name == ATOM_format )
+	    { atom_t d;
+
+	      if ( PL_get_atom_ex(arg, &d) )
+	      { if ( d == ATOM_turtle )
+		  ts->format = D_TURTLE;
+		else if ( d == ATOM_trig )
+		  ts->format = D_TRIG;
+		else if ( d == ATOM_auto )
+		  ts->format = D_AUTO;
+		else
+		  return PL_domain_error("format_option", arg);
+
+		continue;
+	      }
+	      return FALSE;
+	    }
 	    if ( name == ATOM_on_error )
 	    { atom_t mode;
 
@@ -2703,6 +2914,12 @@ create_turtle_parser(term_t parser, term_t in, term_t options)
       }
       if ( PL_exception(0) || !PL_get_nil_ex(opts) )
 	return FALSE;
+
+      if ( ts->format == D_TRIG &&
+	   ts->current_graph )
+      { ts->default_graph = ts->current_graph;
+	ts->current_graph = NULL;
+      }
 
       if ( unify_turtle_parser(parser, ts) )
 	return TRUE;
@@ -2807,6 +3024,54 @@ turtle_parse(term_t parser, term_t triples, term_t options)
 }
 
 
+/** turtle_graph(+Parser, -Graph) is semidet.
+ *
+ * True when Graph is the current graph of Parser
+*/
+
+static foreign_t
+turtle_graph(term_t parser, term_t graph)
+{ turtle_state *ts;
+
+  if ( get_turtle_parser(parser, &ts) )
+  { if ( ts->current_graph )
+    { term_t tmp = PL_new_term_ref();
+
+      if ( put_resource(ts, tmp, ts->current_graph) )
+	return PL_unify(graph, tmp);
+    }
+  }
+
+  return FALSE;
+}
+
+
+/** turtle_set_graph(+Parser, +Graph) is det.
+ *
+ * Set the notion of the `current graph' for the Turtle parser.
+*/
+
+static foreign_t
+turtle_set_graph(term_t parser, term_t graph)
+{ turtle_state *ts;
+
+  if ( get_turtle_parser(parser, &ts) )
+  { atom_t g;
+
+    if ( PL_get_atom_ex(graph, &g) )
+    { if ( ts->current_graph )
+      { return set_atom_resource(ts->current_graph, g);
+      } else
+      { if ( (ts->current_graph = atom_resource(ts, g)) )
+	  return TRUE;
+      }
+    }
+  }
+
+  return FALSE;
+}
+
+
 static foreign_t
 turtle_prefixes(term_t parser, term_t prefixmap)
 { turtle_state *ts;
@@ -2855,6 +3120,29 @@ turtle_error_count(term_t parser, term_t count)
 
   if ( get_turtle_parser(parser, &ts) )
   { return PL_unify_int64(count, ts->error_count);
+  }
+
+  return FALSE;
+}
+
+
+static foreign_t
+turtle_format(term_t parser, term_t format)
+{ turtle_state *ts;
+
+  if ( get_turtle_parser(parser, &ts) )
+  { atom_t a;
+
+    switch(ts->format)
+    { case D_AUTO:   a = ATOM_auto;   break;
+      case D_TURTLE: a = ATOM_turtle; break;
+      case D_TRIG:   a = ATOM_trig;   break;
+      default:
+	assert(0);
+        return FALSE;
+    }
+
+    return PL_unify_atom(format, a);
   }
 
   return FALSE;
@@ -3141,7 +3429,8 @@ turtle_write_uri(term_t Stream, term_t Value)
 
 install_t
 install_turtle(void)
-{ FUNCTOR_pair2 = PL_new_functor(PL_new_atom("-"), 2);
+{ FUNCTOR_pair2  = PL_new_functor(PL_new_atom("-"), 2);
+  FUNCTOR_colon2 = PL_new_functor(PL_new_atom(":"), 2);
 
   MKFUNCTOR(error,	     2);
   MKFUNCTOR(syntax_error,    1);
@@ -3164,6 +3453,11 @@ install_turtle(void)
   MKATOM(on_error);
   MKATOM(error);
   MKATOM(warning);
+  MKATOM(format);
+  MKATOM(turtle);
+  MKATOM(trig);
+  MKATOM(graph);
+  MKATOM(auto);
 
   PL_register_foreign("create_turtle_parser",  3, create_turtle_parser,  0);
   PL_register_foreign("destroy_turtle_parser", 1, destroy_turtle_parser, 0);
@@ -3171,6 +3465,10 @@ install_turtle(void)
   PL_register_foreign("turtle_prefixes",       2, turtle_prefixes,       0);
   PL_register_foreign("turtle_base",           2, turtle_base,           0);
   PL_register_foreign("turtle_error_count",    2, turtle_error_count,    0);
+
+  PL_register_foreign("turtle_set_graph",      2, turtle_set_graph,      0);
+  PL_register_foreign("turtle_graph",	       2, turtle_graph,          0);
+  PL_register_foreign("turtle_format",	       2, turtle_format,         0);
 
   PL_register_foreign("turtle_pn_local",       1, turtle_pn_local,       0);
   PL_register_foreign("turtle_write_uri",      2, turtle_write_uri,      0);
