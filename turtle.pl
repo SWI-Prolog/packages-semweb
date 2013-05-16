@@ -350,7 +350,16 @@ turtle_write_quoted_string(Out, Text) :-
 	rdf_db:rdf_load_stream/3,
 	rdf_db:rdf_file_type/2.
 
-rdf_db:rdf_load_stream(turtle, Stream, _Module:Options) :-
+%%	rdf_db:rdf_load_stream(+Format, +Stream, :Options)
+%
+%	(Turtle clauses)
+
+rdf_db:rdf_load_stream(turtle, Stream, Options) :-
+	load_turtle_stream(Stream, Options).
+rdf_db:rdf_load_stream(trig, Stream, Options) :-
+	load_turtle_stream(Stream, Options).
+
+load_turtle_stream(Stream, _Module:Options) :-
 	rdf_db:graph(Options, Graph),
 	atom_concat('__', Graph, BNodePrefix),
 	rdf_transaction((  rdf_process_turtle(Stream, assert_triples,
@@ -372,5 +381,6 @@ assert_triple(rdf(S,P,O,G), _) :-
 	rdf_assert(S,P,O,G).
 
 
-rdf_db:rdf_file_type(ttl, turtle).
-rdf_db:rdf_file_type(n3,  turtle).	% not really, but good enough
+rdf_db:rdf_file_type(ttl,  turtle).
+rdf_db:rdf_file_type(n3,   turtle).	% not really, but good enough
+rdf_db:rdf_file_type(trig, trig).

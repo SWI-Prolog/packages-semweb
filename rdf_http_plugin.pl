@@ -168,6 +168,7 @@ rdf_content_type('text/rdf+xml',	  xml).
 rdf_content_type('application/rdf+xml',	  xml).
 rdf_content_type('application/x-turtle',  turtle).
 rdf_content_type('application/turtle',	  turtle).
+rdf_content_type('application/trig',	  trig).
 rdf_content_type('text/turtle',		  turtle).
 rdf_content_type('text/rdf+n3',		  turtle).	% Bit dubious
 rdf_content_type('text/html',		  xhtml).
