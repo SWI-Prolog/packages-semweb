@@ -535,6 +535,8 @@ add_string_hash_map(hash_map *hm,
 		 *	      ERROR		*
 		 *******************************/
 
+static int	next(turtle_state *ts);
+
 static int
 print_warning(term_t t)
 { static predicate_t print_message2;
@@ -569,6 +571,13 @@ syntax_error(turtle_state *ts, const char *msg)
 
   if ( (pos=ts->input->position) )
   { term_t stream;
+    int linepos = pos->linepos;
+    int64_t charno = pos->charno;
+
+    if ( linepos > 0 )
+    { linepos--;
+      charno--;
+    }
 
     if ( !(stream = PL_new_term_ref()) ||
 	 !PL_unify_stream(stream, ts->input) ||
@@ -576,21 +585,18 @@ syntax_error(turtle_state *ts, const char *msg)
 			PL_FUNCTOR, FUNCTOR_stream4,
 			  PL_TERM, stream,
 			  PL_INT, (int)pos->lineno,
-			  PL_INT, (int)(pos->linepos-1), /* one too late */
-			  PL_INT64, (int64_t)(pos->charno-1)) )
+			  PL_INT, linepos,
+			  PL_INT64, charno) )
       return FALSE;
   }
 
   if ( PL_cons_functor_v(ex, FUNCTOR_error2, ex) )
-  { int c;
-
-    for(;;)
-    { c = Sgetcode(ts->input);
-      if ( c == -1 )
-	break;				/* error or end-of-file */
-      if ( c == '.' )
-      { c = Sgetcode(ts->input);
-	if ( is_ws(c) )
+  { for(;;)
+    { if ( !next(ts) || ts->current_char == -1 )
+	break;
+      if ( ts->current_char == '.' )
+      { next(ts);
+	if ( is_ws(ts->current_char) )
 	  break;
       }
     }
@@ -1828,13 +1834,13 @@ static int
 read_short_string(turtle_state *ts, int q, string_buffer *text)
 { do
   { switch(ts->current_char)
-    { case 0x0a:
-      case 0x0d:
+    { case '\n':
+      case '\r':
 	discardBuf(text);
-	return syntax_error(ts, "Illegal character in string");
+	return syntax_error(ts, "Unexpected newline in short string");
       case -1:
 	discardBuf(text);
-	return syntax_error(ts, "End-of-file in string");
+	return syntax_error(ts, "End-of-file in short string");
       case '\\':
       { int c;
 
@@ -2164,6 +2170,8 @@ read_object(turtle_state *ts)
 
 	return rc;
       }
+
+      return FALSE;
     }
     default:				/* Number, true, false or PrefixedName */
       if ( is_digit(ts->current_char) )
