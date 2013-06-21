@@ -29,8 +29,10 @@
 */
 
 :- module(rdf_turtle_write,
-	  [ rdf_save_turtle/2,		% +File, +Options
-	    rdf_save_canonical_turtle/2	% +File, +Options
+	  [ rdf_save_turtle/2,			% +File, +Options
+	    rdf_save_canonical_turtle/2,	% +File, +Options
+	    rdf_save_trig/2,			% +File, +Options
+	    rdf_save_canonical_trig/2		% +File, +Options
 	  ]).
 :- use_module(library(semweb/rdf_db)).
 :- use_module(library(semweb/turtle), []). % we make calls to public preds here
@@ -103,6 +105,7 @@ has the following properties:
 
 :- record
 	tw_state(graph,			% graph being saved
+		 graphs:list(atom),	% TriG graphs being saved
 		 base,			% The base-URI
 		 encoding=utf8,		% Desired encoding
 		 indent:nonneg=8,	% Indent for ; and ,-lists
@@ -122,7 +125,7 @@ has the following properties:
 		 bnode_id=0,		% Incrementing bnode-id
 		 nodeid_map,		% RBTree mapping NodeIDs to Refs
 		 bnode_hash,		% RBTree holding reuse-count of hashes
-		 subject_count,		% # subjects saved
+		 subject_count=0,	% # subjects saved
 		 triple_count=0,	% # triples saved
 		 base_root,		% Root URL of base
 		 base_dir,		% Directory
@@ -132,7 +135,8 @@ has the following properties:
 
 :- meta_predicate
 	rdf_save_turtle(+, :),
-	rdf_save_canonical_turtle(+, :).
+	rdf_save_canonical_turtle(+, :),
+	rdf_save_trig(+, :).
 
 %%	rdf_save_turtle(+Out, :Options) is det.
 %
@@ -204,9 +208,12 @@ rdf_save_turtle(Spec, QOptions) :-
 	init_base(State0, State1),
 	init_prefix_map(State1, State),
 	tw_state_encoding(State, Enc),
-	open_output(Spec, Enc, Stream, Cleanup),
-	call_cleanup(tw_graph(State, Stream),
-		     Cleanup),
+	setup_call_cleanup(
+	    open_output(Spec, Enc, Stream, Cleanup),
+	    ( tw_prefix_map(State, Stream),
+	      tw_graph(State, Stream)
+	    ),
+	    Cleanup),
 	thread_statistics(Me, cputime, T1),
 	Time is T1-T0,
 	tw_state_triple_count(State, SavedTriples),
@@ -219,7 +226,7 @@ rdf_save_turtle(Spec, QOptions) :-
 
 is_meta(expand).
 
-%%	rdf_save_canonical_turtle(+Spec, +Options) is det.
+%%	rdf_save_canonical_turtle(+Spec, :Options) is det.
 %
 %	Save triples in  a  canonical  format.   This  is  the  same  as
 %	rdf_save_turtle/2, but using different defaults. In particular:
@@ -238,19 +245,104 @@ is_meta(expand).
 %	incomplete.
 
 rdf_save_canonical_turtle(Spec, M:Options) :-
-	rdf_save_turtle(Spec,
-			M:[ encoding(utf8),
-			    indent(0),
-			    tab_distance(0),
-			    subject_white_lines(1),
-			    align_prefixes(false),
-			    user_prefixes(false),
-			    comment(false),
-			    group(false),
-			    single_line_bnodes(true),
-			    canonical(true)
-			  | Options
-			  ]).
+	canonical_options(CannonicalOptions, Options),
+	rdf_save_turtle(Spec, M:CannonicalOptions).
+
+canonical_options([ encoding(utf8),
+		    indent(0),
+		    tab_distance(0),
+		    subject_white_lines(1),
+		    align_prefixes(false),
+		    user_prefixes(false),
+		    comment(false),
+		    group(false),
+		    single_line_bnodes(true),
+		    canonical(true)
+		  | Options
+		  ],
+		  Options).
+
+
+%%	rdf_save_trig(+Spec, :Options) is det.
+%
+%	Save multiple RDF graphs into a TriG  file. Options are the same
+%	as   for   rdf_save_turtle/2.   rdf_save_trig/2    ignores   the
+%	graph(+Graph)  option  and  instead   processes  one  additional
+%	option:
+%
+%	  - graphs(+ListOfGraphs)
+%	  List of graphs to save. When omitted, all graphs in the RDF
+%	  store are stored in the TriG file.
+
+rdf_save_trig(Spec, QOptions) :-
+	meta_options(is_meta, QOptions, Options),
+	thread_self(Me),
+	thread_statistics(Me, cputime, T0),
+	must_be(list, Options),
+	make_tw_state(Options, State0, _Rest),
+	init_base(State0, State1),
+	trig_graphs(State1, Graphs),
+	init_prefix_map(State1, Graphs, State2),
+	tw_state_encoding(State2, Enc),
+	setup_call_cleanup(
+	    open_output(Spec, Enc, Stream, Cleanup),
+	    ( tw_prefix_map(State2, Stream),
+	      tw_trig_graphs(Graphs, Stream, State2, State)
+	    ),
+	    Cleanup),
+	thread_statistics(Me, cputime, T1),
+	Time is T1-T0,
+	tw_state_triple_count(State, SavedTriples),
+	tw_state_subject_count(State, SavedSubjects),
+	length(Graphs, SavedGraphs),
+	(   tw_state_silent(State, true)
+	->  true
+	;   print_message(informational,
+			  rdf(saved(Spec, Time, SavedSubjects, SavedTriples, SavedGraphs)))
+	).
+
+%%	rdf_save_canonical_trig(+Spec, :Options) is det.
+%
+%	Save     triples     in     a      canonical     format.     See
+%	rdf_save_canonical_turtle/2 foir details.
+
+
+rdf_save_canonical_trig(Spec, M:Options) :-
+	canonical_options(CannonicalOptions, Options),
+	rdf_save_trig(Spec, M:CannonicalOptions).
+
+tw_trig_graphs([], _, State, State).
+tw_trig_graphs([H|T], Stream, State0, State) :-
+	set_graph_of_tw_state(H, State0, State1),
+	nl(Stream),
+	tw_resource(H, State1, Stream),
+	format(Stream, ' = {~n', []),
+	tw_graph(State1, Stream),
+	format(Stream, '~N}~n', []),
+	set_bnode_id_of_tw_state(0, State1, State2),
+	set_nodeid_map_of_tw_state(_, State2, State3),
+	set_bnode_hash_of_tw_state(_, State3, State4),
+	tw_trig_graphs(T, Stream, State4, State).
+
+
+%%	trig_graphs(+State, -Graphs) is det.
+%
+%	True when Graphs is the (sorted) list of graphs we must save. If
+%	the _expand_ argument is used and   no  graphs are specified, it
+%	enumerates all triples and extracts the graphs.
+
+trig_graphs(State, Graphs) :-
+	tw_state_graphs(State, Graphs),
+	(   nonvar(Graphs)
+	->  true
+	;   tw_state_expand(State, Expand),
+	    (	Expand == lookup
+	    ->	findall(G, rdf_graph(G), Graphs0)
+	    ;	findall(G, call(Expand,_S,_P,_O,G), Graphs0)
+	    ),
+	    sort(Graphs0, Graphs)
+	).
+
 
 %%	open_output(+Spec, +Encoding, -Stream, -Cleanup) is det.
 %
@@ -296,19 +388,35 @@ out_to_file(File, File).
 
 init_prefix_map(State0, State) :-
 	tw_state_graph(State0, Graph),
+	graph_prefix_map(State0, Graph, PrefixMap),
+	set_prefix_map_of_tw_state(PrefixMap, State0, State).
+
+init_prefix_map(State0, Graphs, State) :-	% TriG version
+	maplist(graph_prefixes(State0), Graphs, NestedPrefixes),
+	append(NestedPrefixes, Prefixes0),
+	sort(Prefixes0, Prefixes),
+	prefix_map(Prefixes, PrefixMap),
+	set_prefix_map_of_tw_state(PrefixMap, State0, State).
+
+graph_prefix_map(State0, Graph, PrefixMap) :-
+	graph_prefixes(State0, Graph, Prefixes),
+	prefix_map(Prefixes, PrefixMap).
+
+graph_prefixes(State0, Graph, Prefixes) :-
 	tw_state_expand(State0, Expand),
 	tw_state_only_known_prefixes(State0, OnlyKnown),
 	rdf_graph_prefixes(Graph, Prefixes,
 			   [ filter(turtle_prefix(OnlyKnown)),
 			     expand(Expand),
 			     min_count(2)
-			   ]),
+			   ]).
+
+prefix_map(Prefixes, PrefixMap) :-
 	remove_base(State0, Prefixes, Prefixes2),
 	prefix_names(Prefixes2, State0, Pairs),
 	transpose_pairs(Pairs, URI_Abrevs),
 	reverse(URI_Abrevs, RURI_Abrevs),
-	flip_pairs(RURI_Abrevs, PrefixMap),
-	set_prefix_map_of_tw_state(PrefixMap, State0, State).
+	flip_pairs(RURI_Abrevs, PrefixMap).
 
 
 %%	turtle_prefix(+OnlyKnown, +Where, +Prefix, +URI) is semidet.
@@ -480,11 +588,9 @@ root_part(port(_)).
 %	@tbd Write unconnected and multi-connected blank-nodes.
 
 tw_graph(State, Out) :-
-	tw_state_prefix_map(State, PrefixMap),
-	tw_prefix_map(PrefixMap, State, Out),
 	subjects(State, Subjects),
 	length(Subjects, SubjectCount),
-	tw_state_subject_count(State, SubjectCount),
+	inc_subject_count(State, SubjectCount),
 	partition(rdf_is_bnode, Subjects, BNodes, ProperSubjects),
 	maplist(pair_var, BNodes, Pairs),
 	ord_list_to_rbtree(Pairs, BNTree),
@@ -499,6 +605,9 @@ tw_graph(State, Out) :-
 
 pair_var(BNode, BNode-_).
 
+tw_prefix_map(State, Out) :-
+	tw_state_prefix_map(State, PrefixMap),
+	tw_prefix_map(PrefixMap, State, Out).
 
 %%	tw_prefix_map(+PrefixMap, +State, +Out) is det.
 %
@@ -968,7 +1077,6 @@ subject_triples(URI, State, Pairs) :-
 %	State.
 
 subjects(State, Subjects) :-
-	tw_state_graph(State, Graph),
 	tw_state_expand(State, Expand),
 	(   Expand == lookup,
 	    atom(Graph),
@@ -1248,10 +1356,20 @@ inc_triple_count(State, Count) :-
 	C1 is C0+Count,
 	nb_set_triple_count_of_tw_state(C1, State).
 
+inc_subject_count(State, Count) :-
+	tw_state_subject_count(State, C0),
+	C1 is C0+Count,
+	nb_set_subject_count_of_tw_state(C1, State).
+
 :- multifile
 	prolog:message//1.
 
 prolog:message(rdf(saved(File, Time, SavedSubjects, SavedTriples))) -->
 	[ 'Saved ~D triples about ~D subjects into ~p (~3f sec)'-
 	  [SavedTriples, SavedSubjects, File, Time]
+	].
+prolog:message(rdf(saved(File, Time, SavedSubjects, SavedTriples,
+			 SavedGraphs))) -->
+	[ 'Saved ~D graphs, ~D triples about ~D subjects into ~p (~3f sec)'-
+	  [SavedGraphs, SavedTriples, SavedSubjects, File, Time]
 	].
