@@ -57,6 +57,7 @@ streaming RDF and graph manipulation tasks.
 
 
 \section{Introduction}
+\label{sec:semweb-intro}
 
 The core of the SWI-Prolog package \file{semweb} is an efficient
 main-memory RDF store written in C that is tightly integrated with
@@ -126,6 +127,7 @@ for prototyping systems that deal with streaming RDF data.
 
 
 \section{Scalability}
+\label{sec:semweb-scalability}
 
 Depending on the OS and further application restrictions, the SWI-Prolog
 RDF stores scales to about 15~million triples on 32-bit hardware. On
@@ -136,7 +138,7 @@ data and/or restore the database from the persistent file backup.
 Performance depends highly on hardware, concurrent performance and
 whether or not the data is spread over multiple (named) graphs that can
 be loaded in parallel. Restoring over 20~million triples per minute is
-feasible on medium hardware (Intel i7/2600 running Ubuntu 12.10).
+feasible on medium hardware (Intel i7/{2600} running Ubuntu 12.10).
 
 
 		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -145,6 +147,7 @@ feasible on medium hardware (Intel i7/2600 running Ubuntu 12.10).
 
 
 \section{library(semweb/rdf_db): The RDF database}
+\label{sec:semweb-rdf-db}
 
 \input{rdfdb}
 
@@ -812,6 +815,7 @@ taken in the \pllib{semweb/rdfs.p}l library, providing calls like
 
 
 \subsection{Hierarchy and class-individual relations}
+\label{sec:semweb-rdfs-classes}
 
 The predicates in this section explore the \const{rdfs:subPropertyOf},
 \const{rdfs:subClassOf} and \const{rdf:type} relations.  Note that the
@@ -853,6 +857,7 @@ by \arg{Class}.
 \end{description}
 
 \subsection{Collections and Containers}
+\label{sec:semweb-rdfs-containers}
 
 \index{parseType,Collection}%
 \index{Collection,parseType}%
@@ -895,6 +900,7 @@ database \arg{DB}.
 
 
 \section{Related packages}
+\label{sec:semweb-related-packages}
 
 \index{ClioPatria}\index{SPARQL}%
 The core infrastructure for storing and querying RDF is provided by this
@@ -917,6 +923,7 @@ external DL reasoner using DIG.
 		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \section{Version 3 release notes}
+\label{sec:semweb-version3}
 
 RDF-DB version 3 is a major redesign of the SWI-Prolog RDF
 infrastructure. Nevertheles, version~3 is almost perfectly upward

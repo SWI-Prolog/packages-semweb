@@ -32,7 +32,7 @@ G=graph):
     prefix and range search. The plugin library library(semweb/litindex)
     provides indexed search on tokens inside literals.
 
----++ Query the RDF database
+## Query the RDF database {#semweb-query}
 
   * [[rdf/3]]
   * [[rdf/4]]
@@ -41,7 +41,7 @@ G=graph):
   * [[rdf_reachable/3]]
   * [[rdf_reachable/5]]
 
----++ Enumerating objects
+## Enumerating objects {#semweb-enumerate}
 
 The predicates below enumerate the basic objects  of the RDF store. Most
 of these predicates also enumerate objects   that  are not associated to
@@ -56,7 +56,7 @@ by the RDF garbage collector, while others are never reclaimed.
   * [[rdf_graph/1]]
   * [[rdf_current_ns/2]]
 
----++ Modifying the RDF database
+## Modifying the RDF database {#semweb-modify}
 
 The predicates below modify the RDF   store  directly. In addition, data
 may be loaded using rdf_load/2  or   by  restoring a persistent database
@@ -72,7 +72,7 @@ rdf_transaction/3.
   * [[rdf_update/4]]
   * [[rdf_update/5]]
 
----++ Update view, transactions and snapshots
+## Update view, transactions and snapshots {#semweb-update-view}
 
 The update semantics of the RDF database follows the conventional Prolog
 _|logical update view|_. In addition, the RDF database supports
@@ -86,13 +86,13 @@ _transactions_ and _snapshots_.
   * [[rdf_active_transaction/1]]
   * [[rdf_current_snapshot/1]]
 
----++ Type checking predicates
+## Type checking predicates {#semweb-typecheck}
 
   * [[rdf_is_resource/1]]
   * [[rdf_is_bnode/1]]
   * [[rdf_is_literal/1]]
 
----++ Loading and saving to file
+## Loading and saving to file {#semweb-load-save}
 
 The RDF library can read and write triples in RDF/XML and a proprietary
 binary format. There is a plugin interface defined to support additional
@@ -106,7 +106,7 @@ loading Turtle files using rdf_load/2.
   * [[rdf_save/2]]
   * [[rdf_make/0]]
 
----+++ Partial save
+### Partial save {#semweb-partial-save}
 
 Sometimes it is necessary to make more arbitrary selections of material
 to be saved or exchange RDF descriptions over an open network link. The
@@ -118,7 +118,7 @@ are derived from the encoding of the _Stream_, providing support for
   * [[rdf_save_footer/1]]
   * [[rdf_save_subject/3]]
 
----+++ Fast loading and saving
+### Fast loading and saving {#semweb-fast-load-save}
 
 Loading and saving RDF format is relatively slow. For this reason we
 designed a binary format that is more compact, avoids the complications
@@ -134,7 +134,7 @@ library(semweb/rdf_persistency).
   * [[rdf_load_db/1]]
 
 
----++ Graph manipulation
+## Graph manipulation {#semweb-graphs}
 
 Many RDF stores turned triples into quadruples. This store is no
 exception, initially using the 4th argument to store the filename from
@@ -148,7 +148,7 @@ track origin, changes and modified state.
   * [[rdf_set_graph/2]]
 
 
----++ Literal matching and indexing
+## Literal matching and indexing {#semweb-literals}
 
 Literal values are ordered and indexed using a _|skip list|_ The aim of
 this index is threefold.
@@ -189,7 +189,7 @@ literal(prefix(Prefix), Literal) as well as literal(like(Like), Literal)
 if _Like_ does not start with a `*'. Note that results of queries that
 use the tree index are returned in alphabetical order.
 
----++ Predicate properties
+## Predicate properties {#semweb-predicates}
 
 The predicates below form an experimental interface to provide more
 reasoning inside the kernel of the rdb_db engine. Note that =symetric=,
@@ -202,7 +202,7 @@ as an instance of rdf:Property.
   * [[rdf_set_predicate/2]]
   * [[rdf_predicate_property/2]]
 
----++ Prefix Handling
+## Prefix Handling {#semweb-prefixes}
 
 Prolog code often contains references to constant resources with a known
 _prefix_ (also known as XML _namespaces_). For example,
@@ -228,7 +228,7 @@ other predicates do it at runtime.
   * [[rdf_global_object/2]]
   * [[rdf_global_term/2]]
 
----+++ Namespace handling for custom predicates
+### Namespace handling for custom predicates {#semweb-meta}
 
 If we implement a new predicate based on one of the predicates of the
 semweb libraries that expands namespaces, namespace expansion is not
@@ -295,7 +295,7 @@ example produces three clauses with expanded (single-atom) arguments:
   label_predicate(skos:altLabel).
   ==
 
----++ Miscellaneous predicates
+## Miscellaneous predicates {#semweb-misc}
 
 This section describes the remaining predicates of the
 library(semweb/rdf_db) module.
@@ -312,7 +312,7 @@ library(semweb/rdf_db) module.
   * [[rdf_version/1]]
 
 
----++ Memory management considerations
+## Memory management considerations {#semweb-memory-management}
 
 Storing RDF triples in main memory provides much better performance than
 using external databases. Unfortunately, although memory is fairly cheap
@@ -373,7 +373,7 @@ triples for resized hashes.
 
   * [[rdf_set/1]]
 
----+++ The garbage collector
+### The garbage collector {#semweb-gc}
 
 The RDF store has a garbage collector that runs in a separate thread
 named =__rdf_GC=.  The garbage collector removes the following objects:
@@ -395,7 +395,7 @@ Normally, the garbage collector does it job in the background at a low
 priority.  The predicate rdf_gc/0 can be used to reclaim all garbage and
 optimize all indexes.
 
----+++ Warming up the database
+### Warming up the database {#semweb-warming-up}
 
 The RDF store performs many operations lazily or in background threads.
 For maximum performance, perform the following steps:

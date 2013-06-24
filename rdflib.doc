@@ -16,6 +16,7 @@ VoID.
 
 
 \subsection{The Manifest file}
+\label{sec:semweb-rdf-manifest}
 
 A manifest file is an RDF file, often in
 \url[Turtle]{http://www.w3.org/TeamSubmission/turtle/} format, that
@@ -93,6 +94,7 @@ declarations.  E.g.\
 \end{description}
 
 \subsubsection{Support for the VoID and VANN vocabularies}
+\label{sec:semweb-void}
 
 The \url[VoID]{http://www.w3.org/TR/void/} aims at resolving the same
 problem as the Manifest files described here. In addition, the
@@ -133,6 +135,7 @@ rdfs:subClassOf cannot be used to specialise the RDF meta vocabulary.
 
 
 \subsubsection{Finding manifest files}
+\label{sec:semweb-find-manifest}
 
 The initial metadata file(s) are loaded into the system using
 rdf_attach_library/1.
@@ -247,6 +250,7 @@ loads two additional manifests referenced by resources encountered in
 
 
 \subsubsection{Referencing resources}
+\label{sec:semweb-manifest-resources}
 
 Resources and manifests are located either on the local filesystem or on
 a network resource. The initial manifest can also be loaded from a file
@@ -302,6 +306,7 @@ definition of the virtual RDFS resource.
 \end{code}
 
 \subsection{Putting it all together}
+\label{sec:semweb-rdflib-example}
 
 In this section we provide skeleton code for filling the RDF database
 from a password protected HTTP repository. The first line loads the
