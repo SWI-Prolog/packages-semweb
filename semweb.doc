@@ -283,7 +283,8 @@ source-code if you want to add new formats or locations.
     \item[\pllib{library(semweb/rdf_turtle)}]
 Load files in the Turtle format.  See \secref{rdfturtle}.
     \item[\pllib{library(semweb/rdf_zlib_plugin)}]
-Load \program{gzip} compressed files transparently.  See \secref{zlib}.
+Load \program{gzip} compressed files transparently. See
+\secref{semweb-zlib}.
     \item[\pllib{library(semweb/rdf_http_plugin)}]
 Load RDF documents from HTTP servers.  See \secref{http}.
     \item[\pllib{library(semweb/rdf_persistency)}]
@@ -327,7 +328,7 @@ True if \arg{Protocol} is a URL protocol recognised by rdf_load/2.
 
 
 \subsection{library(semweb/rdf_zlib_plugin): Reading compressed RDF}
-\label{sec:zlib}
+\label{sec:semweb-zlib}
 
 \index{gz, format}\index{gzip}\index{compressed data}%
 This module uses the \pllib{zlib} library to load compressed files
