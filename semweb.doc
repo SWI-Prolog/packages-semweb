@@ -272,7 +272,7 @@ different input sources (e.g.\ http) and different strategies for
 caching results.
 
 \subsection{Hooks into the RDF library}
-\label{sec:hooks}
+\label{sec:semweb-hooks}
 
 The hooks below are used to add new RDF file formats and sources from
 which to load data to the library. They are used by the modules
