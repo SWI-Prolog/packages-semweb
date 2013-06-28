@@ -39,6 +39,10 @@
 #include "murmur.h"
 #include "turtle_chars.c"
 
+#ifdef __WINDOWS__
+#define swprintf _snwprintf
+#endif
+
 static functor_t FUNCTOR_error2;
 static functor_t FUNCTOR_existence_error2;
 static functor_t FUNCTOR_syntax_error1;
@@ -1221,6 +1225,7 @@ o_name(object *o, char *buf)
     return buf;
   }
   assert(0);
+  return NULL;
 }
 
 
@@ -1243,7 +1248,7 @@ put_resource(turtle_state *ts, term_t t, resource *r)
 	  wcscpy(ts->bnode.buffer, ts->bnode.prefix);
 	  ts->bnode.prefix_end = &ts->bnode.buffer[plen];
 	}
-	swprintf(ts->bnode.prefix_end, 64, L"%d", r->v.bnode_id);
+	swprintf(ts->bnode.prefix_end, 64, L"%ld", (long)r->v.bnode_id);
 	PL_put_variable(t);
 	return PL_unify_wchars(t, PL_ATOM, (size_t)-1, ts->bnode.buffer);
       } else
