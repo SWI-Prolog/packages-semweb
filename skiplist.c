@@ -74,9 +74,9 @@ cell_height(void)
   int h = 1;
 
   r  = random();
-  if ( RAND_MAX < (1L<<SKIPCELL_MAX_HEIGHT)-1 )
+  if ( RAND_MAX < (1UL<<SKIPCELL_MAX_HEIGHT)-1 )
     r ^= random()<<15;
-  r &= ((1L<<SKIPCELL_MAX_HEIGHT)-1);
+  r &= ((1UL<<SKIPCELL_MAX_HEIGHT)-1);
 
   while(r&0x1)
   { h++;
