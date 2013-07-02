@@ -22,6 +22,9 @@
 */
 
 #include <config.h>
+#ifdef __sun
+#undef HAVE_WCSDUP			/* there is no prototype */
+#endif
 
 #ifdef HAVE_VISIBILITY_ATTRIBUTE
 #define SO_LOCAL __attribute__((visibility("hidden")))
