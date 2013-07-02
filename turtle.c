@@ -24,6 +24,7 @@
 #include <config.h>
 #ifdef __sun
 #undef HAVE_WCSDUP			/* there is no prototype */
+#undef HAVE_WCSCASECMP			/* same problem */
 #endif
 
 #ifdef HAVE_VISIBILITY_ATTRIBUTE
