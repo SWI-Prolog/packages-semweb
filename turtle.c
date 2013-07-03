@@ -2528,11 +2528,32 @@ final_predicate_object_list(turtle_state *ts)
 
 
 static int
-graph_or_final_predicate_object_list(turtle_state *ts, resource *r)
-{ if ( !skip_ws(ts) )
-    return FALSE;
+starts_graph(turtle_state *ts)
+{ if ( ts->current_char == '=' )
+  { if ( !next(ts) ||
+	 !skip_ws(ts) )
+      return -1;			/* input error */
+    if ( ts->current_char == '{' )
+      return TRUE;
+    syntax_error(ts, "TriG: Expected \"{\" after \"=\"");
+    return -1;
+  }
 
   if ( ts->current_char == '{' )
+    return TRUE;
+
+  return FALSE;
+}
+
+
+static int
+graph_or_final_predicate_object_list(turtle_state *ts, resource *r)
+{ int rc;
+
+  if ( !skip_ws(ts) )
+    return FALSE;
+
+  if ( (rc = starts_graph(ts)) == TRUE )
   { switch ( ts->format )
     { case D_AUTO:
 	set_format(ts, D_TRIG);
@@ -2553,11 +2574,12 @@ graph_or_final_predicate_object_list(turtle_state *ts, resource *r)
 	assert(0);
         return FALSE;
     }
-  } else
+  } else if ( rc == FALSE )
   { set_subject(ts, r, NULL);
 
     return final_predicate_object_list(ts);
-  }
+  } else
+    return FALSE;			/* error from starts_graph() */
 }
 
 
