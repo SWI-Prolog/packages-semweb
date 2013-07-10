@@ -395,12 +395,12 @@ init_prefix_map(State0, Graphs, State) :-	% TriG version
 	maplist(graph_prefixes(State0), Graphs, NestedPrefixes),
 	append(NestedPrefixes, Prefixes0),
 	sort(Prefixes0, Prefixes),
-	prefix_map(Prefixes, PrefixMap),
+	prefix_map(State0, Prefixes, PrefixMap),
 	set_prefix_map_of_tw_state(PrefixMap, State0, State).
 
-graph_prefix_map(State0, Graph, PrefixMap) :-
-	graph_prefixes(State0, Graph, Prefixes),
-	prefix_map(Prefixes, PrefixMap).
+graph_prefix_map(State, Graph, PrefixMap) :-
+	graph_prefixes(State, Graph, Prefixes),
+	prefix_map(State, Prefixes, PrefixMap).
 
 graph_prefixes(State0, Graph, Prefixes) :-
 	tw_state_expand(State0, Expand),
@@ -411,9 +411,9 @@ graph_prefixes(State0, Graph, Prefixes) :-
 			     min_count(2)
 			   ]).
 
-prefix_map(Prefixes, PrefixMap) :-
-	remove_base(State0, Prefixes, Prefixes2),
-	prefix_names(Prefixes2, State0, Pairs),
+prefix_map(State, Prefixes, PrefixMap) :-
+	remove_base(State, Prefixes, Prefixes2),
+	prefix_names(Prefixes2, State, Pairs),
 	transpose_pairs(Pairs, URI_Abrevs),
 	reverse(URI_Abrevs, RURI_Abrevs),
 	flip_pairs(RURI_Abrevs, PrefixMap).
