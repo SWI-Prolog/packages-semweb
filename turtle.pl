@@ -237,7 +237,7 @@ process_turtle(Parser, Stream, OnObject, Graph, Options) :-
 %	@tbd	Synchronize with input handling of rdf_db.pl.
 %	@error	existence_error, permission_error
 
-open_input(stream(Stream), Stream, true) :- !,
+open_input(stream(Stream), Stream, Close) :- !,
 	stream_property(Stream, encoding(Old)),
 	(   unicode_encoding(Old)
 	->  Close = true
