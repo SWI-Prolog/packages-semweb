@@ -1078,6 +1078,7 @@ subject_triples(URI, State, Pairs) :-
 
 subjects(State, Subjects) :-
 	tw_state_expand(State, Expand),
+	tw_state_graph(State, Graph),
 	(   Expand == lookup,
 	    atom(Graph),
 	    (   rdf_graph_property(Graph, triples(Count))
