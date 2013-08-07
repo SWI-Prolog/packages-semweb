@@ -562,13 +562,14 @@ rdfe_redo :-
 	(   retract(undo_marker(undo, _))
 	->  last_transaction(TID),
 	    undo_previous(TID, UnDone),
-	    assert(undo_marker(redo, UnDone))
+	    assert(undo_marker(redo, UnDone)),
+	    broadcast(rdf_undo(redo, UnDone))
 	;   retract(undo_marker(redo, TID))
 	->  undo_previous(TID, UnDone),
-	    assert(undo_marker(redo, UnDone))
+	    assert(undo_marker(redo, UnDone)),
+	    broadcast(rdf_undo(redo, UnDone))
 	;   true
-	),
-	broadcast(rdf_undo(redo, UnDone)).
+	).
 
 
 %%	rdfe_can_redo(-TID) is semidet.
