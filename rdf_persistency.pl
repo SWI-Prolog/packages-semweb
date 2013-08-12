@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2002-2012, University of Amsterdam
+    Copyright (C): 2002-2013, University of Amsterdam
 			      VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
@@ -955,7 +955,7 @@ close_journal_(DB) :-
 	;   true
 	).
 
-%	close_journals
+%%	close_journals
 %
 %	Close all open journals.
 
@@ -1038,7 +1038,7 @@ lock_db(Dir) :-
 	flush_output(Out),
 	set_end_of_stream(Out),
 	assert(rdf_lock(Dir, lock(Out, File))),
-	at_halt(unlock_db(Out, File)).
+	at_halt(unlock_db(Dir)).
 
 locked_error(lock, Dir) :-
 	lockfile(Dir, File),
@@ -1058,6 +1058,7 @@ locked_error(open, Dir) :-
 unlock_db(Dir) :-
 	retract(rdf_lock(Dir, lock(Out, File))), !,
 	unlock_db(Out, File).
+unlock_db(_).
 
 unlock_db(Out, File) :-
 	close(Out),
