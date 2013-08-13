@@ -625,6 +625,19 @@ rdf_persistency(DB, true) :-
 	;   true
 	).
 
+%%	rdf_db:property_of_graph(?Property, +Graph) is nondet.
+%
+%	Extend rdf_graph_property/2 with new properties.
+
+:- multifile
+	rdf_db:property_of_graph/2.
+
+rdf_db:property_of_graph(persistent(State), Graph) :-
+	(   blocked_db(Graph, persistency)
+	->  State = true
+	;   State = false
+	).
+
 
 %%	start_monitor is det.
 %%	stop_monitor is det.

@@ -2234,21 +2234,32 @@ modified_graph(SourceURL, Graph) :-
 %	    that the graph was loaded from Source.
 %	    * triples(Count)
 %	    True when Count is the number of triples in Graph.
+%
+%	 Additional graph properties can be added  by defining rules for
+%	 the multifile predicate  property_of_graph/2.   Currently,  the
+%	 following extensions are defined:
+%
+%	    - library(semweb/rdf_persistency)
+%	      - persistent(Boolean)
+%	        Boolean is =true= if the graph is persistent.
 
 rdf_graph_property(Graph, Property) :-
 	rdf_graph(Graph),
-	rdf_graph_property_(Property, Graph).
+	property_of_graph(Property, Graph).
 
-rdf_graph_property_(hash(Hash), Graph) :-
+:- multifile
+	property_of_graph/2.
+
+property_of_graph(hash(Hash), Graph) :-
 	rdf_md5(Graph, Hash).
-rdf_graph_property_(modified(Boolean), Graph) :-
+property_of_graph(modified(Boolean), Graph) :-
 	rdf_graph_modified_(Graph, Boolean, _).
-rdf_graph_property_(source(URL), Graph) :-
+property_of_graph(source(URL), Graph) :-
 	rdf_graph_source_(Graph, URL, _).
-rdf_graph_property_(source_last_modified(Time), Graph) :-
+property_of_graph(source_last_modified(Time), Graph) :-
 	rdf_graph_source_(Graph, _, Time),
 	Time > 0.0.
-rdf_graph_property_(triples(Count), Graph) :-
+property_of_graph(triples(Count), Graph) :-
 	rdf_graph_(Graph, Count).
 
 %%	rdf_set_graph(+Graph, +Property) is det.
