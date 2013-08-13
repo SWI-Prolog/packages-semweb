@@ -634,8 +634,8 @@ rdf_persistency(DB, true) :-
 
 rdf_db:property_of_graph(persistent(State), Graph) :-
 	(   blocked_db(Graph, persistency)
-	->  State = true
-	;   State = false
+	->  State = false
+	;   State = true
 	).
 
 
