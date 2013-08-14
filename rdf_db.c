@@ -6038,7 +6038,7 @@ get_partial_triple(rdf_db *db,
       { if ( !get_literal(db, a, lit, 0) )
 	  return FALSE;
       } else
-      { if ( !get_atom_or_var_ex(a, &lit->value.string) )
+      { if ( !PL_get_atom_ex(a, &lit->value.string) )
 	  return FALSE;
 	lit->objtype = OBJ_STRING;
       }
