@@ -22,7 +22,7 @@
 */
 
 #include <config.h>
-#ifdef __sun
+#if defined(__sun) || __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 1070
 #undef HAVE_WCSDUP			/* there is no prototype */
 #undef HAVE_WCSCASECMP			/* same problem */
 #endif
