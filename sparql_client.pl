@@ -133,7 +133,7 @@ read_reply(MIME, In, VarNames, Row) :-
 	xml_result(Result, Row).
 read_reply(Type, In, _, _) :-
 	read_stream_to_codes(In, Codes),
-	string_to_list(Reply, Codes),
+	string_codes(Reply, Codes),
 	close(In),
 	throw(error(domain_error(sparql_result_document, Type),
 		    context(_, Reply))).
