@@ -1968,7 +1968,8 @@ compat_input(http, SourceURL, url(http, SourceURL)).
 load_graph(_Source, Graph, Options) :-
 	(   option(graph(Graph),    Options)
 	;   option(db(Graph),       Options)
-	;   option(base_uri(Graph), Options)
+	;   option(base_uri(Graph), Options),
+	    Graph \== []
 	),
 	ground(Graph), !.
 load_graph(Source, Graph, _) :-
