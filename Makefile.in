@@ -18,7 +18,7 @@ DOC=semweb
 include ../Makefile.defs
 include common.mk
 CFLAGS+= -I.
-LIBDIR=$(PLBASE)/library/semweb
+PKGPLLIBDIR=$(PLBASE)/library/semweb
 
 # Useful alternatives for debugging
 # COFLAGS+=-gdwarf-2 -g3 -fno-inline
@@ -42,15 +42,15 @@ ntriples.@SO@:	ntriples.o
 turtle.o:	turtle.c turtle_chars.c
 
 install:	$(TARGETS) $(LIBPL)
-		mkdir -p $(DESTDIR)$(LIBDIR)
+		mkdir -p $(DESTDIR)$(PKGPLLIBDIR)
 		mkdir -p $(DESTDIR)$(SOLIBDIR)
 		for f in $(TARGETS); do \
 		  $(INSTALL_PROGRAM) $$f $(DESTDIR)$(SOLIBDIR); \
 		done
 		for f in $(DATA) $(LIBPL); do \
-		  $(INSTALL_DATA) $$f $(DESTDIR)$(LIBDIR); \
+		  $(INSTALL_DATA) $$f $(DESTDIR)$(PKGPLLIBDIR); \
 		done
-		$(INSTALL_DATA) README $(DESTDIR)$(LIBDIR)/README$(TXTEXT)
+		$(INSTALL_DATA) README $(DESTDIR)$(PKGPLLIBDIR)/README$(TXTEXT)
 		$(MKPKGINDEX)
 		$(MKINDEX)
 
@@ -73,7 +73,7 @@ pdf-install::
 
 uninstall::
 		(cd $(SOLIBDIR) && rm -f $(TARGETS))
-		(cd $(PLBASE)/library && rm -f $(LIBPL))
+		(cd $(PKGPLLIBDIR) && rm -f $(LIBPL))
 		$(MKINDEX)
 
 tags::
