@@ -1764,7 +1764,7 @@ read_collection(turtle_state *ts)
 
 static resource *
 read_blank_node_property_list(turtle_state *ts)
-{ resource *olds, *bnode, *oldp;
+{ resource *olds, *bnode, *oldp = NULL;
   int rc;
 
   rc = ( set_anon_subject(ts, &olds) &&
