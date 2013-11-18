@@ -60,23 +60,42 @@ skiplist_debug(int new)
 	((sl)->payload_size + SIZEOF_SKIP_CELL_NOPLAYLOAD(n))
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-On some systems, RAND_MAX is small. We   assume that the C compiler will
-remove the conditional if RAND_MAX is a sufficiently large constant
+We need a logarithmic distribution  the   for  the skiplist cell height.
+Originally, we used random(), but it  appears   that  this is not thread
+safe on MacOS 10.9 (Maverics), leading to   a very poor distribution and
+100 times slower multi-threaded loading of RDF :-(
+
+I considered using mrand48(), but  the  Linux   man  pages  say  this is
+deprecated and new code should use rand().  The manual page also gives a
+reference implementation. We used this and turned   it  into a lock free
+and thread-safe version. This avoids  surprises over different platforms
+and ensures this remains portable.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-#ifndef HAVE_RANDOM
-#define random rand
-#endif
+static unsigned int next = 1536581061;
+
+static unsigned int
+my_rand(void)
+{ unsigned int n, n0;
+
+  do
+  { n0 = next;
+
+    n = n0 * 1103515245 + 12345;
+  } while(n != n0 && !__sync_bool_compare_and_swap(&next, n0, n));
+
+  return((unsigned int)(n/65536) % 32768);
+}
+
 
 static int
 cell_height(void)
 { long r;
   int h = 1;
 
-  r  = random();
-  if ( RAND_MAX < (1UL<<SKIPCELL_MAX_HEIGHT)-1 )
-    r ^= random()<<15;
-  r &= ((1UL<<SKIPCELL_MAX_HEIGHT)-1);
+  r  = my_rand();
+  if ( r == 32767 )			/* all 1-s, create more bits */
+    r = my_rand()<<15;
 
   while(r&0x1)
   { h++;
