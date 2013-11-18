@@ -466,13 +466,14 @@ clean_token_index :-
 create_update_literal_thread(Threads) :-
 	message_queue_create(_,
 			     [ alias(rdf_literal_monitor_queue),
-			       max_size(10000)
+			       max_size(50000)
 			     ]),
 	forall(between(1, Threads, _),
 	       create_index_worker(initial)).
 
 :- dynamic
-	index_worker_id/1.
+	index_worker_id/1,
+	extra_worker_count/1.
 
 create_index_worker(Status) :-
 	(   retract(index_worker_id(Id0))
@@ -482,6 +483,7 @@ create_index_worker(Status) :-
 	succ(Id0, Id1),
 	assertz(index_worker_id(Id1)),
 	atom_concat(rdf_literal_monitor_, Id0, Alias),
+	inc_extra_worker_count(Status),
 	thread_create(monitor_literals(Status), _,
 		      [ alias(Alias)
 		      ]).
@@ -502,6 +504,7 @@ monitor_literals(extra) :-
 		fail
 	    ;	!
 	    ),
+	with_mutex(create_index_worker, dec_extra_worker_count),
 	thread_self(Me),
 	thread_detach(Me).
 
@@ -510,12 +513,43 @@ thread_monitor_literal(new_literal(Literal)) :- !,
 thread_monitor_literal(Action) :- !,
 	monitor_literal(Action).
 
-check_index_workers(Alias) :-
+%%	check_index_workers(+Queue, +Keys)
+%
+%	Increase the number of workers indexing   literals sent to Queue
+%	if the queue gets overful.
+
+check_index_workers(Alias, Keys) :-
+	max_extra_workers(Max),
+	Max > 0,
 	message_queue_property(Queue, alias(Alias)),
 	message_queue_property(Queue, size(Size)),
-	Size > 5000, !,
+	Size > 10000,
+	\+ ( extra_worker_count(Extra),
+	     Extra >= Max
+	   ), !,
+	debug(rdf_litindex,
+	      'Creating extra literal indexer (Queue=~D, Keys=~D)',
+	      [Size, Keys]),
 	with_mutex(create_index_worker, create_index_worker(extra)).
-check_index_workers(_).
+check_index_workers(_, _).
+
+inc_extra_worker_count(extra) :- !,
+	(   retract(extra_worker_count(C0))
+	->  C is C0+1
+	;   C = 1
+	),
+	asserta(extra_worker_count(C)).
+inc_extra_worker_count(_).
+
+dec_extra_worker_count :-
+	retract(extra_worker_count(C0)), !,
+	C is C0-1,
+	asserta(extra_worker_count(C)).
+dec_extra_worker_count.
+
+max_extra_workers(Max) :-
+	current_prolog_flag(cpu_count, Count),
+	Max is Count//2.
 
 
 		 /*******************************
@@ -552,7 +586,10 @@ add_tokens([H|T], Literal, Map) :-
 	;   forall(new_token(H), true),
 	    (	Keys mod 1000 =:= 0
 	    ->	progress(Map, 'Tokens'),
-		check_index_workers(rdf_literal_monitor_queue)
+		(   Keys mod 10000 =:= 0
+		->  check_index_workers(rdf_literal_monitor_queue, Keys)
+		;   true
+		)
 	    ;	true
 	    )
 	),
