@@ -70,7 +70,7 @@ uppercase version for sorting.
 %		Code page to end.
 %
 %		# case(UpperOrLower)
-%		Canonise to upper (default) or lower case.
+%		Canonicalise to upper (default) or lower case.
 
 write_unicode_collate_map(File, Options) :-
 	open(File, write, Out),
