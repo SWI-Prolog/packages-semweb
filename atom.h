@@ -65,7 +65,11 @@ typedef struct atom_info
 #ifdef COMPACT
 typedef unsigned int atom_id;
 #define ATOM_ID_SHIFT	7		/* Sync with SWI-Prolog */
+#if PLVERSION >= 70101
+#define TAG_ATOM	0x00000005L
+#else
 #define TAG_ATOM	0x00000004L
+#endif
 
 #define ATOM_ID(a)	((atom_id)(((uintptr_t)(a))>>ATOM_ID_SHIFT))
 #define ID_ATOM(id)	(((uintptr_t)(id)<<ATOM_ID_SHIFT)|TAG_ATOM)
