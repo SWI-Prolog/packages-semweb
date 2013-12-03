@@ -2290,6 +2290,7 @@ read_object(turtle_state *ts)
 
 	    if ( next(ts) && (r=read_iri(ts, 0)) )
 	    { rc = got_typed_triple(ts, bufSize(&text)-1, baseBuf(&text), r);
+	      free_resource(ts, r);
 	    } else
 	    { rc = FALSE;
 	    }
