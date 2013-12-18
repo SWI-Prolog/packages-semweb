@@ -280,13 +280,16 @@ described below and distributed with the package.  Please examine the
 source-code if you want to add new formats or locations.
 
 \begin{description}
-    \item[\pllib{library(semweb/rdf_turtle)}]
+    \item[\pllib{library(semweb/turtle)}]
 Load files in the Turtle format.  See \secref{rdfturtle}.
     \item[\pllib{library(semweb/rdf_zlib_plugin)}]
 Load \program{gzip} compressed files transparently. See
 \secref{semweb-zlib}.
     \item[\pllib{library(semweb/rdf_http_plugin)}]
 Load RDF documents from HTTP servers.  See \secref{http}.
+    \item[\pllib{library(http/http_ssl_plugin)}]
+May be combined with \pllib{library(semweb/rdf_http_plugin)} to load
+RDF from HTTPS servers.
     \item[\pllib{library(semweb/rdf_persistency)}]
 Provide persistent backup of the triple store.
     \item[\pllib{library(semweb/rdf_cache)}]

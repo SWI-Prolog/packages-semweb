@@ -62,6 +62,7 @@ the RDF database.
 	rdf_db:url_protocol/1.
 
 rdf_db:url_protocol(http).
+rdf_db:url_protocol(https).
 
 
 %%	rdf_extra_headers(-List)
@@ -76,10 +77,15 @@ rdf_extra_headers(
 				     text/rdf+xml; q=0.9, \c
 				     text/turtle, \c
 				     application/x-turtle; q=0.8, \c
-				     */*; q=0.1')
+				     */*; q=0.1'),
+	  cert_verify_hook(ssl_verify)
 	]).
 
 
+rdf_db:rdf_open_hook(https, SourceURL, HaveModified, Stream, Cleanup,
+		     Modified, Format, Options) :-
+	rdf_db:rdf_open_hook(http, SourceURL, HaveModified, Stream, Cleanup,
+			     Modified, Format, Options).
 rdf_db:rdf_open_hook(http, SourceURL, HaveModified, Stream, Cleanup,
 		     Modified, Format, Options) :-
 	modified_since_header(HaveModified, Header),
@@ -107,6 +113,15 @@ rdf_db:rdf_open_hook(http, SourceURL, HaveModified, Stream, Cleanup,
 	;   throw(E)
 	).
 
+:- public ssl_verify/5.
+
+%%	ssl_verify(+SSL, +ProblemCert, +AllCerts, +FirstCert, +Error)
+%
+%	Currently we accept  all  certificates.
+
+ssl_verify(_SSL,
+	   _ProblemCertificate, _AllCertificates, _FirstCertificate,
+	   _Error).
 
 %%	modified_since_header(+LastModified, -ExtraHeaders) is det.
 %

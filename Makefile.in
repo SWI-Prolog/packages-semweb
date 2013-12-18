@@ -135,8 +135,8 @@ clean:		texclean
 		rm -f $(OBJ) *~ *.o *% a.out core config.log
 
 texclean:
-		rm -f $(TEX) $(DOC).aux $(DOC).log $(DOC).out $(DOC).toc \
-		      $(DOC).ilg
+		rm -f $(TEX) $(TEXEXTRA) $(DOC).aux $(DOC).log $(DOC).out \
+		$(DOC).toc $(DOC).ilg
 
 distclean:	clean
 		rm -f $(TARGETS) config.cache config.h config.status Makefile

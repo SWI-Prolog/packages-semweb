@@ -1675,7 +1675,21 @@ rdf_load_db(File) :-
 %	    level =silent=. Otherwise the level is =informational=. See
 %	    also print_message/2.
 %
-%	Other options are forwarded to process_rdf/3.
+%	Other  options  are  forwarded  to  process_rdf/3.  By  default,
+%	rdf_load/2 only loads RDF/XML from files.  It can be extended to
+%	load data from other formats and   locations  using plugins. The
+%	full set of plugins relevant to   support  different formats and
+%	locations is below:
+%
+%	  ==
+%	  :- use_module(library(semweb/turtle)).
+%	  :- use_module(library(semweb/rdf_zlib_plugin)).
+%	  :- use_module(library(semweb/rdf_http_plugin)).
+%	  :- use_module(library(http/http_ssl_plugin)).
+%	  ==
+%
+%	@see	rdf_db:rdf_open_hook/3, library(semweb/rdf_persistency) and
+%		library(semweb/rdf_cache)
 
 :- dynamic
 	rdf_loading/3.				% Graph, Queue, Thread
