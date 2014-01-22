@@ -618,8 +618,9 @@ syntax_error(turtle_state *ts, const char *msg)
     { if ( !next(ts) || ts->current_char == -1 )
 	break;
       if ( ts->current_char == '.' )
-      { next(ts);
-	if ( is_ws(ts->current_char) )
+      { if ( !next(ts) ||
+	     ts->current_char == -1 ||
+	     is_ws(ts->current_char) )
 	  break;
       }
     }
@@ -2403,7 +2404,9 @@ read_end_of_clause(turtle_state *ts)
 { if ( skip_ws(ts) &&
        ts->current_char == '.' &&
        next(ts) &&
-       is_ws(ts->current_char) )
+       ( ts->current_char == -1 ||
+	 is_ws(ts->current_char)
+       ) )
     return TRUE;
 
   return syntax_error(ts, "End of statement expected");
