@@ -92,9 +92,10 @@ one of the extensions =|.ttl|= or =|.n3|=.
 
 %%	rdf_read_turtle(+Input, -Triples, +Options)
 %
-%	Read a stream or file into a set of triples of the format
+%	Read a stream or file into a set of triples or quadruples (if
+%	faced with TRiG input) of the format
 %
-%		rdf(Subject, Predicate, Object)
+%		rdf(Subject, Predicate, Object [, Graph])
 %
 %	The representation is consistent with the SWI-Prolog RDF/XML
 %	and ntriples parsers.  Provided options are:
@@ -107,6 +108,14 @@ one of the extensions =|.ttl|= or =|.n3|=.
 %		Blank nodes are generated as <Prefix>1, <Prefix>2, etc.
 %		If Prefix is not an atom blank nodes are generated as
 %		node(1), node(2), ...
+%
+%		* format(+Format)
+%		One of =auto= (default), =turtle= or =trig=.  The
+%		auto mode switches to TRiG format of there is a
+%		=|{|= before the first triple.  Finally, of the
+%		format is explicitly stated as =turtle= and the
+%		file appears to be a TRiG file, a warning is printed
+%		and the data is loaded while ignoring the graphs.
 %
 %		* resources(URIorIRI)
 %		Officially, Turtle resources are IRIs.  Quite a

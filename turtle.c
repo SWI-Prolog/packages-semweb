@@ -152,7 +152,8 @@ typedef enum error_mode
 typedef enum format
 { D_AUTO = 0,
   D_TURTLE,
-  D_TRIG
+  D_TRIG,
+  D_TRIG_NO_GRAPH			/* read TRiG as Turtle */
 } format;
 
 typedef struct resource
@@ -218,7 +219,7 @@ typedef struct turtle_state
   IOSTREAM     *input;			/* Our input */
   int		current_char;		/* Current character */
   error_mode	on_error;		/* E_* */
-  format	format;			/* D_AUTO, D_TURTLE or D_TRIG */
+  format	format;			/* D_* */
   size_t	error_count;		/* Number of syntax errors */
   size_t	count;			/* Counted triples */
   term_t	head;			/* Head of triple list */
@@ -578,7 +579,7 @@ print_warning(term_t t)
 
 
 static int
-syntax_error(turtle_state *ts, const char *msg)
+syntax_message(turtle_state *ts, const char *msg, int is_error)
 { term_t ex;
   IOPOS *pos;
 
@@ -614,24 +615,37 @@ syntax_error(turtle_state *ts, const char *msg)
   }
 
   if ( PL_cons_functor_v(ex, FUNCTOR_error2, ex) )
-  { for(;;)
-    { if ( !next(ts) || ts->current_char == -1 )
-	break;
-      if ( ts->current_char == '.' )
-      { if ( !next(ts) ||
-	     ts->current_char == -1 ||
-	     is_ws(ts->current_char) )
+  { if ( is_error )
+    { for(;;)
+      { if ( !next(ts) || ts->current_char == -1 )
 	  break;
+	if ( ts->current_char == '.' )
+	{ if ( !next(ts) ||
+	       ts->current_char == -1 ||
+	       is_ws(ts->current_char) )
+	    break;
+	}
       }
     }
 
-    if ( ts->on_error == E_ERROR )
+    if ( is_error && ts->on_error == E_ERROR )
       return PL_raise_exception(ex);
     else
       print_warning(ex);
   }
 
   return FALSE;
+}
+
+
+static int
+syntax_warning(turtle_state *ts, const char *msg)
+{ return syntax_message(ts, msg, FALSE);
+}
+
+static int
+syntax_error(turtle_state *ts, const char *msg)
+{ return syntax_message(ts, msg, TRUE);
 }
 
 
@@ -1086,6 +1100,7 @@ set_format(turtle_state *ts, format fmt)
 	ts->default_graph = ts->current_graph;
         ts->current_graph = NULL;
 	/*FALLTHROUGH*/
+      case D_TRIG_NO_GRAPH:
       case D_TURTLE:
 	ts->format = fmt;
 	return TRUE;
@@ -2572,8 +2587,13 @@ graph_or_final_predicate_object_list(turtle_state *ts, resource *r)
 			      "are not allowed)");
 	}
       case D_TURTLE:
-	return syntax_error(ts, "Unexpected \"{\" in Turtle format "
-			        "(try format(trig))");
+	syntax_warning(ts, "Unexpected \"<graph> {\" in Turtle format "
+		       "(assuming TRiG, ignoring graphs)");
+        set_format(ts, D_TRIG_NO_GRAPH);
+	/*FALLTHROUGH*/
+      case D_TRIG_NO_GRAPH:
+	free_resource(ts, r);		/* discard graph name */
+	return next(ts) && statement(ts);
       default:
 	assert(0);
         return FALSE;
@@ -2602,6 +2622,8 @@ statement(turtle_state *ts)
     { if ( ts->format == D_TRIG )
       { set_graph(ts, NULL, NULL);
 	return next(ts);			/* return } as empty triple set */
+      } else if ( ts->format == D_TRIG_NO_GRAPH )
+      { return next(ts);
       } else
 	return syntax_error(ts, "Unexpected \"}\" in Turtle format");
     }
@@ -2622,8 +2644,14 @@ statement(turtle_state *ts)
 				"are not allowed)");
 	  }
 	case D_TURTLE:
-	  return syntax_error(ts, "Unexpected \"{\" in Turtle format "
-			          "(try format(trig))");
+	  syntax_warning(ts, "Unexpected \"{\" in Turtle format "
+			 "(assuming TRiG, ignoring graphs)");
+	  set_format(ts, D_TRIG_NO_GRAPH);
+	  /*FALLTHROUGH*/
+        case D_TRIG_NO_GRAPH:
+	  if ( !next(ts) )
+	    return FALSE;
+	  goto retry;
       }
     }
     case '<':
@@ -3169,9 +3197,10 @@ turtle_format(term_t parser, term_t format)
   { atom_t a;
 
     switch(ts->format)
-    { case D_AUTO:   a = ATOM_auto;   break;
-      case D_TURTLE: a = ATOM_turtle; break;
-      case D_TRIG:   a = ATOM_trig;   break;
+    { case D_AUTO:          a = ATOM_auto;   break;
+      case D_TURTLE:        a = ATOM_turtle; break;
+      case D_TRIG:          a = ATOM_trig;   break;
+      case D_TRIG_NO_GRAPH: a = ATOM_trig;   break;
       default:
 	assert(0);
         return FALSE;
