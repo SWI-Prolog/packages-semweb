@@ -1621,8 +1621,8 @@ rdf_load_db(File) :-
 
 %%	rdf_load(+FileOrList, :Options) is det.
 %
-%	Load RDF file.  Options provides additional processing options.
-%	Currently defined options are:
+%	Load RDF data. Options provides   additional processing options.
+%	Defined options are:
 %
 %	    * blank_nodes(+ShareMode)
 %	    How to handle equivalent blank nodes.  If =share= (default),
@@ -1667,8 +1667,9 @@ rdf_load_db(File) :-
 %	    If =false=, do not use or create a cache file.
 %
 %	    * register_namespaces(Bool)
-%	    If =true= (default =false=), register xmlns= namespace
-%	    declarations as ns/2 namespaces if there is no conflict.
+%	    If =true= (default =false=), register =xmlns= namespace
+%	    declarations or Turtle =|@prefix|= prefixes using
+%	    rdf_register_prefix/3 if there is no conflict.
 %
 %	    * silent(+Bool)
 %	    If =true=, the message reporting completion is printed using
@@ -1682,7 +1683,8 @@ rdf_load_db(File) :-
 %	locations is below:
 %
 %	  ==
-%	  :- use_module(library(semweb/turtle)).
+%	  :- use_module(library(semweb/turtle)).	% Turtle and TRiG
+%	  :- use_module(library(semweb/rdf_ntriples)).
 %	  :- use_module(library(semweb/rdf_zlib_plugin)).
 %	  :- use_module(library(semweb/rdf_http_plugin)).
 %	  :- use_module(library(http/http_ssl_plugin)).
