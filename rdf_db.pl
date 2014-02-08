@@ -1653,7 +1653,9 @@ rdf_load_db(File) :-
 %	    Named graph in which to load the data.  It is *not* allowed
 %	    to load two sources into the same named graph.  If Graph is
 %	    unbound, it is unified to the graph into which the data is
-%	    loaded.
+%	    loaded.  The default graph is a =file://= URL when loading
+%	    a file or, if the specification is a URL, its normalized
+%	    version without the optional _|#fragment|_.
 %
 %	    * if(Condition)
 %	    When to load the file. One of =true=, =changed= (default) or
@@ -1934,8 +1936,8 @@ source_url(Spec, Protocol, SourceURL) :-
 source_url(FileURL, Protocol, SourceURL) :-		% or return FileURL?
 	uri_file_name(FileURL, File), !,
 	source_file(File, Protocol, SourceURL).
-source_url(SourceURL, Protocol, SourceURL) :-
-	is_url(SourceURL, Protocol), !.
+source_url(SourceURL0, Protocol, SourceURL) :-
+	is_url(SourceURL0, Protocol, SourceURL), !.
 source_url(File, Protocol, SourceURL) :-
 	source_file(File, Protocol, SourceURL).
 
@@ -1946,7 +1948,7 @@ source_file(Spec, file(SExt), SourceURL) :-
 	uri_file_name(SourceURL, Plain).
 
 to_url(URL, URL) :-
-	is_url(URL, _Protocol), !.
+	uri_is_global(URL), !.
 to_url(File, URL) :-
 	absolute_file_name(File, Path),
 	uri_file_name(URL, Path).
@@ -2054,18 +2056,24 @@ valid_extension(Ext) :-
 valid_extension(Ext) :-
 	rdf_storage_encoding(Ext, _).
 
-%%	is_url(+Term, -Protocol) is semidet.
+%%	is_url(@Term, -Scheme, -URL) is semidet.
 %
-%	True if Term is an atom denoting a URL of the given Protocol.
-%	We only support a limited set of protocols as defined by the
-%	extensible predicate url_protocol/1.
+%	True if Term is an atom denoting URL of the given Scheme. URL is
+%	normalized  (see  uri_normalized/2)  and   a  possible  fragment
+%	identifier (#fragment) is removed. This  predicate only succeeds
+%	if  the  scheme  is   registered    using   the  multifile  hook
+%	url_protocol/1.
 
-is_url(URL, Protocol) :-
+is_url(URL, Scheme, FetchURL) :-
 	atom(URL),
-	sub_atom(URL, B, _, _, :), !,
-	sub_atom(URL, 0, B, _, RawProtocol),
-	downcase_atom(RawProtocol, Protocol),
-	url_protocol(Protocol).
+	uri_is_global(URL),
+	uri_normalized(URL, URL1),		% case normalization
+	uri_components(URL1, Components),
+	uri_data(scheme, Components, Scheme0),
+	url_protocol(Scheme0), !,
+	Scheme = Scheme0,
+	uri_data(fragment, Components, _, Components1),
+	uri_components(FetchURL, Components1).
 
 url_protocol(file).			% built-in
 
