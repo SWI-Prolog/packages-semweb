@@ -1959,20 +1959,6 @@ storage_extension(Plain, SExt, File) :-
 	rdf_storage_encoding(SExt, _), !.
 storage_extension(File, '', File).
 
-%%	rdf_input(URL, Source, _BaseURI) is semidet.
-%
-%	@deprecated Only exists to make old ClioPatria rdf_library.pl
-%	work
-
-rdf_input(Spec, Source, _BaseURI) :-
-	source_url(Spec, Class, SourceURL),
-	compat_input(Class, SourceURL, Source).
-
-compat_input(file(Ext), SourceURL, file(Path)) :-
-	uri_file_name(SourceURL, File),
-	file_name_extension(File, Ext, Path).
-compat_input(http, SourceURL, url(http, SourceURL)).
-
 %%	load_graph(+SourceURL, -Graph, +Options) is det.
 %
 %	Graph is the graph into which  we   load  the  data. Tries these
