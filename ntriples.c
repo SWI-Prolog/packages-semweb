@@ -33,6 +33,7 @@ static functor_t FUNCTOR_literal1;
 static functor_t FUNCTOR_type2;
 static functor_t FUNCTOR_lang2;
 static functor_t FUNCTOR_triple3;
+static functor_t FUNCTOR_quad4;
 static functor_t FUNCTOR_error2;
 static functor_t FUNCTOR_syntax_error1;
 static functor_t FUNCTOR_stream4;
@@ -547,6 +548,23 @@ read_predicate(IOSTREAM *in, term_t predicate, int *cp)
 
 
 static int
+read_graph(IOSTREAM *in, term_t graph, int *cp)
+{ int c = *cp;
+  int rc;
+
+  switch ( c )
+  { case '<':
+      rc = read_uniref(in, graph, cp);
+      break;
+    default:
+      return syntax_error(in, "graph expected");
+  }
+
+  return rc;
+}
+
+
+static int
 wrap_literal(term_t lit)
 { return PL_cons_functor_v(lit, FUNCTOR_literal1, lit);
 }
@@ -713,8 +731,8 @@ check_full_stop(IOSTREAM *in, int *cp)
 }
 
 
-static foreign_t
-read_ntriple(term_t from, term_t triple)
+static int
+read_ntuple(term_t from, term_t triple, int arity)
 { IOSTREAM *in;
   int rc;
   int c;
@@ -739,20 +757,39 @@ next:
       } else
 	return FALSE;
     } else
-    { term_t av = PL_new_term_refs(4);
+    { term_t av = PL_new_term_refs(5);	/* room for quad */
 
       rc = (  read_subject(in, av+1, &c) &&
 	      skip_ws(in, &c) &&
 	      read_predicate(in, av+2, &c) &&
 	      skip_ws(in, &c) &&
 	      read_object(in, av+3, &c) &&
-	      skip_ws(in, &c) &&
-	      check_full_stop(in, &c) &&
-	      skip_eol(in, &c)
+	      skip_ws(in, &c)
 	   );
 
       if ( rc )
-      { rc = ( PL_cons_functor_v(av+0, FUNCTOR_triple3, av+1) &&
+      {
+      again:
+	if ( arity == 3 )
+	{ rc = ( check_full_stop(in, &c) &&
+		 skip_eol(in, &c)
+	       );
+	} else if ( arity == 4 )
+	{ rc = ( read_graph(in, av+4, &c) &&
+		 skip_ws(in, &c) &&
+		 check_full_stop(in, &c) &&
+		 skip_eol(in, &c)
+	       );
+	} else
+	{ arity = (c == '<' ? 4 : 3);
+	  goto again;
+	}
+      }
+
+      if ( rc )
+      { functor_t f = arity == 3 ? FUNCTOR_triple3 : FUNCTOR_quad4;
+
+	rc = ( PL_cons_functor_v(av+0, f, av+1) &&
 	       PL_unify(triple, av+0)
 	     );
       }
@@ -760,6 +797,22 @@ next:
   }
 
   return (PL_release_stream(in) && rc);
+}
+
+
+static foreign_t
+read_ntriple(term_t from, term_t triple)
+{ return read_ntuple(from, triple, 3);
+}
+
+static foreign_t
+read_nquad(term_t from, term_t quad)
+{ return read_ntuple(from, quad, 4);
+}
+
+static foreign_t
+read_ntuple2(term_t from, term_t quad)
+{ return read_ntuple(from, quad, 0);
 }
 
 
@@ -779,9 +832,12 @@ install_ntriples(void)
   MKFUNCTOR(type,         2);
   MKFUNCTOR(lang,         2);
   MKFUNCTOR(triple,       3);
+  MKFUNCTOR(quad,         4);
   MKFUNCTOR(error,        2);
   MKFUNCTOR(syntax_error, 1);
   MKFUNCTOR(stream,       4);
 
   PL_register_foreign("read_ntriple", 2, read_ntriple, 0);
+  PL_register_foreign("read_nquad",   2, read_nquad,   0);
+  PL_register_foreign("read_ntuple",  2, read_ntuple2, 0);
 }

@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@cs.vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2013, VU University Amsterdam
+    Copyright (C): 2013-2014, VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License
@@ -29,9 +29,12 @@
 
 :- module(rdf_ntriples,
 	  [ rdf_read_ntriples/3,	% +Input, -Triples, +Options
+	    rdf_read_nquads/3,		% +Input, -Quads, +Options
 	    rdf_process_ntriples/3,	% +Input, :CallBack, +Options
 
-	    read_ntriple/2		% +Stream, -Triple
+	    read_ntriple/2,		% +Stream, -Triple
+	    read_nquad/2,		% +Stream, -Quad
+	    read_ntuple/2		% +Stream, -TripleOrQuad
 	  ]).
 :- use_module(library(record)).
 :- use_module(library(uri)).
@@ -43,15 +46,17 @@
 /** <module> Process files in the RDF N-Triples format
 
 The library(semweb/rdf_ntriples) provides a  fast   reader  for  the RDF
-N-Triples format. N-Triples is  a  simple   format,  originally  used to
-support the W3C RDF test suites. The   current  format has been extended
-and is a subset of the Turtle format (see library(semweb/rdf_turtle)).
+N-Triples and N-Quads format. N-Triples is   a simple format, originally
+used to support the W3C RDF  test   suites.  The current format has been
+extended   and   is   a   subset    of     the    Turtle   format   (see
+library(semweb/rdf_turtle)).
 
-The    API    of    this    library      is    almost    identical    to
-library(semweb/rdf_turtle).  This  module   provides    a   plugin  into
-rdf_load/2, making this predicate support the format =ntriples=.
+The API of this library is   almost identical to library(semweb/turtle).
+This module provides a plugin  into   rdf_load/2,  making this predicate
+support the format =ntriples= and =nquads=.
 
 @see http://www.w3.org/TR/n-triples/
+@tbd Sync with RDF 1.1. specification.
 */
 
 :- predicate_options(rdf_read_ntriples/3, 3,
@@ -59,6 +64,13 @@ rdf_load/2, making this predicate support the format =ntriples=.
 		       base_uri(atom),
 		       error_count(-integer),
 		       on_error(oneof([warning,error]))
+		     ]).
+:- predicate_options(rdf_read_nquads/3, 3,
+		     [ anon_prefix(any), % atom or node(_)
+		       base_uri(atom),
+		       error_count(-integer),
+		       on_error(oneof([warning,error])),
+		       graph(atom)
 		     ]).
 :- predicate_options(rdf_process_ntriples/3, 3,
 		     [ graph(atom),
@@ -81,15 +93,39 @@ rdf_load/2, making this predicate support the format =ntriples=.
 %		=end_of_file=.
 %	@error	syntax_error(Message) on syntax errors
 
+%%	read_nquad(+Stream, -Quad) is det.
+%
+%	Read the next quad from  Stream  as   Quad.  Stream  must have a
+%	byte-oriented encoding and must contain pure ASCII text.
+%
+%	@param	Quad is a term quad(Subject,Predicate,Object,Graph).
+%		Arguments follow the normal conventions of the RDF
+%		libraries.  NodeID elements are mapped to node(Id).
+%		If end-of-file is reached, Quad is unified with
+%		=end_of_file=.
+%	@error	syntax_error(Message) on syntax errors
+
+%%	read_ntuple(+Stream, -Tuple) is det.
+%
+%	Read the next triple or quad from  Stream as Tuple. Tuple is one
+%	of the terms below.  See   read_ntriple/2  and  read_nquad/2 for
+%	details.
+%
+%	  - triple(Subject,Predicate,Object)
+%	  - quad(Subject,Predicate,Object,Graph).
+
 :- record nt_state(anon_prefix,
 		   graph,
 		   on_error:oneof([warning,error])=warning,
+		   format:oneof([ntriples,nquads]),
 		   error_count=0).
 
 
-%%	rdf_read_ntriples(+Input, -Triples, +Options)
+%%	rdf_read_ntriples(+Input, -Triples, +Options) is det.
+%%	rdf_read_nquads(+Input, -Quads, +Options) is det.
 %
-%	True when Triples is a list of triples from Input.  Options:
+%	True when Triples/Quads is a list   of triples/quads from Input.
+%	Options:
 %
 %	  * anon_prefix(+AtomOrNode)
 %	  Prefix nodeIDs with this atom.  If AtomOrNode is the term
@@ -101,12 +137,26 @@ rdf_load/2, making this predicate support the format =ntriples=.
 %	  * error_count(-Count)
 %	  If =on_error= is =warning=, unify Count with th number of
 %	  errors.
+%	  * graph(+Graph)
+%	  For rdf_read_nquads/3, this defines the graph associated
+%	  to _triples_ loaded from the input.  For rdf_read_ntriples/3
+%	  this opion is ignored.
+%
+%	@arg Triples is a list of rdf(Subject, Predicate, Object)
+%	@arg Quads is a list of rdf(Subject, Predicate, Object, Graph)
 
 rdf_read_ntriples(Input, Triples, Options) :-
+	rdf_read_ntuples(Input, Triples, [format(ntriples)|Options]).
+
+rdf_read_nquads(Input, Triples, Options) :-
+	rdf_read_ntuples(Input, Triples, [format(nquads)|Options]).
+
+
+rdf_read_ntuples(Input, Triples, Options) :-
 	setup_call_cleanup(
 	    open_input(Input, Stream, Close),
 	    (	init_state(Input, Options, State0),
-		read_ntriples(Stream, Triples, State0, State)
+		read_ntuples(Stream, Triples, State0, State)
 	    ),
 	    Close),
 	option(error_count(Count), Options, _),
@@ -134,22 +184,22 @@ rdf_process_ntriples(Input, CallBack, Options) :-
 	nt_state_error_count(State, Count).
 
 
-%%	read_ntriples(+Stream, -Triples, +State0, -State)
+%%	read_ntuples(+Stream, -Triples, +State0, -State)
 
-read_ntriples(Stream, Triples, State0, State) :-
-	read_triple(Stream, Triple0, State0, State1),
+read_ntuples(Stream, Triples, State0, State) :-
+	read_ntuple(Stream, Triple0, State0, State1),
 	(   Triple0 == end_of_file
 	->  Triples = [],
 	    State = State1
 	;   map_nodes(Triple0, Triple, State1, State2),
 	    Triples = [Triple|More],
-	    read_ntriples(Stream, More, State2, State)
+	    read_ntuples(Stream, More, State2, State)
 	).
 
 %%	process_ntriple(+Stream, :CallBack, +State0, -State)
 
 process_ntriple(Stream, CallBack, State0, State) :-
-	read_triple(Stream, Triple0, State0, State1),
+	read_ntuple(Stream, Triple0, State0, State1),
 	(   Triple0 == end_of_file
 	->  State = State1
 	;   map_nodes(Triple0, Triple, State1, State2),
@@ -158,30 +208,52 @@ process_ntriple(Stream, CallBack, State0, State) :-
 	    process_ntriple(Stream, CallBack, State2, State)
 	).
 
-%%	read_triple(+Stream, -Triple, +State0, -State) is det.
+%%	read_ntuple(+Stream, -Tuple, +State0, -State) is det.
 %
-%	True when Triple is the next triple on Stream.  May increment
+%	True when Tuple is the next triple on Stream. May increment
 %	the error count on State.
 
-read_triple(Stream, Triple, State0, State) :-
+read_ntuple(Stream, Triple, State0, State) :-
 	nt_state_on_error(State0, error), !,
-	read_ntriple(Stream, Triple),
+	read_ntuple(Stream, Triple, State0),
 	State = State0.
-read_triple(Stream, Triple, State0, State) :-
-	catch(read_ntriple(Stream, Triple), E, true),
+read_ntuple(Stream, Triple, State0, State) :-
+	catch(read_ntuple(Stream, Triple, State0), E, true),
 	(   var(E)
 	->  State = State0
 	;   print_message(warning, E),
 	    nt_state_error_count(State0, EC0),
 	    EC is EC0+1,
 	    set_error_count_of_nt_state(EC, State0, State1),
-	    read_triple(Stream, Triple, State1, State)
+	    read_ntuple(Stream, Triple, State1, State)
 	).
+
+read_ntuple(Stream, Triple, State0) :-
+	nt_state_format(State0, Format),
+	format_read_ntuple(Format, Stream, Triple, State0).
+
+format_read_ntuple(ntriples, Stream, Triple, _) :- !,
+	read_ntriple(Stream, Triple).
+format_read_ntuple(nquads, Stream, Quad, State) :- !,
+	read_ntuple(Stream, Tuple),
+	to_quad(Tuple, Quad, State).
+
+to_quad(Quad, Quad, _) :-
+	functor(Quad, quad, 4), !.
+to_quad(triple(S,P,O), quad(S,P,O,Graph), State) :-
+	nt_state_graph(State, Graph).
+to_quad(end_of_file, end_of_file, _).
+
 
 map_nodes(triple(S0,P0,O0), rdf(S,P,O), State0, State) :-
 	map_node(S0, S, State0, State1),
 	map_node(P0, P, State1, State2),
 	map_node(O0, O, State2, State).
+map_nodes(quad(S0,P0,O0,G0), rdf(S,P,O,G), State0, State) :-
+	map_node(S0, S, State0, State1),
+	map_node(P0, P, State1, State2),
+	map_node(O0, O, State2, State3),
+	map_node(G0, G, State3, State).
 
 map_node(node(NodeId), BNode, State, State) :-
 	nt_state_anon_prefix(State, Prefix),
@@ -247,9 +319,15 @@ init_state(In, Options, State) :-
 	;   atom_concat('__', BaseURI, Prefix)
 	),
 	option(on_error(OnError), Options, warning),
+	option(format(Format), Options, _),
 	rdf_db:graph(Options, Graph),
+	(   var(Graph)
+	->  Graph = user
+	;   true
+	),
 	make_nt_state([ anon_prefix(Prefix),
 			on_error(OnError),
+			format(Format),
 			graph(Graph)
 		      ], State).
 
@@ -264,24 +342,42 @@ init_state(In, Options, State) :-
 
 %%	rdf_db:rdf_load_stream(+Format, +Stream, :Options) is semidet.
 %
-%	Plugin rule that supports loading the =ntriples= format.
+%	Plugin rule that supports loading   the  =ntriples= and =nquads=
+%	formats.
 
 rdf_db:rdf_load_stream(ntriples, Stream, _Module:Options) :-
 	rdf_db:graph(Options, Graph),
-	rdf_transaction((  rdf_process_ntriples(Stream, assert_triples, Options),
+	rdf_transaction((  rdf_process_ntriples(Stream, assert_tuples, Options),
+			   rdf_set_graph(Graph, modified(false))
+			),
+			parse(Graph)).
+rdf_db:rdf_load_stream(nquads, Stream, _Module:Options) :-
+	rdf_db:graph(Options, Graph),
+	(   var(Graph)
+	->  Graph = user
+	;   true
+	),
+	rdf_transaction((  rdf_process_ntriples(Stream, assert_tuples, Options),
 			   rdf_set_graph(Graph, modified(false))
 			),
 			parse(Graph)).
 
-assert_triples([], _).
-assert_triples([rdf(S,P,O)|T], Graph) :-
-	rdf_assert(S,P,O,Graph),
-	assert_triples(T, Graph).
+assert_tuples([], _).
+assert_tuples([H|T], Graph) :-
+	assert_tuple(H, Graph),
+	assert_tuples(T, Graph).
+
+assert_tuple(rdf(S,P,O), Graph) :-
+	rdf_assert(S,P,O,Graph).
+assert_tuple(rdf(S,P,O,Graph), _) :-
+	rdf_assert(S,P,O,Graph).
+
 
 %%	rdf_db:rdf_file_type(+Extension, -Format)
 %
-%	Bind the ntriples reader to files   with the extensions =nt= and
-%	=ntriples=.
+%	Bind the ntriples reader to  files   with  the  extensions =nt=,
+%	=ntriples= and =nquads=.
 
 rdf_db:rdf_file_type(nt,       ntriples).
 rdf_db:rdf_file_type(ntriples, ntriples).
+rdf_db:rdf_file_type(nquads,   nquads).
