@@ -380,4 +380,5 @@ assert_tuple(rdf(S,P,O,Graph), _) :-
 
 rdf_db:rdf_file_type(nt,       ntriples).
 rdf_db:rdf_file_type(ntriples, ntriples).
+rdf_db:rdf_file_type(nq,       nquads).
 rdf_db:rdf_file_type(nquads,   nquads).
