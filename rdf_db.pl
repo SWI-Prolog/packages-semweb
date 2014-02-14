@@ -567,14 +567,14 @@ rdf_expand_args(I0, Arity, Goal, Spec, Expanded) :-
 	rdf_expand_arg(SA, GA, EA),
 	rdf_expand_args(I, Arity, Goal, Spec, Expanded).
 
-rdf_expand_arg(r, A, E) :- !,
-	mk_global(A, E).
-rdf_expand_arg(o, A, E) :- !,
-	rdf_global_object(A, E).
-rdf_expand_arg(t, A, E) :- !,
-	rdf_global_term(A, E).
-rdf_expand_arg(g, A, E) :- !,
-	rdf_global_graph(A, E).
+rdf_expand_arg(r, A, E) :-
+	mk_global(A, E), !.
+rdf_expand_arg(o, A, E) :-
+	rdf_global_object(A, E), !.
+rdf_expand_arg(t, A, E) :-
+	rdf_global_term(A, E), !.
+rdf_expand_arg(g, A, E) :-
+	rdf_global_graph(A, E), !.
 rdf_expand_arg(:, A, E) :- !,
 	expand_goal(A, E).
 rdf_expand_arg(_, A, A).
