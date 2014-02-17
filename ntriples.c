@@ -24,6 +24,7 @@
 #include <SWI-Stream.h>
 #include <SWI-Prolog.h>
 #include <string.h>
+#include <assert.h>
 #include "turtle_chars.c"
 
 static atom_t ATOM_end_of_file;
