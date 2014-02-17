@@ -373,7 +373,7 @@ bufSize(string_buffer *b)
 static const short char_type0[] =
 {   /*0      1      2      3      4      5      6      7
       8      9      A      B      C      D      E      F  */
-     EF,
+  NI|EF,
      NI,    NI,    NI,    NI,    NI,    NI,    NI,    NI,   /* 00-07 */
      NI, WS|NI, EL|NI,	  NI,	 NI, EL|NI,    NI,    NI,   /* 08-0f */
      NI,    NI,    NI,    NI,    NI,    NI,    NI,    NI,   /* 10-17 */
