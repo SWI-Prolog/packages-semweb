@@ -280,7 +280,9 @@ typedef struct string_buffer
 
 static int
 growBuffer(string_buffer *b, int c)
-{ if ( b->buf == b->fast )
+{ assert(c != -1);
+
+  if ( b->buf == b->fast )
   { wchar_t *new = malloc((FAST_BUF_SIZE*2)*sizeof(wchar_t));
 
     if ( new )
