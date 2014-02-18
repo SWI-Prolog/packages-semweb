@@ -351,6 +351,13 @@ consistent.  To add an index:
     * Assign it a (consistent) position in index_col[]
     * If decide wich unindexed queries are best mapped
       to the new index and add them to alt_index[]
+    * Add entries to col_name[], col_avg_len[], col_opt_threshold[]
+    * Deal with the new index in consider_triple_rehash() and
+      initial_size_triple_hash()
+
+Make sure you compile with support for   assert(). If you make a mistake
+in the above, you are likely  to   get  an  assertion failure. Thanks to
+Haitao Zhang for debugging these notes.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #define ICOL(i) (index_col[i])
