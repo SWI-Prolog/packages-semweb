@@ -2021,7 +2021,8 @@ read_short_string(turtle_state *ts, int q, string_buffer *text)
 static int
 read_long_string(turtle_state *ts, int q, string_buffer *text)
 { do
-  { switch(ts->current_char)
+  { retry:
+    switch(ts->current_char)
     { case '\\':
       { int c;
 
@@ -2051,7 +2052,7 @@ read_long_string(turtle_state *ts, int q, string_buffer *text)
 	  { addBuf(text, q);
 	  }
 
-	  addBuf(text, ts->current_char);
+	  goto retry;
 	} else
 	{ addBuf(text, ts->current_char);
 	}
