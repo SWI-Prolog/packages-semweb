@@ -488,14 +488,18 @@ print_command(rdf_load(URL, RDFOptions), Options) :-
 	).
 
 exists_url(URL) :-
-	rdf_db:rdf_input(URL, Source, _BaseURI),
-	existing_url_source(Source).
-
-existing_url_source(file(Path)) :- !,
+	uri_file_name(URL, Path), !,
 	access_file(Path, read).
-existing_url_source(url(http, URL)) :- !,
+exists_url(URL) :-
+	uri_components(URL, Components),
+	uri_data(scheme, Components, Scheme),
+	atom(Scheme),
+	url_scheme(Scheme),
 	catch(http_open(URL, Stream, [ method(head) ]), _, fail),
 	close(Stream).
+
+url_scheme(http).
+url_scheme(https).
 
 
 %%	rdf_list_library
