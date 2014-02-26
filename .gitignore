@@ -41,6 +41,7 @@ sparqlclient.tex
 semweb.tex
 rdfcache.tex
 rdfdb.tex
+rdfa.tex
 doc/*.tex
 g1.rec
 .gdbinit
