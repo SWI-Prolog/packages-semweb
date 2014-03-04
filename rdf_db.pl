@@ -502,7 +502,7 @@ valid_arg(A) :-
 %
 %	  $ r :
 %         The argument must be a resource. If it is a term
-%         <prefix>:<local> it is translated.
+%         _prefix_:_local_ it is translated.
 %
 %	  $ o :
 %	  The argument is an object or resource. See
@@ -510,7 +510,7 @@ valid_arg(A) :-
 %
 %	  $ t :
 %	  The argument is a term that must be translated. Expansion will
-%	  translate all occurences of <prefix>:<local> appearing
+%	  translate all occurences of _prefix_:_local_ appearing
 %	  anywhere in the term. See rdf_global_term/2.
 %
 %	As it is subject to term_expansion/2, the rdf_meta/1 declaration
