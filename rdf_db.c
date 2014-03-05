@@ -137,6 +137,7 @@ static atom_t	ATOM_true;
 static atom_t	ATOM_size;
 static atom_t	ATOM_optimize_threshold;
 static atom_t	ATOM_average_chain_len;
+static atom_t	ATOM_reset;
 
 static atom_t	ATOM_subPropertyOf;
 
@@ -7640,6 +7641,10 @@ rdf_broadcast(broadcast_id id, void *a1, void *a2)
 	  return FALSE;
 	break;
       }
+      case EV_RESET:
+      { PL_put_atom(term, ATOM_reset);
+	break;
+      }
       case EV_CREATE_GRAPH:
       { graph *g = a1;
 	term_t tmp;
@@ -8833,6 +8838,9 @@ rdf_reset_db(void)
 			    "Active queries");
   }
 
+  if ( !rdf_broadcast(EV_RESET, NULL, NULL) )
+    return FALSE;
+
   rc = reset_db(db);
   close_query(q);
 
@@ -9040,6 +9048,7 @@ install_rdf_db(void)
   ATOM_size		  = PL_new_atom("size");
   ATOM_optimize_threshold = PL_new_atom("optimize_threshold");
   ATOM_average_chain_len  = PL_new_atom("average_chain_len");
+  ATOM_reset		  = PL_new_atom("reset");
 
   PRED_call1         = PL_predicate("call", 1, "user");
 
