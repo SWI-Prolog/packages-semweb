@@ -73,10 +73,12 @@ rdf_db:url_protocol(https).
 %	reply with the HTML description rather than the RDF).
 
 rdf_extra_headers(
-	[ request_header('Accept' = 'application/rdf+xml, \c
-				     text/rdf+xml; q=0.9, \c
-				     text/turtle, \c
-				     application/x-turtle; q=0.8, \c
+	[ request_header('Accept' = 'application/x-turtle, \c
+				     application/turtle, \c
+				     application/trig, \c
+				     text/turtle; q=0.9, \c
+				     application/rdf+xml, \c
+				     text/rdf+xml; q=0.8, \c
 				     */*; q=0.1'),
 	  cert_verify_hook(ssl_verify)
 	]).
