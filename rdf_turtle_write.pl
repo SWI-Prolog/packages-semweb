@@ -113,6 +113,7 @@ has the following properties:
 		 silent:boolean=false,	% If true, do not print a message
 		 subject_white_lines:nonneg=1,%Extra lines between subjects
 		 align_prefixes:boolean=true,%Align prefix declarations
+		 prefixes:list,		% Provide prefixes
 		 user_prefixes:boolean=true,% Use rdf_current_ns/2?
 		 only_known_prefixes:boolean=false,% Only use known prefixes
 		 comment:boolean=true,	% write some comments into the file
@@ -166,6 +167,11 @@ has the following properties:
 %	    * only_known_prefixes(+Boolean)
 %	    Only use prefix notation for known prefixes.  Without, some
 %	    documents produce _huge_ amounts of prefixes.
+%	    * prefixes(+List)
+%	    If provided, uses exactly these prefixes.  List is a list
+%	    of prefix specifications, where each specification is either
+%	    a term _Prefix_-_URI_ or a prefix that is known to
+%	    rdf_current_prefix/2.
 %	    * silent(+Boolean)
 %	    If =true= (default =false=), do not print the final
 %	    informational message.
@@ -179,7 +185,7 @@ has the following properties:
 %	    Distance between tab-stops.  `0' forces the library to
 %	    use only spaces for layout.  Default is 8.
 %	    * user_prefixes(+Boolean)
-%	    If =true= (default), use prefixes from rdf_current_ns/2.
+%	    If =true= (default), use prefixes from rdf_current_prefix/2.
 %
 %	The option =expand= allows  for   serializing  alternative graph
 %	representations. It is called through   call/5,  where the first
@@ -387,10 +393,20 @@ out_to_file(File, File).
 %	prefix of the other, the longer one appears first in the list.
 
 init_prefix_map(State0, State) :-
+	tw_state_prefixes(State0, Prefixes),
+	nonvar(Prefixes), !,
+	user_prefix_map(Prefixes, PrefixMap),
+	set_prefix_map_of_tw_state(PrefixMap, State0, State).
+init_prefix_map(State0, State) :-
 	tw_state_graph(State0, Graph),
 	graph_prefix_map(State0, Graph, PrefixMap),
 	set_prefix_map_of_tw_state(PrefixMap, State0, State).
 
+init_prefix_map(State0, _Graphs, State) :-	% TriG version
+	tw_state_prefixes(State0, Prefixes),
+	nonvar(Prefixes), !,
+	user_prefix_map(Prefixes, PrefixMap),
+	set_prefix_map_of_tw_state(PrefixMap, State0, State).
 init_prefix_map(State0, Graphs, State) :-	% TriG version
 	maplist(graph_prefixes(State0), Graphs, NestedPrefixes),
 	append(NestedPrefixes, Prefixes0),
@@ -418,6 +434,29 @@ prefix_map(State, Prefixes, PrefixMap) :-
 	reverse(URI_Abrevs, RURI_Abrevs),
 	flip_pairs(RURI_Abrevs, PrefixMap).
 
+%%	user_prefix_map(+Prefixes, -PrefixMap) is det.
+%
+%	Convert a list of prefix specifications   to  a list Prefix-URI,
+%	longest URI first.
+
+user_prefix_map(Prefixes, PrefixMap) :-
+	must_be(list, Prefixes),
+	maplist(prefix_pair, Prefixes, Pairs),
+	map_list_to_pairs(prefix_length, Pairs, LenPairs),
+	sort(LenPairs, LenPairs1),
+	reverse(LenPairs1, PrefixMap).
+
+prefix_pair(Prefix-URI, Prefix-URI) :- !,
+	must_be(atom, Prefix),
+	must_be(atom, URI).
+prefix_pair(Prefix, Prefix-URI) :-
+	must_be(atom, Prefix),
+	(   rdf_current_prefix(Prefix, URI)
+	->  true
+	;   existence_error(prefix, Prefix)
+	).
+
+prefix_length(_-URI, Len) :- atom_length(URI, Len).
 
 %%	turtle_prefix(+OnlyKnown, +Where, +Prefix, +URI) is semidet.
 %
@@ -427,7 +466,7 @@ prefix_map(State, Prefixes, PrefixMap) :-
 :- public turtle_prefix/4.		% called through rdf_graph_prefixes/3.
 
 turtle_prefix(true, _, Prefix, _) :- !,
-	rdf_current_ns(_, Prefix), !.
+	rdf_current_prefix(_, Prefix), !.
 turtle_prefix(_, _, Prefix, URI) :-
 	sub_atom(Prefix, _, 1, 0, Last),
 	turtle_prefix_char(Last),
@@ -492,7 +531,7 @@ propose_abbrev(_, _, URI, Abbrev) :-
 	well_known_ns(Abbrev, URI), !.
 propose_abbrev(State, _, URI, Abbrev) :-
 	tw_state_user_prefixes(State, true),
-	rdf_current_ns(Abbrev, URI), !.
+	rdf_current_prefix(Abbrev, URI), !.
 propose_abbrev(_, Len, URI, Abbrev) :-
 	namespace_parts(URI, Parts),
 	include(abbrev_part, Parts, Names),
