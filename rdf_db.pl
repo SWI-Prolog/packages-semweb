@@ -1794,6 +1794,7 @@ rdf_load_file(_Ref, _Spec, SourceURL, Protocol, Graph, M, Options) :-
 	statistics(cputime, T0),
 	rdf_open_input(SourceURL, Protocol, Graph,
 		       In, Cleanup, Modified, Format, Options),
+	supported_format(Format, Cleanup),
 	return_modified(Modified, Options),
 	(   Modified == not_modified
 	->  Action = none
@@ -1824,6 +1825,12 @@ rdf_load_file(_Ref, _Spec, SourceURL, Protocol, Graph, M, Options) :-
 	),
 	rdf_statistics_(triples(Graph, Triples)),
 	report_loaded(Action, SourceURL, Graph, Triples, T0, Options).
+
+supported_format(Format, _Cleanup) :-
+	rdf_file_type(_, Format), !.
+supported_format(Format, Cleanup) :-
+	call(Cleanup),
+	existence_error(rdf_format_plugin, Format).
 
 format_action(triples, load) :- !.
 format_action(_, parsed).
