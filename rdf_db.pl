@@ -1449,10 +1449,10 @@ monitor_mask(old_literal,  0x0020).
 monitor_mask(transaction,  0x0040).
 monitor_mask(load,	   0x0080).
 monitor_mask(create_graph, 0x0100).
+monitor_mask(reset,	   0x0200).
 					% prolog defined broadcasts
 monitor_mask(parse,	   0x1000).
-monitor_mask(reset,	   0x2000).
-monitor_mask(unload,	   0x1000).
+monitor_mask(unload,	   0x1000).	% FIXME: Duplicate
 					% mask for all
 monitor_mask(all,	   0xffff).
 

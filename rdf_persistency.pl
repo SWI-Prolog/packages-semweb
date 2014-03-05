@@ -717,6 +717,10 @@ monitor(create_graph(Graph)) :-
 	journal_fd(Graph, Fd),
 	open_transaction(Graph, Fd),
 	sync_journal(Graph, Fd).
+monitor(reset) :-
+	forall(rdf_graph(Graph), delete_db(Graph)).
+					% TBD: Remove empty directories?
+
 monitor(transaction(BE, Id)) :-
 	monitor_transaction(Id, BE).
 
@@ -762,13 +766,6 @@ monitor_transaction(log(Msg, DB), begin(N)) :- !,
 	open_transaction(DB, Fd).
 monitor_transaction(log(Msg, _DB), end(N)) :-
 	monitor_transaction(log(Msg), end(N)).
-monitor_transaction(reset, begin(L)) :-
-	forall(rdf_graph(DB),
-	       monitor_transaction(unload(DB), begin(L))).
-monitor_transaction(reset, end(L)) :-
-	forall(blocked_db(DB, unload),
-	       monitor_transaction(unload(DB), end(L))),
-	retractall(current_transaction_id(_,_)).
 
 
 %%	check_nested(+Level) is semidet.

@@ -579,7 +579,8 @@ typedef enum
   EV_OLD_LITERAL = 0x0020,		/* literal */
   EV_TRANSACTION = 0x0040,		/* id, begin/end */
   EV_LOAD	 = 0x0080,		/* id, begin/end */
-  EV_CREATE_GRAPH= 0x0100		/* graph name */
+  EV_CREATE_GRAPH= 0x0100,		/* graph name */
+  EV_RESET	 = 0x0200		/* reset */
 } broadcast_id;
 
 
