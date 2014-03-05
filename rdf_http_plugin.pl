@@ -82,6 +82,17 @@ rdf_extra_headers(
 	]).
 
 
+%%	rdf_db:rdf_open_hook(+Scheme, +URL, +HaveModified,
+%%			     -Stream, -Cleanup, -Modified, -Format,
+%%			     +Options) is semidet.
+%
+%	Load hook implementation for HTTP(S) URLs.
+%
+%	@arg HaveModified is bound to a timestamp (number) if we already
+%	     have a copy and that copy was modified at HaveModified.
+%	@arg Modified is bound to =unknown=, =not_modified= or a
+%	     timestamp.
+
 rdf_db:rdf_open_hook(https, SourceURL, HaveModified, Stream, Cleanup,
 		     Modified, Format, Options) :-
 	rdf_db:rdf_open_hook(http, SourceURL, HaveModified, Stream, Cleanup,
