@@ -32,9 +32,12 @@
 	  [ rdf_load_turtle/3,			% +Input, -Triples, +Options
 	    rdf_read_turtle/3,			% +Input, -Triples, +Options
 	    rdf_process_turtle/3,		% +Input, :OnObject, +Options
-
+						% re-exports
 	    rdf_save_turtle/2,			% +File, +Options
-	    rdf_save_canonical_turtle/2		% +File, +Options
+	    rdf_save_canonical_turtle/2,	% +File, +Options
+	    rdf_save_trig/2,			% +File, +Options
+	    rdf_save_canonical_trig/2,		% +File, +Options
+	    rdf_save_ntriples/2			% +File, +Options
 	  ]).
 :- use_module(library(option)).
 :- use_module(library(semweb/rdf_db)).

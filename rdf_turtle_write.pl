@@ -32,7 +32,8 @@
 	  [ rdf_save_turtle/2,			% +File, +Options
 	    rdf_save_canonical_turtle/2,	% +File, +Options
 	    rdf_save_trig/2,			% +File, +Options
-	    rdf_save_canonical_trig/2		% +File, +Options
+	    rdf_save_canonical_trig/2,		% +File, +Options
+	    rdf_save_ntriples/2			% +File, +Options
 	  ]).
 :- use_module(library(semweb/rdf_db)).
 :- use_module(library(semweb/turtle), []). % we make calls to public preds here
@@ -57,12 +58,14 @@
 		       subject_white_lines(nonneg),
 		       align_prefixes(boolean),
 		       user_prefixes(boolean),
+		       prefixes(list),
 		       only_known_prefixes(boolean),
 		       comment(boolean),
 		       group(boolean),
 		       single_line_bnodes(boolean),
 		       canonize_numbers(boolean),
 		       canonical(boolean),
+		       a(boolean),
 		       expand(any)
 		     ]).
 :- predicate_options(rdf_save_canonical_turtle/2, 2,
@@ -112,6 +115,7 @@ has the following properties:
 		 tab_distance:nonneg=8,	% Tab distance
 		 silent:boolean=false,	% If true, do not print a message
 		 subject_white_lines:nonneg=1,%Extra lines between subjects
+		 a:boolean=true,	% Use 'a' for rdf:type
 		 align_prefixes:boolean=true,%Align prefix declarations
 		 prefixes:list,		% Provide prefixes
 		 user_prefixes:boolean=true,% Use rdf_current_ns/2?
@@ -143,6 +147,9 @@ has the following properties:
 %
 %	Save an RDF graph as Turtle.  Options processed are:
 %
+%	    * a(+Boolean)
+%	    If =true= (default), use =a= for the predicate =rdf:type=.
+%	    Otherwise use the full resource.
 %	    * align_prefixes(+Boolean)
 %	    Nicely align the @prefix declarations
 %	    * base(+Base)
@@ -267,6 +274,23 @@ canonical_options([ encoding(utf8),
 		  | Options
 		  ],
 		  Options).
+
+
+%%	rdf_save_ntriples(+Spec, :Options) is det.
+%
+%	Save RDF using ntriples format. The  ntriples format is a subset
+%	of Turtle, writing each triple fully qualified on its own line.
+
+rdf_save_ntriples(File, Options):-
+	rdf_save_turtle(File,
+			[ comment(false),
+			  encoding(utf8),
+			  group(false),
+			  prefixes([]),
+			  subject_white_lines(0),
+			  a(false)
+			| Options
+			]).
 
 
 %%	rdf_save_trig(+Spec, :Options) is det.
@@ -920,7 +944,8 @@ tw_write_pvs(Values, P, State, Out) :-
 	tw_write_vs(Values, Indent, State, Out).
 
 tw_predicate(P, State, Out) :-
-	(   rdf_equal(P, rdf:type)
+	(   rdf_equal(P, rdf:type),
+	    tw_state_a(State, true)
 	->  format(Out, 'a', [])
 	;   tw_resource(P, State, Out)
 	).
