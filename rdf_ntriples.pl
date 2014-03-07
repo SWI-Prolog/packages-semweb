@@ -296,7 +296,7 @@ open_input(URL, Stream, close(Stream)) :-
 open_input(File, Stream, close(Stream)) :-
 	absolute_file_name(File, Path,
 			   [ access(read),
-			     extensions([nt, ntriples, ''])
+			     extensions(['', nt, ntriples])
 			   ]),
 	open(Path, read, Stream, [encoding(utf8)]).
 

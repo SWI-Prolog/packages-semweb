@@ -1950,7 +1950,7 @@ source_url(File, Protocol, SourceURL) :-
 
 source_file(Spec, file(SExt), SourceURL) :-
 	findall(Ext, valid_extension(Ext), Exts),
-	absolute_file_name(Spec, File, [access(read), extensions(Exts)]),
+	absolute_file_name(Spec, File, [access(read), extensions([''|Exts])]),
 	storage_extension(Plain, SExt, File),
 	uri_file_name(SourceURL, Plain).
 
