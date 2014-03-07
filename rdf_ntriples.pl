@@ -263,12 +263,20 @@ map_node(Node, Node, State, State).
 
 
 %%	open_input(+Input, -Stream, -Close) is det.
+%
+%	Open input for reading ntriples. The  default encoding is UTF-8.
+%	If the input has a different encoding,   Input  must be a stream
+%	with the correct encoding and the stream type must be =text=.
 
-open_input(stream(Stream), Stream, true) :- !,
-	stream_property(Stream, encoding(Old)),
-	(   n3_encoding(Old)
-	->  true
-	;   domain_error(ntriples_encoding, Old)
+open_input(stream(Stream), Stream, Close) :- !,
+	(   stream_property(Stream, type(binary))
+	->  set_stream(Stream, encoding(utf8)),
+	    Close = set_stream(Stream, type(binary))
+	;   stream_property(Stream, encoding(Old)),
+	    (   n3_encoding(Old)
+	    ->  true
+	    ;   domain_error(ntriples_encoding, Old)
+	    )
 	).
 open_input(Stream, Stream, Close) :-
 	is_stream(Stream), !,
