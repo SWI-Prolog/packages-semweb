@@ -366,6 +366,7 @@ skip_eol(IOSTREAM *in, int *cp)
 		 *******************************/
 
 #define ESCAPED_CODE (-1)
+#define IRI_END      (-2)
 
 static int
 read_hex(IOSTREAM *in, int *cp, int len)
@@ -392,37 +393,28 @@ static int
 get_iri_code(IOSTREAM *in, int *cp)
 { int c = Sgetcode(in);
 
-  switch(c)
-  { case '\r':
-    case '\n':
-      return syntax_error(in, "newline in uriref");
-    case EOF:
-      return syntax_error(in, "EOF in uriref");
-    case '<':
-    case '"':
-    case '{':
-    case '}':
-    case '|':
-    case '^':
-    case '`':
-      return syntax_error(in, "Illegal character in uriref");
-    case '\\':
-    { int c2 = Sgetcode(in);
+  if ( is_iri_char(c) )
+  { *cp = c;
+    return TRUE;
+  }
 
-      switch(c2)
-      { case 'u':	return read_hex(in, cp, 4);
-	case 'U':	return read_hex(in, cp, 8);
-	default:	return syntax_error(in, "illegal escape");
-      }
-    }
-    default:
-    { if ( c > ' ' )
-      { *cp = c;
-	return TRUE;
-      }
-      return syntax_error(in, "Illegal control character in uriref");
+  if ( c == '\\' )
+  { int c2 = Sgetcode(in);
+
+    switch(c2)
+    { case 'u':	return read_hex(in, cp, 4);
+      case 'U':	return read_hex(in, cp, 8);
+      default:	return syntax_error(in, "illegal \\-escape");
     }
   }
+
+  if ( c == '>' )
+    return IRI_END;
+
+  if ( c == '\n' )
+    return syntax_error(in, "newline in uriref");
+
+  return syntax_error(in, "illegal character in uriref");
 }
 
 static int
@@ -435,25 +427,21 @@ read_uniref(IOSTREAM *in, term_t subject, int *cp)
   { int rc;
 
     if ( (rc=get_iri_code(in, &c)) == TRUE )
-    { switch(c)
-      { case '>':
-	{ int rc = PL_unify_wchars(subject, PL_ATOM,
-				   bufSize(&buf), baseBuf(&buf));
-	  discardBuf(&buf);
-	  *cp = Sgetcode(in);
-	  return rc;
-	}
-	default:
-	  if ( !addBuf(&buf, c) )
-	  { discardBuf(&buf);
-	    return FALSE;
-	  }
+    { if ( !addBuf(&buf, c) )
+      { discardBuf(&buf);
+	return FALSE;
       }
     } else if ( rc == ESCAPED_CODE )
     { if ( !addBuf(&buf, c) )
       { discardBuf(&buf);
 	return FALSE;
       }
+    } else if ( rc == IRI_END )
+    { int rc = PL_unify_wchars(subject, PL_ATOM,
+			       bufSize(&buf), baseBuf(&buf));
+      discardBuf(&buf);
+      *cp = Sgetcode(in);
+      return rc;
     } else
     { discardBuf(&buf);
       return FALSE;
