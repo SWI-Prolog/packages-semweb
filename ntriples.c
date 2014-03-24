@@ -51,56 +51,72 @@ static functor_t FUNCTOR_stream4;
 #define UC	0x10			/* digit */
 #define IV	0x20			/* invalid */
 #define EF	0x80			/* END-OF-FILE */
+#define NI	0x100			/* Not IRI */
+#define EC	0x200			/* Local escape */
 
-static const char char_type0[] =
-{/*0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F  */
-  EF,
-   0,  0,  0,  0,  0,  0,  0,  0,  0, WS, EL,  0,  0, EL,  0,  0, /* 00-0f */
-   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, /* 10-1F */
-  WS,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, /* 20-2F */
-  DI, DI, DI, DI, DI, DI, DI, DI, DI, DI,  0,  0,  0,  0,  0,  0, /* 30-3F */
-   0, UC, UC, UC, UC, UC, UC, UC, UC, UC, UC, UC, UC, UC, UC, UC, /* 40-4F */
-  UC, UC, UC, UC, UC, UC, UC, UC, UC, UC, UC,  0,  0,  0,  0,  0, /* 50-5F */
-   0, LC, LC, LC, LC, LC, LC, LC, LC, LC, LC, LC, LC, LC, LC, LC, /* 60-6F */
-  LC, LC, LC, LC, LC, LC, LC, LC, LC, LC, LC,  0,  0,  0,  0,  0  /* 70-7F */
+static const short char_type0[] =
+{   /*0      1      2      3      4      5      6      7
+      8      9      A      B      C      D      E      F  */
+  NI|EF,
+     NI,    NI,    NI,    NI,    NI,    NI,    NI,    NI,   /* 00-07 */
+     NI, WS|NI, EL|NI,	  NI,	 NI, EL|NI,    NI,    NI,   /* 08-0f */
+     NI,    NI,    NI,    NI,    NI,    NI,    NI,    NI,   /* 10-17 */
+     NI,    NI,    NI,    NI,    NI,    NI,    NI,    NI,   /* 18-1F */
+  NI|WS,    EC,    NI,	  EC,	 EC,	EC,    EC,    EC,   /* 20-27 */
+     EC,    EC,	   EC,	  EC,	 EC,	EC,    EC,    EC,   /* 28-2F */
+     DI,    DI,    DI,    DI,    DI,    DI,    DI,    DI,   /* 30-37 */
+     DI,    DI,     0,	  EC,    NI,	EC,    NI,    EC,   /* 38-3F */
+     EC,    UC,    UC,    UC,    UC,    UC,    UC,    UC,   /* 40-47 */
+     UC,    UC,    UC,    UC,    UC,    UC,    UC,    UC,   /* 48-4F */
+     UC,    UC,    UC,    UC,    UC,    UC,    UC,    UC,   /* 50-57 */
+     UC,    UC,    UC,     0,    NI,     0,    NI,    EC,   /* 58-5F */
+     NI,    LC,    LC,    LC,    LC,    LC,    LC,    LC,   /* 60-67 */
+     LC,    LC,    LC,    LC,    LC,    LC,    LC,    LC,   /* 68-6F */
+     LC,    LC,    LC,    LC,    LC,    LC,    LC,    LC,   /* 70-77 */
+     LC,    LC,    LC,    NI,    NI,    NI,    EC,     0    /* 78-7F */
 };
 
-static const char* char_type = &char_type0[1];
+static const short* char_type = &char_type0[1];
 
 static inline int
-is_ws(int c)
-{ return c < 128 && char_type[c] == WS;
+is_ws(int c)				/* Turtle: (WS|EL) */
+{ return (c < 128 ? (char_type[c] & (WS)) != 0 : FALSE);
 }
 
 static inline int
 is_eol(int c)
-{ return c < 128 && char_type[c] == EL;
+{ return (c < 128 ? (char_type[c] & EL) != 0 : FALSE);
 }
 
 static inline int
 is_digit(int c)
-{ return c >= '0' && c <= '9';
+{ return (c < 128 ? (char_type[c] & DI) != 0 : FALSE);
 }
 
 static inline int
-is_ascii_letter(int c)
-{ return c < 128 && ((char_type[c] & (LC|UC)) != 0);
+is_scheme_char(int c)
+{ return (c < 128 ? (char_type[c] & (LC|UC)) != 0 : FALSE);
 }
 
-static int
-is_pn_chars_u(int c)
-{ return wcis_pn_chars_base(c) || c == '_' || c == ':';
+static inline int
+is_lang_char1(int c)
+{ return (c < 128 ? (char_type[c] & (LC|UC)) != 0 : FALSE);
 }
 
-static int
-is_pn_chars(int c)
-{ return ( wcis_pn_chars_base(c) ||
-	   is_digit(c) ||
-	   c == '-' ||
-	   wcis_pn_chars_extra(c)
-	 );
+static inline int
+is_lang_char(int c)
+{ return (c < 128 ? (char_type[c] & (LC|UC|DI)) != 0 : FALSE) || c == '-';
 }
 
+static inline int
+is_local_escape(int c)
+{ return (c < 128 ? (char_type[c] & EC) != 0 : FALSE);
+}
+
+static inline int
+is_iri_char(int c)
+{ return (c < 128 ? (char_type[c] & NI) == 0 : TRUE);
+}
 
 static const char hexval0[] =
 {/*0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F  */
@@ -119,6 +135,32 @@ static const char* hexval = &hexval0[1];
 static inline int
 hexd(int c)
 { return (c <= 'f' ? hexval[c] : -1);
+}
+
+
+static inline int
+wcis_pn_chars_u(int c)			/* 164s */
+{ return ( wcis_pn_chars_base(c) ||
+	   c == '_'
+	 );
+}
+
+
+static inline int
+wcis_pn_chars(int c)
+{ return ( wcis_pn_chars_u(c) ||
+	   wcis_pn_chars_extra(c)
+	 );
+}
+
+
+static inline int			/* 2.4 RDF Blank Nodes */
+wcis_pn_chars_du(int c)
+{ return ( wcis_pn_chars_base(c) ||
+	   (c >= '0' && c <= '9') ||
+	   c == '_' ||
+	   wcis_pn_chars_extra(c)
+	 );
 }
 
 
@@ -429,7 +471,7 @@ read_node_id(IOSTREAM *in, term_t subject, int *cp)
     return syntax_error(in, "invalid nodeID");
 
   c = Sgetcode(in);
-  if ( is_pn_chars_u(c) || is_digit(c) )
+  if ( wcis_pn_chars_du(c) )
   { string_buffer buf;
 
     initBuf(&buf);
@@ -439,9 +481,10 @@ read_node_id(IOSTREAM *in, term_t subject, int *cp)
 
       c = Sgetcode(in);
 
-      if ( is_pn_chars(c) )
+      if ( wcis_pn_chars_du(c) )
       { addBuf(&buf, c);
-      } else if ( c == '.' && (is_pn_chars((c2=Speekcode(in))) || c2 == '.') )
+      } else if ( c == '.' &&
+		  (wcis_pn_chars_du((c2=Speekcode(in))) || c2 == '.') )
       { addBuf(&buf, c);
       } else
       { term_t av = PL_new_term_refs(1);
@@ -468,14 +511,14 @@ read_lan(IOSTREAM *in, term_t lan, int *cp)
   int rc;
 
   c = Sgetcode(in);
-  if ( !is_ascii_letter(c) )
+  if ( !is_lang_char1(c) )
     return syntax_error(in, "language tag must start with a-zA-Z");
 
   initBuf(&buf);
   addBuf(&buf, c);
   for(;;)
   { c = Sgetcode(in);
-    if ( is_ascii_letter(c) )
+    if ( is_lang_char(c) )
     { addBuf(&buf, c);
     } else
     { break;
@@ -484,14 +527,14 @@ read_lan(IOSTREAM *in, term_t lan, int *cp)
   while(c=='-')
   { addBuf(&buf, c);
     c = Sgetcode(in);
-    if ( !is_ascii_letter(c) )
+    if ( !is_lang_char(c) )
     { discardBuf(&buf);
       return syntax_error(in, "Illegal language tag");
     }
     addBuf(&buf, c);
     for(;;)
     { c = Sgetcode(in);
-      if ( is_ascii_letter(c) )
+      if ( is_lang_char(c) )
       { addBuf(&buf, c);
       } else
       { break;
