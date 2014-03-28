@@ -1976,14 +1976,21 @@ storage_extension(File, '', File).
 %	  3. The base_uri(BaseURI) option
 %	  4. The source URL
 
-load_graph(_Source, Graph, Options) :-
-	(   option(graph(Graph),    Options)
-	;   option(db(Graph),       Options)
-	;   option(base_uri(Graph), Options),
-	    Graph \== []
-	),
+load_graph(Source, Graph, Options) :-
+	(   option(graph(Graph), Options)
+	;   option(db(Graph), Options)
+	), !,
+	load_graph2(Source, Graph, Options).
+load_graph(Source, Graph, Options) :-
+	load_graph2(Source, Graph, Options).
+
+load_graph2(_, Graph, _) :-
 	ground(Graph), !.
-load_graph(Source, Graph, _) :-
+load_graph2(_Source, Graph, Options) :-
+	option(base_uri(Graph), Options),
+	Graph \== [],
+	ground(Graph), !.
+load_graph2(Source, Graph, _) :-
 	load_graph(Source, Graph).
 
 load_graph(SourceURL, BaseURI) :-
