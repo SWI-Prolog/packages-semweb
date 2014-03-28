@@ -3700,6 +3700,11 @@ collected? The problem is less likely,   because they become ready after
 all active _queries_ started before the reindexing have died, wereas the
 generation stuff depends on longer lived  objects which as snapshots and
 transactions.
+
+t->linked is managed at three placed:   link_triple_hash(), where we are
+sure that the triple is not garbage  (are we, reindex_triple()?), when a
+new index is created and when the triple has been removed from the index
+links (below).
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static inline int
@@ -4248,6 +4253,8 @@ create_triple_hashes(rdf_db *db, int count, int *ic)
 }
 
 
+/* called with queries.write.lock held */
+
 static void
 link_triple_hash(rdf_db *db, triple *t)
 { int ic;
@@ -4311,6 +4318,8 @@ add_triple_consequences(rdf_db *db, triple *t, query *q)
   }
 }
 
+
+/* Called with queries.write.lock held */
 
 int
 link_triple(rdf_db *db, triple *t, query *q)
