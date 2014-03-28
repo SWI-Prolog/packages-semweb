@@ -2421,7 +2421,7 @@ register_graph(rdf_db *db, triple *t)
     db->last_graph = src;
   }
 
-  src->triple_count++;
+  ATOMIC_ADD(&src->triple_count, 1);
 #ifdef WITH_MD5
   if ( src->md5 )
   { md5_byte_t digest[16];
@@ -2446,7 +2446,7 @@ unregister_graph(rdf_db *db, triple *t)
     db->last_graph = src;
   }
 
-  src->triple_count--;
+  ATOMIC_SUB(&src->triple_count, 1);
 #ifdef WITH_MD5
   if ( src->md5 )
   { md5_byte_t digest[16];
