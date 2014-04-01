@@ -3687,10 +3687,6 @@ generation gen.	 There are two thing we can do:
   - Remove any triple that died before gen.  These triples must be left
     to GC.  See also alloc.c.
 
-(*) We must lock, to avoid a   conflict with link_triple_hash(), but the
-latter only puts things at the end of the chain, so we only need to lock
-if we remove a triple near the end.
-
 We count `uncollectable' triples: erased triples that still have queries
 that depend on them. If no  such  triples   exist  there  is no point in
 running GC.
@@ -3727,10 +3723,7 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol,
 
   for(t = fetch_triple(db, bucket->head); t; t=triple_follow_hash(db, t, icol))
   { if ( is_garbage_triple(t, gen, reindex_gen) )
-    { int lock = !t->tp.next[icol];
-
-      if ( lock )
-	simpleMutexLock(&db->queries.write.lock); /* (*) */
+    { simpleMutexLock(&db->queries.write.lock);
 
       if ( prev )
 	prev->tp.next[icol] = t->tp.next[icol];
@@ -3738,9 +3731,6 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol,
 	bucket->head = t->tp.next[icol];
       if ( T_ID(t) == bucket->tail )
 	bucket->tail = T_ID(prev);
-
-      if ( lock )
-	simpleMutexUnlock(&db->queries.write.lock);
 
       collected++;
 
@@ -3756,7 +3746,11 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol,
 	  db->gc.reclaimed_reindexed++;
 	else
 	  db->gc.reclaimed_triples++;
+
+	simpleMutexUnlock(&db->queries.write.lock);
 	free_triple(db, t, TRUE);
+      } else
+      { simpleMutexUnlock(&db->queries.write.lock);
       }
     } else
     { prev=t;
