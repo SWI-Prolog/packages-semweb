@@ -162,8 +162,8 @@ deferred_free(defer_free *df, void *data)
 
 static inline void
 deferred_finalize(defer_free *df, void *data,
-		 void (*finalizer)(void *data, void *client_data),
-		 void *client_data)
+		  void (*finalizer)(void *data, void *client_data),
+		  void *client_data)
 { defer_cell *c = alloc_defer_cell(df);
   defer_cell *o;
 
