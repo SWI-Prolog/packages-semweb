@@ -1291,8 +1291,10 @@ new_predicate_cloud(rdf_db *db, predicate **p, size_t count)
 
 
 static void
-free_predicate_cloud(rdf_db *db, predicate_cloud *cloud)
-{ sub_p_matrix *rm, *rm2;
+finalize_cloud(void *data, void *client)
+{ rdf_db *db = client;
+  predicate_cloud *cloud = data;
+  sub_p_matrix *rm, *rm2;
 
   if ( cloud->members )
     rdf_free(db, cloud->members, sizeof(predicate*)*cloud->size);
@@ -1302,7 +1304,12 @@ free_predicate_cloud(rdf_db *db, predicate_cloud *cloud)
 
     free_reachability_matrix(db, rm);
   }
+}
 
+
+static void
+free_predicate_cloud(rdf_db *db, predicate_cloud *cloud)
+{ finalize_cloud(cloud, db);
 
   rdf_free(db, cloud, sizeof(*cloud));
 }
@@ -1481,7 +1488,8 @@ append_clouds(rdf_db *db,
     c1->alt_hash_count = newc;
   }
 
-  free_predicate_cloud(db, c2);		/* FIXME: Leave to GC */
+  deferred_finalize(&db->defer_clouds, c2,
+		    finalize_cloud, db);
 
   return c1;
 }
