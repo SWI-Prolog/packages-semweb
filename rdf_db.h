@@ -268,14 +268,14 @@ typedef struct literal
       size_t	len;
     } term;				/* external record */
   } value;
-  atom_t	type_or_lang;		/* Type or language for literals */
+  atom_id	type_or_lang;		/* Type or language for literals */
   unsigned int  hash;			/* saved hash */
+  unsigned int	references;		/* # references to me */
   unsigned	objtype : 3;
   unsigned	qualifier : 2;		/* Lang/Type qualifier */
   unsigned	shared : 1;		/* member of shared table */
   unsigned	term_loaded : 1;	/* OBJ_TERM from quick save file */
   unsigned	atoms_locked : 1;	/* Atoms have been locked */
-  unsigned	references : 24;	/* # references to me */
 } literal;
 
 
