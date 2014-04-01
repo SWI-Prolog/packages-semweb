@@ -282,7 +282,7 @@ replay_stream(Graph, In) :-
 	repeat,
 	    read(In, Term),
 	    (	Term == end_of_file
-	    ->	!, close(In)
+	    ->	!
 	    ;	Term = action(Graph,Action),
 		broadcast(graph(Graph, Action)),
 		fail
