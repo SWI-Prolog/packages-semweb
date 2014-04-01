@@ -212,12 +212,12 @@ print_literal(literal *lit)
       { case Q_TYPE:
 	  Sdprintf("%s^^\"%s\"",
 		   PL_atom_chars(lit->value.string),
-		   PL_atom_chars(lit->type_or_lang));
+		   PL_atom_chars(ID_ATOM(lit->type_or_lang)));
 	  break;
 	case Q_LANG:
 	  Sdprintf("%s@\"%s\"",
 		   PL_atom_chars(lit->value.string),
-		   PL_atom_chars(lit->type_or_lang));
+		   PL_atom_chars(ID_ATOM(lit->type_or_lang)));
 	  break;
 	default:
 	{ size_t len;
@@ -2833,6 +2833,7 @@ free_literal(rdf_db *db, literal *lit)
 static literal *
 copy_literal(rdf_db *db, literal *lit)
 { lit->references++;
+  assert(lit->references != 0);
   return lit;
 }
 
@@ -2855,7 +2856,7 @@ lock_atoms_literal(literal *lit)
     { case OBJ_STRING:
 	PL_register_atom(lit->value.string);
 	if ( lit->qualifier )
-	  PL_register_atom(lit->type_or_lang);
+	  PL_register_atom(ID_ATOM(lit->type_or_lang));
 	break;
     }
   }
@@ -2871,7 +2872,7 @@ unlock_atoms_literal(literal *lit)
     { case OBJ_STRING:
 	PL_unregister_atom(lit->value.string);
 	if ( lit->qualifier )
-	  PL_unregister_atom(lit->type_or_lang);
+	  PL_unregister_atom(ID_ATOM(lit->type_or_lang));
 	break;
     }
   }
@@ -2898,7 +2899,7 @@ compare_literals() sorts literals.  Ordering is defined as:
 static int
 cmp_qualifier(const literal *l1, const literal *l2)
 { if ( l1->qualifier == l2->qualifier )
-    return cmp_atoms(l1->type_or_lang, l2->type_or_lang);
+    return cmp_atoms(ID_ATOM(l1->type_or_lang), ID_ATOM(l2->type_or_lang));
 
   return l1->qualifier - l2->qualifier;
 }
@@ -3065,6 +3066,7 @@ share_literal(rdf_db *db, literal *from)
     if ( !skiplist_erased_payload(&db->literals, data) )
     { shared = *data;
       shared->references++;
+      assert(shared->references != 0);
 
       simpleMutexUnlock(&db->locks.literal);
       free_literal(db, from);
@@ -3088,6 +3090,7 @@ share_literal(rdf_db *db, literal *from)
   { existing = existing*0.99+1.0;
     shared = *data;
     shared->references++;
+    assert(shared->references != 0);
   }
   simpleMutexUnlock(&db->locks.literal);
 
@@ -3569,6 +3572,7 @@ reindex_triple(rdf_db *db, triple *t)
   if ( t2->object_is_literal )			/* do not deallocate lit twice */
   { simpleMutexLock(&db->locks.literal);
     t2->object.literal->references++;
+    assert(t2->object.literal->references != 0);
     simpleMutexUnlock(&db->locks.literal);
   }
   t->atoms_locked = FALSE;			/* same for unlock_atoms() */
@@ -4869,7 +4873,7 @@ save_literal(rdf_db *db, IOSTREAM *out, literal *lit, save_context *ctx)
   if ( lit->qualifier )
   { assert(lit->type_or_lang);
     Sputc(lit->qualifier == Q_LANG ? 'l' : 't', out);
-    save_atom(db, out, lit->type_or_lang, ctx);
+    save_atom(db, out, ID_ATOM(lit->type_or_lang), ctx);
   }
 
   switch(lit->objtype)
@@ -5267,6 +5271,7 @@ load_literal(rdf_db *db, IOSTREAM *in, ld_context *ctx, int c)
     lit = fetch_literal(ctx, idx);
     simpleMutexLock(&db->locks.literal);
     lit->references++;
+    assert(lit->references != 0);
     simpleMutexUnlock(&db->locks.literal);
   } else if ( (lit=new_literal(db)) )
   {
@@ -5301,12 +5306,12 @@ load_literal(rdf_db *db, IOSTREAM *in, ld_context *ctx, int c)
       }
       case 'l':
 	lit->qualifier = Q_LANG;
-	lit->type_or_lang = load_atom(db, in, ctx);
+	lit->type_or_lang = ATOM_ID(load_atom(db, in, ctx));
 	c = Sgetc(in);
 	goto value;
       case 't':
 	lit->qualifier = Q_TYPE;
-	lit->type_or_lang = load_atom(db, in, ctx);
+	lit->type_or_lang = ATOM_ID(load_atom(db, in, ctx));
 	c = Sgetc(in);
 	goto value;
       default:
@@ -5833,10 +5838,12 @@ get_literal(rdf_db *db, term_t litt, literal *lit, int flags)
   { lit->objtype = OBJ_DOUBLE;
   } else if ( PL_is_functor(litt, FUNCTOR_lang2) )
   { term_t a = PL_new_term_ref();
+    atom_t tol;
 
     _PL_get_arg(1, litt, a);
-    if ( !get_lit_atom_ex(a, &lit->type_or_lang, flags) )
+    if ( !get_lit_atom_ex(a, &tol, flags) )
       return FALSE;
+    lit->type_or_lang = ATOM_ID(tol);
     _PL_get_arg(2, litt, a);
     if ( !get_lit_atom_ex(a, &lit->value.string, flags) )
       return FALSE;
@@ -5846,10 +5853,12 @@ get_literal(rdf_db *db, term_t litt, literal *lit, int flags)
   } else if ( PL_is_functor(litt, FUNCTOR_type2) &&
 	      !(flags & LIT_TYPED) )	/* avoid recursion */
   { term_t a = PL_new_term_ref();
+    atom_t tol;
 
     _PL_get_arg(1, litt, a);
-    if ( !get_lit_atom_ex(a, &lit->type_or_lang, flags) )
+    if ( !get_lit_atom_ex(a, &tol, flags) )
       return FALSE;
+    lit->type_or_lang = ATOM_ID(tol);
     lit->qualifier = Q_TYPE;
     _PL_get_arg(2, litt, a);
 
@@ -6249,7 +6258,7 @@ unify_literal(term_t lit, literal *l)
       qf = FUNCTOR_type2;
 
     if ( PL_unify_term(lit, PL_FUNCTOR, qf,
-			 PL_ATOM, l->type_or_lang,
+			 PL_ATOM, ID_ATOM(l->type_or_lang),
 			 PL_TERM, v) )
       return TRUE;
 
