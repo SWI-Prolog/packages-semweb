@@ -1750,12 +1750,12 @@ rdf_load_one(Spec, M, Options) :-
 	load_graph(SourceURL, Graph, Options),
 	setup_call_cleanup(
 	    with_mutex(rdf_load_file,
-		       rdf_start_load(Graph, Loading, Options)),
+		       rdf_start_load(SourceURL, Loading)),
 	    rdf_load_file(Loading, Spec, SourceURL, Protocol,
 			  Graph, M, Options),
 	    rdf_end_load(Loading)).
 
-%%	rdf_start_load(+Graph, -WhatToDo) is det.
+%%	rdf_start_load(+SourceURL, -WhatToDo) is det.
 %%	rdf_end_load(+WhatToDo) is det.
 %%	rdf_load_file(+WhatToDo, +Spec, +SourceURL, +Protocol, +Graph,
 %%		      +Module, +Options) is det.
@@ -1770,15 +1770,15 @@ rdf_load_one(Spec, M, Options) :-
 %	@see	Code is modelled closely after how concurrent loading
 %		is handled in SWI-Prolog's boot/init.pl
 
-rdf_start_load(Graph, queue(Queue), _) :-
-	rdf_loading(Graph, Queue, LoadThread),
+rdf_start_load(SourceURL, queue(Queue)) :-
+	rdf_loading(SourceURL, Queue, LoadThread),
 	\+ thread_self(LoadThread), !,
-	debug(rdf(load), 'Graph ~w is being loaded by thread ~w; waiting ...',
-	      [ Graph, LoadThread]).
-rdf_start_load(Graph, Ref, _) :-
+	debug(rdf(load), '~p is being loaded by thread ~w; waiting ...',
+	      [ SourceURL, LoadThread]).
+rdf_start_load(SourceURL, Ref) :-
 	thread_self(Me),
 	message_queue_create(Queue),
-	assertz(rdf_loading(Graph, Queue, Me), Ref).
+	assertz(rdf_loading(SourceURL, Queue, Me), Ref).
 
 rdf_end_load(queue(_)) :- !.
 rdf_end_load(Ref) :-
@@ -1976,14 +1976,21 @@ storage_extension(File, '', File).
 %	  3. The base_uri(BaseURI) option
 %	  4. The source URL
 
-load_graph(_Source, Graph, Options) :-
-	(   option(graph(Graph),    Options)
-	;   option(db(Graph),       Options)
-	;   option(base_uri(Graph), Options),
-	    Graph \== []
-	),
+load_graph(Source, Graph, Options) :-
+	(   option(graph(Graph), Options)
+	;   option(db(Graph), Options)
+	), !,
+	load_graph2(Source, Graph, Options).
+load_graph(Source, Graph, Options) :-
+	load_graph2(Source, Graph, Options).
+
+load_graph2(_, Graph, _) :-
 	ground(Graph), !.
-load_graph(Source, Graph, _) :-
+load_graph2(_Source, Graph, Options) :-
+	option(base_uri(Graph), Options),
+	Graph \== [],
+	ground(Graph), !.
+load_graph2(Source, Graph, _) :-
 	load_graph(Source, Graph).
 
 load_graph(SourceURL, BaseURI) :-
