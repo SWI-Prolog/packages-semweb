@@ -1,5 +1,6 @@
 :- module(test_subprop,
 	  [ test_subprop/0,
+	    test_subprop/1,		% +Seed
 	    test/1,			% +Times
 	    test/2,			% +Graph, +Times
 	    replay/0,
@@ -53,6 +54,12 @@ cleanup(G) :-
 %	Toplevel for non-interactive test
 
 test_subprop :-
+	Seed is random(1000),
+	format(user_error, 'Seed: ~d: ', [Seed]),
+	test_subprop(Seed).
+
+test_subprop(Seed) :-
+	set_random(seed(Seed)),
 	nodebug(subprop),
 	setup_call_cleanup(
 	    asserta((prolog:assertion_failed(Reason, Goal) :-
