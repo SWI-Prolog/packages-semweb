@@ -37,6 +37,7 @@
 #include <SWI-Stream.h>
 #include <SWI-Prolog.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <wchar.h>
 #include <assert.h>
