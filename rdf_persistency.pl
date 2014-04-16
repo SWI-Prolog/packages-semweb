@@ -159,11 +159,7 @@ rdf_attach_db(DirSpec, Options) :-
 			   [ access(read),
 			     file_type(directory)
 			   ]),
-	rdf_detach_db,
-	assert(rdf_directory(Directory)),
-	assert_options(Options),
-	stop_monitor,		% make sure not to register load
-	no_agc(load_db).
+	rdf_attach_db_ro(Directory, Options).
 rdf_attach_db(DirSpec, Options) :-
 	option(access(read_write), Options), !,
 	rdf_attach_db_rw(DirSpec, Options).
@@ -187,7 +183,7 @@ rdf_attach_db(DirSpec, Options) :-
 	;   print_message(warning,
 			  error(permission_error(write, directory, Directory))),
 	    print_message(warning, rdf(read_only)),
-	    rdf_attach_db_rw(Directory, Options)
+	    rdf_attach_db_ro(Directory, Options)
 	).
 rdf_attach_db(DirSpec, Options) :-
 	catch(rdf_attach_db_rw(DirSpec, Options), E, true),
@@ -236,6 +232,17 @@ rdf_attach_db_rw(DirSpec, _) :-		% Generate an existence or
 			   ]),
 	permission_error(write, directory, Directory).
 
+%%	rdf_attach_db_ro(+Directory, +Options)
+%
+%	Open an RDF database in read-only mode.
+
+rdf_attach_db_ro(Directory, Options) :-
+	rdf_detach_db,
+	assert(rdf_directory(Directory)),
+	assert_options(Options),
+	stop_monitor,		% make sure not to register load
+	no_agc(load_db).
+
 
 assert_options([]).
 assert_options([H|T]) :-
@@ -249,9 +256,10 @@ assert_options([H|T]) :-
 option_type(concurrency(X),		must_be(positive_integer, X)).
 option_type(max_open_journals(X),	must_be(positive_integer, X)).
 option_type(directory_levels(X),	must_be(positive_integer, X)).
-option_type(silent(X),	       must_be(oneof([true,false,brief]), X)).
+option_type(silent(X),			must_be(oneof([true,false,brief]), X)).
 option_type(log_nested_transactions(X),	must_be(boolean, X)).
-option_type(access(X),	       must_be(oneof([read_write,read_only]), X)).
+option_type(access(X),			must_be(oneof([read_write,
+						       read_only]), X)).
 
 
 %%	no_agc(:Goal)
