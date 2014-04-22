@@ -1340,3 +1340,33 @@ copy_pattern([(rdf:type)-(rdfa:'Pattern')|T], S) --> !,
 copy_pattern([P-O|T], S) -->
 	[rdf(S,P,O)],
 	copy_pattern(T, S).
+
+
+		 /*******************************
+		 *	 HOOK INTO RDF-DB	*
+		 *******************************/
+
+:- multifile
+	rdf_db:rdf_load_stream/3,
+	rdf_db:rdf_file_type/2.
+
+%%	rdf_db:rdf_load_stream(+Format, +Stream, :Options)
+%
+%	Register library(semweb/rdfa) as loader for HTML RDFa files.
+%
+%	@tbd	Which options need to be forwarded to read_rdfa/3?
+
+rdf_db:rdf_load_stream(rdfa, Stream, _Module:Options):-
+	rdf_db:graph(Options, Graph),
+	atom_concat('__', Graph, BNodePrefix),
+	read_rdfa(Stream, Triples,
+		  [ anon_prefix(BNodePrefix)
+		  ]),
+	rdf_transaction(( forall(member(rdf(S,P,O), Triples),
+				 rdf_assert(S, P, O, Graph)),
+			  rdf_set_graph(Graph, modified(false))
+			),
+			parse(Graph)).
+
+rdf_db:rdf_file_type(html, rdfa).
+
