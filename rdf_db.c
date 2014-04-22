@@ -5651,7 +5651,7 @@ md5_triple(triple *t, md5_byte_t *digest)
     md5_append(&state,
 	       (const md5_byte_t *)(lit->qualifier == Q_LANG ? "l" : "t"),
 	       1);
-    s = PL_blob_data(lit->type_or_lang, &len, NULL);
+    s = PL_blob_data(ID_ATOM(lit->type_or_lang), &len, NULL);
     md5_append(&state, (const md5_byte_t *)s, (int)len);
   }
   if ( t->graph_id )
