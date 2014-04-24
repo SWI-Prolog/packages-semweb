@@ -272,7 +272,7 @@ check_existence(CommandsIn, Commands, Options) :-
 missing_urls([], [], []).
 missing_urls([H|T0], Cmds, Missing) :-
 	H = rdf_load(URL, _),
-	(   catch(exists_url(URL), error(existence_error(_,_), _), fail)
+	(   catch(exists_url(URL, _Ext), error(existence_error(_,_), _), fail)
 	->  Cmds = [H|T],
 	    missing_urls(T0, T, Missing)
 	;   Missing = [URL|T],
@@ -475,8 +475,8 @@ print_command(rdf_load(URL, RDFOptions), Options) :-
 	    ->  format(' <not shared>')
 	    ;   true
 	    ),
-	    (   exists_url(URL)
-	    ->  true
+	    (   exists_url(URL, Ext)
+	    ->  format('[.~w]', [Ext])
 	    ;   format(' [NOT FOUND]')
 	    )
 	;   true
@@ -487,16 +487,27 @@ print_command(rdf_load(URL, RDFOptions), Options) :-
 	;   true
 	).
 
-exists_url(URL) :-
+exists_url(URL, Ext) :-
 	uri_file_name(URL, Path), !,
-	access_file(Path, read).
-exists_url(URL) :-
+	add_storage_extension(Path, Ext, PathEx),
+	access_file(PathEx, read), !.
+exists_url(URL, Ext) :-
 	uri_components(URL, Components),
 	uri_data(scheme, Components, Scheme),
 	atom(Scheme),
 	url_scheme(Scheme),
-	catch(http_open(URL, Stream, [ method(head) ]), _, fail),
+	add_storage_extension(URL, Ext, URLEx),
+	catch(http_open(URLEx, Stream, [ method(head) ]), _, fail), !,
 	close(Stream).
+
+:- multifile
+	rdf_db:rdf_storage_encoding/2.
+
+add_storage_extension(File, '', File).
+add_storage_extension(File, Ext, FileEx) :-
+	rdf_db:rdf_storage_encoding(Ext, _Format),
+	\+ file_name_extension(_, Ext, File),
+	file_name_extension(File, Ext, FileEx).
 
 url_scheme(http).
 url_scheme(https).
