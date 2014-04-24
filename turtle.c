@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2013, VU University Amsterdam
+    Copyright (C): 2013-2014, VU University Amsterdam
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public
@@ -157,6 +157,12 @@ typedef enum format
   D_TRIG_NO_GRAPH			/* read TRiG as Turtle */
 } format;
 
+typedef enum recover_mode
+{ R_STATEMENT = 0,			/* on error, re-sync at statement */
+  R_PREDOBJLIST,			/* on error, re-sync at ; or . */
+  R_OBJLIST				/* on error, re-sync at , ; or . */
+} recover_mode;
+
 typedef struct resource
 { resource_type  type;
   int		 constant;		/* read-only constant */
@@ -219,6 +225,8 @@ typedef struct turtle_state
   resource     *free_resources;		/* Recycle resources */
   IOSTREAM     *input;			/* Our input */
   int		current_char;		/* Current character */
+  recover_mode	recover;		/* R_*: how to recover */
+  recover_mode  recovered;		/* R_*: how we recovered */
   error_mode	on_error;		/* E_* */
   format	format;			/* D_* */
   size_t	error_count;		/* Number of syntax errors */
@@ -257,6 +265,17 @@ static resource resource_constants[] =
   RES_CONST(XSD_DOUBLE),	/* 6 */
   RES_CONST(XSD_BOOLEAN)	/* 7 */
 };
+
+#define RECOVER_BEGIN(mode) { recover_mode __or = ts->recover; \
+			      ts->recover = mode; \
+			      ts->recovered = R_STATEMENT;
+#define RECOVER_END()         ts->recover = __or; \
+			    }
+#define RECOVER(mode, code) \
+        RECOVER_BEGIN(mode); \
+	code; \
+	RECOVER_END();
+
 
 		 /*******************************
 		 *	       BUFFER		*
@@ -565,24 +584,7 @@ add_string_hash_map(hash_map *hm,
 static int	next(turtle_state *ts);
 
 static int
-print_warning(term_t t)
-{ static predicate_t print_message2;
-  term_t av;
-
-  if ( !print_message2 )
-    print_message2 = PL_predicate("print_message", 2, "system");
-
-  if ( (av = PL_new_term_refs(2)) &&
-       PL_put_atom(av+0, ATOM_warning) &&
-       PL_put_term(av+1, t) )
-    return PL_call_predicate(NULL, PL_Q_PASS_EXCEPTION, print_message2, av);
-
-  return FALSE;
-}
-
-
-static int
-syntax_message(turtle_state *ts, const char *msg, int is_error)
+print_message(turtle_state *ts, term_t ex1, int is_error)
 { term_t ex;
   IOPOS *pos;
 
@@ -590,12 +592,11 @@ syntax_message(turtle_state *ts, const char *msg, int is_error)
     return FALSE;
 
   ts->error_count++;
-
   if ( !(ex=PL_new_term_refs(2)) ||
-       !PL_unify_term(ex+0, PL_FUNCTOR, FUNCTOR_syntax_error1,
-		              PL_CHARS, msg) )
+       !PL_put_term(ex+0, ex1) )
     return FALSE;
 
+					/* create position term */
   if ( (pos=ts->input->position) )
   { term_t stream;
     int linepos = pos->linepos;
@@ -617,29 +618,67 @@ syntax_message(turtle_state *ts, const char *msg, int is_error)
       return FALSE;
   }
 
-  if ( PL_cons_functor_v(ex, FUNCTOR_error2, ex) )
-  { if ( is_error )
-    { for(;;)
-      { if ( !next(ts) || ts->current_char == -1 )
+					/* create error(Format, Pos) */
+  if ( !PL_cons_functor_v(ex, FUNCTOR_error2, ex) )
+    return FALSE;
+
+  if ( is_error )			/* re-sync after error */
+  { for(;;)
+    { if ( !next(ts) || ts->current_char == -1 )
+	break;
+      if ( ts->current_char == '.' )
+      { if ( !next(ts) ||
+	     ts->current_char == -1 ||
+	     is_ws(ts->current_char) )
+	{ ts->recovered = R_STATEMENT;
 	  break;
-	if ( ts->current_char == '.' )
-	{ if ( !next(ts) ||
-	       ts->current_char == -1 ||
-	       is_ws(ts->current_char) )
-	    break;
 	}
       }
+      if ( ( (ts->current_char == ';' && (ts->recover == R_PREDOBJLIST ||
+					  ts->recover == R_OBJLIST) ) ||
+	     (ts->current_char == ',' && ts->recover == R_OBJLIST)
+	   ) && ts->on_error == E_WARNING )
+      { ts->recovered = (ts->current_char == ';' ? R_PREDOBJLIST : R_OBJLIST);
+	break;
+      }
     }
-
-    if ( is_error && ts->on_error == E_ERROR )
-      return PL_raise_exception(ex);
-    else
-      print_warning(ex);
   }
 
-  return FALSE;
+  if ( is_error && ts->on_error == E_ERROR )
+  { return PL_raise_exception(ex);	/* raise exception */
+  } else
+  { static predicate_t print_message2;	/* or print message */
+    term_t av;
+
+    if ( !print_message2 )
+      print_message2 = PL_predicate("print_message", 2, "system");
+
+    if ( (av = PL_new_term_refs(2)) &&
+	 PL_put_atom(av+0, is_error ? ATOM_error : ATOM_warning) &&
+	 PL_put_term(av+1, ex) )
+      PL_call_predicate(NULL, PL_Q_PASS_EXCEPTION, print_message2, av);
+
+    return FALSE;
+  }
 }
 
+
+static int
+syntax_message(turtle_state *ts, const char *msg, int is_error)
+{ term_t ex1;
+
+  if ( PL_exception(0) )		/* pending earlier exception */
+    return FALSE;
+
+  ts->error_count++;
+
+  if ( !(ex1=PL_new_term_ref()) ||
+       !PL_unify_term(ex1, PL_FUNCTOR, FUNCTOR_syntax_error1,
+		              PL_CHARS, msg) )
+    return FALSE;
+
+  return print_message(ts, ex1, is_error);
+}
 
 static int
 syntax_warning(turtle_state *ts, const char *msg)
@@ -860,23 +899,18 @@ free_resources(turtle_state *ts)
 
 static int
 turtle_existence_error(turtle_state *ts, const char *what, term_t t)
-{ if ( ts->on_error == E_ERROR )
-  { return PL_existence_error(what, t);
-  } else
-  { term_t ex = PL_new_term_ref();
+{ term_t ex1;
 
-    if ( PL_unify_term(ex,
-		       PL_FUNCTOR, FUNCTOR_error2,
-		         PL_FUNCTOR, FUNCTOR_existence_error2,
-		           PL_CHARS, what,
-		           PL_TERM, t,
-		         PL_VARIABLE) )
-      print_warning(ex);
-
-    return FALSE;
+  if ( (ex1 = PL_new_term_ref()) &&
+       PL_unify_term(ex1,
+		     PL_FUNCTOR, FUNCTOR_existence_error2,
+		       PL_CHARS, what,
+		       PL_TERM, t) )
+  { return print_message(ts, ex1, TRUE);
   }
-}
 
+  return FALSE;
+}
 
 
 static resource *
@@ -1949,12 +1983,23 @@ read_iri(turtle_state *ts, int flags)
 }
 
 
+/* read_verb() reads a predicate.  If the predicate cannot be read, input
+   is advanced to the next ; or end-of-statement.
+*/
+
 static int
 read_verb(turtle_state *ts)
-{ resource *r;
+{ for(;;)
+  { resource *r;
 
-  if ( (r=read_iri(ts, IRI_VERB)) )
-    return set_predicate(ts, r, NULL);
+    RECOVER(R_PREDOBJLIST,
+	    r=read_iri(ts, IRI_VERB));
+    if ( r )
+      return set_predicate(ts, r, NULL);
+    if ( ts->recovered == R_PREDOBJLIST && next(ts) )
+      continue;
+    break;
+  }
 
   return FALSE;
 }
@@ -2353,8 +2398,11 @@ read_object(turtle_state *ts)
 static int
 read_object_list(turtle_state *ts)
 { for(;;)
-  { if ( !read_object(ts) ||
-	 !skip_ws(ts) )
+  { int  rc;
+
+    RECOVER(R_OBJLIST, rc = read_object(ts));
+
+    if ( !skip_ws(ts) )
       return FALSE;
 
     if ( ts->current_char == ',' )
@@ -2363,8 +2411,10 @@ read_object_list(turtle_state *ts)
       else
 	return FALSE;
     }
+    if ( ts->current_char == ';' )
+      return TRUE;
 
-    return TRUE;
+    return rc;
   }
 }
 
