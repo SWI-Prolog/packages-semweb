@@ -257,6 +257,8 @@ ns(dc,	    'http://purl.org/dc/elements/1.1/').
 ns(dcterms, 'http://purl.org/dc/terms/').
 ns(eor,	    'http://dublincore.org/2000/03/13/eor#').
 ns(skos,    'http://www.w3.org/2004/02/skos/core#').
+ns(foaf,    'http://xmlns.com/foaf/0.1/').
+ns(void,    'http://rdfs.org/ns/void#').
 ns(serql,   'http://www.openrdf.org/schema/serql#').
 
 %%	rdf_register_prefix(+Prefix, +URI) is det.
