@@ -396,3 +396,13 @@ assert_triple(rdf(S,P,O,G), _) :-
 rdf_db:rdf_file_type(ttl,  turtle).
 rdf_db:rdf_file_type(n3,   turtle).	% not really, but good enough
 rdf_db:rdf_file_type(trig, trig).
+
+
+		 /*******************************
+		 *	       MESSAGES		*
+		 *******************************/
+
+:- multifile prolog:error_message//1.
+
+prolog:error_message(existence_error(turtle_prefix, '')) -->
+	[ 'Turtle empty prefix (:) is not defined' ].
