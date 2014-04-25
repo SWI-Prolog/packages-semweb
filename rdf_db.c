@@ -188,6 +188,7 @@ INIT_LOCK(rdf_db *db)
   simpleMutexInit(&db->locks.misc);
   simpleMutexInit(&db->locks.gc);
   simpleMutexInit(&db->locks.duplicates);
+  simpleMutexInit(&db->locks.erase);
 }
 
 static simpleMutex rdf_lock;
@@ -4364,14 +4365,21 @@ del_triple_consequences(rdf_db *db, triple *t, query *q)
 
 void
 erase_triple(rdf_db *db, triple *t, query *q)
-{ if ( !t->erased )
+{ if ( t->erased )
+    return;
+
+  simpleMutexLock(&db->locks.erase);
+  if ( !t->erased )
   { t->erased = TRUE;
+    simpleMutexUnlock(&db->locks.erase);
 
     unregister_graph(db, t);		/* Updates count and MD5 */
     unregister_predicate(db, t);	/* Updates count */
     if ( t->is_duplicate )
-      db->duplicates--;
-    db->erased++;
+      ATOMIC_SUB(&db->duplicates, 1);
+    ATOMIC_ADD(&db->erased, 1);
+  } else
+  { simpleMutexUnlock(&db->locks.erase);
   }
 }
 

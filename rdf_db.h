@@ -465,6 +465,7 @@ typedef struct rdf_db
     simpleMutex misc;			/* general DB locks */
     simpleMutex gc;			/* DB garbage collection lock */
     simpleMutex duplicates;		/* Duplicate init lock */
+    simpleMutex erase;			/* Erase triples */
   } locks;
 
   struct
