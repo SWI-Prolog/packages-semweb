@@ -838,8 +838,13 @@ discard_transaction(query *q)
 
 					/* revert creation of new */
     if ( is_wr_transaction_gen(q, t->lifespan.born) )
-    { t->lifespan.died = GEN_PREHIST;
-      erase_triple(db, t, q);
+    { triple *prev;
+
+      for(; t; t = prev )
+      { prev = fetch_triple(db, t->reindexed);
+	t->lifespan.died = GEN_PREHIST;
+	erase_triple(db, t, q);
+      }
     }
   }
 
@@ -850,7 +855,12 @@ discard_transaction(query *q)
 
 					/* revert deletion of old */
     if ( is_wr_transaction_gen(q, t->lifespan.died) )
-    { t->lifespan.died = GEN_MAX;
+    { triple *prev;
+
+      for(; t; t = prev )
+      { prev = fetch_triple(db, t->reindexed);
+	t->lifespan.died = GEN_MAX;
+      }
     }
   }
 
@@ -862,13 +872,23 @@ discard_transaction(query *q)
 
 					/* revert deletion of old */
     if ( is_wr_transaction_gen(q, to->lifespan.died) )
-    { to->lifespan.died = GEN_MAX;
+    { triple *prev;
+
+      for(; to; to = prev )
+      { prev = fetch_triple(db, to->reindexed);
+	to->lifespan.died = GEN_MAX;
+      }
     }
 					/* revert creation of new */
     if ( is_wr_transaction_gen(q, tn->lifespan.born) &&
 	 tn->lifespan.died == gen_max )
-    { tn->lifespan.died = GEN_PREHIST;
-      erase_triple(db, tn, q);
+    { triple *prev;
+
+      for(; tn; tn = prev )
+      { prev = fetch_triple(db, tn->reindexed);
+	tn->lifespan.died = GEN_PREHIST;
+	erase_triple(db, tn, q);
+      }
     }
   }
 
