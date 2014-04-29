@@ -286,6 +286,24 @@ typedef struct literal
 typedef unsigned int triple_id;		/* Triple identifier */
 #endif
 
+#ifdef TRIPLE_MAGIC
+
+typedef enum
+{ T_CHAINED1 = TRIPLE_MAGIC,		/* Added to hash-chains */
+  T_CHAINED2,				/* Added to hash as reindexed */
+  T_REINDEXED,				/* Reindexed (waiting for GC) */
+  T_LINGERING,				/* waiting to be freed */
+  T_FREED				/* freed */
+} triple_status;
+
+#define TMAGIC(t, s) (t->magic = s)
+
+#else
+
+#define TMAGIC(t, s) (void)0
+
+#endif
+
 typedef struct triple
 { lifespan	lifespan;		/* Start and end generation */
   atom_id	subject_id;
@@ -328,6 +346,9 @@ typedef struct triple
   unsigned	erased : 1;		/* Consistency of erased */
   unsigned	lingering : 1;		/* Deleted; waiting for GC */
 					/* Total: 32 */
+#ifdef TRIPLE_MAGIC
+  triple_status	magic;
+#endif
 } triple;
 
 

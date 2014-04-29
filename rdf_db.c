@@ -949,7 +949,10 @@ unregister_triple(rdf_db *db, triple *t)
 
 static void
 finalize_triple(void *data, void *client)
-{ unregister_triple(client, data);
+{ triple *t = data;
+  unregister_triple(client, t);
+  SECURE(memset(t, 0, sizeof(*t)));
+  TMAGIC(t, T_FREED);
 }
 
 static triple *
@@ -3149,7 +3152,7 @@ unalloc_triple(rdf_db *db, triple *t, int linger)
   { assert(t->atoms_locked == FALSE);
 
     if ( linger )
-    {
+    { TMAGIC(t, T_LINGERING);
 #ifdef COMPACT
       if ( t->id != TRIPLE_NO_ID )
 	deferred_finalize(&db->defer_triples, t,
@@ -3158,7 +3161,9 @@ unalloc_triple(rdf_db *db, triple *t, int linger)
       deferred_free(&db->defer_triples, t);
 #endif
     } else
-    { free(t);
+    { SECURE(memset(t, 0, sizeof(*t)));
+      TMAGIC(t, T_FREED);
+      free(t);
     }
   }
 }
@@ -3576,7 +3581,9 @@ reindex_triple(rdf_db *db, triple *t)
   register_triple(db, t2);
   simpleMutexLock(&db->queries.write.lock);
   link_triple_hash(db, t2);
+  TMAGIC(t2, T_CHAINED2);
   t->reindexed = T_ID(t2);
+  TMAGIC(t, T_REINDEXED);
   t->lifespan.died = db->reindexed++;
   if ( t2->object_is_literal )			/* do not deallocate lit twice */
   { simpleMutexLock(&db->locks.literal);
@@ -4333,6 +4340,7 @@ link_triple(rdf_db *db, triple *t, query *q)
 { assert(!t->linked);
 
   link_triple_hash(db, t);
+  TMAGIC(t, T_CHAINED1);
   add_triple_consequences(db, t, q);
   db->created++;
 
