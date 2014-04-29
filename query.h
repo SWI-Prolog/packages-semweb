@@ -176,8 +176,12 @@ fetch_triple(rdf_db *db, triple_id id)
 
 static inline triple *
 deref_triple(rdf_db *db, triple *t)
-{ while(t->reindexed)
-    t = fetch_triple(db, t->reindexed);
+{ SECURE(int times = 32);
+
+  while(t->reindexed)
+  { t = fetch_triple(db, t->reindexed);
+    SECURE(if ( --times == 0 ) assert(0));
+  }
 
   return t;
 }
