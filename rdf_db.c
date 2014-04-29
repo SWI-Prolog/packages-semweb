@@ -9164,11 +9164,6 @@ install_rdf_db(void)
 		      rdf_checks_literal_references, 0);
 #endif
 
-#ifdef O_SECURE
-  PL_register_foreign("rdf_dump_literals", 0, dump_literals, 0);
-  PL_register_foreign("rdf_check_literals", 0, check_transitivity, 0);
-#endif
-
   PL_register_foreign("lang_matches", 2, lang_matches, 0);
 
   install_atom_map();
