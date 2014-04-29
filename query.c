@@ -273,6 +273,7 @@ open_transaction(rdf_db *db,
 
   q->type = Q_TRANSACTION;
   q->transaction = ti->queries.transaction;
+  q->reindex_gen = GEN_MAX;		/* should not get this down */
 
   if ( ss && ss != SNAPSHOT_ANONYMOUS )
   { int ss_tid = snapshot_thread(ss);
