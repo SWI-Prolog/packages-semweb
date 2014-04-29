@@ -345,6 +345,7 @@ typedef struct triple
   unsigned	loaded : 1;		/* for EV_ASSERT_LOAD */
   unsigned	erased : 1;		/* Consistency of erased */
   unsigned	lingering : 1;		/* Deleted; waiting for GC */
+  unsigned	has_reindex_prev : 1;	/* some ->reindexed points to me */
 					/* Total: 32 */
 #ifdef TRIPLE_MAGIC
   triple_status	magic;

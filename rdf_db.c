@@ -3577,6 +3577,7 @@ reindex_triple(rdf_db *db, triple *t)
 { triple *t2 = alloc_triple();
 
   *t2 = *t;
+  t2->has_reindex_prev = TRUE;
   memset(&t2->tp, 0, sizeof(t2->tp));
   register_triple(db, t2);
   simpleMutexLock(&db->queries.write.lock);
@@ -3725,7 +3726,10 @@ links (below).
 
 static inline int
 is_garbage_triple(triple *t, gen_t old_query_gen, gen_t old_reindex_gen)
-{ if ( t->reindexed )				/* Safe: reindex_triple() */
+{ if ( t->has_reindex_prev )
+    return FALSE;
+
+  if ( t->reindexed )				/* Safe: reindex_triple() */
     return t->lifespan.died < old_reindex_gen;	/* is also part of GC */
   else
     return t->lifespan.died < old_query_gen;
@@ -3763,8 +3767,11 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol,
 		 });
 
 	if ( t->reindexed )
+	{ triple *t2 = fetch_triple(db, t->reindexed);
+
 	  db->gc.reclaimed_reindexed++;
-	else
+	  t2->has_reindex_prev = FALSE;
+	} else
 	  db->gc.reclaimed_triples++;
 
 	simpleMutexUnlock(&db->queries.write.lock);
