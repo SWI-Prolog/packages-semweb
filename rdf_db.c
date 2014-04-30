@@ -3388,9 +3388,6 @@ Consider resizing the hash-tables. The argument 'extra' gives the number
 of triples that  will  be  added.  This   is  used  to  guess  the  hash
 requirements of the table  and  thus   avoid  duplicating  triples in on
 optimize_triple_hashes().
-
-TBD: Can we omit linking all  the   hashes  when adding triples? Then we
-need to materialize on the first query.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 void
