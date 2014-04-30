@@ -3423,10 +3423,14 @@ consider_triple_rehash(rdf_db *db, size_t extra)
 	  break;
 	case BY_O:
 	case BY_PO:
-	  while ( SCALE(db->resources.hash.count + db->literals.count) >
-		  sizenow<<resize )
+	{ size_t setsize = SCALE(db->resources.hash.count + db->literals.count);
+
+	  if ( setsize > triples )
+	    setsize = triples;
+	  while ( setsize > sizenow<<resize )
 	    resize++;
 	  break;
+	}
 	case BY_SPO:
 	  while ( (extra+triples)/spo->avg_chain_len > sizenow<<resize )
 	    resize++;
