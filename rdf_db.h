@@ -446,7 +446,8 @@ typedef struct rdf_db
 #endif
   size_t	created;		/* #triples created */
   size_t	erased;			/* #triples erased */
-  gen_t		reindexed;		/* #triples reindexed (gc_hash_chain) */
+  size_t	reindexed;		/* #triples reindexed (gc_hash_chain) */
+  size_t	lingering;		/* #triples lingering to be freed */
   size_t	indexed[16];		/* Count calls (2**4 possible indices) */
   resource_db	resources;		/* admin of used resources */
   pred_hash	predicates;		/* Predicate table */

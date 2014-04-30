@@ -1194,6 +1194,8 @@ rdf_statistics(triples(Count)) :-
 	rdf_statistics_(triples(Count)).
 rdf_statistics(duplicates(Count)) :-
 	rdf_statistics_(duplicates(Count)).
+rdf_statistics(lingering(Count)) :-
+	rdf_statistics_(lingering(Count)).
 rdf_statistics(resources(Count)) :-
 	rdf_statistics_(resources(Count)).
 rdf_statistics(properties(Count)) :-
