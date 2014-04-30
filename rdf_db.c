@@ -74,6 +74,7 @@ static functor_t FUNCTOR_triples2;
 static functor_t FUNCTOR_resources1;
 static functor_t FUNCTOR_predicates1;
 static functor_t FUNCTOR_duplicates1;
+static functor_t FUNCTOR_lingering1;
 static functor_t FUNCTOR_literals1;
 static functor_t FUNCTOR_subject1;
 static functor_t FUNCTOR_predicate1;
@@ -950,9 +951,12 @@ unregister_triple(rdf_db *db, triple *t)
 static void
 finalize_triple(void *data, void *client)
 { triple *t = data;
-  unregister_triple(client, t);
+  rdf_db *db = client;
+
+  unregister_triple(db, t);
   SECURE(memset(t, 0, sizeof(*t)));
   TMAGIC(t, T_FREED);
+  ATOMIC_SUB(&db->lingering, 1);
 }
 
 static triple *
@@ -3160,6 +3164,7 @@ unalloc_triple(rdf_db *db, triple *t, int linger)
 #else
       deferred_free(&db->defer_triples, t);
 #endif
+      ATOMIC_ADD(&db->lingering, 1);
     } else
     { SECURE(memset(t, 0, sizeof(*t)));
       TMAGIC(t, T_FREED);
@@ -8515,6 +8520,8 @@ unify_statistics(rdf_db *db, term_t key, functor_t f)
   { if ( db->duplicates_up_to_date == FALSE )
       return FALSE;
     v = db->duplicates;
+  } else if ( f == FUNCTOR_lingering1 )
+  { v = db->lingering;
   } else if ( f == FUNCTOR_literals1 )
   { v = db->literals.count;
   } else if ( f == FUNCTOR_triples2 && PL_is_functor(key, f) )
@@ -9045,6 +9052,7 @@ install_rdf_db(void)
   MKFUNCTOR(literal, 2);
   MKFUNCTOR(searched_nodes, 1);
   MKFUNCTOR(duplicates, 1);
+  MKFUNCTOR(lingering, 1);
   MKFUNCTOR(literals, 1);
   MKFUNCTOR(symmetric, 1);
   MKFUNCTOR(transitive, 1);
@@ -9105,6 +9113,7 @@ install_rdf_db(void)
   keys[i++] = FUNCTOR_predicates1;
   keys[i++] = FUNCTOR_searched_nodes1;
   keys[i++] = FUNCTOR_duplicates1;
+  keys[i++] = FUNCTOR_lingering1;
   keys[i++] = FUNCTOR_literals1;
   keys[i++] = FUNCTOR_triples2;
   keys[i++] = FUNCTOR_gc4;
