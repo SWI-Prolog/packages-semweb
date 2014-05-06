@@ -174,6 +174,7 @@ static void	free_bitmatrix(rdf_db *db, bitmatrix *bm);
 static predicate_cloud *new_predicate_cloud(rdf_db *db,
 					    predicate **p, size_t count);
 static int	unify_literal(term_t lit, literal *l);
+static int	free_literal(rdf_db *db, literal *lit);
 static int	check_predicate_cloud(predicate_cloud *c);
 static void	invalidate_is_leaf(predicate *p, query *q, int add);
 static void	create_triple_hashes(rdf_db *db, int count, int *ic);
@@ -6459,34 +6460,40 @@ update_duplicates(rdf_db *db)
   db->maintain_duplicates = FALSE;
 
   if ( db->duplicates )
-  { for(t=fetch_triple(db, db->by_none.head);
+  { enter_scan(&db->defer_all);
+    for(t=fetch_triple(db, db->by_none.head);
 	t;
 	t=triple_follow_hash(db, t, ICOL(BY_NONE)))
     { if ( ++count % 10240 == 0 &&
 	   (PL_handle_signals() < 0 || db->resetting) )
 
-      { simpleMutexUnlock(&db->locks.duplicates);
+      { exit_scan(&db->defer_all);
+	simpleMutexUnlock(&db->locks.duplicates);
 	return FALSE;			/* aborted */
       }
       t->is_duplicate = FALSE;
     }
+    exit_scan(&db->defer_all);
 
     db->duplicates = 0;
   }
 
   db->maintain_duplicates = TRUE;
 
+  enter_scan(&db->defer_all);
   for(t=fetch_triple(db, db->by_none.head);
       t;
       t=triple_follow_hash(db, t, ICOL(BY_NONE)))
   { if ( ++count % 1024 == 0 &&
 	 PL_handle_signals() < 0 )
-    { db->maintain_duplicates = FALSE;		/* no point anymore */
+    { exit_scan(&db->defer_all);
+      db->maintain_duplicates = FALSE;		/* no point anymore */
       simpleMutexUnlock(&db->locks.duplicates);
       return FALSE;
     }
     mark_duplicate(db, t, NULL);
   }
+  exit_scan(&db->defer_all);
 
   db->duplicates_up_to_date = TRUE;
   simpleMutexUnlock(&db->locks.duplicates);
