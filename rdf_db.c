@@ -954,7 +954,12 @@ finalize_triple(void *data, void *client)
 { triple *t = data;
   rdf_db *db = client;
 
+  unlock_atoms(db, t);
+  if ( t->object_is_literal && t->object.literal )
+    free_literal(db, t->object.literal);
+#ifdef COMPACT
   unregister_triple(db, t);
+#endif
   SECURE(memset(t, 0, sizeof(*t)));
   TMAGIC(t, T_FREED);
   ATOMIC_SUB(&db->lingering, 1);
@@ -3154,20 +3159,17 @@ alloc_triple(void)
 static void
 unalloc_triple(rdf_db *db, triple *t, int linger)
 { if ( t )
-  { assert(t->atoms_locked == FALSE);
-
-    if ( linger )
+  { if ( linger )
     { TMAGIC(t, T_LINGERING);
-#ifdef COMPACT
       if ( t->id != TRIPLE_NO_ID )
 	deferred_finalize(&db->defer_triples, t,
 			  finalize_triple, db);
-#else
-      deferred_free(&db->defer_triples, t);
-#endif
       ATOMIC_ADD(&db->lingering, 1);
     } else
-    { SECURE(memset(t, 0, sizeof(*t)));
+    { unlock_atoms(db, t);
+      if ( t->object_is_literal && t->object.literal )
+	free_literal(db, t->object.literal);
+      SECURE(memset(t, 0, sizeof(*t)));
       TMAGIC(t, T_FREED);
       free(t);
     }
@@ -4094,17 +4096,16 @@ either case, this is typically called unlocked.
 
 static void
 free_triple(rdf_db *db, triple *t, int linger)
-{ unlock_atoms(db, t);
-
-  if ( t->object_is_literal && t->object.literal )
-  { assert(!linger || t->object.literal->shared);
-    free_literal(db, t->object.literal);
-  }
-  if ( t->match == STR_MATCH_BETWEEN )
+{ if ( t->match == STR_MATCH_BETWEEN )
     free_literal_value(db, &t->tp.end);
 
-  if ( t->allocated )
-    unalloc_triple(db, t, linger);
+  if ( !t->allocated )
+  { unlock_atoms(db, t);
+    if ( t->object_is_literal && t->object.literal )
+      free_literal(db, t->object.literal);
+  } else
+  { unalloc_triple(db, t, linger);
+  }
 }
 
 
