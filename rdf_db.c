@@ -949,22 +949,6 @@ unregister_triple(rdf_db *db, triple *t)
   }
 }
 
-static void
-finalize_triple(void *data, void *client)
-{ triple *t = data;
-  rdf_db *db = client;
-
-  unlock_atoms(db, t);
-  if ( t->object_is_literal && t->object.literal )
-    free_literal(db, t->object.literal);
-#ifdef COMPACT
-  unregister_triple(db, t);
-#endif
-  SECURE(memset(t, 0, sizeof(*t)));
-  TMAGIC(t, T_FREED);
-  ATOMIC_SUB(&db->lingering, 1);
-}
-
 static triple *
 triple_follow_hash(rdf_db *db, triple *t, int icol)
 { triple_id nid = t->tp.next[icol];
@@ -984,6 +968,22 @@ triple_follow_hash(rdf_db *db, triple *t, int icol)
 #define T_ID(t) (t)
 
 #endif /*COMPACT*/
+
+static void
+finalize_triple(void *data, void *client)
+{ triple *t = data;
+  rdf_db *db = client;
+
+  unlock_atoms(db, t);
+  if ( t->object_is_literal && t->object.literal )
+    free_literal(db, t->object.literal);
+#ifdef COMPACT
+  unregister_triple(db, t);
+#endif
+  SECURE(memset(t, 0, sizeof(*t)));
+  TMAGIC(t, T_FREED);
+  ATOMIC_SUB(&db->lingering, 1);
+}
 
 
 		 /*******************************
@@ -3161,7 +3161,9 @@ unalloc_triple(rdf_db *db, triple *t, int linger)
 { if ( t )
   { if ( linger )
     { TMAGIC(t, T_LINGERING);
+#ifdef COMPACT
       if ( t->id != TRIPLE_NO_ID )
+#endif
 	deferred_finalize(&db->defer_triples, t,
 			  finalize_triple, db);
       ATOMIC_ADD(&db->lingering, 1);
