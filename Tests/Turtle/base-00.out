@@ -1,0 +1,5 @@
+<http://www.example.com/c/s> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.example.com/c/Class> .
+<http://www.example.com/c/s> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.example.com/c/Class> .
+<http://www.example.com/c/s> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.example.com/c/Class> .
+<http://www.example.com/c/s> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.example.com/c/Class> .
+<http://www.example.com/c> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.example.com/c/Class> .

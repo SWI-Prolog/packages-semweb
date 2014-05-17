@@ -1,0 +1,10 @@
+@base <http://www.example.com/a/b> .
+@prefix t: <../c/> .
+@prefix  rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+
+<../c/s>    a t:Class .
+<../../c/s> a t:Class .
+<.././c/s>  a t:Class .
+<..//c/s>   a t:Class .
+</c>        a t:Class .
+
