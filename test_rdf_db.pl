@@ -321,9 +321,7 @@ lshare(1) :-
 lshare(2) :-
 	rdf_assert(a,b,literal(aap)),
 	rdf_retractall(a,b,literal(aap)),
-	rdf_gc,
-	rdf_statistics(literals(X)),
-	assertion(X == 0).
+	assertion(no_literals).
 lshare(3) :-
 	rdf_assert(a,b,literal(aap)),
 	rdf_assert(a,c,literal(aap)),	% shared
@@ -333,18 +331,30 @@ lshare(4) :-
 	rdf_assert(a,c,literal(aap)),
 	rdf_retractall(a,b,literal(aap)),
 	rdf_retractall(a,c,literal(aap)),
-	rdf_gc,
-	rdf_statistics(literals(X)),
-	assertion(X == 0).
+	assertion(no_literals).
 lshare(5) :-
 	rdf_assert(a,b,literal(aap), g1),
 	rdf_assert(a,b,literal(aap), g2),
 	rdf_statistics(literals(X1)),
 	assertion(X1 == 1),
 	rdf_retractall(a,b,literal(aap)),
+	assertion(no_literals).
+
+%%	no_literals
+%
+%	We may have to  wait  a   little  because  the automatic garbage
+%	collector did the work asynchronously and   we still get the old
+%	value.
+
+no_literals :-
 	rdf_gc,
-	rdf_statistics(literals(X)),
-	assertion(X == 0).
+	(   rdf_statistics(literals(0))
+	->  true
+	;   %writeln('Retrying'),
+	    between(1, 10, _),
+	    sleep(0.01),
+	    rdf_statistics(literals(0))
+	).
 
 
 		 /*******************************
