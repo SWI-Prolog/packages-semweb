@@ -974,12 +974,14 @@ finalize_triple(void *data, void *client)
 { triple *t = data;
   rdf_db *db = client;
 
-  unlock_atoms(db, t);
-  if ( t->object_is_literal && t->object.literal )
-    free_literal(db, t->object.literal);
+  if ( !db->resetting )
+  { unlock_atoms(db, t);
+    if ( t->object_is_literal && t->object.literal )
+      free_literal(db, t->object.literal);
 #ifdef COMPACT
-  unregister_triple(db, t);
+      unregister_triple(db, t);
 #endif
+  }
   SECURE(memset(t, 0, sizeof(*t)));
   TMAGIC(t, T_FREED);
   ATOMIC_SUB(&db->lingering, 1);
@@ -8851,8 +8853,6 @@ static int
 reset_db(rdf_db *db)
 { int rc;
 
-  db->resetting = TRUE;
-
   suspend_gc(db);
   simpleMutexLock(&db->locks.duplicates);
   erase_snapshots(db);
@@ -8871,7 +8871,6 @@ reset_db(rdf_db *db)
 
   simpleMutexUnlock(&db->locks.duplicates);
   resume_gc(db);
-  db->resetting = FALSE;
 
   return rc;
 }
@@ -8890,8 +8889,11 @@ reset_db(rdf_db *db)
 static foreign_t
 rdf_reset_db(void)
 { rdf_db *db = rdf_current_db();
-  query *q = open_query(db);
+  query *q;
   int rc;
+
+  db->resetting = TRUE;
+  q = open_query(db);
 
   if ( q->depth > 0 || q->transaction )
   { close_query(q);
@@ -8904,6 +8906,7 @@ rdf_reset_db(void)
 
   rc = reset_db(db);
   close_query(q);
+  db->resetting = FALSE;
 
   return rc;
 }
