@@ -209,6 +209,7 @@ typedef struct turtle_state
 { wchar_t      *base_uri;		/* Base URI for <> */
   size_t	base_uri_len;		/* Length of base uri */
   size_t	base_uri_base_len;	/* Length upto last / */
+  size_t	base_uri_host_len;	/* Length upto start of path */
   wchar_t      *empty_prefix;		/* Empty :local */
   hash_map	prefix_map;		/* Prefix --> IRI */
   hash_map	blank_node_map;		/* Name --> resource */
@@ -692,6 +693,101 @@ syntax_error(turtle_state *ts, const char *msg)
 
 
 		 /*******************************
+		 *     CANONICAL RESOURCE	*
+		 *******************************/
+
+#define MAX_SAVEP 100
+
+#define EOP(c) ((c) == 0 || (c) == '#' || (c) == '?')
+
+static void
+cpAfterPath(wchar_t *out, wchar_t *in)
+{ while (*in )
+    *out++ = *in++;
+  *out = EOS;
+}
+
+
+static wchar_t *
+url_skip_to_path(const wchar_t *in)
+{ while( *in && *in != ':' )		/* skip scheme */
+    in++;
+  if ( *in == ':' && in[1] == '/' && in[2] == '/' )
+    in += 3;
+  while( *in && *in != '/' )		/* skip authority */
+    in++;
+
+  return (wchar_t *)in;
+}
+
+
+static wchar_t *
+canonicaliseResourcePath(wchar_t *path)
+{ wchar_t *in, *out, *start;
+  wchar_t *save_buf[MAX_SAVEP];
+  wchar_t **savep = save_buf;
+
+  in = url_skip_to_path(path);
+
+  if ( !in[0] )
+    return path;
+  out = start = in;			/* start of path */
+
+  while( in[0] == '/' && in[1] == '.' && in[2] == '.' && in[3] == '/' )
+    in += 3;
+  while( in[0] == '.' && in[1] == '/' )
+    in += 2;
+  if ( in[0] == '/' )
+    *out++ = '/';
+
+  while(*in)
+  { if (*in == '/')
+    {
+    again:
+      if ( *in )
+      { while( in[1] == '/' )		/* delete multiple / */
+	  in++;
+	if ( in[1] == '.' )
+	{ if ( in[2] == '/' )		/* delete /./ */
+	  { in += 2;
+	    goto again;
+	  }
+	  if ( EOP(in[2]) )		/* delete trailing /. */
+	  { cpAfterPath(out, in+2);
+	    return path;
+	  }
+	  if ( in[2] == '.' && (in[3] == '/' || EOP(in[3])) )
+	  { if ( savep > save_buf )	/* delete /foo/../ */
+	    { out = *(--savep);
+	      in += 3;
+	      if ( EOP(in[0]) && out > start+1 )
+	      { cpAfterPath(out-1, in);	/* delete trailing / */
+		return path;
+	      }
+	      goto again;
+	    } else if (	start[0] == '/' && out == start+1 )
+	    { in += 3;
+	      goto again;
+	    }
+	  }
+	}
+      }
+      if ( *in )
+	in++;
+      if ( out > path && out[-1] != '/' )
+	*out++ = '/';
+      if ( savep < &save_buf[MAX_SAVEP-1] )
+	*savep++ = out;
+    } else
+      *out++ = *in++;
+  }
+  *out++ = *in++;
+
+  return path;
+}
+
+
+		 /*******************************
 		 *	     SKIPPING		*
 		 *******************************/
 
@@ -993,6 +1089,8 @@ make_absolute_resource(turtle_state *ts, const wchar_t *uri)
 
   if ( uri[0] == '#' )			/* relative to file */
     plen = ts->base_uri_len;
+  else if ( uri[0] == '/' )		/* relative to host */
+    plen = ts->base_uri_host_len;
   else
     plen = ts->base_uri_base_len;
 
@@ -1011,6 +1109,7 @@ make_absolute_resource(turtle_state *ts, const wchar_t *uri)
 
     wcsncpy(name, ts->base_uri, plen);
     wcscpy(name+plen, uri);
+    canonicaliseResourcePath(name);
 
     r->type = R_RESOURCE;
     r->v.r.name = name;
@@ -1207,6 +1306,7 @@ init_base_uri(turtle_state *ts)
       s--)
     ;
   ts->base_uri_base_len = s-ts->base_uri;
+  ts->base_uri_host_len = url_skip_to_path(ts->base_uri)-ts->base_uri;
 
   return TRUE;
 }
