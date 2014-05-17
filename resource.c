@@ -24,6 +24,8 @@
 #include "rdf_db.h"
 #include "murmur.h"
 
+static functor_t FUNCTOR_literal1;
+
 static int
 init_resource_hash(resource_db *rdb)
 { size_t bytes = sizeof(resource**)*INITIAL_RESOURCE_TABLE_SIZE;
@@ -254,7 +256,7 @@ rdf_resource(term_t r, control_t h)
 	state->current = NULL;
 	state->current_entry = -1;
 	break;
-      } else if ( PL_get_atom_ex(r, &name) )
+      } else if ( PL_get_atom(r, &name) )
       { resource *r;
 
 	if ( (r=existing_resource(&db->resources, name)) &&
@@ -262,9 +264,10 @@ rdf_resource(term_t r, control_t h)
 	   )
 	  return TRUE;
 	return FALSE;
-      }
+      } else if ( PL_is_functor(r, FUNCTOR_literal1) )
+	return FALSE;
 
-      return FALSE;
+      return PL_type_error("atom", name);
     }
     case PL_REDO:
       state = PL_foreign_context_address(h);
@@ -318,11 +321,15 @@ rdf_lookup_resource(term_t r)
 }
 #endif
 
+#define MKFUNCTOR(n, a) \
+	FUNCTOR_ ## n ## a = PL_new_functor(PL_new_atom(#n), a)
 #define NDET PL_FA_NONDETERMINISTIC
 
 int
 register_resource_predicates(void)
-{ PL_register_foreign("rdf_resource",        1, rdf_resource,        NDET);
+{ MKFUNCTOR(literal, 1);
+
+  PL_register_foreign("rdf_resource",        1, rdf_resource,        NDET);
 #ifdef RDF_LOOKUP_RESOURCE
   PL_register_foreign("rdf_lookup_resource", 1, rdf_lookup_resource, 0);
 #endif
