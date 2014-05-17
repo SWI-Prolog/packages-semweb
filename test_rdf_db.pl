@@ -37,6 +37,7 @@
 :- use_module(library(xsdp_types)).
 :- use_module(library(lists)).
 :- use_module(library(plunit)).
+:- use_module(library(debug)).
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 RDF-DB test file.  A test is a clause of the form:
@@ -322,7 +323,7 @@ lshare(2) :-
 	rdf_retractall(a,b,literal(aap)),
 	rdf_gc,
 	rdf_statistics(literals(X)),
-	expect(X == 0).
+	assertion(X == 0).
 lshare(3) :-
 	rdf_assert(a,b,literal(aap)),
 	rdf_assert(a,c,literal(aap)),	% shared
@@ -334,23 +335,16 @@ lshare(4) :-
 	rdf_retractall(a,c,literal(aap)),
 	rdf_gc,
 	rdf_statistics(literals(X)),
-	expect(X == 0).
+	assertion(X == 0).
 lshare(5) :-
 	rdf_assert(a,b,literal(aap), g1),
 	rdf_assert(a,b,literal(aap), g2),
 	rdf_statistics(literals(X1)),
-	expect(X1 == 1),
+	assertion(X1 == 1),
 	rdf_retractall(a,b,literal(aap)),
 	rdf_gc,
 	rdf_statistics(literals(X)),
-	expect(X == 0).
-
-expect(Goal) :-
-	Goal, !.
-expect(Goal) :-
-	print_message(error, format('FALSE: ~q', [Goal])),
-	backtrace(3),
-	fail.
+	assertion(X == 0).
 
 
 		 /*******************************
@@ -657,13 +651,13 @@ monitor(transaction-1) :-
 	rdf_transaction(rdf_assert(x, a, y, db)),
 	rdf_monitor(do_monitor, [-all]),
 	findall(rdf(S,P,O), rdf(S,P,O), DB),
-	expect(DB == [ rdf(x, a, y),
-		       rdf(y, ia, x)
-		     ]),
+	assertion(DB == [ rdf(x, a, y),
+			  rdf(y, ia, x)
+			]),
 	rdf_monitor(do_monitor, []),
 	rdf_transaction(rdf_retractall(x, a, y, db)),
 	rdf_monitor(do_monitor, [-all]),
-	expect(\+rdf(_,_,_)).
+	assertion(\+rdf(_,_,_)).
 
 
 
@@ -829,18 +823,18 @@ delete(1) :-
 	rdf_assert(s,p,o),
 	rdf_retractall(s,p,o),
 	rdf_statistics(triples(Count)),
-	expect(Count == 0).
+	assertion(Count == 0).
 delete(2) :-
 	rdf_assert(s,p,o),
 	rdf_transaction(rdf_retractall(s,p,o)),
 	rdf_statistics(triples(Count)),
-	expect(Count == 0).
+	assertion(Count == 0).
 delete(3) :-
 	rdf_transaction(rdf_assert(s,p,o)),
 	rdf_transaction(rdf_retractall(s,p,o)),
 	rdf_transaction(rdf_assert(s,p,o)),
 	rdf_statistics(triples(Count)),
-	expect(Count == 1).
+	assertion(Count == 1).
 
 
 		 /*******************************
@@ -854,8 +848,8 @@ unload(1) :-
 	rdf_statistics(triples(T1)),
 	rdf_load(dc),
 	rdf_statistics(triples(T2)),
-	expect(T0 == T2),
-	expect(T1 == 0).
+	assertion(T0 == T2),
+	assertion(T1 == 0).
 
 		 /*******************************
 		 *	      SCRIPTS		*
