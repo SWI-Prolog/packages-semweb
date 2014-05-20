@@ -7901,12 +7901,11 @@ rdf_current_predicate(term_t name, control_t h)
 	ep->p  = NULL;
 	goto next;
       } else if ( PL_get_atom(name, &a) )
-      { predicate *p;
-
-	if ( (p=existing_predicate(db, a)) )
-	  return TRUE;
+      { return existing_predicate(db, a) != NULL;
       } else if ( PL_is_functor(name, FUNCTOR_literal1) )
-	return FALSE;
+      { return FALSE;
+      }
+
       return PL_type_error("atom", name);
     case PL_REDO:
       ep = PL_foreign_context_address(h);
