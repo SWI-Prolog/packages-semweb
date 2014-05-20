@@ -267,7 +267,7 @@ rdf_resource(term_t r, control_t h)
       } else if ( PL_is_functor(r, FUNCTOR_literal1) )
 	return FALSE;
 
-      return PL_type_error("atom", name);
+      return PL_type_error("atom", r);
     }
     case PL_REDO:
       state = PL_foreign_context_address(h);
