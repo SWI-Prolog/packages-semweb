@@ -700,6 +700,15 @@ subproperty(5) :-
 	P == inverse_of(p).
 
 
+		 /*******************************
+		 *	      INVERSE		*
+		 *******************************/
+
+inverse(1) :-
+	rdf_assert(s, p, o),
+	rdf_set_predicate(p, inverse_of(ip)),
+	findall(O-S, rdf_has(O, ip, S), List),
+	List == [o-s].
 
 
 		 /*******************************
@@ -949,6 +958,7 @@ testset(prefix).
 testset(rdf_retractall).
 testset(monitor).
 testset(subproperty).
+testset(inverse).
 testset(ptree).
 testset(reachable).
 testset(duplicates).
