@@ -6173,8 +6173,8 @@ inverse_partial_triple(triple *t)
        !t->object_is_literal )
   { atom_t o = t->object.resource;
 
-    t->object.resource = ID_ATOM(t->subject_id);
-    t->subject_id = ATOM_ID(o);
+    t->object.resource = t->subject_id ? ID_ATOM(t->subject_id) : 0;
+    t->subject_id = o ? ATOM_ID(o) : 0;
 
     if ( t->predicate.r )
       t->predicate.r = i;
