@@ -468,7 +468,8 @@ user_prefix_map(Prefixes, PrefixMap) :-
 	maplist(prefix_pair, Prefixes, Pairs),
 	map_list_to_pairs(prefix_length, Pairs, LenPairs),
 	sort(LenPairs, LenPairs1),
-	reverse(LenPairs1, PrefixMap).
+	pairs_values(LenPairs1, RevPrefixMap),
+	reverse(RevPrefixMap, PrefixMap).
 
 prefix_pair(Prefix-URI, Prefix-URI) :- !,
 	must_be(atom, Prefix),
