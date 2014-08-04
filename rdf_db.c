@@ -7130,9 +7130,7 @@ rdf(term_t subject, term_t predicate, term_t object,
       state->dup_answers.entries = NULL;	/* see add_tripleset() */
 
       if ( !init_search_state(state, q) )
-      { free_search_state(state);
 	return FALSE;
-      }
 
       goto search;
     }
