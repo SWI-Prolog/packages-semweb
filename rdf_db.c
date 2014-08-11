@@ -6749,7 +6749,7 @@ init_search_state(search_state *state, query *query)
   if ( get_partial_triple(state->db,
 			  state->subject, state->predicate, state->object,
 			  state->src, p) != TRUE )
-  { free_triple(state->db, p, FALSE);
+  { free_search_state(state);
     return FALSE;
   }
 
