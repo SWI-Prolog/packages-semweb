@@ -33,6 +33,7 @@
 	  ]).
 :- use_module(library(semweb/rdf_db)).
 :- use_module(library(http/http_open)).
+:- use_module(library(dcg/basics)).
 :- use_module(library(xpath)).
 :- use_module(library(apply)).
 :- use_module(library(sgml)).
@@ -164,11 +165,28 @@ guess_dialect(Start, Dialect) :-
 	Dialect = xml.
 guess_dialect(Start, Dialect) :-
 	sub_string(Start, _, _, _, "<html"), !,
-	Dialect = html.
+	(   string_codes(Start, Codes),
+	    phrase(html_doctype(DialectFound), Codes, _)
+	->  Dialect = DialectFound
+	;   Dialect = html
+	).
 guess_dialect(Start, Dialect) :-
 	sub_string(Start, _, _, _, "<svg"), !,
 	Dialect = svg.
 guess_dialect(_, xml).
+
+html_doctype(html5) -->
+	blanks,
+	"<!DOCTYPE", blank, blanks, "html", blanks, ">", !.
+html_doctype(html4) -->
+	blanks,
+	"<!", icase_string(`doctype`), blank, blanks, icase_string(`html`),
+	blank, blanks,
+	icase_string(`public`),
+	blank, !.
+
+icase_string([]) --> [].
+icase_string([H|T]) --> alpha_to_lower(H), icase_string(T).
 
 
 		 /*******************************
