@@ -276,7 +276,8 @@ open_input(stream(Stream), Stream, Close) :- !,
 	    (   n3_encoding(Old)
 	    ->  true
 	    ;   domain_error(ntriples_encoding, Old)
-	    )
+	    ),
+	    Close = true
 	).
 open_input(Stream, Stream, Close) :-
 	is_stream(Stream), !,
