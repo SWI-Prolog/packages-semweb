@@ -194,8 +194,10 @@ guess_dialect(_, xml).
 xml_rdfa(DOM, _, _) :-
 	var(DOM), !,
 	instantiation_error(DOM).
-xml_rdfa([DOM], RDF, Options) :- !,
-	xml_rdfa(DOM, RDF, Options).
+xml_rdfa(DOM, RDF, Options) :-
+	is_list(DOM), !,
+	maplist(xml_rdfa_aux(Options), DOM, RDFList),
+	append(RDFList, RDF).
 xml_rdfa(DOM, RDF, Options) :-
 	DOM = element(_,_,_), !,
 	rdfa_evaluation_context(DOM, EvalContext, Options),
@@ -205,6 +207,9 @@ xml_rdfa(DOM, RDF, Options) :-
 	apply_patterns(RDF0, RDF).
 xml_rdfa(DOM, _, _) :-
 	type_error(xml_dom, DOM).
+
+xml_rdfa_aux(Options, DOM, RDF) :-
+	xml_rdfa(DOM, RDF, Options).
 
 process_node(DOM, EvalContext) :-
 	rdfa_local_context(EvalContext, LocalContext),	% 7.5.1
