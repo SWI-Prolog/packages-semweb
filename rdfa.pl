@@ -1379,12 +1379,11 @@ copy_pattern([P-O|T], S) -->
 %
 %	@tbd	Which options need to be forwarded to read_rdfa/3?
 
-rdf_db:rdf_load_stream(rdfa, Stream, _Module:Options):-
-	rdf_db:graph(Options, Graph),
+rdf_db:rdf_load_stream(rdfa, Stream, _Module:Options1):-
+	rdf_db:graph(Options1, Graph),
 	atom_concat('__', Graph, BNodePrefix),
-	read_rdfa(Stream, Triples,
-		  [ anon_prefix(BNodePrefix)
-		  ]),
+	merge_options([anon_prefix(BNodePrefix)], Options1, Options2),
+	read_rdfa(Stream, Triples, Options2),
 	rdf_transaction(( forall(member(rdf(S,P,O), Triples),
 				 rdf_assert(S, P, O, Graph)),
 			  rdf_set_graph(Graph, modified(false))
