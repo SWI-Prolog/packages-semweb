@@ -8247,7 +8247,7 @@ peek_agenda(rdf_db *db, agenda *a)
   while( a->to_expand )
   { uintptr_t next_d = a->to_expand->distance+1;
 
-    if ( next_d >= a->max_d )
+    if ( next_d > a->max_d )
       return FALSE;
 
     a->to_return = bf_expand(db, a,
