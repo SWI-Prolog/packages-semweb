@@ -76,6 +76,8 @@ rdf_extra_headers(
 	[ request_header('Accept' = 'application/x-turtle, \c
 				     application/turtle, \c
 				     application/trig, \c
+				     application/n-triples, \c
+				     application/n-quads, \c
 				     text/turtle; q=0.9, \c
 				     application/rdf+xml, \c
 				     text/rdf+xml; q=0.8, \c
