@@ -1,11 +1,9 @@
-/*  $Id$
-
-    Part of SWI-Prolog
+/*  Part of SWI-Prolog
 
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@cs.vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2004-2011, University of Amsterdam
+    Copyright (C): 2004-2014, University of Amsterdam
 			      VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
@@ -104,6 +102,7 @@ sparql_query(Query, Row, Options) :-
 	sparql_param(path(Path), Options2, Options3),
 	select_option(search(Extra), Options3, Options4, []),
 	select_option(variable_names(VarNames), Options4, Options5, _),
+	sparql_extra_headers(HTTPOptions),
 	http_open([ protocol(http),
 		    host(Host),
 		    port(Port),
@@ -113,16 +112,47 @@ sparql_query(Query, Row, Options) :-
 			   ])
 		  | Options5
 		  ], In,
-		  [ header(content_type, ContentType),
-		    request_header('Accept' = '*/*')
+		  [ header(content_type, ContentType)
+		  | HTTPOptions
 		  ]),
 	plain_content_type(ContentType, CleanType),
 	read_reply(CleanType, In, VarNames, Row).
 
+%%	sparql_extra_headers(-List)
+%
+%	Send extra headers with the request. Note that, although we also
+%	process RDF embedded in HTML, we do  not explicitely ask for it.
+%	Doing so causes some   (e.g., http://w3.org/2004/02/skos/core to
+%	reply with the HTML description rather than the RDF).
+
+sparql_extra_headers(
+	[ request_header('Accept' = 'application/sparql-results+xml, \c
+				     application/n-triples, \c
+				     application/x-turtle, \c
+				     application/turtle, \c
+				     text/turtle; q=0.9, \c
+				     application/rdf+xml, \c
+				     text/rdf+xml; q=0.8, \c
+				     */*; q=0.1'),
+	  cert_verify_hook(ssl_verify)
+	]).
+
+:- public ssl_verify/5.
+
+%%	ssl_verify(+SSL, +ProblemCert, +AllCerts, +FirstCert, +Error)
+%
+%	Currently we accept  all  certificates.
+
+ssl_verify(_SSL,
+	   _ProblemCertificate, _AllCertificates, _FirstCertificate,
+	   _Error).
+
+
 read_reply('application/rdf+xml', In, _, Row) :- !,
 	call_cleanup(load_rdf(stream(In), RDF), close(In)),
 	member(Row, RDF).
-read_reply('text/rdf+n3', In, _, Row) :- !,
+read_reply(MIME, In, _, Row) :-
+	turtle_media_type(MIME), !,
 	call_cleanup(rdf_read_turtle(stream(In), RDF, []), close(In)),
 	member(Row, RDF).
 read_reply(MIME, In, VarNames, Row) :-
@@ -138,7 +168,12 @@ read_reply(Type, In, _, _) :-
 	throw(error(domain_error(sparql_result_document, Type),
 		    context(_, Reply))).
 
-sparql_result_mime('application/sparql-results+xml').
+turtle_media_type('application/x-turtle').
+turtle_media_type('application/turtle').
+turtle_media_type('application/n-triples').
+turtle_media_type('text/rdf+n3').
+
+sparql_result_mime('application/sparql-results+xml'). % official
 sparql_result_mime('application/sparql-result+xml').
 
 
