@@ -223,6 +223,9 @@ xml_rdfa(DOM, RDF, Options) :-
 	arg(1, EvalContext.triples, List),
 	reverse(List, RDF0),
 	apply_patterns(RDF0, RDF).
+% XML Processing Instruction (PI).
+xml_rdfa(DOM, [], _) :-
+	DOM = pi(_), !.
 xml_rdfa(DOM, _, _) :-
 	type_error(xml_dom, DOM).
 
