@@ -796,7 +796,7 @@ next:
 	goto next;
     } else if ( c == EOF )
     { rc = PL_unify_atom(triple, ATOM_end_of_file);
-    } else if ( (char_type[c]&EL) )
+    } else if ( c < 128 && (char_type[c]&EL) )
     { if ( skip_eol(in, &c) )
       { c=Sgetcode(in);
 	goto next;
