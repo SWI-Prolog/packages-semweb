@@ -172,6 +172,7 @@ turtle_media_type('application/x-turtle').
 turtle_media_type('application/turtle').
 turtle_media_type('application/n-triples').
 turtle_media_type('text/rdf+n3').
+turtle_media_type('text/turtle').
 
 sparql_result_mime('application/sparql-results+xml'). % official
 sparql_result_mime('application/sparql-result+xml').
