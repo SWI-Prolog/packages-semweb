@@ -1,11 +1,10 @@
-/*  $Id$
-
-    Part of SWI-Prolog
+/*  Part of SWI-Prolog
 
     Author:        Jan Wielemaker
-    E-mail:        wielemak@science.uva.nl
+    E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2006, University of Amsterdam
+    Copyright (C): 2006-2014, University of Amsterdam
+			      VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License
@@ -44,8 +43,11 @@
 :- use_module(library(double_metaphone)).
 
 /** <module> Search literals
-This module finds literals of the RDF database based on stemming and
-being flexible to ordering of tokens.
+
+This module finds literals of the RDF  database based on words, stemming
+and _sounds like_ (metaphone).  The normal user-level predicate is
+
+  - rdf_find_literals/2
 */
 
 :- dynamic
@@ -772,3 +774,13 @@ progress(Map, Which) :-
 	       '\r~t~w: ~12|Keys: ~t~D~15+; Values: ~t~D~20+',
 	       [Which, Keys, Values]).
 progress(_,_).
+
+
+		 /*******************************
+		 *	      SANDBOX		*
+		 *******************************/
+
+:- multifile sandbox:safe_primitive/1.
+
+safe_primitive:safe_primitive(rdf_litindex:rdf_find_literals(_,_)).
+safe_primitive:safe_primitive(rdf_litindex:rdf_tokenize_literal(_,_)).
