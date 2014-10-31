@@ -156,6 +156,7 @@
 :- use_module(library(uri)).
 :- use_module(library(debug)).
 :- use_module(library(apply)).
+:- use_module(library(xsdp_types)).
 :- if(exists_source(library(thread))).
 :- use_module(library(thread)).
 :- endif.
@@ -987,7 +988,9 @@ rdf_is_literal(literal(Value)) :-
 %	@tbd	Add mode (-,+)
 
 :- rdf_meta
-	typed_value(r, +, -).
+	rdf_literal_value(o, -),
+	typed_value(r, +, -),
+	numeric_value(r, +, -).
 
 rdf_literal_value(literal(String), Value) :-
 	atom(String), !,
@@ -1010,16 +1013,17 @@ typed_value(rdf:'XMLLiteral', Value, DOM) :-
 		close(In))
 	;   DOM = Value
 	).
-numeric_value(integer, String, Value) :-
+
+numeric_value(xsd:integer, String, Value) :-
 	atom_number(String, Value),
 	integer(Value).
-numeric_value(float, String, Value) :-
+numeric_value(xsd:float, String, Value) :-
 	atom_number(String, Number),
 	Value is float(Number).
-numeric_value(double, String, Value) :-
+numeric_value(xsd:double, String, Value) :-
 	atom_number(String, Number),
 	Value is float(Number).
-numeric_value(decimal, String, Value) :-
+numeric_value(xsd:decimal, String, Value) :-
 	atom_number(String, Value).
 
 

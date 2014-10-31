@@ -204,6 +204,8 @@ typed(match) :-
 	rdf_assert(x, a, literal(c)),
 	\+ rdf(x, a, literal(type(t, c))),
 	\+ rdf(x, a, literal(type(t, _))).
+typed(convert) :-
+	rdf_literal_value(literal(type(xsd:integer, '42')), 42).
 
 
 		 /*******************************
