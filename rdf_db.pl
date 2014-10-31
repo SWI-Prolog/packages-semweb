@@ -998,7 +998,8 @@ rdf_literal_value(literal(type(Type, String)), Value) :-
 
 typed_value(Numeric, String, Value) :-
 	xsdp_numeric_uri(Numeric, NumType), !,
-	numeric_value(NumType, String, Value).
+	iri_xml_namespace(NumType, _, LocalName),
+	numeric_value(LocalName, String, Value).
 typed_value(xsd:string, String, String).
 typed_value(rdf:'XMLLiteral', Value, DOM) :-
 	(   atom(Value)
