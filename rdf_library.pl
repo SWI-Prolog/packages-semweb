@@ -416,7 +416,7 @@ import(Path, Level, Options) :-
 	(   (   library(Id, Path, _)
 	    ->	true
 	    ;	manifest_for_path(Path, Manifest),
-		catch(exists_url(Manifest), _, fail)
+		catch(exists_url(Manifest, _Ext), _, fail)
 	    ->  process_manifest(Manifest),
 		library(Id, Path, _)
 	    )
@@ -476,7 +476,10 @@ print_command(rdf_load(URL, RDFOptions), Options) :-
 	    ;   true
 	    ),
 	    (   exists_url(URL, Ext)
-	    ->  format('[.~w]', [Ext])
+	    ->  (   Ext == ''
+		->  true
+		;   format('[.~w]', [Ext])
+		)
 	    ;   format(' [NOT FOUND]')
 	    )
 	;   true
