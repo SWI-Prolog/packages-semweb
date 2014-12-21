@@ -130,6 +130,7 @@ sparql_extra_headers(
 				     application/n-triples, \c
 				     application/x-turtle, \c
 				     application/turtle, \c
+				     application/sparql-results+json, \c
 				     text/turtle; q=0.9, \c
 				     application/rdf+xml, \c
 				     text/rdf+xml; q=0.8, \c
@@ -161,6 +162,16 @@ read_reply(MIME, In, VarNames, Row) :-
 		     close(In)),
 	varnames(Result, VarNames),
 	xml_result(Result, Row).
+read_reply(MIME, In, VarNames, Row) :-
+	json_result_mime(MIME), !,
+	call_cleanup(sparql_read_json_result(stream(In), Result),
+		     close(In)),
+	(   Result = select(VarNames, Rows)
+	->  member(Row, Rows)
+	;   Result = ask(True)
+	->  Row = True,
+	    VarNames = []
+	).
 read_reply(Type, In, _, _) :-
 	read_stream_to_codes(In, Codes),
 	string_codes(Reply, Codes),
@@ -176,6 +187,8 @@ turtle_media_type('text/turtle').
 
 sparql_result_mime('application/sparql-results+xml'). % official
 sparql_result_mime('application/sparql-result+xml').
+
+json_result_mime('application/sparql-results+json').
 
 
 plain_content_type(Type, Plain) :-
