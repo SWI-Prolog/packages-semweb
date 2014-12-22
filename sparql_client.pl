@@ -419,11 +419,21 @@ sparql_read_json_result(Input, Result) :-
 	    read_json_result(In, Result),
 	    close_input(Close)).
 
-open_input(stream(In), In, true) :- !.
-open_input(In, In, true) :-
-	is_stream(In), !.
+open_input(stream(In), In, Close) :- !,
+	encoding(In, utf8, Close).
+open_input(In, In, Close) :-
+	is_stream(In), !,
+	encoding(In, utf8, Close).
 open_input(File, In, close(In)) :-
 	open(File, read, In, [encoding(utf8)]).
+
+encoding(In, Encoding, Close) :-
+	stream_property(In, encoding(Old)),
+	(   Encoding == Old
+	->  Close = true
+	;   set_stream(In, encoding(Encoding)),
+	    Close = set_stream(In, Encoding, Old)
+	).
 
 close_input(close(In)) :- !,
 	retractall(bnode_map(_,_)),
