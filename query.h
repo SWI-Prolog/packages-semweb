@@ -110,7 +110,7 @@ typedef struct query
   } state;
 } query;
 
-#define MAX_QBLOCKS 20			/* allows for 2M concurrent queries */
+#define MAX_QBLOCKS 21			/* allows for 1M concurrent queries */
 
 typedef struct query_stack
 { query	       *blocks[MAX_QBLOCKS];

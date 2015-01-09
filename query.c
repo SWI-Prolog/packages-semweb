@@ -185,10 +185,15 @@ init_query_stack(rdf_db *db, query_stack *qs)
 }
 
 
-query *
+static query *
 alloc_query(query_stack *qs)
 { int depth = qs->top;
   int b = MSB(depth);
+
+  if ( b >= MAX_QBLOCKS )
+  { PL_resource_error("open_rdf_queries");
+    return NULL;
+  }
 
   if ( qs->blocks[b] )
   { query *q = &qs->blocks[b][depth];
@@ -201,9 +206,15 @@ alloc_query(query_stack *qs)
   simpleMutexLock(&qs->lock);
   if ( !qs->blocks[b] )
   { size_t bytes = BLOCKLEN(b) * sizeof(query);
-    query *ql = PL_malloc_uncollectable(bytes);
+    query *ql = rdf_malloc(qs->db, bytes);
     query *parent;
     int i;
+
+    if ( !ql )
+    { simpleMutexUnlock(&qs->lock);
+      PL_resource_error("memory");
+      return NULL;
+    }
 
     memset(ql, 0, bytes);
     ql -= depth;			/* rebase */
@@ -242,6 +253,7 @@ open_query(rdf_db *db)
   thread_info *ti = rdf_thread_info(db, tid);
   query *q = alloc_query(&ti->queries);
 
+  if ( !q ) return NULL;
   q->type = Q_NORMAL;
   q->transaction = ti->queries.transaction;
   q->reindex_gen = db->reindexed;
@@ -271,6 +283,7 @@ open_transaction(rdf_db *db,
   thread_info *ti = rdf_thread_info(db, tid);
   query *q = alloc_query(&ti->queries);
 
+  if ( !q ) return NULL;
   q->type = Q_TRANSACTION;
   q->transaction = ti->queries.transaction;
   q->reindex_gen = GEN_MAX;		/* should not get this down */

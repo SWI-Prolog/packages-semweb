@@ -2091,7 +2091,11 @@ print_reachability_cloud(rdf_db *db, predicate *p, int all)
   Sdprintf("Cloud has %d members, hash = 0x%x\n", cloud->size, cloud->hash);
   check_predicate_cloud(cloud);
 
-  q = open_query(db);
+  if ( !(q = open_query(db)) )
+  { Sdprintf("No more open queries\n");
+    return;
+  }
+
   for(rm=cloud->reachable; rm; rm=rm->older)
   { char b[2][24];
 
@@ -5064,11 +5068,12 @@ rdf_save_db(term_t stream, term_t graph, term_t version)
   if ( v < 2 || v > 3 )
     return PL_domain_error("rdf_db_save_version", version);
 
-  q = open_query(db);
-  rc = save_db(q, out, src, v);
-  close_query(q);
-
-  return rc;
+  if ( (q = open_query(db)) )
+  { rc = save_db(q, out, src, v);
+    close_query(q);
+    return rc;
+  } else
+    return FALSE;
 }
 
 
@@ -5597,10 +5602,14 @@ rdf_load_db(term_t stream, term_t id, term_t graphs)
   }
 
   if ( rc )
-  { query *q = open_query(db);
+  { query *q;
 
-    add_triples(q, ctx.triples.base, ctx.triples.top - ctx.triples.base);
-    close_query(q);
+    if ( (q=open_query(db)) )
+    { add_triples(q, ctx.triples.base, ctx.triples.top - ctx.triples.base);
+      close_query(q);
+    } else
+    { goto error;
+    }
     if ( ctx.graph )
     { if ( ctx.has_digest )
       { sum_digest(ctx.graph->digest, ctx.digest);
@@ -5611,12 +5620,14 @@ rdf_load_db(term_t stream, term_t id, term_t graphs)
     if ( (rc=PL_cons_functor(ba_arg2, FUNCTOR_end1, graphs)) )
       rc = rdf_broadcast(EV_LOAD, (void*)id, (void*)ba_arg2);
     destroy_load_context(db, &ctx, FALSE);
-  } else
-  { rdf_broadcast(EV_LOAD, (void*)id, (void*)ATOM_error);
-    destroy_load_context(db, &ctx, TRUE);
+
+    return rc;
   }
 
-  return rc;
+error:
+  rdf_broadcast(EV_LOAD, (void*)id, (void*)ATOM_error);
+  destroy_load_context(db, &ctx, TRUE);
+  return FALSE;
 }
 
 
@@ -6582,7 +6593,8 @@ rdf_transaction(term_t goal, term_t id, term_t options)
       return FALSE;
   }
 
-  q = open_transaction(db, &added, &deleted, &updated, ss);
+  if ( !(q = open_transaction(db, &added, &deleted, &updated, ss)) )
+    return FALSE;
   q->transaction_data.prolog_id = id;
   rc = PL_call_predicate(NULL, PL_Q_PASS_EXCEPTION, PRED_call1, goal);
 
@@ -6631,6 +6643,7 @@ rdf_active_transactions(term_t list)
   term_t head = PL_new_term_ref();
   query *t;
 
+  if ( !q ) return FALSE;
   for(t = q->transaction; t; t=t->transaction)
   { if ( !PL_unify_list(tail, head, tail) ||
          !PL_unify(head, t->transaction_data.prolog_id) )
@@ -6657,11 +6670,12 @@ reasoning.
 static foreign_t
 rdf_assert4(term_t subject, term_t predicate, term_t object, term_t src)
 { rdf_db *db = rdf_current_db();
-  triple *t = new_triple(db);
   query *q = open_query(db);
-  triple *d;
+  triple *t, *d;
   triple_walker tw;
 
+  if ( !q ) return FALSE;
+  t = new_triple(db);
   if ( !get_triple(db, subject, predicate, object, t, q) )
   { error:
     free_triple(db, t, FALSE);
@@ -7115,6 +7129,8 @@ rdf(term_t subject, term_t predicate, term_t object,
   { case PL_FIRST_CALL:
     { query *q = open_query(db);
 
+      if ( !q ) return FALSE;
+
       state = &q->state.search;
       state->query     = q;
       state->db	       = db;
@@ -7416,6 +7432,7 @@ rdf_update5(term_t subject, term_t predicate, term_t object, term_t src,
   triple_buffer matches;
   query *q = open_query(db);
 
+  if ( !q ) return FALSE;
   memset(&t, 0, sizeof(t));
 
   if ( !get_src(src, &t) ||
@@ -7495,8 +7512,9 @@ rdf_retractall4(term_t subject, term_t predicate, term_t object, term_t src)
       return TRUE;
   }
 
+  if ( !(q = open_query(db)) )
+    return FALSE;
   init_triple_buffer(&buf);
-  q = open_query(db);
   init_triple_walker(&tw, db, &t, t.indexed);
   while((p=next_triple(&tw)))
   { if ( !(p=alive_triple(q, p)) )
@@ -7781,6 +7799,7 @@ rdf_set_predicate(term_t pred, term_t option)
   query *q = open_query(db);
   int rc;
 
+  if ( !q ) return FALSE;
   if ( !get_predicate(db, pred, &p, q) )
   { rc = FALSE;
     goto out;
@@ -7964,7 +7983,8 @@ rdf_predicate_property(term_t pred, term_t option, control_t h)
     { functor_t f;
       int rc;
 
-      q = open_query(db);
+      if ( !(q = open_query(db)) )
+	return FALSE;
       if ( PL_is_variable(option) )
       { q->state.predprop.prop = 0;
 	if ( !get_predicate(db, pred, &q->state.predprop.pred, q) )
@@ -8328,7 +8348,8 @@ rdf_reachable(term_t subj, term_t pred, term_t obj,
       if ( PL_is_variable(pred) )
 	return PL_instantiation_error(pred);
 
-      q = open_query(db);
+      if ( !(q = open_query(db)) )
+	return FALSE;
       a = &q->state.tr_search;
       memset(a, 0, sizeof(*a));
       a->query = q;
@@ -8614,6 +8635,7 @@ rdf_generation(term_t t)
   query *q = open_query(db);
   int rc;
 
+  if ( !q ) return FALSE;
   if ( q->tr_gen > q->stack->tr_gen_base )
   { assert(q->tr_gen < q->stack->tr_gen_max);
 
@@ -8640,6 +8662,8 @@ rdf_snapshot(term_t t)
 { rdf_db *db = rdf_current_db();
   snapshot *s = new_snapshot(db);
 
+  if ( !s )
+    return FALSE;
   return unify_snapshot(t, s);
 }
 
@@ -8891,7 +8915,8 @@ rdf_reset_db(void)
   int rc;
 
   db->resetting = TRUE;
-  q = open_query(db);
+  if ( !(q = open_query(db)) )
+    return FALSE;
 
   if ( q->depth > 0 || q->transaction )
   { close_query(q);

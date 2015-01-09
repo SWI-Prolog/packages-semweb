@@ -31,8 +31,10 @@ list.
 snapshot *
 new_snapshot(rdf_db *db)
 { query *q = open_query(db);
-  snapshot *ss = rdf_malloc(db, sizeof(*ss));
+  snapshot *ss;
 
+  if ( !q ) return NULL;
+  ss = rdf_malloc(db, sizeof(*ss));
   ss->rd_gen = q->rd_gen;
   ss->tr_gen = q->tr_gen;
   ss->db = db;
