@@ -511,6 +511,8 @@ read_lan(IOSTREAM *in, term_t lan, int *cp)
   int rc;
 
   c = Sgetcode(in);
+  if ( !skip_ws(in, &c) )
+    return FALSE;
   if ( !is_lang_char1(c) )
     return syntax_error(in, "language tag must start with a-zA-Z");
 
@@ -661,6 +663,11 @@ read_literal(IOSTREAM *in, term_t literal, int *cp)
       { case '"':
 	{ c = Sgetcode(in);
 
+	  if ( !skip_ws(in, &c) )
+	  { discardBuf(&buf);
+	    return FALSE;
+	  }
+
 	  switch(c)
 	  { case '@':
 	    { term_t av = PL_new_term_refs(2);
@@ -685,6 +692,10 @@ read_literal(IOSTREAM *in, term_t literal, int *cp)
 	      { term_t av = PL_new_term_refs(2);
 
 		c = Sgetcode(in);
+		if ( !skip_ws(in, &c) )
+		{ discardBuf(&buf);
+		  return FALSE;
+		}
 		if ( c == '<' )
 		{ if ( read_uniref(in, av+0, cp) )
 		  { int rc = ( PL_unify_wchars(av+1, PL_ATOM,

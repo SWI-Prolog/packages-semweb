@@ -2440,10 +2440,15 @@ read_object(turtle_state *ts)
       if ( read_string(ts, &text) )
       { int rc;
 
+	if ( !skip_ws(ts) )
+	{ discardBuf(&text);
+	  return FALSE;
+	}
+
 	if ( ts->current_char == '@' )
 	{ string_buffer lang;
 
-	  if ( (rc = next(ts) && read_lang(ts, &lang)) )
+	  if ( (rc = next(ts) && skip_ws(ts) && read_lang(ts, &lang)) )
 	  { rc = got_lang_triple(ts,
 				 bufSize(&text)-1, baseBuf(&text),
 				 baseBuf(&lang));
@@ -2453,7 +2458,7 @@ read_object(turtle_state *ts)
 	{ if ( next(ts) && ts->current_char == '^' )
 	  { resource *r;
 
-	    if ( next(ts) && (r=read_iri(ts, 0)) )
+	    if ( next(ts) && skip_ws(ts) && (r=read_iri(ts, 0)) )
 	    { rc = got_typed_triple(ts, bufSize(&text)-1, baseBuf(&text), r);
 	      free_resource(ts, r);
 	    } else
