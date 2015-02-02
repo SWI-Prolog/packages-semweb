@@ -487,6 +487,26 @@ transaction(nest-2) :-
 	findall(rdf(S,P,O), rdf(S,P,O), L),
 	L == [ rdf(x, a, v)
 	     ].
+transaction(nest-3) :-
+	rdf_assert(s1,p1,o1),
+	rdf_transaction( ( rdf_assert(s2,p2,o2),
+			   rdf_transaction(rdf_retractall(_,_,_), _,
+					   [snapshot(true)]),
+			   findall(rdf(S,P,O), rdf(S,P,O), L)
+			 )),
+	L == [ rdf(s1,p1,o1),
+	       rdf(s2,p2,o2)
+	     ].
+transaction(nest-3) :-
+	rdf_assert(s1,p1,o1),
+	rdf_transaction( ( rdf_assert(s2,p2,o2),
+			   rdf_transaction(rdf_assert(s3,p3,o3), _,
+					   [snapshot(true)]),
+			   findall(rdf(S,P,O), rdf(S,P,O), L)
+			 )),
+	L == [ rdf(s1,p1,o1),
+	       rdf(s2,p2,o2)
+	     ].
 transaction(deadlock-1) :-
 	rdf_assert(x,y,z,g),
 	rdf_assert(x,y,z,g),

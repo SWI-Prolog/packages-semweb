@@ -867,7 +867,7 @@ discard_transaction(query *q)
     if ( is_wr_transaction_gen(q, t->lifespan.died) )
     { t = deref_triple(db, t);
 
-      t->lifespan.died = GEN_MAX;
+      t->lifespan.died = gen_max;
     }
   }
 
@@ -881,7 +881,7 @@ discard_transaction(query *q)
     if ( is_wr_transaction_gen(q, to->lifespan.died) )
     { to = deref_triple(db, to);
 
-      to->lifespan.died = GEN_MAX;
+      to->lifespan.died = gen_max;
     }
 					/* revert creation of new */
     if ( is_wr_transaction_gen(q, tn->lifespan.born) &&
