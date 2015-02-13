@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2006-2014, University of Amsterdam
+    Copyright (C): 2006-2015, University of Amsterdam
 			      VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
@@ -782,5 +782,5 @@ progress(_,_).
 
 :- multifile sandbox:safe_primitive/1.
 
-safe_primitive:safe_primitive(rdf_litindex:rdf_find_literals(_,_)).
-safe_primitive:safe_primitive(rdf_litindex:rdf_tokenize_literal(_,_)).
+sandbox:safe_primitive(rdf_litindex:rdf_find_literals(_,_)).
+sandbox:safe_primitive(rdf_litindex:rdf_tokenize_literal(_,_)).

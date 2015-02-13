@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@cs.vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 1985-2013, University of Amsterdam
+    Copyright (C): 1985-2015, University of Amsterdam
 			      VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
@@ -3534,6 +3534,10 @@ sandbox:safe_primitive(rdf_db:rdf_statistics(_)).
 sandbox:safe_primitive(rdf_db:lang_matches(_,_)).
 sandbox:safe_primitive(rdf_db:lang_equal(_,_)).
 sandbox:safe_primitive(rdf_db:rdf_version(_)).
+sandbox:safe_primitive(rdf_db:rdf_md5(_,_)).
+sandbox:safe_primitive(rdf_db:rdf_graph_modified_(_,_,_)).
+sandbox:safe_primitive(rdf_db:rdf_graph_source_(_,_,_)).
+sandbox:safe_primitive(rdf_db:rdf_graph_(_,_)).
 
 
 		 /*******************************
