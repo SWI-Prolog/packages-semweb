@@ -98,31 +98,50 @@ read_rdfa(Input, Triples, Options) :-
 	merge_options(NewOptions, Options, RDFaOptions),
 	xml_rdfa(DOM, Triples, RDFaOptions).
 
-open_input(stream(In), In, Options, true, _) :- !,
+open_input(Input, In, NewOptions, Close, Options) :-
+	open_input2(Input, In, NewOptions, Close0, Options),
+	detect_bom(In, Close0, Close).
+
+open_input2(stream(In), In, Options, true, _) :- !,
 	(   stream_property(In, file_name(Name)),
 	    to_uri(Name, URI)
 	->  Options = [base(URI)]
 	;   Options = []
 	).
-open_input(In, In, Options, true, _) :-
+open_input2(In, In, Options, true, _) :-
 	is_stream(In), !,
 	(   stream_property(In, file_name(Name)),
 	    to_uri(Name, URI)
 	->  Options = [base(URI)]
 	;   Options = []
 	).
-open_input(URL, In, [base(URL)], close(In), Options) :-
+open_input2(URL, In, [base(URL)], close(In), Options) :-
 	atom(URL),
 	uri_file_name(URL, File), !,
 	open(File, read, In, Options).
-open_input(URL, In, [base(Base)], close(In), Options) :-
+open_input2(URL, In, [base(Base)], close(In), Options) :-
 	atom(URL),
 	to_uri2(URL, Base), !,
 	http_open(URL, In, Options).
-open_input(File, In, [base(URI)], close(In), Options) :-
+open_input2(File, In, [base(URI)], close(In), Options) :-
 	absolute_file_name(File, Path, [access(read)]),
 	uri_file_name(URI, Path),
 	open(Path, read, In, Options).
+
+%%	detect_bom(+In, +Close0, -Close) is det.
+%
+%	We may be loading a binary stream. In   that  case we want to do
+%	BOM detection.
+
+detect_bom(In, Close0, Close) :-
+	stream_property(In, type(binary)),
+	stream_property(In, encoding(Enc)),
+	catch(set_stream(In, encoding(bom)),_,fail), !,
+	merge_close(Close0, set_stream(In, encoding(Enc)), Close).
+detect_bom(_, Close, Close).
+
+merge_close(true, Close, Close) :- !.
+merge_close(Close, _, Close).
 
 to_uri(URI0, URI) :-
 	to_uri2(URI0, URI), !.
@@ -142,6 +161,7 @@ http_scheme(https).
 
 close_input(true).
 close_input(close(X)) :- close(X).
+close_input(set_stream(In, encoding(Enc))) :- set_stream(In, encoding(Enc)).
 
 read_dom(In, DOM, Options) :-
 	option(dialect(Dialect), Options), !,
