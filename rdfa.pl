@@ -185,7 +185,9 @@ guess_dialect(Start, Dialect) :-
 	Dialect = xml.
 guess_dialect(Start, Dialect) :-
 	sub_string(Start, _, _, _, "<html"), !,
-	(   string_codes(Start, Codes),
+	(   sub_string(Start, _, _, _, "xmlns:")
+	->  Dialect = xhtml
+	;   string_codes(Start, Codes),
 	    phrase(html_doctype(DialectFound), Codes, _)
 	->  Dialect = DialectFound
 	;   Dialect = html
