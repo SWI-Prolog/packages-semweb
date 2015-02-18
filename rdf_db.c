@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2002-2013, University of Amsterdam
+    Copyright (C): 2002-2015, University of Amsterdam
 			      VU University Amsterdam
 
     This library is free software; you can redistribute it and/or
@@ -6532,7 +6532,7 @@ start_duplicate_admin(rdf_db *db)
 		 *	    TRANSACTIONS	*
 		 *******************************/
 
-int
+static int
 put_begin_end(term_t t, functor_t be, int level)
 { term_t av;
 
