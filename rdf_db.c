@@ -6550,6 +6550,17 @@ Options:
   Determines query generation
 */
 
+static int
+transaction_depth(const query *q)
+{ int depth = 0;
+
+  for(q=q->transaction; q; q=q->transaction)
+    depth++;
+
+  return depth;
+}
+
+
 static foreign_t
 rdf_transaction(term_t goal, term_t id, term_t options)
 { int rc;
@@ -6604,11 +6615,12 @@ rdf_transaction(term_t goal, term_t id, term_t options)
       { discard_transaction(q);
       } else
       { term_t be;
+	int depth = transaction_depth(q);
 
 	if ( !(be=PL_new_term_ref()) ||
-	     !put_begin_end(be, FUNCTOR_begin1, 0) ||
+	     !put_begin_end(be, FUNCTOR_begin1, depth) ||
 	     !rdf_broadcast(EV_TRANSACTION, (void*)id, (void*)be) ||
-	     !put_begin_end(be, FUNCTOR_end1, 0) )
+	     !put_begin_end(be, FUNCTOR_end1, depth) )
 	  return FALSE;
 
 	commit_transaction(q);
