@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2002-2013, University of Amsterdam
+    Copyright (C): 2002-2015, University of Amsterdam
 			      VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
@@ -43,6 +43,7 @@
 :- use_module(library(lists)).
 :- use_module(library(uri)).
 :- use_module(library(debug)).
+:- use_module(library(option)).
 :- use_module(library(error)).
 :- use_module(library(thread)).
 :- use_module(library(apply)).
@@ -311,15 +312,18 @@ rdf_current_db(Directory) :-
 %
 %		* min_size(+KB)
 %		Only flush if journal is over KB in size.
+%		* graph(+Graph)
+%		Only flush the journal of Graph
 %
 %	@tbd Provide a default for min_size?
 
 rdf_flush_journals(Options) :-
-	forall(rdf_graph(DB),
-	       rdf_flush_journal(DB, Options)).
+	option(graph(Graph), Options, _),
+	forall(rdf_graph(Graph),
+	       rdf_flush_journal(Graph, Options)).
 
-rdf_flush_journal(DB, Options) :-
-	db_files(DB, _SnapshotFile, JournalFile),
+rdf_flush_journal(Graph, Options) :-
+	db_files(Graph, _SnapshotFile, JournalFile),
 	db_file(JournalFile, File),
 	(   \+ exists_file(File)
 	->  true
@@ -327,7 +331,7 @@ rdf_flush_journal(DB, Options) :-
 	    size_file(JournalFile, Size),
 	    Size / 1024 < KB
 	->  true
-	;   create_db(DB)
+	;   create_db(Graph)
 	).
 
 		 /*******************************
@@ -982,17 +986,22 @@ close_journals :-
 	       catch(close_journal(DB), E,
 		     print_message(error, E))).
 
-%%	create_db(+DB)
+%%	create_db(+Graph)
 %
-%	Create a saved version of DB in corresponding file, close and
+%	Create a saved version of Graph in corresponding file, close and
 %	delete journals.
 
-create_db(DB) :-
-	debug(rdf_persistency, 'Saving DB ~w', [DB]),
-	db_abs_files(DB, Snapshot, Journal),
+create_db(Graph) :-
+	\+ rdf(_,_,_,Graph), !,
+	debug(rdf_persistency, 'Deleting empty Graph ~w', [Graph]),
+	delete_db(Graph).
+create_db(Graph) :-
+	debug(rdf_persistency, 'Saving Graph ~w', [Graph]),
+	close_journal(Graph),
+	db_abs_files(Graph, Snapshot, Journal),
 	atom_concat(Snapshot, '.new', NewSnapshot),
 	(   catch(( create_directory_levels(Snapshot),
-		    rdf_save_db(NewSnapshot, DB)
+		    rdf_save_db(NewSnapshot, Graph)
 		  ), Error,
 		  ( print_message(warning, Error),
 		    fail
@@ -1002,7 +1011,7 @@ create_db(DB) :-
 	    ;   true
 	    ),
 	    rename_file(NewSnapshot, Snapshot),
-	    debug(rdf_persistency, 'Saved DB ~w', [DB])
+	    debug(rdf_persistency, 'Saved Graph ~w', [Graph])
 	;   catch(delete_file(NewSnapshot), _, true)
 	).
 
