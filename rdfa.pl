@@ -651,7 +651,8 @@ step_7_5_9(DOM, Context) :-
 	memberchk(inlist=_, Attrs),
 	has_attribute(rel, Attrs, Rel, Context), !,
 	iri_list(Rel, Preds, Context),
-	maplist(add_property_list(Context, Context.current_object_resource),
+	CurrentObjectResource = Context.current_object_resource,
+	maplist(add_property_list(Context, CurrentObjectResource),
 		Preds).
 step_7_5_9(DOM, Context) :-
 	DOM = element(_,Attrs,_),
@@ -779,7 +780,8 @@ update_property_value(DOM, Context) :-
 	),
 	(   memberchk(inlist=_, Attrs)
 	->  maplist(add_property_list(Context, Obj), Preds)
-	;   maplist(add_property(Context, Context.new_subject, Obj), Preds)
+	;   NewSubject = Context.new_subject,
+	    maplist(add_property(Context, NewSubject, Obj), Preds)
 	).
 update_property_value(_, _).
 
