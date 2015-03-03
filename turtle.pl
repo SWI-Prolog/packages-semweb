@@ -179,11 +179,27 @@ rdf_load_turtle(Input, Triples, Options) :-
 
 %%	rdf_process_turtle(+Input, :OnObject, +Options) is det.
 %
-%	Process Turtle input from Input, calling OnObject with a list of
-%	triples. Options is the same as for rdf_load_turtle/3.
+%	Streaming  Turtle  parser.  The  predicate  rdf_process_turtle/3
+%	processes Turtle data from Input, calling   OnObject with a list
+%	of triples for every Turtle _statement_ found in Input. OnObject
+%	is  called  as  below,  where  `ListOfTriples`   is  a  list  of
+%	rdf(S,P,O) terms for a normal Turtle  file or rdf(S,P,O,G) terms
+%	if the =GRAPH= keyword is used to  associate a set of triples in
+%	the document with  a  particular   graph.  The  `Graph` argument
+%	provides the default graph for storing the triples and _Line_ is
+%	the line number where the statement started.
+%
+%	  ==
+%	  call(OnObject, ListOfTriples, Graph:Line)
+%	  ==
+%
+%	This predicate supports the same Options as rdf_load_turtle/3.
 %
 %	Errors encountered are sent to  print_message/2, after which the
 %	parser tries to recover and parse the remainder of the data.
+%
+%	@see  This  predicate  is  normally    used  by  load_rdf/2  for
+%	processing RDF data.
 
 rdf_process_turtle(In, OnObject, Options) :-
 	base_uri(In, BaseURI, Options),
