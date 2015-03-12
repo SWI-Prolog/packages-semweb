@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2009-2012, University of Amsterdam
+    Copyright (C): 2009-2015, University of Amsterdam
 			      VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
@@ -204,6 +204,10 @@ typed(match) :-
 	rdf_assert(x, a, literal(c)),
 	\+ rdf(x, a, literal(type(t, c))),
 	\+ rdf(x, a, literal(type(t, _))).
+typed(match_lang) :-
+	rdf_assert(x, a, literal(lang(en, 'hello'))),
+	rdf_retractall(_,_,literal(lang(nl, _))),
+	rdf(x,a,literal(lang(en, 'hello'))).
 typed(convert) :-
 	rdf_literal_value(literal(type(xsd:integer, '42')), 42).
 

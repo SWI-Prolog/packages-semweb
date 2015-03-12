@@ -4466,6 +4466,9 @@ match_object(triple *t, triple *p, unsigned flags)
 	  if ( plit->qualifier &&
 	       tlit->qualifier != plit->qualifier )
 	    return FALSE;
+	  if ( plit->type_or_lang &&
+	       tlit->type_or_lang != plit->type_or_lang )
+	    return FALSE;
 	  return TRUE;
 	case OBJ_STRING:
 	  if ( (flags & MATCH_QUAL) ||
