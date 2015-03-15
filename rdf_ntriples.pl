@@ -330,7 +330,9 @@ init_state(In, Options, State) :-
 	;   atom_concat('__', BaseURI, Prefix)
 	),
 	option(on_error(OnError), Options, warning),
-	option(format(Format), Options, _),
+	% If the format is not set explicitly we assume N-Triples.
+	% The format option _must_ be set before make_nt_state/2.
+	option(format(Format), Options, ntriples),
 	rdf_db:graph(Options, Graph),
 	(   var(Graph)
 	->  Graph = user
