@@ -314,6 +314,8 @@ init_state(In, Options, State) :-
 	->  true
 	;   In = stream(_)
 	->  BaseURI = []
+	;   is_stream(In)
+	->  BaseURI = []
 	;   In = atom(_)
 	->  BaseURI = []
 	;   uri_is_global(In),
