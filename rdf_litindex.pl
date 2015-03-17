@@ -59,6 +59,7 @@ and _sounds like_ (metaphone).  The normal user-level predicate is
 
 :- dynamic
 	literal_map/2,			% Type, -Map
+	map_building/2,			% Type, -Queue
 	new_token/2,			% Hook
 	setting/1.
 :- volatile
@@ -703,17 +704,40 @@ text_of(Text, -, Text) :- integer(Text).
 		 *	   STEM INDEX		*
 		 *******************************/
 
+%%	stem_index(-Map) is det.
+%
+%	Get the stemming literal index. This index is created on demand.
+%	If some thread is creating the index, other threads wait for its
+%	completion.
+
 stem_index(Map) :-
-	literal_map(stem, Map), !.
+	literal_map(stem, Map), !,
+	wait_for_map(stem).
 stem_index(Map) :-
 	rdf_new_literal_map(Map),
 	assert(literal_map(stem, Map)),
-	fill_stem_index(Map),
-	assert((new_token(Token, Lang) :- add_stem(Token, Lang, Map))).
+	assert((new_token(Token, Lang) :- add_stem(Token, Lang, Map))),
+	message_queue_create(Queue),
+	assert(map_building(stem, Queue)),
+	thread_create(fill_stem_index(Map, Queue), _,
+		      [ alias('__rdf_stemmer'),
+			detached(true)
+		      ]),
+	wait_for_map(stem).
 
-fill_stem_index(StemMap) :-
-	forall(rdf_current_literal(Literal),
-	       stem_literal_tokens(Literal, StemMap)).
+wait_for_map(MapName) :-
+	(   map_building(MapName, Queue)
+	->  catch(thread_get_message(Queue, _), _, true),
+	    wait_for_map(MapName)
+	;   true
+	).
+
+fill_stem_index(StemMap, Queue) :-
+	call_cleanup(
+	    forall(rdf_current_literal(Literal),
+		   stem_literal_tokens(Literal, StemMap)),
+	    ( message_queue_destroy(Queue),
+	      retractall(map_building(stem, _)))).
 
 stem_literal_tokens(Literal, StemMap) :-
 	rdf_tokenize_literal(Literal, Tokens),
@@ -763,23 +787,36 @@ main_lang(LangSpec, Lang) :-
 
 
 metaphone_index(Map) :-
-	literal_map(metaphone, Map), !.
+	literal_map(metaphone, Map), !,
+	wait_for_map(metaphone).
 metaphone_index(Map) :-
 	rdf_new_literal_map(Map),
 	assert(literal_map(metaphone, Map)),
-	fill_metaphone_index(Map),
-	assert((new_token(Token, Lang) :- add_metaphone(Token, Lang, Map))).
+	assert((new_token(Token, Lang) :- add_metaphone(Token, Lang, Map))),
+	message_queue_create(Queue),
+	assert(map_building(metaphone, Queue)),
+	thread_create(fill_metaphone_index(Map, Queue), _,
+		      [ alias('__rdf_metaphone_indexer'),
+			detached(true)
+		      ]),
+	wait_for_map(metaphone).
 
-fill_metaphone_index(PorterMap) :-
+fill_metaphone_index(MetaphoneMap, Queue) :-
+	call_cleanup(
+	    fill_metaphone_index(MetaphoneMap),
+	    ( message_queue_destroy(Queue),
+	      retractall(map_building(metaphone, _)))).
+
+fill_metaphone_index(MetaphoneMap) :-
 	token_index(TokenMap),
 	rdf_keys_in_literal_map(TokenMap, all, Tokens),
-	metaphone(Tokens, PorterMap).
+	metaphone(Tokens, MetaphoneMap).
 
 metaphone([], _).
 metaphone([Token|T], Map) :-
-	(   atom(Token)
-	->  double_metaphone(Token, SoundEx),
-	    rdf_insert_literal_map(Map, SoundEx, Token, Keys),
+	(   atom(Token),
+	    double_metaphone(Token, SoundEx)
+	->  rdf_insert_literal_map(Map, SoundEx, Token, Keys),
 	    (	integer(Keys),
 		Keys mod 1000 =:= 0
 	    ->	progress(Map, 'Metaphone')
