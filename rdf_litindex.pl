@@ -33,13 +33,19 @@
 	  [ rdf_set_literal_index_option/1,	% +Options
 	    rdf_tokenize_literal/2,		% +Literal, -Tokens
 	    rdf_find_literals/2,		% +Spec, -ListOfLiterals
-	    rdf_token_expansions/2		% +Spec, -Expansions
+	    rdf_token_expansions/2,		% +Spec, -Expansions
+
+	    rdf_literal_index/2			% +Type, -Index
 	  ]).
 :- use_module(rdf_db).
 :- use_module(library(debug)).
 :- use_module(library(lists)).
 :- use_module(library(error)).
+:- if(exists_source(library(snowball))).
+:- use_module(library(snowball)).
+:- else.
 :- use_module(library(porter_stem)).
+:- endif.
 :- use_module(library(double_metaphone)).
 
 /** <module> Search literals
@@ -52,7 +58,7 @@ and _sounds like_ (metaphone).  The normal user-level predicate is
 
 :- dynamic
 	literal_map/2,			% Type, -Map
-	new_token/1,			% Hook
+	new_token/2,			% Hook
 	setting/1.
 :- volatile
 	literal_map/2.
@@ -124,7 +130,8 @@ check_option(Option) :-
 %	Spec ::= or(Spec,Spec)
 %	Spec ::= not(Spec)
 %	Spec ::= sounds(Like)
-%	Spec ::= stem(Like)
+%	Spec ::= stem(Like)		% same as stem(Like, en)
+%	Spec ::= stem(Like, Lang)
 %	Spec ::= prefix(Prefix)
 %	Spec ::= between(Low, High)	% Numerical between
 %	Spec ::= ge(High)		% Numerical greater-equal
@@ -158,7 +165,7 @@ rdf_token_expansions(sounds(Like), [sounds(Like, Tokens)]) :-
 	metaphone_index(Map),
 	rdf_find_literal_map(Map, [Like], Tokens).
 rdf_token_expansions(stem(Like), [stem(Like, Tokens)]) :-
-	porter_index(Map),
+	stem_index(Map),
 	rdf_find_literal_map(Map, [Like], Tokens).
 rdf_token_expansions(Spec, Expansions) :-
 	compile_spec(Spec, DNF),
@@ -242,9 +249,11 @@ expand_fuzzy(sounds(Like), Or) :- !,
 	;   expand_fuzzy(Like, Or)
 	).
 expand_fuzzy(stem(Like), Or) :- !,
+	expand_fuzzy(stem(Like, en), Or).
+expand_fuzzy(stem(Like, Lang), Or) :- !,
 	(   atom(Like)
-	->  porter_index(Map),
-	    porter_stem(Like, Key),
+	->  stem_index(Map),
+	    stem(Like, Lang, Key),
 	    rdf_find_literal_map(Map, [Key], Tokens),
 	    list_to_or(Tokens, stem(Like), Or)
 	;   expand_fuzzy(Like, Or)
@@ -381,10 +390,10 @@ dnf1(DNF, DNF).
 %	a monitor hook.
 
 token_index(Map) :-
-	literal_map(tokens, Map), !.
+	literal_map(token, Map), !.
 token_index(Map) :-
 	rdf_new_literal_map(Map),
-	assert(literal_map(tokens, Map)),
+	assert(literal_map(token, Map)),
 	make_literal_index,
 	verbose('~N', []),
 	Monitor = [ reset,
@@ -574,18 +583,18 @@ monitor_literal(transaction(end, reset)) :-
 
 register_literal(Literal) :-
 	(   rdf_tokenize_literal(Literal, Tokens)
-	->  text_of(Literal, Text),
-	    literal_map(tokens, Map),
-	    add_tokens(Tokens, Text, Map)
+	->  text_of(Literal, Lang, Text),
+	    literal_map(token, Map),
+	    add_tokens(Tokens, Lang, Text, Map)
 	;   true
 	).
 
-add_tokens([], _, _).
-add_tokens([H|T], Literal, Map) :-
+add_tokens([], _, _, _).
+add_tokens([H|T], Lang, Literal, Map) :-
 	rdf_insert_literal_map(Map, H, Literal, Keys),
 	(   var(Keys)
 	->  true
-	;   forall(new_token(H), true),
+	;   forall(new_token(H, Lang), true),
 	    (	Keys mod 1000 =:= 0
 	    ->	progress(Map, 'Tokens'),
 		(   Keys mod 10000 =:= 0
@@ -595,7 +604,7 @@ add_tokens([H|T], Literal, Map) :-
 	    ;	true
 	    )
 	),
-	add_tokens(T, Literal, Map).
+	add_tokens(T, Lang, Literal, Map).
 
 
 %%	unregister_literal(+Literal)
@@ -605,11 +614,11 @@ add_tokens([H|T], Literal, Map) :-
 %	that is destroyed.
 
 unregister_literal(Literal) :-
-	text_of(Literal, Text),
+	text_of(Literal, _Lang, Text),
 	(   rdf(_,_,literal(Text))
 	->  true			% still something left
 	;   rdf_tokenize_literal(Literal, Tokens),
-	    literal_map(tokens, Map),
+	    literal_map(token, Map),
 	    del_tokens(Tokens, Text, Map)
 	).
 
@@ -627,7 +636,7 @@ del_tokens([H|T], Literal, Map) :-
 rdf_tokenize_literal(Literal, Tokens) :-
 	tokenization(Literal, Tokens), !.		% Hook
 rdf_tokenize_literal(Literal, Tokens) :-
-	text_of(Literal, Text),
+	text_of(Literal, _Lang, Text),
 	atom(Text),
 	tokenize_atom(Text, Tokens0),
 	select_tokens(Tokens0, Tokens).
@@ -652,7 +661,7 @@ select_tokens([H|T0], T) :-
 	).
 
 
-%	no_index_token/1
+%%	no_index_token(?Token)
 %
 %	Tokens we do not wish to index,   as  they creat huge amounts of
 %	data with little or no value.  Is   there  a more general way to
@@ -669,55 +678,77 @@ no_index_token(this).
 no_index_token(the).
 
 
-%%	text_of(+LiteralArg, -Text)
+%%	text_of(+LiteralArg, -Lang, -Text) is semidet.
 %
 %	Get the textual  or  (integer)   numerical  information  from  a
-%	literal value.
+%	literal value. Lang  is  the  language   to  use  for  stemming.
+%	Currently we use English for untyped  plain literals or literals
+%	typed xsd:string. Formally, these should not be tokenized, but a
+%	lot of data out there does not tag strings with their language.
 
-text_of(type(_, Text), Text) :- !.
-text_of(lang(_, Text), Text) :- !.
-text_of(Text, Text) :- atom(Text), !.
-text_of(Text, Text) :- integer(Text).
+text_of(type(xsd:string, Text), en, Text) :- !.
+text_of(type(_, Text), -, Text) :- !.
+text_of(lang(Lang, Text), Lang, Text) :- !.
+text_of(Text, en, Text) :- atom(Text), !.
+text_of(Text, -, Text) :- integer(Text).
 
 
 		 /*******************************
-		 *	   PORTER INDEX		*
+		 *	   STEM INDEX		*
 		 *******************************/
 
-
-porter_index(Map) :-
-	literal_map(porter, Map), !.
-porter_index(Map) :-
+stem_index(Map) :-
+	literal_map(stem, Map), !.
+stem_index(Map) :-
 	rdf_new_literal_map(Map),
-	assert(literal_map(porter, Map)),
-	fill_porter_index(Map),
-	assert((new_token(Token) :- add_stem(Token, Map))).
+	assert(literal_map(stem, Map)),
+	fill_stem_index(Map),
+	assert((new_token(Token, Lang) :- add_stem(Token, Lang, Map))).
 
-fill_porter_index(PorterMap) :-
-	token_index(TokenMap),
-	rdf_keys_in_literal_map(TokenMap, all, Tokens),
-	stem(Tokens, PorterMap).
+fill_stem_index(StemMap) :-
+	forall(rdf_current_literal(Literal),
+	       stem_literal_tokens(Literal, StemMap)).
 
-stem([], _).
-stem([Token|T], Map) :-
+stem_literal_tokens(Literal, StemMap) :-
+	rdf_tokenize_literal(Literal, Tokens),
+	text_of(Literal, Lang, _Text),
+	insert_tokens_stem(Tokens, Lang, StemMap).
+
+insert_tokens_stem([], _, _).
+insert_tokens_stem([Token|T], Lang, Map) :-
 	(   atom(Token)
-	->  (   porter_stem(Token, Stem)
+	->  (   stem(Token, Lang, Stem)
 	    ->	rdf_insert_literal_map(Map, Stem, Token, Keys),
 		(   integer(Keys),
 		    Keys mod 1000 =:= 0
-		->  progress(Map, 'Porter')
+		->  progress(Map, 'Stem')
 		;   true
 		)
 	    ;	true
 	    )
 	;   true
 	),
-	stem(T, Map).
+	insert_tokens_stem(T, Lang, Map).
 
 
-add_stem(Token, Map) :-
-	porter_stem(Token, Stem),
+add_stem(Token, Lang, Map) :-
+	stem(Lang, Token, Stem),
 	rdf_insert_literal_map(Map, Stem, Token, _).
+
+:- if(current_predicate(snowball/3)).
+stem(Token, LangSpec, Stem) :-
+	main_lang(LangSpec, Lang),
+	catch(snowball(Lang, Token, Stem), _, fail).
+:- else.
+stem(Token, _Lang, Stem) :-
+	porter_stem(Token, Stem).
+:- endif.
+
+main_lang(LangSpec, Lang) :-
+	sub_atom(LangSpec, Before, _, _, -), !,
+	sub_atom(LangSpec, 0, Before, _, Lang).
+main_lang(LangSpec, Lang) :-
+	downcase_atom(LangSpec, Lang).
 
 
 		 /*******************************
@@ -731,7 +762,7 @@ metaphone_index(Map) :-
 	rdf_new_literal_map(Map),
 	assert(literal_map(metaphone, Map)),
 	fill_metaphone_index(Map),
-	assert((new_token(Token) :- add_metaphone(Token, Map))).
+	assert((new_token(Token, Lang) :- add_metaphone(Token, Lang, Map))).
 
 fill_metaphone_index(PorterMap) :-
 	token_index(TokenMap),
@@ -753,9 +784,36 @@ metaphone([Token|T], Map) :-
 	metaphone(T, Map).
 
 
-add_metaphone(Token, Map) :-
+add_metaphone(Token, _Lang, Map) :-
 	double_metaphone(Token, SoundEx),
 	rdf_insert_literal_map(Map, SoundEx, Token).
+
+
+%%	rdf_literal_index(+Type, -Index) is det.
+%
+%	True when Index is a literal map   containing the index of Type.
+%	Type is one of:
+%
+%	  - token
+%	  Tokens are basically words of literal values. See
+%	  rdf_tokenize_literal/2.  The `token` map maps tokens to full
+%	  literal texts.
+%	  - stem
+%	  Index of stemmed tokens.  If the language is available, the
+%	  tokens are stemmed using the matching _snowball_ stemmer.
+%	  The `stem` map maps stemmed to full tokens.
+%	  - metaphone
+%	  Phonetic index of tokens.  The `metaphone` map maps phonetic
+%	  keys to tokens.
+
+rdf_literal_index(token, Map) :- !,
+	token_index(Map).
+rdf_literal_index(stem, Map) :- !,
+	stem_index(Map).
+rdf_literal_index(metaphone, Map) :- !,
+	metaphone_index(Map).
+rdf_literal_index(Type, _Map) :-
+	domain_error(literal_index, Type).
 
 
 		 /*******************************
@@ -784,3 +842,4 @@ progress(_,_).
 
 sandbox:safe_primitive(rdf_litindex:rdf_find_literals(_,_)).
 sandbox:safe_primitive(rdf_litindex:rdf_tokenize_literal(_,_)).
+sandbox:safe_primitive(rdf_litindex:rdf_literal_index(_,_)).
