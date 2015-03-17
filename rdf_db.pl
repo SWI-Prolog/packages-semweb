@@ -3538,6 +3538,9 @@ sandbox:safe_primitive(rdf_db:rdf_md5(_,_)).
 sandbox:safe_primitive(rdf_db:rdf_graph_modified_(_,_,_)).
 sandbox:safe_primitive(rdf_db:rdf_graph_source_(_,_,_)).
 sandbox:safe_primitive(rdf_db:rdf_graph_(_,_)).
+sandbox:safe_primitive(rdf_db:rdf_find_literal_map(_,_,_)).
+sandbox:safe_primitive(rdf_db:rdf_keys_in_literal_map(_,_,_)).
+sandbox:safe_primitive(rdf_db:rdf_statistics_literal_map(_,_)).
 
 
 		 /*******************************
