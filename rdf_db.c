@@ -2927,7 +2927,10 @@ compare_literals() sorts literals.  Ordering is defined as:
 static int
 cmp_qualifier(const literal *l1, const literal *l2)
 { if ( l1->qualifier == l2->qualifier )
-    return cmp_atoms(ID_ATOM(l1->type_or_lang), ID_ATOM(l2->type_or_lang));
+  { if ( l1->type_or_lang )
+      return cmp_atoms(ID_ATOM(l1->type_or_lang), ID_ATOM(l2->type_or_lang));
+    return -1;
+  }
 
   return l1->qualifier - l2->qualifier;
 }
