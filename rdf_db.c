@@ -2926,7 +2926,7 @@ compare_literals() sorts literals.  Ordering is defined as:
 
 static int
 cmp_qualifier(const literal *l1, const literal *l2)
-{ if ( l1->qualifier == l2->qualifier )
+{ if ( l1->qualifier != Q_NONE && l1->qualifier == l2->qualifier )
   { if ( l1->type_or_lang )
       return cmp_atoms(ID_ATOM(l1->type_or_lang), ID_ATOM(l2->type_or_lang));
     return -1;
@@ -7300,36 +7300,68 @@ rdf_estimate_complexity(term_t subject, term_t predicate, term_t object,
 current_literal(?Literals)
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+typedef struct cl_state
+{ skiplist_enum sl_state;
+  int		indexed;
+  literal	lit;
+  literal_ex	lit_ex;
+} cl_state;
+
+static int
+indexedLiteral(const literal *lit)
+{ if ( lit->objtype == OBJ_STRING )
+    return lit->value.string != 0;
+  return lit->objtype != OBJ_UNTYPED;
+}
+
+
 static foreign_t
 rdf_current_literal(term_t t, control_t h)
 { rdf_db *db = rdf_current_db();
   literal **data;
-  skiplist_enum *state;
+  cl_state *state;
   int rc;
 
   switch(PL_foreign_control(h))
   { case PL_FIRST_CALL:
-      if ( PL_is_variable(t) )
-      { state = rdf_malloc(db, sizeof(*state));
+      state = rdf_malloc(db, sizeof(*state));
+      memset(state, 0, sizeof(*state));
 
-	data = skiplist_find_first(&db->literals, NULL, state);
+      if ( PL_is_variable(t) )
+      { data = skiplist_find_first(&db->literals, NULL, &state->sl_state);
 	goto next;
       } else
-      { return FALSE;			/* TBD */
+      { if ( !get_literal(db, t, &state->lit, LIT_PARTIAL) )
+	{ rdf_free(db, state, sizeof(*state));
+	  return FALSE;
+	}
+	if ( indexedLiteral(&state->lit) )
+	{ state->lit_ex.literal = &state->lit;
+	  prepare_literal_ex(&state->lit_ex);
+	  data = skiplist_find_first(&db->literals,
+				     &state->lit_ex, &state->sl_state);
+	  state->indexed = TRUE;
+	} else
+	{ data = skiplist_find_first(&db->literals, NULL, &state->sl_state);
+	}
+	goto next;
       }
     case PL_REDO:
       state = PL_foreign_context_address(h);
-      data  = skiplist_find_next(state);
+      data  = skiplist_find_next(&state->sl_state);
     next:
     { fid_t fid = PL_open_foreign_frame();
 
-      for(; data; data=skiplist_find_next(state))
+      for(; data; data=skiplist_find_next(&state->sl_state))
       { literal *lit = *data;
 
 	if ( unify_literal(t, lit) )
 	{ PL_close_foreign_frame(fid);
 	  PL_retry_address(state);
 	} else if ( PL_exception(0) )
+	{ break;
+	} else if ( state->indexed &&
+		    compare_literals(&state->lit_ex, lit) > 0 )
 	{ break;
 	} else
 	{ PL_rewind_foreign_frame(fid);
@@ -7340,10 +7372,11 @@ rdf_current_literal(term_t t, control_t h)
       goto cleanup;
     }
     case PL_PRUNED:
+      state = PL_foreign_context_address(h);
       rc = TRUE;
 
     cleanup:
-      state = PL_foreign_context_address(h);
+      free_literal(db, &state->lit);
       rdf_free(db, state, sizeof(*state));
 
       return rc;
