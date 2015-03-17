@@ -32,6 +32,7 @@
 :- module(rdf_litindex,
 	  [ rdf_set_literal_index_option/1,	% +Options
 	    rdf_tokenize_literal/2,		% +Literal, -Tokens
+	    rdf_find_literal/2,			% +Spec, -Literal
 	    rdf_find_literals/2,		% +Spec, -ListOfLiterals
 	    rdf_token_expansions/2,		% +Spec, -Expansions
 
@@ -120,7 +121,8 @@ check_option(Option) :-
 		 *	      QUERY		*
 		 *******************************/
 
-%%	rdf_find_literals(+Spec, -Literals)
+%%	rdf_find_literal(+Spec, -Literal) is nondet.
+%%	rdf_find_literals(+Spec, -Literals) is det.
 %
 %	Find literals in the RDF database matching Spec.  Spec is defined
 %	as:
@@ -145,6 +147,10 @@ check_option(Option) :-
 %	generate the union using ordered-set algorithms.
 %
 %	@tbd Exploit ordering of numbers and allow for > N, < N, etc.
+
+rdf_find_literal(Spec, Literal) :-
+	rdf_find_literals(Spec, Literals),
+	member(Literal, Literals).
 
 rdf_find_literals(Spec, Literals) :-
 	compile_spec(Spec, DNF),
