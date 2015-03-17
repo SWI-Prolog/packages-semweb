@@ -42,6 +42,7 @@
 :- use_module(library(debug)).
 :- use_module(library(lists)).
 :- use_module(library(error)).
+:- use_module(library(apply)).
 :- if(exists_source(library(snowball))).
 :- use_module(library(snowball)).
 :- else.
@@ -397,12 +398,21 @@ dnf1(DNF, DNF).
 %	a monitor hook.
 
 token_index(Map) :-
-	literal_map(token, Map), !.
+	literal_map(token, Map), !,
+	wait_for_map(token).
 token_index(Map) :-
 	rdf_new_literal_map(Map),
 	assert(literal_map(token, Map)),
-	make_literal_index,
-	verbose('~N', []),
+	register_token_updater,
+	message_queue_create(Queue),
+	assert(map_building(token, Queue)),
+	thread_create(make_literal_index(Queue), _,
+		      [ alias('__rdf_tokenizer'),
+			detached(true)
+		      ]),
+	wait_for_map(token).
+
+register_token_updater :-
 	Monitor = [ reset,
 		    new_literal,
 		    old_literal
@@ -416,6 +426,11 @@ token_index(Map) :-
 	;   rdf_monitor(monitor_literal, Monitor)
 	).
 
+make_literal_index(Queue) :-
+	call_cleanup(
+	    make_literal_index,
+	    ( message_queue_destroy(Queue),
+	      retractall(map_building(token, _)))).
 
 %%	make_literal_index
 %
@@ -423,10 +438,12 @@ token_index(Map) :-
 
 make_literal_index :-
 	setting(index_threads(N)), !,
-	threaded_literal_index(N).
+	threaded_literal_index(N),
+	verbose('~N', []).
 make_literal_index :-
 	current_prolog_flag(cpu_count, X),
-	threaded_literal_index(X).
+	threaded_literal_index(X),
+	verbose('~N', []).
 
 threaded_literal_index(N) :-
 	N > 1, !,
