@@ -7318,16 +7318,24 @@ rdf_current_literal(term_t t, control_t h)
       state = PL_foreign_context_address(h);
       data  = skiplist_find_next(state);
     next:
+    { fid_t fid = PL_open_foreign_frame();
+
       for(; data; data=skiplist_find_next(state))
       { literal *lit = *data;
 
 	if ( unify_literal(t, lit) )
-	{ PL_retry_address(state);
+	{ PL_close_foreign_frame(fid);
+	  PL_retry_address(state);
+	} else if ( PL_exception(0) )
+	{ break;
+	} else
+	{ PL_rewind_foreign_frame(fid);
 	}
       }
-
+      PL_close_foreign_frame(fid);
       rc = FALSE;
       goto cleanup;
+    }
     case PL_PRUNED:
       rc = TRUE;
 
