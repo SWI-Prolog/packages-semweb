@@ -35,6 +35,7 @@
 	    rdf_find_literal/2,			% +Spec, -Literal
 	    rdf_find_literals/2,		% +Spec, -ListOfLiterals
 	    rdf_token_expansions/2,		% +Spec, -Expansions
+	    rdf_stopgap_token/1,		% -Token
 
 	    rdf_literal_index/2			% +Type, -Index
 	  ]).
@@ -62,7 +63,8 @@ and _sounds like_ (metaphone).  The normal user-level predicate is
 	literal_map/2,			% Type, -Map
 	map_building/2,			% Type, -Queue
 	new_token/2,			% Hook
-	setting/1.
+	setting/1,
+	stopgap/1.
 :- volatile
 	literal_map/2.
 :- multifile
@@ -73,6 +75,7 @@ and _sounds like_ (metaphone).  The normal user-level predicate is
 setting(verbose(false)).		% print progress messages
 setting(index_threads(1)).		% # threads for creating the index
 setting(index(thread(1))).		% Use a thread for incremental updates
+setting(stopgap_threshold(50000)).	% consider token a stopgap over N
 
 %%	rdf_set_literal_index_option(+Options:list)
 %
@@ -91,6 +94,10 @@ setting(index(thread(1))).		% Use a thread for incremental updates
 %		=self= (execute in the same thread), thread(N) (execute
 %		in N concurrent threads) or =default= (depends on number
 %		of cores).
+%
+%		* stopgap_threshold(+Count)
+%		Add a token to the dynamic stopgap set if it appears in
+%		more than Count literals.  The default is 50,000.
 
 rdf_set_literal_index_option([]) :- !.
 rdf_set_literal_index_option([H|T]) :- !,
@@ -112,6 +119,8 @@ check_option(X) :-
 check_option(verbose(X)) :- !,
 	must_be(boolean, X).
 check_option(index_threads(Count)) :- !,
+	must_be(nonneg, Count).
+check_option(stopgap_threshold(Count)) :- !,
 	must_be(nonneg, Count).
 check_option(index(How)) :- !,
 	must_be(oneof([default,thread(_),self]), How).
@@ -476,13 +485,15 @@ work(Literal) :-
 	fail.
 
 
-%	clean_token_index
+%%	clean_token_index
 %
 %	Clean after a reset.
 
 clean_token_index :-
 	forall(literal_map(_, Map),
-	       rdf_reset_literal_map(Map)).
+	       rdf_reset_literal_map(Map)),
+	retractall(stopgap(_)).
+
 
 		 /*******************************
 		 *	  THREADED UPDATE	*
@@ -617,7 +628,13 @@ add_tokens([], _, _, _).
 add_tokens([H|T], Lang, Literal, Map) :-
 	rdf_insert_literal_map(Map, H, Literal, Keys),
 	(   var(Keys)
-	->  true
+	->  (   rdf_keys_in_literal_map(Map, key(H), Count),
+	        setting(stopgap_threshold(Threshold)),
+		Count > Threshold
+	    ->	assert(stopgap(H)),
+		rdf_delete_literal_map(Map, H)
+	    ;	true
+	    )
 	;   forall(new_token(H, Lang), true),
 	    (	Keys mod 1000 =:= 0
 	    ->	progress(Map, 'Tokens'),
@@ -678,28 +695,56 @@ select_tokens([H|T0], T) :-
 	    )
 	;   atom_length(H, 1)
 	->  select_tokens(T0, T)
-	;   no_index_token(H)
+	;   default_stopgap(H)
+	->  select_tokens(T0, T)
+	;   stopgap(H)
 	->  select_tokens(T0, T)
 	;   T = [H|T1],
 	    select_tokens(T0, T1)
 	).
 
+%%	rdf_stopgap_token(-Token) is nondet.
+%
+%	True when Token is a stopgap  token. Currently, this implies one
+%	of:
+%
+%	  - exclude_from_index(token, Token) is true
+%	  - default_stopgap(Token) is true
+%	  - Token is an atom of length 1
+%	  - Token was added to the dynamic stopgap token set because
+%	    it appeared in more than _stopgap_threshold_ literals.
 
-%%	no_index_token(?Token)
+rdf_stopgap_token(Token) :-
+	(   var(Token)
+	->  rdf_stopgap_token2(Token)
+	;   rdf_stopgap_token2(Token), !
+	).
+
+rdf_stopgap_token2(Token) :-
+	exclude_from_index(token, Token).
+rdf_stopgap_token2(Token) :-
+	default_stopgap(Token).
+rdf_stopgap_token2(Token) :-
+	atom(Token),
+	atom_length(Token, 1).
+rdf_stopgap_token2(Token) :-
+	stopgap(Token).
+
+%%	default_stopgap(?Token)
 %
 %	Tokens we do not wish to index,   as  they creat huge amounts of
 %	data with little or no value.  Is   there  a more general way to
 %	describe this? Experience shows that simply  word count is not a
 %	good criterium as it often rules out popular domain terms.
 
-no_index_token(and).
-no_index_token(an).
-no_index_token(or).
-no_index_token(of).
-no_index_token(on).
-no_index_token(in).
-no_index_token(this).
-no_index_token(the).
+default_stopgap(and).
+default_stopgap(an).
+default_stopgap(or).
+default_stopgap(of).
+default_stopgap(on).
+default_stopgap(in).
+default_stopgap(this).
+default_stopgap(the).
 
 
 %%	text_of(+LiteralArg, -Lang, -Text) is semidet.
