@@ -157,6 +157,9 @@ check_option(Option) :-
 %	on elementary tokens. Then we execute   all the conjunctions and
 %	generate the union using ordered-set algorithms.
 %
+%	Stopgaps are ignored. If the final result is only a stopgap, the
+%	predicate fails.
+%
 %	@tbd Exploit ordering of numbers and allow for > N, < N, etc.
 
 rdf_find_literal(Spec, Literal) :-
@@ -165,6 +168,7 @@ rdf_find_literal(Spec, Literal) :-
 
 rdf_find_literals(Spec, Literals) :-
 	compile_spec(Spec, DNF),
+	DNF \== @(stopgap),
 	token_index(Map),
 	lookup(DNF, Map, _, SuperSet),
 	flatten(SuperSet, Set0),
@@ -311,8 +315,12 @@ expand_fuzzy(ge(Low), Or) :- !,
 	token_index(Map),
 	rdf_keys_in_literal_map(Map, ge(Low), Tokens),
 	list_to_or(Tokens, ge(Low), Or).
-expand_fuzzy(Token, Token) :-
-	atomic(Token), !.
+expand_fuzzy(Token, Result) :-
+	atomic(Token), !,
+	(   rdf_stopgap_token(Token)
+	->  Result = @(stopgap)
+	;   Result = Token
+	).
 expand_fuzzy(Token, _) :-
 	throw(error(type_error(Token, boolean_expression), _)).
 
@@ -322,8 +330,12 @@ simplify(Expr, Expr).
 
 simple(and(@(false), _), @(false)).
 simple(and(_, @(false)), @(false)).
+simple(and(@(stopgap), Token), Token).
+simple(and(Token, @(stopgap)), Token).
 simple(or(@(false), X), X).
 simple(or(X, @(false)), X).
+simple(or(@(stopgap), Token), Token).
+simple(or(Token, @(stopgap)), Token).
 
 
 list_to_or([], _, @(false)) :- !.
