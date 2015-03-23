@@ -37,7 +37,8 @@
 	    rdf_token_expansions/2,		% +Spec, -Expansions
 	    rdf_stopgap_token/1,		% -Token
 
-	    rdf_literal_index/2			% +Type, -Index
+	    rdf_literal_index/2,		% +Type, -Index
+	    rdf_delete_literal_index/1		% +Type
 	  ]).
 :- use_module(rdf_db).
 :- use_module(library(debug)).
@@ -506,6 +507,15 @@ clean_token_index :-
 	       rdf_reset_literal_map(Map)),
 	retractall(stopgap(_)).
 
+%%	rdf_delete_literal_index(+Type)
+%
+%	Fully delete a literal index
+
+rdf_delete_literal_index(Type) :-
+	must_be(atom, Type),
+	(   retract(literal_map(Type, Map))
+	->  rdf_reset_literal_map(Map)		% destroy is unsafe
+	).
 
 		 /*******************************
 		 *	  THREADED UPDATE	*
