@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@cs.vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2004-2014, University of Amsterdam
+    Copyright (C): 2004-2015, University of Amsterdam
 			      VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
@@ -40,6 +40,7 @@
 :- use_module(library(rdf)).
 :- use_module(library(semweb/rdf_turtle)).
 :- use_module(library(option)).
+:- use_module(library(sandbox)).
 
 /** <module> SPARQL client library
 
@@ -491,3 +492,8 @@ jvalue(bnode, JValue, URI) :-
 	memberchk(value=NodeID, JValue),
 	bnode(NodeID, URI).
 
+		 /*******************************
+		 *	      SANDBOX		*
+		 *******************************/
+
+sandbox:safe_primitive(sparql_client:sparql_query(_,_,_)).
