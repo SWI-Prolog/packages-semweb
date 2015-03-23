@@ -629,8 +629,9 @@ monitor_literal(transaction(end, reset)) :-
 %	Associate the tokens of a literal with the literal itself.
 
 register_literal(Literal) :-
-	(   rdf_tokenize_literal(Literal, Tokens)
-	->  text_of(Literal, Lang, Text),
+	(   rdf_tokenize_literal(Literal, Tokens0)
+	->  sort(Tokens0, Tokens),
+	    text_of(Literal, Lang, Text),
 	    literal_map(token, Map),
 	    add_tokens(Tokens, Lang, Text, Map)
 	;   true
@@ -670,7 +671,8 @@ unregister_literal(Literal) :-
 	text_of(Literal, _Lang, Text),
 	(   rdf(_,_,literal(Text))
 	->  true			% still something left
-	;   rdf_tokenize_literal(Literal, Tokens),
+	;   rdf_tokenize_literal(Literal, Tokens0),
+	    sort(Tokens0, Tokens),
 	    literal_map(token, Map),
 	    del_tokens(Tokens, Text, Map)
 	).
@@ -815,8 +817,9 @@ fill_stem_index(StemMap, Queue) :-
 
 stem_literal_tokens(Literal, StemMap) :-
 	rdf_tokenize_literal(Literal, Tokens),
+	sort(Tokens, Tokens1),
 	text_of(Literal, Lang, _Text),
-	insert_tokens_stem(Tokens, Lang, StemMap).
+	insert_tokens_stem(Tokens1, Lang, StemMap).
 
 insert_tokens_stem([], _, _).
 insert_tokens_stem([Token|T], Lang, Map) :-
@@ -842,10 +845,12 @@ add_stem(Token, Lang, Map) :-
 :- if(current_predicate(snowball/3)).
 stem(Token, LangSpec, Stem) :-
 	main_lang(LangSpec, Lang),
-	catch(snowball(Lang, Token, Stem), _, fail).
+	downcase_atom(Token, Lower),
+	catch(snowball(Lang, Lower, Stem), _, fail).
 :- else.
 stem(Token, _Lang, Stem) :-
-	porter_stem(Token, Stem).
+	downcase_atom(Token, Lower),
+	porter_stem(Lower, Stem).
 :- endif.
 
 main_lang(LangSpec, Lang) :-
