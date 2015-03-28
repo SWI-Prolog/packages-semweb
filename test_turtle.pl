@@ -32,13 +32,7 @@
 	  [ test_turtle/0,
 	    test_turtle/1		% +Test
 	  ]).
-:- asserta(user:file_search_path(library, '..')).
-:- asserta(user:file_search_path(library, '../clib')).
-:- asserta(user:file_search_path(library, '../sgml')).
-:- asserta(user:file_search_path(library, '../RDF')).
-:- asserta(user:file_search_path(foreign, '.')).
-:- asserta(user:file_search_path(foreign, '../sgml')).
-:- asserta(user:file_search_path(foreign, '../clib')).
+:- include(local_test).
 
 fix_load_path :-
 	prolog_load_context(directory, Dir),

@@ -6,6 +6,7 @@ is normally included into the test scripts.
 :- asserta(user:file_search_path(foreign, '../sgml')).
 :- asserta(user:file_search_path(foreign, '../clib')).
 :- asserta(user:file_search_path(foreign, '../zlib')).
+:- asserta(user:file_search_path(foreign, '../http')).
 :- asserta(user:file_search_path(library, '../sgml')).
 :- asserta(user:file_search_path(library, '../clib')).
 :- asserta(user:file_search_path(library, '../zlib')).
