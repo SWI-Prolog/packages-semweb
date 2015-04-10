@@ -7812,9 +7812,8 @@ rdf_monitor(term_t goal, term_t mask)
   long msk;
   module_t m = NULL;
 
-  PL_strip_module(goal, &m, goal);
-
-  if ( !PL_get_atom_ex(goal, &name) ||
+  if ( !PL_strip_module(goal, &m, goal) ||
+       !PL_get_atom_ex(goal, &name) ||
        !PL_get_long_ex(mask, &msk) )
     return FALSE;
 
