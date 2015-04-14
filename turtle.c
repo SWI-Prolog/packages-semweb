@@ -1128,7 +1128,7 @@ make_absolute_resource(turtle_state *ts, const wchar_t *uri)
 
 static void	clear_turtle_parser(turtle_state *ts);
 static int	init_base_uri(turtle_state *ts);
-static int	read_predicate_object_list(turtle_state *ts, int end);
+static int	read_predicate_object_list(turtle_state *ts, const char *end);
 static int	read_object(turtle_state *ts);
 static int	set_subject(turtle_state *ts, resource *r, resource **old);
 static int	set_predicate(turtle_state *ts, resource *r, resource **old);
@@ -1922,7 +1922,7 @@ read_blank_node_property_list(turtle_state *ts)
 
   rc = ( set_anon_subject(ts, &olds) &&
 	 set_predicate(ts, NULL, &oldp) &&
-	 read_predicate_object_list(ts, ']')
+	 read_predicate_object_list(ts, "]")
        );
   set_subject(ts, olds, &bnode);
   set_predicate(ts, oldp, NULL);
@@ -2525,7 +2525,7 @@ read_object_list(turtle_state *ts)
 
 
 static int
-read_predicate_object_list(turtle_state *ts, int end)
+read_predicate_object_list(turtle_state *ts, const char *end)
 { for(;;)
   { if ( !read_verb(ts)	||
 	 !read_object_list(ts) ||
@@ -2535,7 +2535,7 @@ read_predicate_object_list(turtle_state *ts, int end)
     if ( ts->current_char == ';' )
     { empty:
       if ( next(ts) && skip_ws(ts) )
-      { if ( ts->current_char == end )
+      { if ( ts->current_char <= 256 && index(end, ts->current_char) )
 	  return TRUE;
 	if ( ts->current_char == ';' )
 	  goto empty;
@@ -2700,8 +2700,20 @@ the subject.
 
 static int
 final_predicate_object_list(turtle_state *ts)
-{ return ( read_predicate_object_list(ts, '.') &&
-	   read_end_of_clause(ts) );
+{ const char *end;
+
+  if ( ts->format == D_TRIG && ts->current_graph )
+    end = "}.";
+  else
+    end = ".";
+
+  if ( !read_predicate_object_list(ts, end) )
+    return FALSE;
+
+  if ( ts->current_char == '}' && ts->format == D_TRIG && ts->current_graph )
+    return TRUE;
+
+  return read_end_of_clause(ts);
 }
 
 
