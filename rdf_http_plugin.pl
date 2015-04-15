@@ -33,10 +33,11 @@
 :- use_module(library(http/http_open)).
 :- use_module(library(http/http_header)).
 :- use_module(library(semweb/rdf_db), []). % we define hooks for this
+:- use_module(library(semweb/rdf_serialization_format)).
 :- use_module(library(date)).
 :- use_module(library(error)).
 :- use_module(library(lists)).
-
+:- use_module(library(option)).
 
 /** <module> RDF HTTP Plugin
 
@@ -73,17 +74,11 @@ rdf_db:url_protocol(https).
 %	reply with the HTML description rather than the RDF).
 
 rdf_extra_headers(
-	[ request_header('Accept' = 'application/x-turtle, \c
-				     application/turtle, \c
-				     application/trig, \c
-				     application/n-triples, \c
-				     application/n-quads, \c
-				     text/turtle; q=0.9, \c
-				     application/rdf+xml, \c
-				     text/rdf+xml; q=0.8, \c
-				     */*; q=0.1'),
-	  cert_verify_hook(ssl_verify)
-	]).
+  [cert_verify_hook(ssl_verify),request_header('Accept'=AcceptValue)],
+  Options
+):-
+  option(format(Format), Options, _VAR),
+  rdf_accept_header_value(Format, AcceptValue).
 
 
 %%	rdf_db:rdf_open_hook(+Scheme, +URL, +HaveModified,
@@ -107,7 +102,7 @@ rdf_db:rdf_open_hook(http, SourceURL, HaveModified, Stream, Cleanup,
 	TypeHdr = [ header(content_type, ContentType),
 		    header(last_modified, ModifiedText)
 		  ],
-	rdf_extra_headers(Extra),
+	rdf_extra_headers(Extra, Options),
 	append([Extra, TypeHdr, Header, Options], OpenOptions),
 	catch(http_open(SourceURL, Stream0, OpenOptions), E, true),
 	(   var(E)
