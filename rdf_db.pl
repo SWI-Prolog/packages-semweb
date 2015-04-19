@@ -237,7 +237,15 @@ store.
 %%	rdf_current_prefix(?Alias, ?URI) is nondet.
 %
 %	Query   predefined   prefixes   and    prefixes   defined   with
-%	rdf_register_ns/2.
+%	rdf_register_ns/2. If Alias is unbound and one URI is the prefix
+%	of another, the longest is returned first. This allows turning a
+%	resource into a prefix/local couple using the simple enumeration
+%	below. See rdf_global_id/2.
+%
+%	  ==
+%	  rdf_current_prefix(Prefix, Expansion),
+%	  atom_concat(Expansion, Local, URI),
+%	  ==
 
 rdf_current_prefix(Alias, URI) :-
 	ns(Alias, URI).
@@ -302,14 +310,32 @@ rdf_register_prefix(Alias, URI, Options) :-
 	ns(Alias, _), !,
 	(   option(force(true), Options, false)
 	->  retractall(ns(Alias, _)),
-	    assert(ns(Alias, URI))
+	    rdf_register_prefix(Alias, URI, Options)
 	;   option(keep(true), Options, false)
 	->  true
 	;   throw(error(permission_error(register, namespace, Alias),
 			context(_, 'Already defined')))
 	).
 rdf_register_prefix(Alias, URI, _) :-
-	assert(ns(Alias, URI)).
+	findall(P-U, prefix_conflict(URI, P, U), Pairs),
+	order_prefixes([Alias-URI|Pairs], Ordered),
+	forall(member(P-U, Pairs), retract(ns(P,U))),
+	forall(member(P-U, Ordered), assert(ns(P,U))).
+
+prefix_conflict(URI, P, U) :-
+	ns(P,U),
+	(   sub_atom(URI, 0, _, _, U)
+	->  true
+	;   sub_atom(U, 0, _, _, URI)
+	).
+
+order_prefixes(Pairs, Sorted) :-
+	map_list_to_pairs(prefix_uri_length, Pairs, ByLen),
+	sort(1, >=, ByLen, SortedByLen),
+	pairs_values(SortedByLen, Sorted).
+
+prefix_uri_length(_-URI, Len) :-
+	atom_length(URI, Len).
 
 %%	rdf_current_ns(?Prefix, ?URI) is nondet.
 %
