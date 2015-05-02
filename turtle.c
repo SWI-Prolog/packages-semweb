@@ -2535,7 +2535,7 @@ read_predicate_object_list(turtle_state *ts, const char *end)
     if ( ts->current_char == ';' )
     { empty:
       if ( next(ts) && skip_ws(ts) )
-      { if ( ts->current_char <= 256 && index(end, ts->current_char) )
+      { if ( ts->current_char <= 256 && strchr(end, ts->current_char) )
 	  return TRUE;
 	if ( ts->current_char == ';' )
 	  goto empty;
