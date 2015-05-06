@@ -33,7 +33,6 @@
 :- use_module(library(http/http_open)).
 :- use_module(library(http/http_header)).
 :- use_module(library(semweb/rdf_db), []). % we define hooks for this
-:- use_module(library(semweb/rdf_serialization_format)).
 :- use_module(library(date)).
 :- use_module(library(error)).
 :- use_module(library(lists)).
@@ -53,6 +52,11 @@ the RDF database.
 	rdf_load('http://www.w3.org/1999/02/22-rdf-syntax-ns')
     ==
 */
+
+:- multifile(error:has_type/2).
+
+error:has_type(rdf_format, Term):-
+  error:has_type(oneof([nquads,ntriples,rdfa,trig,turtle,xml]), Term).
 
 :- multifile
 	rdf_content_type/2.		% Allow defining additional
@@ -187,17 +191,77 @@ major_content_type(Major, Major).
 :- multifile
 	rdf_content_type/2.
 
-rdf_content_type('text/rdf',		  xml).
-rdf_content_type('text/xml',		  xml).
-rdf_content_type('text/rdf+xml',	  xml).
-rdf_content_type('application/rdf+xml',	  xml).
-rdf_content_type('application/x-turtle',  turtle).
-rdf_content_type('application/turtle',	  turtle).
-rdf_content_type('application/trig',	  trig).
-rdf_content_type('application/n-triples', ntriples).
-rdf_content_type('application/n-quads',   nquads).
-rdf_content_type('text/turtle',		  turtle).
 rdf_content_type('text/rdf+n3',		  turtle).	% Bit dubious
 rdf_content_type('text/html',		  xhtml).
 rdf_content_type('application/xhtml+xml', xhtml).
 rdf_content_type('application/x-gzip',	  gzip).
+rdf_content_type(MediaType, Format):- rdf_content_type(MediaType, _, Format).
+
+
+%! rdf_accept_header_value(?Format:rdf_format, -AcceptValue:atom) is det.
+
+rdf_accept_header_value(Format, AcceptValue):-
+  findall(
+    AcceptValue,
+    (
+      rdf_content_type(MediaType, QValue0, Format0),
+      (   Format == Format0
+      ->  QValue = 1.0
+      ;   QValue = QValue0
+      ),
+      format(atom(AcceptValue), '~a;q=~f', [MediaType,QValue])
+    ),
+    AcceptValues
+  ),
+  atomic_list_concat(['*/*;q=0.001'|AcceptValues], ',', AcceptValue).
+
+
+%! rdf_content_type(
+%!   ?MediaType:atom,
+%!   ?QualityValue:between(0.0,1.0),
+%!   ?Format:rdf_format
+%! ) is nondet.
+%
+% ### Quality values
+%
+% Quality values are intended to be used in accordance with RFC 2616.
+%
+% Quality values are determined based on the following criteria:
+%
+%   | **Quality value** | **Reason**                   |
+%   | 0.45              | Official content type        |
+%   | 0.45              | Specific for RDF content     |
+%   | 0.05              | Inofficial content type      |
+%   | 0.05              | Not specific for RDF content |
+%
+% For example, `text/tutle` has quality value `0.9` because it is
+% an official content type that is RDF-specific.
+%
+% @see Discussion http://richard.cyganiak.de/blog/2008/03/what-is-your-rdf-browsers-accept-header/
+% @see N-Quadruples http://www.w3.org/ns/formats/N-Quads
+% @see N-Triples http://www.w3.org/ns/formats/N-Triples
+% @see N3 http://www.w3.org/ns/formats/N3
+% @see RDFa http://www.w3.org/ns/formats/RDFa
+% @see TriG http://www.w3.org/ns/formats/TriG
+% @see Turtle http://www.w3.org/ns/formats/Turtle
+% @see XML/RDF http://www.w3.org/ns/formats/RDF_XML
+
+rdf_content_type('application/n-quads', 0.9, nquads).
+rdf_content_type('application/n-triples', 0.9, ntriples).
+rdf_content_type('application/rdf', 0.5, xml).
+rdf_content_type('application/rdf+turtle', 0.5, turtle).
+rdf_content_type('application/rdf+xml', 0.5, xml).
+rdf_content_type('application/rss+xml', 0.1, xml).
+rdf_content_type('application/trig', 0.9, trig).
+rdf_content_type('application/turtle', 0.5, turtle).
+rdf_content_type('application/x-trig', 0.5, trig).
+rdf_content_type('application/x-turtle', 0.5, turtle).
+rdf_content_type('application/xhtml+xml', 0.2, rdfa).
+rdf_content_type('application/xml', 0.1, xml).
+rdf_content_type('text/html', 0.1, rdfa).
+rdf_content_type('text/n3', 0.9, n3).
+rdf_content_type('text/rdf', 0.5, xml).
+rdf_content_type('text/rdf+n3', 0.5, n3).
+rdf_content_type('text/rdf+xml', 0.9, xml).
+rdf_content_type('text/turtle', 0.9, turtle).
+rdf_content_type('text/xml', 0.5, xml).
