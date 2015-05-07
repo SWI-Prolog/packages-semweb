@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 1985-2013, University of Amsterdam
+    Copyright (C): 1985-2015, University of Amsterdam
 			      VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
@@ -36,7 +36,7 @@
 :- use_module(library(date)).
 :- use_module(library(error)).
 :- use_module(library(lists)).
-
+:- use_module(library(option)).
 
 /** <module> RDF HTTP Plugin
 
@@ -65,6 +65,11 @@ rdf_db:url_protocol(http).
 rdf_db:url_protocol(https).
 
 
+% define `rdf_format` as a type.
+:- multifile error:has_type/2.
+error:has_type(rdf_format, Term):-
+	error:has_type(oneof([nquads,ntriples,rdfa,trig,turtle,xml]), Term).
+
 %%	rdf_extra_headers(-List)
 %
 %	Send extra headers with the request. Note that, although we also
@@ -72,18 +77,11 @@ rdf_db:url_protocol(https).
 %	Doing so causes some   (e.g., http://w3.org/2004/02/skos/core to
 %	reply with the HTML description rather than the RDF).
 
-rdf_extra_headers(
-	[ request_header('Accept' = 'application/x-turtle, \c
-				     application/turtle, \c
-				     application/trig, \c
-				     application/n-triples, \c
-				     application/n-quads, \c
-				     text/turtle; q=0.9, \c
-				     application/rdf+xml, \c
-				     text/rdf+xml; q=0.8, \c
-				     */*; q=0.1'),
-	  cert_verify_hook(ssl_verify)
-	]).
+rdf_extra_headers([ cert_verify_hook(ssl_verify),
+		    request_header('Accept'=AcceptValue)
+		  ], Options) :-
+	option(format(Format), Options, _VAR),
+	rdf_accept_header_value(Format, AcceptValue).
 
 
 %%	rdf_db:rdf_open_hook(+Scheme, +URL, +HaveModified,
@@ -107,7 +105,7 @@ rdf_db:rdf_open_hook(http, SourceURL, HaveModified, Stream, Cleanup,
 	TypeHdr = [ header(content_type, ContentType),
 		    header(last_modified, ModifiedText)
 		  ],
-	rdf_extra_headers(Extra),
+	rdf_extra_headers(Extra, Options),
 	append([Extra, TypeHdr, Header, Options], OpenOptions),
 	catch(http_open(SourceURL, Stream0, OpenOptions), E, true),
 	(   var(E)
@@ -192,17 +190,70 @@ major_content_type(Major, Major).
 :- multifile
 	rdf_content_type/2.
 
-rdf_content_type('text/rdf',		  xml).
-rdf_content_type('text/xml',		  xml).
-rdf_content_type('text/rdf+xml',	  xml).
-rdf_content_type('application/rdf+xml',	  xml).
-rdf_content_type('application/x-turtle',  turtle).
-rdf_content_type('application/turtle',	  turtle).
-rdf_content_type('application/trig',	  trig).
-rdf_content_type('application/n-triples', ntriples).
-rdf_content_type('application/n-quads',   nquads).
-rdf_content_type('text/turtle',		  turtle).
 rdf_content_type('text/rdf+n3',		  turtle).	% Bit dubious
 rdf_content_type('text/html',		  xhtml).
 rdf_content_type('application/xhtml+xml', xhtml).
 rdf_content_type('application/x-gzip',	  gzip).
+rdf_content_type(MediaType, Format) :-
+	rdf_content_type(MediaType, _, Format).
+
+
+%% rdf_accept_header_value(?Format:rdf_format, -AcceptValue:atom) is det.
+
+rdf_accept_header_value(Format, AcceptValue) :-
+	findall(AcceptValue, accept_value(Format, AcceptValue), AcceptValues),
+	atomic_list_concat(['*/*;q=0.001'|AcceptValues], ',', AcceptValue).
+
+accept_value(Format, AcceptValue) :-
+	rdf_content_type(MediaType, QValue0, Format0),
+	(   Format == Format0
+	->  QValue = 1.0
+	;   QValue = QValue0
+	),
+	format(atom(AcceptValue), '~a;q=~3f', [MediaType,QValue]).
+
+
+%%	rdf_content_type(?MediaType:atom, ?QualityValue:between(0.0,1.0),
+%%			 ?Format:rdf_format) is nondet.
+%
+%	Quality values are intended to be   used  in accordance with RFC
+%	2616. Quality values  are  determined   based  on  the following
+%	criteria:
+%
+%	    | **Quality value** | **Reason**                   |
+%	    | 0.45              | Official content type        |
+%	    | 0.45              | Specific for RDF content     |
+%	    | 0.05              | Inofficial content type      |
+%	    | 0.05              | Not specific for RDF content |
+%
+%	For example, `text/turtle` has quality value `0.9` because it is
+%	an official content type that is RDF-specific.
+%
+%	@see Discussion http://richard.cyganiak.de/blog/2008/03/what-is-your-rdf-browsers-accept-header/
+%	@see N-Quadruples http://www.w3.org/ns/formats/N-Quads
+%	@see N-Triples http://www.w3.org/ns/formats/N-Triples
+%	@see N3 http://www.w3.org/ns/formats/N3
+%	@see RDFa http://www.w3.org/ns/formats/RDFa
+%	@see TriG http://www.w3.org/ns/formats/TriG
+%	@see Turtle http://www.w3.org/ns/formats/Turtle
+%	@see XML/RDF http://www.w3.org/ns/formats/RDF_XML
+
+rdf_content_type('application/n-quads',	   0.9,	nquads).
+rdf_content_type('application/n-triples',  0.9,	ntriples).
+rdf_content_type('application/rdf',	   0.5,	xml).
+rdf_content_type('application/rdf+turtle', 0.5,	turtle).
+rdf_content_type('application/rdf+xml',	   0.5,	xml).
+rdf_content_type('application/rss+xml',	   0.1,	xml).
+rdf_content_type('application/trig',	   0.9,	trig).
+rdf_content_type('application/turtle',	   0.5,	turtle).
+rdf_content_type('application/x-trig',	   0.5,	trig).
+rdf_content_type('application/x-turtle',   0.5,	turtle).
+rdf_content_type('application/xhtml+xml',  0.2,	rdfa).
+rdf_content_type('application/xml',	   0.1,	xml).
+rdf_content_type('text/html',		   0.1,	rdfa).
+rdf_content_type('text/n3',		   0.9,	n3).
+rdf_content_type('text/rdf',		   0.5,	xml).
+rdf_content_type('text/rdf+n3',		   0.5,	n3).
+rdf_content_type('text/rdf+xml',	   0.9,	xml).
+rdf_content_type('text/turtle',		   0.9,	turtle).
+rdf_content_type('text/xml',		   0.5,	xml).
