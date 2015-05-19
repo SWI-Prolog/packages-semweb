@@ -107,8 +107,11 @@ rdf_db:rdf_open_hook(http, SourceURL, HaveModified, Stream, Cleanup,
 		  ],
 	rdf_extra_headers(Extra, Options),
 	append([Extra, TypeHdr, Header, Options], OpenOptions),
-	catch(http_open(SourceURL, Stream0, OpenOptions), E, true),
-	(   var(E)
+	catch(http_open(SourceURL, Stream0,
+			[ status_code(Code)
+			| OpenOptions
+			]), E, true),
+	(   Code == 200
 	->  (   open_envelope(ContentType, SourceURL,
 			      Stream0, Stream, Format)
 	    ->	Cleanup = close(Stream),
@@ -120,9 +123,12 @@ rdf_db:rdf_open_hook(http, SourceURL, HaveModified, Stream, Cleanup,
 	    ;	close(Stream0),
 		domain_error(content_type, ContentType)
 	    )
-	;   subsumes_term(error(_, context(_, status(304, _))), E)
+	;   Code == 304
 	->  Modified = not_modified,
 	    Cleanup = true
+	;   var(E)
+	->  throw(error(existence_error(url, SourceURL),
+			context(_, status(Code,_))))
 	;   throw(E)
 	).
 
