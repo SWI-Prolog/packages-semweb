@@ -70,12 +70,15 @@ rdf_db:url_protocol(https).
 error:has_type(rdf_format, Term):-
 	error:has_type(oneof([nquads,ntriples,rdfa,trig,turtle,xml]), Term).
 
-%%	rdf_extra_headers(-List)
+%%	rdf_extra_headers(-RequestHeaders:list(compound), +Options:list) is det.
 %
 %	Send extra headers with the request. Note that, although we also
 %	process RDF embedded in HTML, we do  not explicitely ask for it.
 %	Doing so causes some   (e.g., http://w3.org/2004/02/skos/core to
 %	reply with the HTML description rather than the RDF).
+%	
+%	When given, option format(+atom) is used in order to prioritize
+%	the corresponding RDF content types.
 
 rdf_extra_headers([ cert_verify_hook(ssl_verify),
 		    request_header('Accept'=AcceptValue)
