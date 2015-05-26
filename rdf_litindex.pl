@@ -826,10 +826,11 @@ fill_stem_index(StemMap, Queue) :-
 	      retractall(map_building(stem, _)))).
 
 stem_literal_tokens(Literal, StemMap) :-
-	rdf_tokenize_literal(Literal, Tokens),
+	rdf_tokenize_literal(Literal, Tokens), !,
 	sort(Tokens, Tokens1),
 	text_of(Literal, Lang, _Text),
 	insert_tokens_stem(Tokens1, Lang, StemMap).
+stem_literal_tokens(_,_).
 
 insert_tokens_stem([], _, _).
 insert_tokens_stem([Token|T], Lang, Map) :-
