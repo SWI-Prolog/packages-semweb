@@ -256,6 +256,7 @@ typedef struct graph_hash_table
   size_t	bucket_count;		/* Allocated #buckets */
   size_t	bucket_count_epoch;	/* Initial bucket count */
   size_t	count;			/* Total #predicates */
+  size_t	erased;			/* erased and not reclaimed graphs */
 } graph_hash_table;
 
 typedef struct literal

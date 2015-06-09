@@ -2300,6 +2300,7 @@ init_graph_table(rdf_db *db)
   db->graphs.bucket_count       = count;
   db->graphs.bucket_count_epoch = count;
   db->graphs.count              = 0;
+  db->graphs.erased             = 0;
 
   return TRUE;
 }
@@ -2431,8 +2432,49 @@ erase_graphs(rdf_db *db)
     }
   }
 
-  db->graphs.count = 0;
-  db->last_graph = NULL;
+  db->graphs.count  = 0;
+  db->graphs.erased = 0;
+  db->last_graph    = NULL;
+}
+
+
+static int
+gc_graphs(rdf_db *db, gen_t gen)
+{ int reclaimed = 0;
+
+  if ( db->graphs.erased > 10 + db->graphs.count/2 )
+  { int i;
+
+    LOCK_MISC(db);
+    for(i=0; i<db->graphs.bucket_count; i++)
+    { graph *p, *n, *g;
+
+      p = NULL;
+      g = db->graphs.blocks[MSB(i)][i];
+
+      for( ; g; g = n )
+      { n = g->next;
+
+	if ( g->erased )
+	{ if ( p )
+	    p->next = g->next;
+	  else
+	    db->graphs.blocks[MSB(i)][i] = g->next;
+
+	  if ( db->last_graph == g )
+	    db->last_graph = NULL;
+	  db->graphs.count--;
+	  db->graphs.erased--;
+	  reclaimed++;
+	  deferred_free(&db->defer_all, g);
+	} else
+	  p = g;
+      }
+    }
+    UNLOCK_MISC(db);
+  }
+
+  return reclaimed;
 }
 
 
@@ -2680,6 +2722,8 @@ rdf_destroy_graph(term_t graph_name)
     memset(g->unmodified_digest, 0, sizeof(g->unmodified_digest));
     g->modified = 0.0;
     g->erased = TRUE;
+    db->graphs.erased++;
+
     UNLOCK_MISC(db);
   }
 
@@ -3920,7 +3964,8 @@ gc_db(rdf_db *db, gen_t gen, gen_t reindex_gen)
   DEBUG(10, Sdprintf("RDF GC; gen = %s\n", gen_name(gen, buf)));
   if ( optimize_triple_hashes(db, gen) >= 0 &&
        gc_hashes(db, gen, reindex_gen) >= 0 &&
-       gc_clouds(db, gen) >= 0 )
+       gc_clouds(db, gen) >= 0 &&
+       gc_graphs(db, gen) >= 0 )
   { db->gc.count++;
     db->gc.last_gen = gen;
     db->gc.last_reindex_gen = reindex_gen;
