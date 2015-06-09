@@ -180,7 +180,7 @@
 		       cache(boolean),
 		       concurrent(positive_integer),
 		       db(atom),
-		       format(oneof([xml,triples,turtle])),
+		       format(oneof([xml,triples,turtle,trig,nquads,ntriples])),
 		       graph(atom),
 		       if(oneof([true,changed,not_loaded])),
 		       modified(-float),
