@@ -178,6 +178,7 @@ static int	free_literal(rdf_db *db, literal *lit);
 static int	check_predicate_cloud(predicate_cloud *c);
 static void	invalidate_is_leaf(predicate *p, query *q, int add);
 static void	create_triple_hashes(rdf_db *db, int count, int *ic);
+static int	free_literal_value(rdf_db *db, literal *lit);
 
 
 		 /*******************************
@@ -2775,21 +2776,37 @@ new_literal(rdf_db *db)
 
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-FIXME: rdf_broadcast(EV_OLD_LITERAL,...) happens with   the literal lock
-helt. Needs better merging with  free_literal()   to  reduce locking and
-avoid this problem.
+free_literal_value() gets rid of atoms or term   that forms the value of
+the literal. We cannot dispose of  these   immediately  as they might be
+needed by an ongoing  scan  of   the  literal  skiplist  for comparison.
+Therefore, we use deferred_finalize() and dispose of the triple later.
+
+Return TRUE if the triple value  could   be  distroyed  and FALSE if the
+destruction   has   been   deferred.   That     will   eventually   call
+finalize_literal_ptr(), which calls free_literal_value()  again, but now
+as not shared literal so it can do its work unconditionally.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+static void
+finalize_literal_ptr(void *mem, void *clientdata)
+{ literal **litp = mem;
+  rdf_db *db = clientdata;
+  literal *lit = *litp;
+  int rc = free_literal_value(db, lit);
+
+  assert(rc);
+  if ( rc )
+    rdf_free(db, lit, sizeof(*lit));
+}
+
 
 static int
 free_literal_value(rdf_db *db, literal *lit)
-{ int rc = TRUE;
-
-  if ( lit->shared && !db->resetting )
+{ if ( lit->shared && !db->resetting )
   { literal_ex lex;
     literal **data;
 
     lit->shared = FALSE;
-    rc = rdf_broadcast(EV_OLD_LITERAL, lit, NULL);
     DEBUG(2,
 	  Sdprintf("Delete %p from literal table: ", lit);
 	  print_literal(lit);
@@ -2799,19 +2816,18 @@ free_literal_value(rdf_db *db, literal *lit)
     prepare_literal_ex(&lex);
 
     if ( (data=skiplist_delete(&db->literals, &lex)) )
-    { unlock_atoms_literal(lit);
-
-      deferred_free(&db->defer_literals, data);	/* someone else may be reading */
+    { deferred_finalize(&db->defer_literals, data,
+			finalize_literal_ptr, db);
+      return FALSE;			/* deferred */
     } else
     { Sdprintf("Failed to delete %p (size=%ld): ", lit, db->literals.count);
       print_literal(lit);
       Sdprintf("\n");
       assert(0);
     }
-  } else
-  { unlock_atoms_literal(lit);
   }
 
+  unlock_atoms_literal(lit);
   if ( lit->objtype == OBJ_TERM &&
        lit->value.term.record )
   { if ( lit->term_loaded )
@@ -2819,8 +2835,9 @@ free_literal_value(rdf_db *db, literal *lit)
     else
       PL_erase_external(lit->value.term.record);
   }
+  lit->objtype = OBJ_UNTYPED;		/* debugging: trap errors early */
 
-  return rc;
+  return TRUE;
 }
 
 
@@ -2842,7 +2859,11 @@ free_literal(rdf_db *db, literal *lit)
     { rc = free_literal_value(db, lit);
       simpleMutexUnlock(&db->locks.literal);
 
-      rdf_free(db, lit, sizeof(*lit));
+      if ( rc )
+      { rdf_free(db, lit, sizeof(*lit));
+      } else
+      { rdf_broadcast(EV_OLD_LITERAL, lit, NULL);
+      }
     } else
     { simpleMutexUnlock(&db->locks.literal);
     }
@@ -3018,6 +3039,7 @@ sl_compare_literals(void *p1, void *p2, void *cd)
 #endif
   { literal_ex *lex = p1;
 
+    assert(l2->objtype != OBJ_UNTYPED);
     return compare_literals(lex, l2);
   }
 }
