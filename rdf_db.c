@@ -2289,9 +2289,9 @@ object_branch_factor(rdf_db *db, predicate *p, query *q, int which)
 
 static int
 init_graph_table(rdf_db *db)
-{ size_t bytes = sizeof(graph**)*INITIAL_PREDICATE_TABLE_SIZE;
+{ size_t bytes = sizeof(graph**)*INITIAL_GRAPH_TABLE_SIZE;
   graph **p = PL_malloc_uncollectable(bytes);
-  int i, count = INITIAL_PREDICATE_TABLE_SIZE;
+  int i, count = INITIAL_GRAPH_TABLE_SIZE;
 
   memset(p, 0, bytes);
   for(i=0; i<MSB(count); i++)
