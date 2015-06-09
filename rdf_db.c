@@ -179,6 +179,7 @@ static int	check_predicate_cloud(predicate_cloud *c);
 static void	invalidate_is_leaf(predicate *p, query *q, int add);
 static void	create_triple_hashes(rdf_db *db, int count, int *ic);
 static int	free_literal_value(rdf_db *db, literal *lit);
+static void	finalize_graph(void *g, void *db);
 
 
 		 /*******************************
@@ -2383,7 +2384,7 @@ lookup_graph(rdf_db *db, atom_t name)
 { graph *g, **gp;
   int entry;
 
-  if ( (g=existing_graph(db, name)) )
+  if ( (g=existing_graph(db, name)) && !g->erased )
     return g;
 
   LOCK_MISC(db);
@@ -2455,7 +2456,7 @@ gc_graphs(rdf_db *db, gen_t gen)
       for( ; g; g = n )
       { n = g->next;
 
-	if ( g->erased )
+	if ( g->erased && g->triple_count == 0 )
 	{ if ( p )
 	    p->next = g->next;
 	  else
@@ -2466,7 +2467,8 @@ gc_graphs(rdf_db *db, gen_t gen)
 	  db->graphs.count--;
 	  db->graphs.erased--;
 	  reclaimed++;
-	  deferred_free(&db->defer_all, g);
+	  deferred_finalize(&db->defer_all, g,
+			    finalize_graph, db);
 	} else
 	  p = g;
       }
@@ -2513,18 +2515,19 @@ unregister_graph(rdf_db *db, triple *t)
   if ( db->last_graph && db->last_graph->name == ID_ATOM(t->graph_id) )
   { src = db->last_graph;
   } else
-  { src = lookup_graph(db, ID_ATOM(t->graph_id));
-    db->last_graph = src;
+  { src = existing_graph(db, ID_ATOM(t->graph_id));
   }
 
-  ATOMIC_SUB(&src->triple_count, 1);
+  if ( src )
+  { ATOMIC_SUB(&src->triple_count, 1);
 #ifdef WITH_MD5
-  if ( src->md5 )
-  { md5_byte_t digest[16];
-    md5_triple(t, digest);
-    dec_digest(src->digest, digest);
-  }
+    if ( src->md5 )
+    { md5_byte_t digest[16];
+      md5_triple(t, digest);
+      dec_digest(src->digest, digest);
+    }
 #endif
+  }
 }
 
 
@@ -2701,6 +2704,26 @@ rdf_create_graph(term_t graph_name)
 }
 
 
+static void
+clean_atom(atom_t *ap)
+{ atom_t old;
+
+  if ( (old=*ap) )
+  { *ap = 0;
+    PL_unregister_atom(old);
+  }
+}
+
+
+static void
+finalize_graph(void *mem, void *clientdata)
+{ graph *g = mem;
+  (void)clientdata;
+
+  clean_atom(&g->name);
+}
+
+
 static foreign_t
 rdf_destroy_graph(term_t graph_name)
 { atom_t gn;
@@ -2711,19 +2734,13 @@ rdf_destroy_graph(term_t graph_name)
     return FALSE;
 
   if ( (g = existing_graph(db, gn)) )
-  { atom_t a;
-
-    LOCK_MISC(db);
-    if ( (a=g->source) )
-    { g->source = 0;
-      PL_unregister_atom(a);
-    }
+  { LOCK_MISC(db);
     memset(g->digest,            0, sizeof(g->digest));
     memset(g->unmodified_digest, 0, sizeof(g->unmodified_digest));
+    clean_atom(&g->source);
     g->modified = 0.0;
     g->erased = TRUE;
     db->graphs.erased++;
-
     UNLOCK_MISC(db);
   }
 
