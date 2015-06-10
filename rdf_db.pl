@@ -1357,10 +1357,24 @@ rdf_predicate_property(P, Prop) :-
 %%	rdf_set_predicate(+Predicate, +Property) is det.
 %
 %	Define a property of  the   predicate.  This predicate currently
-%	supports   the   properties   =symmetric=,    =inverse_of=   and
-%	=transitive= as defined with rdf_predicate_property/2. Adding an
-%	A inverse_of B also adds B inverse_of  A. An inverse relation is
-%	deleted using inverse_of([]).
+%	supports the following properties:
+%
+%	    - symmetric(+Boolean)
+%	    Set/unset the predicate as being symmetric.  Using
+%	    symmetric(true) is the same as inverse_of(Predicate),
+%	    i.e., creating a predicate that is the inverse of
+%	    itself.
+%	    - transitive(+Boolean)
+%	    Sets the transitive property.
+%	    - inverse_of(+Predicate2)
+%	    Define Predicate as the inverse of Predicate2. An inverse
+%	    relation is deleted using inverse_of([]).
+%
+%	The `transitive` property is currently not used. The `symmetric`
+%	and `inverse_of` properties are considered   by  rdf_has/3,4 and
+%	rdf_reachable/3.
+%
+%	@tbd	Maintain these properties based on OWL triples.
 
 
 		 /*******************************
