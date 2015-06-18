@@ -40,7 +40,6 @@
 :- use_module(library(rdf)).
 :- use_module(library(semweb/rdf_turtle)).
 :- use_module(library(option)).
-:- use_module(library(sandbox)).
 
 /** <module> SPARQL client library
 
@@ -495,5 +494,8 @@ jvalue(bnode, JValue, URI) :-
 		 /*******************************
 		 *	      SANDBOX		*
 		 *******************************/
+
+:- multifile
+	sandbox:safe_primitive/1.
 
 sandbox:safe_primitive(sparql_client:sparql_query(_,_,_)).
