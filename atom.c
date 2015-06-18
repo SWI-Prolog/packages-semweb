@@ -57,7 +57,7 @@ get_atom_text(atom_t atom, text *txt)
 }
 
 
-inline wint_t
+static wint_t
 fetch(const text *txt, int i)
 { return txt->a ? (wint_t)txt->a[i] : (wint_t)txt->w[i];
 }
