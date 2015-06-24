@@ -178,7 +178,7 @@ static int	free_literal(rdf_db *db, literal *lit);
 static int	check_predicate_cloud(predicate_cloud *c);
 static void	invalidate_is_leaf(predicate *p, query *q, int add);
 static void	create_triple_hashes(rdf_db *db, int count, int *ic);
-static int	free_literal_value(rdf_db *db, literal *lit);
+static void	free_literal_value(rdf_db *db, literal *lit);
 static void	finalize_graph(void *g, void *db);
 
 
@@ -2853,16 +2853,14 @@ finalize_literal_ptr(void *mem, void *clientdata)
 { literal **litp = mem;
   rdf_db *db = clientdata;
   literal *lit = *litp;
-  int rc = free_literal_value(db, lit);
 
-  assert(rc);
-  if ( rc )
-    rdf_free(db, lit, sizeof(*lit));
+  free_literal_value(db, lit);
+  rdf_free(db, lit, sizeof(*lit));
 }
 
 
-static int
-free_literal_value(rdf_db *db, literal *lit)
+static literal **
+unlink_literal(rdf_db *db, literal *lit)
 { if ( lit->shared && !db->resetting )
   { literal_ex lex;
     literal **data;
@@ -2877,9 +2875,7 @@ free_literal_value(rdf_db *db, literal *lit)
     prepare_literal_ex(&lex);
 
     if ( (data=skiplist_delete(&db->literals, &lex)) )
-    { deferred_finalize(&db->defer_literals, data,
-			finalize_literal_ptr, db);
-      return FALSE;			/* deferred */
+    { return data;
     } else
     { Sdprintf("Failed to delete %p (size=%ld): ", lit, db->literals.count);
       print_literal(lit);
@@ -2888,7 +2884,13 @@ free_literal_value(rdf_db *db, literal *lit)
     }
   }
 
-  unlock_atoms_literal(lit);
+  return NULL;
+}
+
+
+static void
+free_literal_value(rdf_db *db, literal *lit)
+{ unlock_atoms_literal(lit);
   if ( lit->objtype == OBJ_TERM &&
        lit->value.term.record )
   { if ( lit->term_loaded )
@@ -2897,8 +2899,6 @@ free_literal_value(rdf_db *db, literal *lit)
       PL_erase_external(lit->value.term.record);
   }
   lit->objtype = OBJ_UNTYPED;		/* debugging: trap errors early */
-
-  return TRUE;
 }
 
 
@@ -2917,19 +2917,23 @@ free_literal(rdf_db *db, literal *lit)
   if ( lit->shared )
   { simpleMutexLock(&db->locks.literal);
     if ( --lit->references == 0 )
-    { rdf_broadcast(EV_OLD_LITERAL, lit, NULL);
-      rc = free_literal_value(db, lit);
+    { literal **data = unlink_literal(db, lit);
       simpleMutexUnlock(&db->locks.literal);
 
-      if ( rc )
+      if ( data )			/* unlinked */
+      { rc = rdf_broadcast(EV_OLD_LITERAL, lit, NULL);
+	deferred_finalize(&db->defer_literals, data,
+			  finalize_literal_ptr, db);
+      } else
+      { free_literal_value(db, lit);
 	rdf_free(db, lit, sizeof(*lit));
+      }
     } else
     { simpleMutexUnlock(&db->locks.literal);
     }
   } else				/* not shared; no locking needed */
   { if ( --lit->references == 0 )
-    { rc = free_literal_value(db, lit);
-
+    { free_literal_value(db, lit);
       rdf_free(db, lit, sizeof(*lit));
     }
   }
