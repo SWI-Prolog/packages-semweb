@@ -2917,14 +2917,12 @@ free_literal(rdf_db *db, literal *lit)
   if ( lit->shared )
   { simpleMutexLock(&db->locks.literal);
     if ( --lit->references == 0 )
-    { rc = free_literal_value(db, lit);
+    { rdf_broadcast(EV_OLD_LITERAL, lit, NULL);
+      rc = free_literal_value(db, lit);
       simpleMutexUnlock(&db->locks.literal);
 
       if ( rc )
-      { rdf_free(db, lit, sizeof(*lit));
-      } else
-      { rdf_broadcast(EV_OLD_LITERAL, lit, NULL);
-      }
+	rdf_free(db, lit, sizeof(*lit));
     } else
     { simpleMutexUnlock(&db->locks.literal);
     }
