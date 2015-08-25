@@ -247,22 +247,22 @@ accept_value(Format, AcceptValue) :-
 %	@see Turtle http://www.w3.org/ns/formats/Turtle
 %	@see XML/RDF http://www.w3.org/ns/formats/RDF_XML
 
-rdf_content_type('application/n-quads',	   0.9,	nquads).
-rdf_content_type('application/n-triples',  0.9,	ntriples).
-rdf_content_type('application/rdf',	   0.5,	xml).
-rdf_content_type('application/rdf+turtle', 0.5,	turtle).
-rdf_content_type('application/rdf+xml',	   0.5,	xml).
-rdf_content_type('application/rss+xml',	   0.1,	xml).
-rdf_content_type('application/trig',	   0.9,	trig).
-rdf_content_type('application/turtle',	   0.5,	turtle).
-rdf_content_type('application/x-trig',	   0.5,	trig).
-rdf_content_type('application/x-turtle',   0.5,	turtle).
-rdf_content_type('application/xhtml+xml',  0.2,	rdfa).
-rdf_content_type('application/xml',	   0.1,	xml).
-rdf_content_type('text/html',		   0.1,	rdfa).
-rdf_content_type('text/n3',		   0.9,	n3).
-rdf_content_type('text/rdf',		   0.5,	xml).
-rdf_content_type('text/rdf+n3',		   0.5,	n3).
-rdf_content_type('text/rdf+xml',	   0.9,	xml).
-rdf_content_type('text/turtle',		   0.9,	turtle).
-rdf_content_type('text/xml',		   0.5,	xml).
+rdf_content_type('application/n-quads',    0.9, nquads).
+rdf_content_type('application/n-triples',  0.9, ntriples).
+rdf_content_type('application/rdf',        0.5, xml).
+rdf_content_type('application/rdf+turtle', 0.5, turtle).
+rdf_content_type('application/rdf+xml',    0.5, xml).
+rdf_content_type('application/rss+xml',    0.1, xml).
+rdf_content_type('application/trig',       0.9, trig).
+rdf_content_type('application/turtle',     0.5, turtle).
+rdf_content_type('application/x-trig',     0.5, trig).
+rdf_content_type('application/x-turtle',   0.5, turtle).
+rdf_content_type('application/xhtml+xml',  0.2, rdfa).
+rdf_content_type('application/xml',        0.1, xml).
+rdf_content_type('text/html',              0.1, rdfa).
+rdf_content_type('text/n3',                0.3, turtle).
+rdf_content_type('text/rdf',               0.5, xml).
+rdf_content_type('text/rdf+n3',            0.1, turtle).
+rdf_content_type('text/rdf+xml',           0.9, xml).
+rdf_content_type('text/turtle',            0.9, turtle).
+rdf_content_type('text/xml',               0.5, xml).
