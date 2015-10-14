@@ -30,10 +30,22 @@
 
 :- include(local_test).
 
+run_zlib_tests :-
+	absolute_file_name(foreign(zlib4pl), _,
+			   [ file_type(executable),
+			     access(execute),
+			     file_errors(fail)
+			   ]).
+
+run_network_tests :-
+	\+ getenv('USE_PUBLIC_NETWORK_TESTS', false).
+
 :- use_module(library(plunit)).
 :- use_module(library(uri)).
 :- use_module(library(semweb/rdf_db)).
+:- if(run_zlib_tests).
 :- use_module(rdf_zlib_plugin).
+:- endif.
 :- use_module(rdf_http_plugin).
 
 
@@ -51,20 +63,20 @@ test(file, [true(N == 1), cleanup(rdf_reset_db)]) :-
 	rdf_load(URI, [silent(true)]),
 	rdf_statistics(triples(N)).
 
-test(gzip_file, [true(N == 1), cleanup(rdf_reset_db)]) :-
+test(gzip_file, [condition(run_zlib_tests), true(N == 1), cleanup(rdf_reset_db)]) :-
 	rdf_load('Tests/test-002.rdf', [silent(true)]),
 	rdf_statistics(triples(N)).
 
-test(gzip_file, [true(N == 1), cleanup(rdf_reset_db)]) :-
+test(gzip_file, [condition(run_zlib_tests), true(N == 1), cleanup(rdf_reset_db)]) :-
 	uri_file_name(URI, 'Tests/test-002.rdf'),
 	rdf_load(URI, [silent(true)]),
 	rdf_statistics(triples(N)).
 
-test(http, [true(N == 1), cleanup(rdf_reset_db)]) :-
+test(http, [condition(run_network_tests), true(N == 1), cleanup(rdf_reset_db)]) :-
 	rdf_load('http://www.swi-prolog.org/Tests/semweb/test-001.rdf', [silent(true)]),
 	rdf_statistics(triples(N)).
 
-test(gzip_http, [true(N == 1), cleanup(rdf_reset_db)]) :-
+test(gzip_http, [condition((run_network_tests, run_zlib_tests)), true(N == 1), cleanup(rdf_reset_db)]) :-
 	rdf_load('http://www.swi-prolog.org/Tests/semweb/test-002.rdf.gz', [silent(true)]),
 	rdf_statistics(triples(N)).
 
