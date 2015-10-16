@@ -34,6 +34,7 @@
 	    rdf_current_db/1,		% -Directory
 	    rdf_persistency/2,		% +Graph, +Bool
 	    rdf_flush_journals/1,	% +Options
+	    rdf_persistency_property/1,	% ?Property
 	    rdf_journal_file/2,		% ?Graph, ?JournalFile
 	    rdf_snapshot_file/2,	% ?Graph, ?SnapshotFile
 	    rdf_db_to_file/2		% ?Graph, ?FileBase
@@ -262,6 +263,28 @@ option_type(log_nested_transactions(X),	must_be(boolean, X)).
 option_type(access(X),			must_be(oneof([read_write,
 						       read_only]), X)).
 
+
+%%	rdf_persistency_property(?Property) is nondet.
+%
+%	True if Property  is  a  property   of  the  current  persistent
+%	database. Currently makes to options   passed to rdf_attach_db/2
+%	available.  Notable  rdf_persistency_property(access(read_only))
+%	is true if the database  is   mounted  in  read-only mode. Other
+%	properties:
+%
+%	  - directory(Dir)
+%	  Directory in which the database resides.
+
+rdf_persistency_property(Property) :-
+	var(Property), !,
+	rdf_persistency_property_(Property).
+rdf_persistency_property(Property) :-
+	rdf_persistency_property_(Property), !.
+
+rdf_persistency_property_(Property) :-
+	rdf_option(Property).
+rdf_persistency_property_(directory(Dir)) :-
+	rdf_directory(Dir).
 
 %%	no_agc(:Goal)
 %
