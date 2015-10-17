@@ -918,9 +918,10 @@ metaphone([Token|T], Map) :-
 
 
 add_metaphone(Token, _Lang, Map) :-
+	atom(Token), !,
 	double_metaphone(Token, SoundEx),
 	rdf_insert_literal_map(Map, SoundEx, Token).
-
+add_metaphone(_, _, _).
 
 %%	rdf_literal_index(+Type, -Index) is det.
 %
