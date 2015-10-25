@@ -229,14 +229,19 @@ accept_value(Format, AcceptValue) :-
 %	2616. Quality values  are  determined   based  on  the following
 %	criteria:
 %
-%	    | **Quality value** | **Reason**                   |
-%	    | 0.45              | Official content type        |
-%	    | 0.45              | Specific for RDF content     |
-%	    | 0.05              | Inofficial content type      |
-%	    | 0.05              | Not specific for RDF content |
+%	    | **Label** | | **Criterion**           | **Value** |
+%	    | A         | Supported RDF parser      | 0.43      |
+%	    | B         | RDF-specific content type | 0.33      |
+%	    | C         | Official content type     | 0.23      |
 %
-%	For example, `text/turtle` has quality value `0.9` because it is
-%	an official content type that is RDF-specific.
+%	For example, `text/turtle` has quality value 0.99 because it is
+%	an official content type that is RDF-specific and that has a parser
+%	in Semweb.
+%
+%	This intentionally allows the user to add another content type with
+%	a higher Q-value (i.e., >0.99).
+%
+%	Notice that the N3 format is treated as if it were Turtle.
 %
 %	@see Discussion http://richard.cyganiak.de/blog/2008/03/what-is-your-rdf-browsers-accept-header/
 %	@see N-Quadruples http://www.w3.org/ns/formats/N-Quads
@@ -247,22 +252,22 @@ accept_value(Format, AcceptValue) :-
 %	@see Turtle http://www.w3.org/ns/formats/Turtle
 %	@see XML/RDF http://www.w3.org/ns/formats/RDF_XML
 
-rdf_content_type('application/n-quads',	   0.9,	nquads).
-rdf_content_type('application/n-triples',  0.9,	ntriples).
-rdf_content_type('application/rdf',	   0.5,	xml).
-rdf_content_type('application/rdf+turtle', 0.5,	turtle).
-rdf_content_type('application/rdf+xml',	   0.5,	xml).
-rdf_content_type('application/rss+xml',	   0.1,	xml).
-rdf_content_type('application/trig',	   0.9,	trig).
-rdf_content_type('application/turtle',	   0.5,	turtle).
-rdf_content_type('application/x-trig',	   0.5,	trig).
-rdf_content_type('application/x-turtle',   0.5,	turtle).
-rdf_content_type('application/xhtml+xml',  0.2,	rdfa).
-rdf_content_type('application/xml',	   0.1,	xml).
-rdf_content_type('text/html',		   0.1,	rdfa).
-rdf_content_type('text/n3',		   0.9,	n3).
-rdf_content_type('text/rdf',		   0.5,	xml).
-rdf_content_type('text/rdf+n3',		   0.5,	n3).
-rdf_content_type('text/rdf+xml',	   0.9,	xml).
-rdf_content_type('text/turtle',		   0.9,	turtle).
-rdf_content_type('text/xml',		   0.5,	xml).
+rdf_content_type('application/n-quads',    0.99, nquads  ). %ABC
+rdf_content_type('application/n-triples',  0.99, ntriples). %ABC
+rdf_content_type('application/rdf',        0.76, xml     ). %AB
+rdf_content_type('application/rdf+turtle', 0.76, turtle  ). %AB
+rdf_content_type('application/rdf+xml',    0.76, xml     ). %AB
+rdf_content_type('application/rss+xml',    0.66, xml     ). %AC
+rdf_content_type('application/trig',       0.99, trig    ). %ABC
+rdf_content_type('application/turtle',     0.99, turtle  ). %ABC
+rdf_content_type('application/x-trig',     0.76, trig    ). %AB
+rdf_content_type('application/x-turtle',   0.76, turtle  ). %AB
+rdf_content_type('application/xhtml+xml',  0.66, rdfa    ). %AC
+rdf_content_type('application/xml',        0.66, xml     ). %AC
+rdf_content_type('text/html',              0.66, rdfa    ). %AC
+rdf_content_type('text/n3',                0.56, turtle  ). %BC (N3)
+rdf_content_type('text/rdf',               0.76, xml     ). %AB
+rdf_content_type('text/rdf+n3',            0.33, turtle  ). %B (N3)
+rdf_content_type('text/rdf+xml',           0.76, xml     ). %AB
+rdf_content_type('text/turtle',            0.76, turtle  ). %AB
+rdf_content_type('text/xml',               0.66, xml     ). %AC
