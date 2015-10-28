@@ -779,6 +779,7 @@ update_property_value(DOM, Context) :-
 	    Obj0 = literal(Text)
 	),
 	(   Obj0 = literal(Text),
+	    atomic(Text),
 	    Context.lang \== ''
 	->  Obj = literal(lang(Context.lang, Text))
 	;   Obj = Obj0
