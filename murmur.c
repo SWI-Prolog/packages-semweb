@@ -7,6 +7,7 @@
     See:	http://murmurhash.googlepages.com/
 */
 
+#include <config.h>
 #include <SWI-Prolog.h>			/* het uintptr_t */
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -14,7 +15,7 @@ The first one is actually  MurmurHashNeutral2().   It  produces the same
 hash  as  MurmurHashAligned2()  on  little    endian  machines,  but  is
 significantly  slower.  MurmurHashAligned2()  however    is   broken  on
 big-endian machines, as it produces different   hashes, depending on the
-alignment. 
+alignment.
 
 NOTE: This file is a copy of src/pl-hash.c from SWI-Prolog.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -39,10 +40,10 @@ rdf_murmer_hash(const void * key, int len, unsigned int seed)
     k *= m;
     k ^= k >> r;
     k *= m;
-    
+
     h *= m;
     h ^= k;
-    
+
     data += 4;
     len -= 4;
   }
@@ -96,11 +97,11 @@ rdf_murmer_hash(const void *key, int len, unsigned int seed)
 
       d = *(unsigned int *)data;
       t = (t >> sr) | (d << sl);
-      
+
       k = t;
       MIX(h,k,m);
       t = d;
-      
+
       data += 4;
       len -= 4;
     }
@@ -159,11 +160,11 @@ rdf_murmer_hash(const void *key, int len, unsigned int seed)
       case 1: h ^= data[0];
       h *= m;
     };
-    
+
     h ^= h >> 13;
     h *= m;
     h ^= h >> 15;
-    
+
     return h;
   }
 }

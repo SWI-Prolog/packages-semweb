@@ -22,6 +22,7 @@
     02110-1301  USA
 */
 
+#include <config.h>
 #include "SWI-Prolog.h"
 #include "debug.h"
 

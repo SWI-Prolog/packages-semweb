@@ -22,6 +22,7 @@
     02110-1301  USA
 */
 
+#include <config.h>
 #include <SWI-Stream.h>
 #include <SWI-Prolog.h>
 #include "rdf_db.h"

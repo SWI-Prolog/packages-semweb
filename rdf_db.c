@@ -6669,7 +6669,7 @@ rdf_transaction(term_t goal, term_t id, term_t options)
     term_t arg = PL_new_term_ref();
 
     while( PL_get_list(tail, head, tail) )
-    { int arity;
+    { size_t arity;
       atom_t name;
 
       if ( !PL_get_name_arity(head, &name, &arity) || arity != 1 )

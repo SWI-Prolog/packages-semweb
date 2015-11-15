@@ -3061,7 +3061,7 @@ create_turtle_parser(term_t parser, term_t in, term_t options)
 
       while(PL_get_list_ex(opts, opt, opts))
       { atom_t name;
-	int arity;
+	size_t arity;
 
 	if ( PL_get_name_arity(opt, &name, &arity) )
 	{ if ( arity == 1 )
@@ -3194,7 +3194,7 @@ turtle_parse(term_t parser, term_t triples, term_t options)
 
     while(PL_get_list_ex(opts, opt, opts))
     { atom_t name;
-      int arity;
+      size_t arity;
 
       if ( PL_get_name_arity(opt, &name, &arity) )
       { if ( arity == 1 )

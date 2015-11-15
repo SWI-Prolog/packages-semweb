@@ -1007,7 +1007,7 @@ rdf_keys_in_literal_map_proteced(atom_map *map, term_t spec, term_t keys)
 { term_t tail = PL_copy_term_ref(keys);
   term_t head = PL_new_term_ref();
   atom_t name;
-  int arity;
+  size_t arity;
 
   if ( !PL_get_name_arity(spec, &name, &arity) )
     PL_type_error("key-specifier", spec);
