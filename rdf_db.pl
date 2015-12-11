@@ -643,7 +643,7 @@ mk_global(NS:Local, Global) :-
 	rdf_reachable(r,r,o,+,?),
 	rdf_update(r,r,o,t),
 	rdf_update(r,r,o,+,t),
-	rdf_equal(r,r),
+	rdf_equal(o,o),
 	rdf_source_location(r,-),
 	rdf_resource(r),
 	rdf_subject(r),
