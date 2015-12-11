@@ -411,6 +411,9 @@ rdf_global_object(NS:Local, Global) :-
 rdf_global_object(literal(type(NS:Local, Value)),
 		  literal(type(Global, Value))) :-
 	global(NS, Local, Global), !.
+rdf_global_object(^^(Value,NS:Local),
+		  ^^(Value,Global)) :-
+	global(NS, Local, Global), !.
 rdf_global_object(literal(Query, type(NS:Local, Value)),
 		  literal(Query, type(Global, Value))) :-
 	global(NS, Local, Global), !.
