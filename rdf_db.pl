@@ -2394,6 +2394,7 @@ assert_triples([H|_], _) :-
 %		start with an empty database.
 
 rdf_reset_db :-
+	reset_gensym('__bnode'),
 	rdf_reset_db_.
 
 
