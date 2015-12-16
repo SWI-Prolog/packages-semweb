@@ -265,10 +265,12 @@ after_char(Atom, Char, Rest) :-
 %	subproperty thereof.
 
 label_of(Resource, Lang, Label) :-
-	rdf(Resource, rdfs:label, literal(lang(Lang, Label))).
+	rdf(Resource, rdfs:label, literal(lang(Lang, Label))),
+	nonvar(Lang).
 label_of(Resource, Lang, Label) :-
 	rdf_equal(rdfs:label, LabelP),
 	rdf_has(Resource, LabelP, literal(lang(Lang, Label)), P),
+	nonvar(Lang),
 	P \== LabelP.
 label_of(Resource, Lang, Label) :-
 	var(Lang),

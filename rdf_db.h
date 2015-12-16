@@ -74,8 +74,8 @@ supposed to be local to the SWI-Prolog kernel are declared using
 
 #define RDF_VERSION 30000		/* 3.0.0 */
 
-#define URL_subPropertyOf \
-	"http://www.w3.org/2000/01/rdf-schema#subPropertyOf"
+#define URL_subPropertyOf "http://www.w3.org/2000/01/rdf-schema#subPropertyOf"
+#define URL_xsdString     "http://www.w3.org/2001/XMLSchema#string"
 
 
 		 /*******************************

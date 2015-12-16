@@ -143,6 +143,7 @@ static atom_t	ATOM_average_chain_len;
 static atom_t	ATOM_reset;
 
 static atom_t	ATOM_subPropertyOf;
+static atom_t	ATOM_xsdString;
 
 static predicate_t PRED_call1;
 
@@ -4554,6 +4555,9 @@ match_object(triple *t, triple *p, unsigned flags)
 
       switch( plit->objtype )
       { case 0:
+	  if ( plit->type_or_lang == ATOM_ID(ATOM_xsdString) &&
+	       tlit->qualifier == Q_NONE )
+	    return TRUE;
 	  if ( plit->qualifier &&
 	       tlit->qualifier != plit->qualifier )
 	    return FALSE;
@@ -4562,18 +4566,23 @@ match_object(triple *t, triple *p, unsigned flags)
 	    return FALSE;
 	  return TRUE;
 	case OBJ_STRING:
-	  if ( (flags & MATCH_QUAL) ||
-	       p->match == STR_MATCH_PLAIN )
-	  { if ( tlit->qualifier != plit->qualifier )
-	      return FALSE;
-	  } else
-	  { if ( plit->qualifier && tlit->qualifier &&
-		 tlit->qualifier != plit->qualifier )
+	  /* qualifier match */
+	  if ( !( plit->type_or_lang == ATOM_ID(ATOM_xsdString) &&
+		  tlit->qualifier == Q_NONE ) )
+	  { if ( (flags & MATCH_QUAL) ||
+		 p->match == STR_MATCH_PLAIN )
+	    { if ( tlit->qualifier != plit->qualifier )
+		return FALSE;
+	    } else
+	    { if ( plit->qualifier && tlit->qualifier &&
+		   tlit->qualifier != plit->qualifier )
+		return FALSE;
+	    }
+	    if ( plit->type_or_lang &&
+		 tlit->type_or_lang != plit->type_or_lang )
 	      return FALSE;
 	  }
-	  if ( plit->type_or_lang &&
-	       tlit->type_or_lang != plit->type_or_lang )
-	    return FALSE;
+	  /* lexical match */
 	  if ( plit->value.string )
 	  { if ( tlit->value.string != plit->value.string )
 	    { if ( p->match >= STR_MATCH_ICASE )
@@ -9279,6 +9288,7 @@ install_rdf_db(void)
   ATOM_substring	  = PL_new_atom("substring");
   ATOM_word		  = PL_new_atom("word");
   ATOM_subPropertyOf	  = PL_new_atom(URL_subPropertyOf);
+  ATOM_xsdString	  = PL_new_atom(URL_xsdString);
   ATOM_error		  = PL_new_atom("error");
   ATOM_begin		  = PL_new_atom("begin");
   ATOM_end		  = PL_new_atom("end");

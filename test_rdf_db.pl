@@ -142,6 +142,11 @@ literal(1) :-
 	       rdf_assert(x, a, literal(Value))),
 	findall(V, (rdf(x, a, X), X = literal(V)), V2),
 	V2 == Vs.
+literal(2) :-
+	rdf_assert(x, a, literal(plain)),
+	rdf(x, a, literal(type(xsd:string, Plain))),
+	Plain == plain,
+	rdf(x, a, literal(type(xsd:string, plain))).
 
 
 		 /*******************************
