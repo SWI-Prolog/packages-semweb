@@ -358,7 +358,7 @@ nextwordA(const charA *s)
 static int
 matchA(int how, const charA *f, const charA *l)
 { switch(how)
-  { case STR_MATCH_EXACT:
+  { case STR_MATCH_ICASE:
     { for( ; *l && *f; l++, f++ )
       { if ( cmp_pointA(*l) != cmp_pointA(*f) )
 	  return FALSE;
@@ -499,7 +499,7 @@ match_atoms(int how, atom_t search, atom_t label)
     return matchA(how, f.a, l.a);
 
   switch(how)
-  { case STR_MATCH_EXACT:
+  { case STR_MATCH_ICASE:
     { if ( l.length == f.length )
       { unsigned int i;
 

@@ -725,9 +725,12 @@ lang_equal(Lang1, Lang2) :-
 %	  Perform exact match and demand the language or type qualifiers
 %	  to match. This query is fully indexed.
 %
-%	  * exact(+Text)
-%	  Perform exact, but case-insensitive match. This query is
+%	  * icase(+Text)
+%	  Perform a full but case-insensitive match. This query is
 %	  fully indexed.
+%
+%	  * exact(+Text)
+%	  Same as icase(Text).  Backward compatibility.
 %
 %	  * substring(+Text)
 %	  Match any literal that contains Text as a case-insensitive
@@ -3331,8 +3334,10 @@ rdf_value(V, _, Q, Encoding) :-
 %	True if Search matches Atom as   defined by Method. All matching
 %	is performed case-insensitive. Defines methods are:
 %
+%	  * icase
+%	  Perform full, case-insensitive match.
 %	  * exact
-%	  Perform exact, but case-insensitive match.
+%	  Same as `icase`.  Backward compatibility.
 %	  * substring
 %	  Search is a sub-string of Text.
 %	  * word

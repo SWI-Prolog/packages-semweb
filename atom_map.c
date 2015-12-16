@@ -1050,7 +1050,7 @@ rdf_keys_in_literal_map_proteced(atom_map *map, term_t spec, term_t keys)
     skiplist_enum state;
     node_data *data;
     node_data_ex search;
-    int match = (name == ATOM_prefix ? STR_MATCH_PREFIX : STR_MATCH_EXACT);
+    int match = (name == ATOM_prefix ? STR_MATCH_PREFIX : STR_MATCH_ICASE);
 
     _PL_get_arg(1, spec, a);
     if ( !PL_get_atom_ex(a, &prefix) )

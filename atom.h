@@ -32,7 +32,7 @@
 
 #define STR_MATCH_CASE		0x0	/* Default: perfect match */
 #define STR_MATCH_PLAIN		0x1	/* Same, also match qualifier */
-#define	STR_MATCH_EXACT		0x2	/* case-insensitive */
+#define	STR_MATCH_ICASE		0x2	/* case-insensitive */
 					/* keep after exact */
 #define	STR_MATCH_SUBSTRING	0x3	/* substring */
 #define	STR_MATCH_WORD		0x4	/* whole word */

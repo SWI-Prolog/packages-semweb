@@ -86,6 +86,7 @@ static functor_t FUNCTOR_hash3;
 static functor_t FUNCTOR_hash4;
 
 static functor_t FUNCTOR_exact1;
+static functor_t FUNCTOR_icase1;
 static functor_t FUNCTOR_plain1;
 static functor_t FUNCTOR_substring1;
 static functor_t FUNCTOR_word1;
@@ -123,6 +124,7 @@ static functor_t FUNCTOR_create_graph1;
 
 static atom_t   ATOM_user;
 static atom_t	ATOM_exact;
+static atom_t	ATOM_icase;
 static atom_t	ATOM_plain;
 static atom_t	ATOM_prefix;
 static atom_t	ATOM_substring;
@@ -4574,7 +4576,7 @@ match_object(triple *t, triple *p, unsigned flags)
 	    return FALSE;
 	  if ( plit->value.string )
 	  { if ( tlit->value.string != plit->value.string )
-	    { if ( p->match >= STR_MATCH_EXACT )
+	    { if ( p->match >= STR_MATCH_ICASE )
 	      { return match_literals(p->match, plit, &p->tp.end, tlit);
 	      } else
 	      { return FALSE;
@@ -6173,7 +6175,9 @@ get_partial_triple(rdf_db *db,
 
       _PL_get_arg(1, object, a);
       if ( PL_is_functor(a, FUNCTOR_exact1) )
-	t->match = STR_MATCH_EXACT;
+	t->match = STR_MATCH_ICASE;
+      if ( PL_is_functor(a, FUNCTOR_icase1) )
+	t->match = STR_MATCH_ICASE;
       else if ( PL_is_functor(a, FUNCTOR_plain1) )
 	t->match = STR_MATCH_PLAIN;
       else if ( PL_is_functor(a, FUNCTOR_substring1) )
@@ -6228,7 +6232,7 @@ get_partial_triple(rdf_db *db,
       case OBJ_STRING:
 	if ( lit->objtype == OBJ_STRING )
 	{ if ( lit->value.string &&
-	       t->match <= STR_MATCH_EXACT )
+	       t->match <= STR_MATCH_ICASE )
 	    ipat |= BY_O;
 	}
         break;
@@ -7296,6 +7300,7 @@ Search specifications:
 		literal(substring(X), L)
 		literal(word(X), L)
 		literal(exact(X), L)
+		literal(icase(X), L)
 		literal(prefix(X), L)
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
@@ -9152,7 +9157,9 @@ match_label(term_t how, term_t search, term_t label)
     return FALSE;
 
   if ( h == ATOM_exact )
-    type = STR_MATCH_EXACT;
+    type = STR_MATCH_ICASE;
+  if ( h == ATOM_icase )
+    type = STR_MATCH_ICASE;
   else if ( h == ATOM_substring )
     type = STR_MATCH_SUBSTRING;
   else if ( h == ATOM_word )
@@ -9221,6 +9228,7 @@ install_rdf_db(void)
   MKFUNCTOR(graph, 1);
   MKFUNCTOR(indexed, 16);
   MKFUNCTOR(exact, 1);
+  MKFUNCTOR(icase, 1);
   MKFUNCTOR(plain, 1);
   MKFUNCTOR(substring, 1);
   MKFUNCTOR(word, 1);
@@ -9264,6 +9272,7 @@ install_rdf_db(void)
 
   ATOM_user		  = PL_new_atom("user");
   ATOM_exact		  = PL_new_atom("exact");
+  ATOM_icase		  = PL_new_atom("icase");
   ATOM_plain		  = PL_new_atom("plain");
   ATOM_prefix		  = PL_new_atom("prefix");
   ATOM_like		  = PL_new_atom("like");
