@@ -6094,7 +6094,8 @@ get_existing_predicate(rdf_db *db, term_t t, predicate **p)
   if ( !PL_get_atom(t, &name ) )
   { if ( PL_is_functor(t, FUNCTOR_literal1) )
       return 0;				/* rdf(_, literal(_), _) */
-    return PL_type_error("atom", t);
+    PL_type_error("atom", t);
+    return -1;
   }
 
   if ( (*p = existing_predicate(db, name)) )

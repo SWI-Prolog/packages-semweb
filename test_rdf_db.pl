@@ -55,7 +55,8 @@ available test sets. The public goals are:
 test_rdf_db :-
 	test,
 	run_tests([ lang_matches,
-		    lit_ranges
+		    lit_ranges,
+		    rdf_misc
 		  ]).
 
 
@@ -1143,3 +1144,11 @@ test(bt, [setup(integers), cleanup(rdf_reset_db), all(X==[6,7,8])]) :-
 	bt(6,8, X).
 
 :- end_tests(lit_ranges).
+
+:- begin_tests(rdf_misc).
+
+test(type, error(type_error(atom, P))) :-
+	P = p:n,
+	rdf_retractall(_, P, _).
+
+:- end_tests(rdf_misc).
