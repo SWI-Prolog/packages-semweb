@@ -86,30 +86,45 @@ is_numeric_type(atom_t type)
 
 
 int
-xsd_compare_numeric(atom_t type1, const char *s1,
-		    atom_t type2, const char *s2)
-{ if ( is_numeric_type(type1) == XSD_INTEGER &&
-       is_numeric_type(type2) == XSD_INTEGER )
+xsd_compare_numeric(xsd_primary type1, const unsigned char *s1,
+		    xsd_primary type2, const unsigned char *s2)
+{ if ( type1 == XSD_INTEGER && type2 == XSD_INTEGER )
   { size_t l1, l2;
 
     while(*s1 == '0') s1++;
     while(*s2 == '0') s2++;
-    l1 = strlen(s1);
-    l2 = strlen(s2);
+    l1 = strlen((const char*)s1);
+    l2 = strlen((const char*)s2);
     if ( l1 != l2 )
       return l1 < l2 ? -1 : 1;
 
-    return strcmp(s1, s2);
+    return strcmp((const char*)s1, (const char*)s2);
   } else
   { char *e1, *e2;
-    double v1 = strtod(s1, &e1);
-    double v2 = strtod(s2, &e2);
+    double v1 = strtod((const char*)s1, &e1);
+    double v2 = strtod((const char*)s2, &e2);
 
     if ( !*e1 && !*e2 )
     { return v1 < v2 ? -1 :
 	     v1 > v2 ?  1 : 0;
     }
 
-    return strcmp(s1, s2);
+    return strcmp((const char*)s1, (const char*)s2);
+  }
+}
+
+
+int
+cmp_xsd_info(xsd_primary type1, atom_info *v1,
+	     xsd_primary type2, atom_t v2)
+{ text t2;
+
+  if ( fill_atom_info(v1) &&
+       v1->text.a &&
+       get_atom_text(v2, &t2) &&
+       t2.a )
+  { return xsd_compare_numeric(type1, v1->text.a, type2, t2.a);
+  } else
+  { return v1->handle < v2 ? -1 : 1;	/* == already covered */
   }
 }

@@ -86,5 +86,7 @@ COMMON(int)		match_atoms(int how, atom_t search, atom_t label);
 COMMON(int)		match_text(int how, text *search, text *label);
 COMMON(unsigned int)	atom_hash_case(atom_t a);
 COMMON(int)		atom_lang_matches(atom_t lang, atom_t pattern);
+COMMON(int)		fill_atom_info(atom_info *info);
+COMMON(int)		get_atom_text(atom_t atom, text *txt);
 
 #endif /*ATOM_H_INCLUDED*/

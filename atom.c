@@ -43,7 +43,7 @@
 		 *	   TEXT HANDLING	*
 		 *******************************/
 
-static inline int
+int
 get_atom_text(atom_t atom, text *txt)
 { if ( (txt->a = (const charA*)PL_atom_nchars(atom, &txt->length)) )
   { txt->w = NULL;
@@ -58,13 +58,13 @@ get_atom_text(atom_t atom, text *txt)
 }
 
 
-static wint_t
+static inline wint_t
 fetch(const text *txt, int i)
 { return txt->a ? (wint_t)txt->a[i] : (wint_t)txt->w[i];
 }
 
 
-static int
+int
 fill_atom_info(atom_info *info)
 { if ( !info->resolved )
   { info->resolved = TRUE;

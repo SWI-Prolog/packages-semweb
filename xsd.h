@@ -46,14 +46,16 @@
 #define COMMON(type) SO_LOCAL type
 #endif
 
+#include "atom.h"
+
 #define URL_xsd		  "http://www.w3.org/2001/XMLSchema#"
 #define URL_xsdString     URL_xsd "string"
 
 typedef enum xsd_primary
 { XSD_NONNUMERIC = 0,
-  XSD_DOUBLE,
+  XSD_INTEGER,
   XSD_DECIMAL,
-  XSD_INTEGER
+  XSD_DOUBLE
 } xsd_primary;
 
 typedef struct xsd_type
@@ -65,7 +67,9 @@ typedef struct xsd_type
 } xsd_type;
 
 COMMON(xsd_primary)	is_numeric_type(atom_t type);
-COMMON(int)		xsd_compare_numeric(atom_t type1, const char *s1,
-					    atom_t type2, const char *s2);
-
+COMMON(int)		xsd_compare_numeric(
+			    xsd_primary type1, const unsigned char *s1,
+			    xsd_primary type2, const unsigned char *s2);
+COMMON(int)		cmp_xsd_info(xsd_primary type1, atom_info *v1,
+				     xsd_primary type2, atom_t v2);
 #endif /*XSD_H_INCLUDED*/
