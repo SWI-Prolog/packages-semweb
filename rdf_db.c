@@ -3022,6 +3022,15 @@ cmp_qualifier(const literal *l1, const literal *l2)
   return l1->qualifier - l2->qualifier;
 }
 
+static xsd_primary
+is_numerical_string(const literal *lit)
+{ if ( lit->objtype == OBJ_STRING &&
+       lit->qualifier == Q_TYPE )
+    return is_numeric_type(ID_ATOM(lit->type_or_lang));
+
+  return XSD_NONNUMERIC;
+}
+
 
 static int
 compare_literals(literal_ex *lex, literal *l2)
@@ -3048,7 +3057,24 @@ compare_literals(literal_ex *lex, literal *l2)
 	break;
       }
       case OBJ_STRING:
-      { rc = cmp_atom_info(&lex->atom, l2->value.string);
+      { if ( lex->atom.handle == l2->value.string )
+	{ rc = 0;
+	} else
+	{ xsd_primary nt1 = is_numerical_string(l1);
+	  xsd_primary nt2 = is_numerical_string(l2);
+
+	  if ( nt1 || nt2 )
+	  { if ( nt1 && nt2 )
+	    { rc = cmp_xsd_info(nt1, &lex->atom, nt2, l2->value.string);
+	      if ( rc == 0 && nt1 != nt2 )
+		rc = nt1 < nt2 ? -1 : 1;
+	    } else
+	    { return nt1 ? -1 : 1;
+	    }
+	  } else
+	  { rc = cmp_atom_info(&lex->atom, l2->value.string);
+	  }
+	}
 	break;
       }
       case OBJ_TERM:
