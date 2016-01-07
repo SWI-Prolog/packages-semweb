@@ -79,12 +79,12 @@ typedef atom_t	atom_id;
 #define ID_ATOM(id)	(id)
 #endif
 
-int	cmp_atoms(atom_t a1, atom_t a2);
-int	cmp_atom_info(atom_info *a1, atom_t a2);
-atom_t	first_atom(atom_t a, int match);
-int	match_atoms(int how, atom_t search, atom_t label);
-int	match_text(int how, text *search, text *label);
-unsigned int atom_hash_case(atom_t a);
-int	atom_lang_matches(atom_t lang, atom_t pattern);
+COMMON(int)		cmp_atoms(atom_t a1, atom_t a2);
+COMMON(int)		cmp_atom_info(atom_info *a1, atom_t a2);
+COMMON(atom_t)		first_atom(atom_t a, int match);
+COMMON(int)		match_atoms(int how, atom_t search, atom_t label);
+COMMON(int)		match_text(int how, text *search, text *label);
+COMMON(unsigned int)	atom_hash_case(atom_t a);
+COMMON(int)		atom_lang_matches(atom_t lang, atom_t pattern);
 
 #endif /*ATOM_H_INCLUDED*/
