@@ -9156,14 +9156,28 @@ rdf_checks_literal_references(term_t l)
 		 *******************************/
 
 
+static int
+get_text_ex(term_t term, text *txt)
+{ memset(txt, 0, sizeof(*txt));
+
+  return ( PL_get_nchars(term, &txt->length, (char**)&txt->a,
+			 CVT_ATOM|CVT_STRING) ||
+	   PL_get_wchars(term, &txt->length, (pl_wchar_t**)&txt->w,
+			 CVT_ATOM|CVT_STRING|CVT_EXCEPTION)
+	 );
+}
+
+
+
 static foreign_t
 match_label(term_t how, term_t search, term_t label)
-{ atom_t h, f, l;
+{ atom_t h;
+  text f, l;
   int type;
 
   if ( !PL_get_atom_ex(how, &h) ||
-       !PL_get_atom_ex(search, &f) ||
-       !PL_get_atom_ex(label, &l) )
+       !get_text_ex(search, &f) ||
+       !get_text_ex(label, &l) )
     return FALSE;
 
   if ( h == ATOM_exact )
@@ -9181,7 +9195,7 @@ match_label(term_t how, term_t search, term_t label)
   else
     return PL_domain_error("search_method", how);
 
-  return match_atoms(type, f, l);
+  return match_text(type, &f, &l);
 }
 
 

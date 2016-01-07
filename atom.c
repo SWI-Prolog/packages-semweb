@@ -492,19 +492,25 @@ match_atoms(int how, atom_t search, atom_t label)
        !get_atom_text(search, &f) )
     return FALSE;			/* error? */
 
-  if ( f.length == 0 )
+  return match_text(how, &f, &l);
+}
+
+
+int
+match_text(int how, text *f, text *l)
+{ if ( f->length == 0 )
     return TRUE;
 
-  if ( f.a && l.a )
-    return matchA(how, f.a, l.a);
+  if ( f->a && l->a )
+    return matchA(how, f->a, l->a);
 
   switch(how)
   { case STR_MATCH_ICASE:
-    { if ( l.length == f.length )
+    { if ( l->length == f->length )
       { unsigned int i;
 
-	for(i=0; i<l.length; i++ )
-	{ if ( cmp_point(fetch(&l, i)) != cmp_point(fetch(&f, i)) )
+	for(i=0; i<l->length; i++ )
+	{ if ( cmp_point(fetch(l, i)) != cmp_point(fetch(f, i)) )
 	    return FALSE;
 	}
 
@@ -514,11 +520,11 @@ match_atoms(int how, atom_t search, atom_t label)
       return FALSE;
     }
     case STR_MATCH_PREFIX:
-    { if ( f.length <= l.length )
+    { if ( f->length <= l->length )
       { unsigned int i;
 
-	for(i=0; i<f.length; i++ )
-	{ if ( cmp_point(fetch(&l, i)) != cmp_point(fetch(&f, i)) )
+	for(i=0; i<f->length; i++ )
+	{ if ( cmp_point(fetch(l, i)) != cmp_point(fetch(f, i)) )
 	    return FALSE;
 	}
 
@@ -528,12 +534,12 @@ match_atoms(int how, atom_t search, atom_t label)
       return FALSE;
     }
     case STR_MATCH_SUBSTRING:		/* use Boyle-More! */
-    { if ( f.length <= l.length )
+    { if ( f->length <= l->length )
       { unsigned int i, s;
 
-	for(s=0; s+f.length <= l.length; s++)
-	{ for(i=0; i<f.length; i++)
-	  { if ( cmp_point(fetch(&l, i+s)) != cmp_point(fetch(&f, i)) )
+	for(s=0; s+f->length <= l->length; s++)
+	{ for(i=0; i<f->length; i++)
+	  { if ( cmp_point(fetch(l, i+s)) != cmp_point(fetch(f, i)) )
 	      goto snext;
 	  }
 	  return TRUE;
@@ -545,15 +551,15 @@ match_atoms(int how, atom_t search, atom_t label)
       return FALSE;
     }
     case STR_MATCH_WORD:
-    { if ( f.length <= l.length )
+    { if ( f->length <= l->length )
       { unsigned int i, s;
 
-	for(s=0; s+f.length <= l.length; s = nextword(&l, s))
-	{ for(i=0; i<f.length; i++)
-	  { if ( cmp_point(fetch(&l, i+s)) != cmp_point(fetch(&f, i)) )
+	for(s=0; s+f->length <= l->length; s = nextword(l, s))
+	{ for(i=0; i<f->length; i++)
+	  { if ( cmp_point(fetch(l, i+s)) != cmp_point(fetch(f, i)) )
 	      goto wnext;
 	  }
-	  if ( i+s == l.length || !iswalnum(fetch(&l,i+s)) )
+	  if ( i+s == l->length || !iswalnum(fetch(l,i+s)) )
 	    return TRUE;
 
 	wnext:;
@@ -570,19 +576,19 @@ match_atoms(int how, atom_t search, atom_t label)
       chp chps[MAX_LIKE_CHOICES];
       int chn=0;
 
-      for(ip=il=0; il < l.length && ip < f.length; ip++, il++ )
-      { if ( fetch(&f, ip) == '*' )
+      for(ip=il=0; il < l->length && ip < f->length; ip++, il++ )
+      { if ( fetch(f, ip) == '*' )
 	{ ip++;
 
-	  if ( ip == f.length )		/* foo* */
+	  if ( ip == f->length )		/* foo* */
 	    return TRUE;
 
 	search_like:
-	  while ( il < l.length &&
-		  cmp_point(fetch(&l, il)) != cmp_point(fetch(&f, ip)) )
+	  while ( il < l->length &&
+		  cmp_point(fetch(l, il)) != cmp_point(fetch(f, ip)) )
 	    il++;
 
-	  if ( il < l.length )
+	  if ( il < l->length )
 	  { if ( chn >= MAX_LIKE_CHOICES )
 	    { Sdprintf("rdf_db: too many * in `like' expression (>%d)",
 		       MAX_LIKE_CHOICES);
@@ -597,11 +603,11 @@ match_atoms(int how, atom_t search, atom_t label)
 	    goto retry_like;
 	}
 
-	if ( cmp_point(fetch(&l, il)) != cmp_point(fetch(&f, ip)) )
+	if ( cmp_point(fetch(l, il)) != cmp_point(fetch(f, ip)) )
 	  goto retry_like;
       }
-      if ( il == l.length && (ip == f.length ||
-			      (fetch(&f,ip) == '*' && ip+1 == f.length)) )
+      if ( il == l->length && (ip == f->length ||
+			      (fetch(f,ip) == '*' && ip+1 == f->length)) )
 	return TRUE;
 
 retry_like:

@@ -3329,10 +3329,10 @@ rdf_value(V, _, Q, Encoding) :-
 		 *	DEPRECATED MATERIAL	*
 		 *******************************/
 
-%%	rdf_match_label(+Method, +Search, +Atom) is semidet.
+%%	rdf_match_label(+Method, +Search, +Label) is semidet.
 %
-%	True if Search matches Atom as   defined by Method. All matching
-%	is performed case-insensitive. Defines methods are:
+%	True if Search matches Label as  defined by Method. All matching
+%	is performed case-insensitively. Defines methods are:
 %
 %	  * icase
 %	  Perform full, case-insensitive match.
@@ -3347,6 +3347,8 @@ rdf_value(V, _, Q, Encoding) :-
 %	  * like
 %	  Text matches Search, case insensitively, where the `*'
 %	  character in Search matches zero or more characters.
+%
+%	Both Search and Label are either an atom or string.
 
 
 %%	rdf_split_url(+Prefix, +Local, -URL) is det.
