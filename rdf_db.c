@@ -6212,7 +6212,7 @@ get_partial_triple(rdf_db *db,
       _PL_get_arg(1, object, a);
       if ( PL_is_functor(a, FUNCTOR_exact1) )
 	t->match = STR_MATCH_ICASE;
-      if ( PL_is_functor(a, FUNCTOR_icase1) )
+      else if ( PL_is_functor(a, FUNCTOR_icase1) )
 	t->match = STR_MATCH_ICASE;
       else if ( PL_is_functor(a, FUNCTOR_plain1) )
 	t->match = STR_MATCH_PLAIN;
