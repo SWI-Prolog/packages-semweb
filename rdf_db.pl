@@ -652,6 +652,8 @@ mk_global(NS:Local, Global) :-
 	rdf_subject(r),
 	rdf_create_graph(r),
 	rdf_graph(r),
+	rdf_graph_property(r,?),
+	rdf_set_graph(r,+),
 	rdf_unload_graph(r),
 	rdf_set_predicate(r, t),
 	rdf_predicate_property(r, -),
