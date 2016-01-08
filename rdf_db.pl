@@ -406,6 +406,9 @@ rdf_global_id(Global, Global).
 %
 %	@error	existence_error(rdf_namespace, NS)
 
+rdf_global_object(Var, Global) :-
+	var(Var), !,
+	Global = Var.
 rdf_global_object(NS:Local, Global) :-
 	global(NS, Local, Global), !.
 rdf_global_object(literal(type(NS:Local, Value)),
@@ -414,9 +417,13 @@ rdf_global_object(literal(type(NS:Local, Value)),
 rdf_global_object(^^(Value,NS:Local),
 		  ^^(Value,Global)) :-
 	global(NS, Local, Global), !.
-rdf_global_object(literal(Query, type(NS:Local, Value)),
-		  literal(Query, type(Global, Value))) :-
-	global(NS, Local, Global), !.
+rdf_global_object(literal(Query0, type(NS:Local, Value)),
+		  literal(Query1, type(Global, Value))) :-
+	global(NS, Local, Global), !,
+	rdf_global_term(Query0, Query1).
+rdf_global_object(literal(Query0, Value),
+		  literal(Query1, Value)) :- !,
+	rdf_global_term(Query0, Query1).
 rdf_global_object(Global, Global).
 
 global(NS, Local, Global) :-
@@ -752,9 +759,17 @@ lang_equal(Lang1, Lang2) :-
 %	  Match any literal that is equal or larger then Literal in the
 %	  ordered set of literals.
 %
+%	  * gt(+Literal)
+%	  Match any literal that is larger then Literal in the ordered set
+%	  of literals.
+%
 %	  * le(+Literal)
 %	  Match any literal that is equal or smaller then Literal in the
 %	  ordered set of literals.
+%
+%	  * lt(+Literal)
+%	  Match any literal that is smaller then Literal in the ordered set
+%	  of literals.
 %
 %	  * between(+Literal1, +Literal2)
 %	  Match any literal that is between Literal1 and Literal2 in the

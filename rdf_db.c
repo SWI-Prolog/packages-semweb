@@ -92,9 +92,11 @@ static functor_t FUNCTOR_substring1;
 static functor_t FUNCTOR_word1;
 static functor_t FUNCTOR_prefix1;
 static functor_t FUNCTOR_like1;
+static functor_t FUNCTOR_lt1;
 static functor_t FUNCTOR_le1;
 static functor_t FUNCTOR_between2;
 static functor_t FUNCTOR_ge1;
+static functor_t FUNCTOR_gt1;
 
 static functor_t FUNCTOR_symmetric1;
 static functor_t FUNCTOR_inverse_of1;
@@ -4547,10 +4549,14 @@ match_literals(int how, literal *p, literal *e, literal *v)
 	     Sdprintf(")\n"); });
 
   switch(how)
-  { case STR_MATCH_LE:
+  { case STR_MATCH_LT:
+      return compare_literals(&lex, v) > 0;
+    case STR_MATCH_LE:
       return compare_literals(&lex, v) >= 0;
     case STR_MATCH_GE:
       return compare_literals(&lex, v) <= 0;
+    case STR_MATCH_GT:
+      return compare_literals(&lex, v) < 0;
     case STR_MATCH_BETWEEN:
       if ( compare_literals(&lex, v) <= 0 )
       { lex.literal = e;
@@ -4620,15 +4626,15 @@ match_object(triple *t, triple *p, unsigned flags)
 	  }
 	  return TRUE;
 	case OBJ_INTEGER:
-	  if ( p->match >= STR_MATCH_LE )
+	  if ( p->match >= STR_MATCH_LT )
 	    return match_literals(p->match, plit, &p->tp.end, tlit);
 	  return tlit->value.integer == plit->value.integer;
 	case OBJ_DOUBLE:
-	  if ( p->match >= STR_MATCH_LE )
+	  if ( p->match >= STR_MATCH_LT )
 	    return match_literals(p->match, plit, &p->tp.end, tlit);
 	  return tlit->value.real == plit->value.real;
 	case OBJ_TERM:
-	  if ( p->match >= STR_MATCH_LE )
+	  if ( p->match >= STR_MATCH_LT )
 	    return match_literals(p->match, plit, &p->tp.end, tlit);
 	  if ( plit->value.term.record &&
 	       plit->value.term.len != tlit->value.term.len )
@@ -6224,10 +6230,14 @@ get_partial_triple(rdf_db *db,
 	t->match = STR_MATCH_PREFIX;
       else if ( PL_is_functor(a, FUNCTOR_like1) )
 	t->match = STR_MATCH_LIKE;
+      else if ( PL_is_functor(a, FUNCTOR_lt1) )
+	t->match = STR_MATCH_LT;
       else if ( PL_is_functor(a, FUNCTOR_le1) )
 	t->match = STR_MATCH_LE;
       else if ( PL_is_functor(a, FUNCTOR_ge1) )
 	t->match = STR_MATCH_GE;
+      else if ( PL_is_functor(a, FUNCTOR_gt1) )
+	t->match = STR_MATCH_GT;
       else if ( PL_is_functor(a, FUNCTOR_between2) )
       { term_t e = PL_new_term_ref();
 
@@ -6240,7 +6250,7 @@ get_partial_triple(rdf_db *db,
 	return PL_domain_error("match_type", a);
 
       _PL_get_arg(1, a, a);
-      if ( t->match >= STR_MATCH_LE )
+      if ( t->match >= STR_MATCH_LT )
       { if ( !get_literal(db, a, lit, 0) )
 	  return FALSE;
       } else
@@ -6932,17 +6942,19 @@ init_search_state(search_state *state, query *query)
     { free_search_state(state);
       return FALSE;
     }
-  } else if ( p->indexed != BY_SP && p->match >= STR_MATCH_LE )
+  } else if ( p->indexed != BY_SP && p->match >= STR_MATCH_LT )
   { literal **rlitp;
 
     state->lit_ex.literal = p->object.literal;
     prepare_literal_ex(&state->lit_ex);
 
     switch(p->match)
-    { case STR_MATCH_LE:
+    { case STR_MATCH_LT:
+      case STR_MATCH_LE:
 	rlitp = skiplist_find_first(&state->db->literals,
 				    NULL, &state->literal_state);
         break;
+      case STR_MATCH_GT:
       case STR_MATCH_GE:
 	rlitp = skiplist_find_first(&state->db->literals,
 				    &state->lit_ex, &state->literal_state);
@@ -7155,6 +7167,9 @@ next_pattern(search_state *state)
 
 	  break;
 	}
+	case STR_MATCH_LT:
+	  if ( compare_literals(&state->lit_ex, lit) <= 0 )
+	    return FALSE;
 	case STR_MATCH_LE:
 	case STR_MATCH_BETWEEN:
 	{ if ( compare_literals(&state->lit_ex, lit) < 0 )
@@ -9284,9 +9299,11 @@ install_rdf_db(void)
   MKFUNCTOR(word, 1);
   MKFUNCTOR(prefix, 1);
   MKFUNCTOR(like, 1);
+  MKFUNCTOR(lt, 1);
   MKFUNCTOR(le, 1);
   MKFUNCTOR(between, 2);
   MKFUNCTOR(ge, 1);
+  MKFUNCTOR(gt, 1);
   MKFUNCTOR(literal, 2);
   MKFUNCTOR(searched_nodes, 1);
   MKFUNCTOR(duplicates, 1);

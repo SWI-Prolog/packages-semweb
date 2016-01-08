@@ -39,9 +39,11 @@
 #define	STR_MATCH_PREFIX	0x5	/* prefix */
 #define STR_MATCH_LIKE		0x6	/* SeRQL *like* match */
 					/* Keep after LIKE */
-#define STR_MATCH_LE		0x7	/* =< */
-#define STR_MATCH_GE		0x8	/* >= */
-#define STR_MATCH_BETWEEN	0x9	/* X .. Y */
+#define STR_MATCH_LT		0x7	/* < */
+#define STR_MATCH_LE		0x8	/* =< */
+#define STR_MATCH_GE		0x9	/* >= */
+#define STR_MATCH_GT		0xA	/* > */
+#define STR_MATCH_BETWEEN	0xB	/* X .. Y */
 					/* MAX: 0xf (4 bits in triple) */
 
 typedef unsigned char charA;
