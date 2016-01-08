@@ -90,15 +90,23 @@ xsd_compare_numeric(xsd_primary type1, const unsigned char *s1,
 		    xsd_primary type2, const unsigned char *s2)
 { if ( type1 == XSD_INTEGER && type2 == XSD_INTEGER )
   { size_t l1, l2;
+    int mul = 1;
+
+    if ( *s1 == '-' && *s2 != '-' ) return -1;
+    if ( *s2 == '-' && *s1 != '-' ) return 1;
+    if ( *s1 == '-' && *s2 == '-' )
+      s1++, s2++, mul = -1;
+    if ( *s1 == '+' ) s1++;
+    if ( *s2 == '+' ) s2++;
 
     while(*s1 == '0') s1++;
     while(*s2 == '0') s2++;
     l1 = strlen((const char*)s1);
     l2 = strlen((const char*)s2);
     if ( l1 != l2 )
-      return l1 < l2 ? -1 : 1;
+      return (l1 < l2 ? -1 : 1) * mul;
 
-    return strcmp((const char*)s1, (const char*)s2);
+    return strcmp((const char*)s1, (const char*)s2) * mul;
   } else
   { char *e1, *e2;
     double v1 = strtod((const char*)s1, &e1);
