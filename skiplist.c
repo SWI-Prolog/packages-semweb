@@ -37,7 +37,7 @@
 
 static int debuglevel;
 
-#define DEBUG(n, g) do { if ( debuglevel > n ) { g; } } while(0)
+#define DEBUG(n, g) do { if ( debuglevel >= n ) { g; } } while(0)
 
 int
 skiplist_debug(int new)
