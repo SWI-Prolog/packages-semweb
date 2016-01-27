@@ -3059,7 +3059,8 @@ compare_literals(literal_ex *lex, literal *l2)
 	break;
       }
       case OBJ_STRING:
-      { if ( lex->atom.handle == l2->value.string )
+      { if ( lex->atom.handle == l2->value.string &&
+	     l1->type_or_lang == l2->type_or_lang )
 	{ rc = 0;
 	} else
 	{ xsd_primary nt1 = is_numerical_string(l1);
