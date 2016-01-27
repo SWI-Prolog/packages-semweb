@@ -3072,7 +3072,7 @@ compare_literals(literal_ex *lex, literal *l2)
 	      if ( rc == 0 && nt1 != nt2 )
 		rc = nt1 < nt2 ? -1 : 1;
 	    } else
-	    { return nt1 ? -1 : 1;
+	    { rc = nt1 ? -1 : 1;
 	    }
 	  } else
 	  { rc = cmp_atom_info(&lex->atom, l2->value.string);
