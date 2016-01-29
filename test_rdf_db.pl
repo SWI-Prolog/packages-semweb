@@ -1164,7 +1164,6 @@ term_expansion(In, Out) :-
 
 num(xsd:byte,    '10').
 num(xsd:integer, '10').
-num(xsd:integer, '11').
 num(xsd:integer, '12').
 num(xsd:double,  '10.0E0').
 num(xsd:double,  '1.5E1').
@@ -1180,9 +1179,16 @@ test(eq, all(L == [ type(xsd:byte,'10'),
 		    type(xsd:integer,'10'),
 		    type(xsd:double,'10.0E0')])) :-
 	rdf(s,p,literal(eq(type(xsd:integer, '10')), L)).
+test(eq, all(L == [ type(xsd:byte,'10'),
+		    type(xsd:integer,'10'),
+		    type(xsd:double,'10.0E0')])) :-
+	rdf(_,_,literal(eq(type(xsd:integer, '10')), L)).
 test(gt, all(L == [ type(xsd:integer,'12'),
 		    type(xsd:double,'1.5E1')])) :-
 	rdf(s,p,literal(gt(type(xsd:integer, '11')), L)).
+test(gt, all(L == [ type(xsd:integer,'12'),
+		    type(xsd:double,'1.5E1')])) :-
+	rdf(_,_,literal(gt(type(xsd:integer, '11')), L)).
 
 :- end_tests(num_ranges).
 
