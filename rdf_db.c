@@ -4581,6 +4581,47 @@ match_literals(int how, literal *p, literal *e, literal *v)
 
 
 static int
+match_numerical(int how, literal *p, literal *e, literal *v)
+{ xsd_primary nv, np;
+  literal_ex lex;
+
+  if ( !(nv=is_numerical_string(v)) )
+    return FALSE;
+  if ( !p->value.string )		/* literal(eq(type(<numeric>,_)),_) */
+    return TRUE;
+
+  np = is_numerical_string(p);
+  assert(np);
+
+  lex.literal = p;
+  prepare_literal_ex(&lex);
+
+  switch(how)
+  { case STR_MATCH_LT:
+      return cmp_xsd_info(np, &lex.atom, nv, v->value.string)  > 0;
+    case STR_MATCH_LE:
+      return cmp_xsd_info(np, &lex.atom, nv, v->value.string) >= 0;
+    case STR_MATCH_GE:
+      return cmp_xsd_info(np, &lex.atom, nv, v->value.string) <= 0;
+    case STR_MATCH_GT:
+      return cmp_xsd_info(np, &lex.atom, nv, v->value.string) <  0;
+    case STR_MATCH_BETWEEN:
+      if ( cmp_xsd_info(np, &lex.atom, nv, v->value.string) <= 0 )
+      { lex.literal = e;
+	prepare_literal_ex(&lex);
+
+	if ( cmp_xsd_info(np, &lex.atom, nv, v->value.string) >= 0 )
+	  return TRUE;
+      }
+      return FALSE;
+    case STR_MATCH_EQ:
+    default:
+      return cmp_xsd_info(np, &lex.atom, nv, v->value.string) == 0;
+  }
+}
+
+
+static int
 match_object(triple *t, triple *p, unsigned flags)
 { if ( p->object_is_literal )
   { if ( t->object_is_literal )
@@ -4608,24 +4649,7 @@ match_object(triple *t, triple *p, unsigned flags)
 	case OBJ_STRING:
 	  /* numeric match */
 	  if ( (flags&MATCH_NUMERIC) )
-	  { xsd_primary nt;
-
-	    if ( (nt = is_numerical_string(tlit)) )
-	    { if ( plit->value.string )
-	      { xsd_primary np = is_numerical_string(plit);
-		literal_ex lex;
-
-		assert(np);
-		lex.literal = plit;
-		prepare_literal_ex(&lex);
-		return cmp_xsd_info(np, &lex.atom, nt, tlit->value.string) == 0;
-	      }
-
-	      return TRUE;
-	    }
-
-	    return FALSE;
-	  }
+	    return match_numerical(p->match, plit, &p->tp.end, tlit);
 	  /* qualifier match */
 	  if ( !( plit->type_or_lang == ATOM_ID(ATOM_xsdString) &&
 		  tlit->qualifier == Q_NONE ) )
