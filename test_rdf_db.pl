@@ -39,6 +39,9 @@
 :- use_module(library(plunit)).
 :- use_module(library(debug)).
 
+:- discontiguous
+	term_expansion/2.
+
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 RDF-DB test file.  A test is a clause of the form:
 
@@ -56,6 +59,7 @@ test_rdf_db :-
 	test,
 	run_tests([ lang_matches,
 		    lit_ranges,
+		    num_ranges,
 		    rdf_misc
 		  ]).
 
@@ -1109,6 +1113,11 @@ test(lang_matches, true) :-
 
 :- end_tests(lang_matches).
 
+
+		 /*******************************
+		 *	  LITERAL RANGES	*
+		 *******************************/
+
 :- begin_tests(lit_ranges, [cleanup(rdf_reset_db)]).
 
 letters :-
@@ -1144,6 +1153,43 @@ test(bt, [setup(integers), cleanup(rdf_reset_db), all(X==[6,7,8])]) :-
 	bt(6,8, X).
 
 :- end_tests(lit_ranges).
+
+
+		 /*******************************
+		 *	 NUMERICAL RANGES	*
+		 *******************************/
+
+term_expansion(In, Out) :-
+	rdf_global_term(In, Out).
+
+num(xsd:byte,    '10').
+num(xsd:integer, '10').
+num(xsd:integer, '11').
+num(xsd:integer, '12').
+num(xsd:double,  '10.0E0').
+num(xsd:double,  '1.5E1').
+num(xsd:string,  '10').
+
+num_data :-
+	forall(num(Type, Lex),
+	       rdf_assert(s,p,literal(type(Type,Lex)))).
+
+:- begin_tests(num_ranges, [setup(num_data), cleanup(rdf_reset_db)]).
+
+test(eq, all(L == [ type(xsd:byte,'10'),
+		    type(xsd:integer,'10'),
+		    type(xsd:double,'10.0E0')])) :-
+	rdf(s,p,literal(eq(type(xsd:integer, '10')), L)).
+test(gt, all(L == [ type(xsd:integer,'12'),
+		    type(xsd:double,'1.5E1')])) :-
+	rdf(s,p,literal(gt(type(xsd:integer, '11')), L)).
+
+:- end_tests(num_ranges).
+
+
+		 /*******************************
+		 *	       MISC		*
+		 *******************************/
 
 :- begin_tests(rdf_misc).
 

@@ -730,6 +730,8 @@ lang_equal(Lang1, Lang2) :-
 %
 %	For literal querying purposes, Object can be of the form
 %	literal(+Query, -Value), where Query is one of the terms below.
+%	If the Query takes a literal argument and the value has a
+%	numeric type numerical comparison is performed.
 %
 %	  * plain(+Text)
 %	  Perform exact match and demand the language or type qualifiers
@@ -762,6 +764,10 @@ lang_equal(Lang1, Lang2) :-
 %
 %	  * gt(+Literal)
 %	  Match any literal that is larger then Literal in the ordered set
+%	  of literals.
+%
+%	  * eq(+Literal)
+%	  Match any literal that is equal to Literal in the ordered set
 %	  of literals.
 %
 %	  * le(+Literal)

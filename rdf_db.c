@@ -94,6 +94,7 @@ static functor_t FUNCTOR_prefix1;
 static functor_t FUNCTOR_like1;
 static functor_t FUNCTOR_lt1;
 static functor_t FUNCTOR_le1;
+static functor_t FUNCTOR_eq1;
 static functor_t FUNCTOR_between2;
 static functor_t FUNCTOR_ge1;
 static functor_t FUNCTOR_gt1;
@@ -157,6 +158,7 @@ static predicate_t PRED_call1;
 #define MATCH_SRC		0x04	/* Match graph location */
 #define MATCH_INVERSE		0x08	/* use symmetric match too */
 #define MATCH_QUAL		0x10	/* Match qualifiers too */
+#define MATCH_NUMERIC		0x20	/* Match typed objects numerically */
 #define MATCH_DUPLICATE		(MATCH_EXACT|MATCH_QUAL)
 
 static int match_triples(rdf_db *db, triple *t, triple *p,
@@ -4557,6 +4559,8 @@ match_literals(int how, literal *p, literal *e, literal *v)
       return compare_literals(&lex, v) > 0;
     case STR_MATCH_LE:
       return compare_literals(&lex, v) >= 0;
+    case STR_MATCH_EQ:
+      return compare_literals(&lex, v) == 0;
     case STR_MATCH_GE:
       return compare_literals(&lex, v) <= 0;
     case STR_MATCH_GT:
@@ -4602,6 +4606,26 @@ match_object(triple *t, triple *p, unsigned flags)
 	    return FALSE;
 	  return TRUE;
 	case OBJ_STRING:
+	  /* numeric match */
+	  if ( (flags&MATCH_NUMERIC) )
+	  { xsd_primary nt;
+
+	    if ( (nt = is_numerical_string(tlit)) )
+	    { if ( plit->value.string )
+	      { xsd_primary np = is_numerical_string(plit);
+		literal_ex lex;
+
+		assert(np);
+		lex.literal = plit;
+		prepare_literal_ex(&lex);
+		return cmp_xsd_info(np, &lex.atom, nt, tlit->value.string) == 0;
+	      }
+
+	      return TRUE;
+	    }
+
+	    return FALSE;
+	  }
 	  /* qualifier match */
 	  if ( !( plit->type_or_lang == ATOM_ID(ATOM_xsdString) &&
 		  tlit->qualifier == Q_NONE ) )
@@ -6238,6 +6262,8 @@ get_partial_triple(rdf_db *db,
 	t->match = STR_MATCH_LT;
       else if ( PL_is_functor(a, FUNCTOR_le1) )
 	t->match = STR_MATCH_LE;
+      else if ( PL_is_functor(a, FUNCTOR_eq1) )
+	t->match = STR_MATCH_EQ;
       else if ( PL_is_functor(a, FUNCTOR_ge1) )
 	t->match = STR_MATCH_GE;
       else if ( PL_is_functor(a, FUNCTOR_gt1) )
@@ -6925,6 +6951,9 @@ init_search_state(search_state *state, query *query)
     return FALSE;
   }
 
+  if ( p->object_is_literal && !is_numerical_string(p->object.literal) )
+    state->flags &= ~MATCH_NUMERIC;
+
   if ( (p->match == STR_MATCH_PREFIX ||	p->match == STR_MATCH_LIKE) &&
        p->indexed != BY_SP &&
        (state->prefix = first_atom(p->object.literal->value.string, p->match)))
@@ -6955,6 +6984,7 @@ init_search_state(search_state *state, query *query)
     switch(p->match)
     { case STR_MATCH_LT:
       case STR_MATCH_LE:
+      case STR_MATCH_EQ:
 	rlitp = skiplist_find_first(&state->db->literals,
 				    NULL, &state->literal_state);
         break;
@@ -7174,6 +7204,7 @@ next_pattern(search_state *state)
 	case STR_MATCH_LT:
 	  if ( compare_literals(&state->lit_ex, lit) <= 0 )
 	    return FALSE;
+	case STR_MATCH_EQ:
 	case STR_MATCH_LE:
 	case STR_MATCH_BETWEEN:
 	{ if ( compare_literals(&state->lit_ex, lit) < 0 )
@@ -7363,21 +7394,21 @@ Search specifications:
 static foreign_t
 rdf3(term_t subject, term_t predicate, term_t object, control_t h)
 { return rdf(subject, predicate, object, 0, 0, h,
-	     MATCH_EXACT);
+	     MATCH_EXACT|MATCH_NUMERIC);
 }
 
 static foreign_t
 rdf4(term_t subject, term_t predicate, term_t object,
      term_t src, control_t h)
 { return rdf(subject, predicate, object, src, 0, h,
-	     MATCH_EXACT|MATCH_SRC);
+	     MATCH_EXACT|MATCH_NUMERIC|MATCH_SRC);
 }
 
 
 static foreign_t
 rdf_has3(term_t subject, term_t predicate, term_t object, control_t h)
 { return rdf(subject, predicate, object, 0, 0, h,
-	     MATCH_SUBPROPERTY|MATCH_INVERSE);
+	     MATCH_EXACT|MATCH_NUMERIC|MATCH_SUBPROPERTY|MATCH_INVERSE);
 }
 
 
@@ -7385,7 +7416,7 @@ static foreign_t
 rdf_has4(term_t subject, term_t predicate, term_t object,
 	term_t realpred, control_t h)
 { return rdf(subject, predicate, object, 0, realpred, h,
-	     MATCH_SUBPROPERTY|MATCH_INVERSE);
+	     MATCH_EXACT|MATCH_NUMERIC|MATCH_SUBPROPERTY|MATCH_INVERSE);
 }
 
 
@@ -9344,6 +9375,7 @@ install_rdf_db(void)
   MKFUNCTOR(lt, 1);
   MKFUNCTOR(le, 1);
   MKFUNCTOR(between, 2);
+  MKFUNCTOR(eq, 1);
   MKFUNCTOR(ge, 1);
   MKFUNCTOR(gt, 1);
   MKFUNCTOR(literal, 2);
