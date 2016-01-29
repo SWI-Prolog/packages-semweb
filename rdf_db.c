@@ -7231,14 +7231,28 @@ next_pattern(search_state *state)
 	case STR_MATCH_EQ:
 	case STR_MATCH_LE:
 	case STR_MATCH_BETWEEN:
-	{ if ( compare_literals(&state->lit_ex, lit) < 0 )
-	  { DEBUG(1,
-		  Sdprintf("LE/BETWEEN(");
-		  print_literal(state->lit_ex.literal);
-		  Sdprintf("): terminated literal iteration from ");
-		  print_literal(lit);
-		  Sdprintf("\n"));
-	    return FALSE;			/* no longer a prefix */
+	{ if ( (state->flags&MATCH_NUMERIC) )
+	  { xsd_primary nt;
+
+	    if ( (nt=is_numerical_string(lit)) )
+	    { xsd_primary np = is_numerical_string(state->lit_ex.literal);
+
+	      if ( cmp_xsd_info(np, &state->lit_ex.atom, nt, lit->value.string) < 0 )
+		return FALSE;			/* no longer smaller/equal */
+
+	      break;
+	    }
+	    return FALSE;
+	  } else
+	  { if ( compare_literals(&state->lit_ex, lit) < 0 )
+	    { DEBUG(1,
+		    Sdprintf("LE/BETWEEN(");
+		    print_literal(state->lit_ex.literal);
+		    Sdprintf("): terminated literal iteration from ");
+		    print_literal(lit);
+		    Sdprintf("\n"));
+	      return FALSE;			/* no longer smaller/equal */
+	    }
 	  }
 
 	  break;
