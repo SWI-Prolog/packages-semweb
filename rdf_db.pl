@@ -118,6 +118,7 @@
 	    rdf_global_object/2,	% ?Object, ?NSExpandedObject
 	    rdf_global_term/2,		% Term, WithExpandedNS
 
+	    rdf_compare/3,		% -Dif, +Object1, +Object2
 	    rdf_match_label/3,		% +How, +String, +Label
 	    rdf_split_url/3,		% ?Base, ?Local, ?URL
 	    rdf_url_namespace/2,	% +URL, ?Base
@@ -3343,30 +3344,27 @@ rdf_value(V, _, Q, Encoding) :-
 
 
 		 /*******************************
-		 *	DEPRECATED MATERIAL	*
+		 *	 MATCH AND COMPARE	*
 		 *******************************/
 
-%%	rdf_match_label(+Method, +Search, +Label) is semidet.
+%%	rdf_compare(-Dif, +Object1, +Object2) is det.
 %
-%	True if Search matches Label as  defined by Method. All matching
-%	is performed case-insensitively. Defines methods are:
+%	Compare  two  object  terms.  Where  SPARQL  defines  a  partial
+%	ordering, we define a complete ordering   of terms. The ordering
+%	is defines as:
 %
-%	  * icase
-%	  Perform full, case-insensitive match.
-%	  * exact
-%	  Same as `icase`.  Backward compatibility.
-%	  * substring
-%	  Search is a sub-string of Text.
-%	  * word
-%	  Search appears as a whole-word in Text.
-%	  * prefix
-%	  Text start with Search.
-%	  * like
-%	  Text matches Search, case insensitively, where the `*'
-%	  character in Search matches zero or more characters.
-%
-%	Both Search and Label are either an atom or string.
+%	  - Blank nodes < IRIs < Literals
+%	  - Numeric literals < other literals
+%	  - Numeric literals are compared by value and then by type,
+%	    where Integer < Decimal < Double
+%	  - Other literals are compare lexically, case insensitive.
+%	    If equal, uppercase preceeds lowercase.  If still equal,
+%	    the types are compared lexically.
 
+
+		 /*******************************
+		 *	DEPRECATED MATERIAL	*
+		 *******************************/
 
 %%	rdf_split_url(+Prefix, +Local, -URL) is det.
 %%	rdf_split_url(-Prefix, -Local, +URL) is det.

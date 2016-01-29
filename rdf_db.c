@@ -143,6 +143,9 @@ static atom_t	ATOM_size;
 static atom_t	ATOM_optimize_threshold;
 static atom_t	ATOM_average_chain_len;
 static atom_t	ATOM_reset;
+static atom_t	ATOM_lt;		/* < */
+static atom_t	ATOM_eq;		/* = */
+static atom_t	ATOM_gt;		/* > */
 
 static atom_t	ATOM_subPropertyOf;
 static atom_t	ATOM_xsdString;
@@ -9253,6 +9256,44 @@ lang_matches(term_t lang, term_t pattern)
 }
 
 
+static foreign_t
+rdf_compare(term_t dif, term_t a, term_t b)
+{ triple ta, tb;
+  rdf_db *db = rdf_current_db();
+  int rc;
+
+  memset(&ta, 0, sizeof(ta));
+  memset(&tb, 0, sizeof(tb));
+  if ( get_object(db, a, &ta) &&
+       get_object(db, b, &tb) )
+  { int d;
+    atom_t ad;
+
+    if ( ta.object_is_literal &&
+	 tb.object_is_literal )
+    { literal_ex lex;
+      lex.literal = ta.object.literal;
+      prepare_literal_ex(&lex);
+      d = compare_literals(&lex, tb.object.literal);
+    } else if ( !ta.object_is_literal && !tb.object_is_literal )
+    { d = cmp_atoms(ta.object.resource, tb.object.resource);
+    } else
+    { d = ta.object_is_literal ? -1 : 1;
+    }
+
+    ad = d < 0 ? ATOM_lt : d > 0 ? ATOM_gt : ATOM_eq;
+
+    rc = PL_unify_atom(dif, ad);
+  } else
+  { rc = FALSE;
+  }
+
+  free_triple(db, &ta, FALSE);
+  free_triple(db, &tb, FALSE);
+
+  return rc;
+}
+
 
 
 		 /*******************************
@@ -9359,6 +9400,9 @@ install_rdf_db(void)
   ATOM_optimize_threshold = PL_new_atom("optimize_threshold");
   ATOM_average_chain_len  = PL_new_atom("average_chain_len");
   ATOM_reset		  = PL_new_atom("reset");
+  ATOM_lt		  = PL_new_atom("<");
+  ATOM_eq		  = PL_new_atom("=");
+  ATOM_gt		  = PL_new_atom(">");
 
   PRED_call1         = PL_predicate("call", 1, "user");
 
@@ -9448,6 +9492,7 @@ install_rdf_db(void)
 #endif
 
   PL_register_foreign("lang_matches", 2, lang_matches, 0);
+  PL_register_foreign("rdf_compare",  3, rdf_compare,  0);
 
   install_atom_map();
 }
