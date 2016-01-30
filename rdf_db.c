@@ -8225,7 +8225,9 @@ next:
 
   if ( !(ep->p = p->next) )
   { if ( ++ep->i >= db->predicates.bucket_count )
-      goto fail;
+    { rdf_free(db, ep, sizeof(*ep));
+      return TRUE;
+    }
   }
   PL_retry_address(ep);
 }
