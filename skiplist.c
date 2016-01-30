@@ -203,7 +203,7 @@ skiplist_find(skiplist *sl, void *payload)
 	{ scpp--;
 	  scp = (void**)*scpp;
 	  h--;
-	} while(scp == NULL && h>=0 );
+	} while(h>=0 && scp == NULL);
 
 	continue;
       }
