@@ -4668,7 +4668,8 @@ match_object(triple *t, triple *p, unsigned flags)
 	  }
 	  /* lexical match */
 	  if ( plit->value.string )
-	  { if ( tlit->value.string != plit->value.string )
+	  { if ( tlit->value.string != plit->value.string ||
+		 p->match == STR_MATCH_LT || p->match == STR_MATCH_GT )
 	    { if ( p->match >= STR_MATCH_ICASE )
 	      { return match_literals(p->match, plit, &p->tp.end, tlit);
 	      } else
