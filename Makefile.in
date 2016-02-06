@@ -4,7 +4,7 @@
 # This template is used by configure to create Makefile.  See
 # the file INSTALL for further installation instructions.
 #
-# License: LGPL
+# License: BSD-2
 #
 # Special targets:
 #
