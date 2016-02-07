@@ -243,7 +243,7 @@ store.
 %%	rdf_current_prefix(?Alias, ?URI) is nondet.
 %
 %	Query   predefined   prefixes   and    prefixes   defined   with
-%	rdf_register_ns/2. If Alias is unbound and one URI is the prefix
+%	rdf_register_prefix/2.  If Alias is unbound and one URI is the prefix
 %	of another, the longest is returned first. This allows turning a
 %	resource into a prefix/local couple using the simple enumeration
 %	below. See rdf_global_id/2.
