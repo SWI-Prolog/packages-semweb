@@ -52,6 +52,7 @@
 :- use_module(library(pairs)).
 :- use_module(library(debug)).
 :- use_module(library(sgml_write)).
+:- use_module(library(sgml)).
 
 :- predicate_options(rdf_save_turtle/2, 2,
 		     [ graph(atom),
@@ -69,6 +70,7 @@
 		       group(boolean),
 		       inline_bnodes(boolean),
 		       single_line_bnodes(boolean),
+		       abbreviate_literals(boolean),
 		       canonize_numbers(boolean),
 		       canonical(boolean),
 		       a(boolean),
@@ -130,6 +132,7 @@ has the following properties:
 		 group:boolean=true,	% Group using ; and ,
 		 inline_bnodes:boolean=true, % Inline single-used bnodes
 		 single_line_bnodes:boolean=false, % No newline after ;
+		 abbreviate_literals:boolean=true, % Abbreviate known types
 		 canonize_numbers:boolean=false, % How to write numbers
 		 canonical:boolean=false,
 		 expand:any=lookup,	% Access to the triples
@@ -180,6 +183,8 @@ has the following properties:
 %	    If =true= (default), using P-O and O-grouping.
 %	    * inline_bnodes(+Boolean)
 %	    if =true= (default), inline bnodes that are used once.
+%	    * abbreviate_literals(+Boolean)
+%	    if =true= (default), omit the typeif allowed by turtle.
 %	    * only_known_prefixes(+Boolean)
 %	    Only use prefix notation for known prefixes.  Without, some
 %	    documents produce _huge_ amounts of prefixes.
@@ -298,7 +303,8 @@ rdf_save_ntriples(File, Options):-
 			  prefixes([]),
 			  subject_white_lines(0),
 			  a(false),
-			  inline_bnodes(false)
+			  inline_bnodes(false),
+			  abbreviate_literals(false)
 			| Options
 			]).
 
@@ -848,12 +854,16 @@ tw_top_bnodes([BNode-_|T], State, Out) :-
 
 tw_bnode(BNode, State, Out) :-
 	subject_triples(BNode, State, Pairs),
-	tw_bnode_triples(Pairs, State, Out),
-	format(Out, ' .~n', []).
-
-tw_bnode_triples(Pairs, State, Out) :-
 	length(Pairs, Count),
 	inc_triple_count(State, Count),
+	(   tw_state_inline_bnodes(State, true)
+	->  tw_bnode_triples(Pairs, State, Out),
+	    format(Out, ' .~n', [])
+	;   next_bnode_id(State, BNode, Ref),
+	    tw_bnode_ntriples(Pairs, Ref, State, Out)
+	).
+
+tw_bnode_triples(Pairs, State, Out) :-
 	group_po(Pairs, Grouped),
 	(   tw_state_single_line_bnodes(State, true)
 	->  format(Out, '[ ', []),
@@ -866,6 +876,17 @@ tw_bnode_triples(Pairs, State, Out) :-
 	    nl_indent(Out, State, Indent),
 	    format(Out, ']', [])
 	).
+
+tw_bnode_ntriples([], _, _, _).
+tw_bnode_ntriples([P-O|T], Ref, State, Out) :-
+	tw_bnode_ref(Ref, Out),
+	format(Out, ' ', []),
+	tw_predicate(P, State, Out),
+	format(Out, ' ', []),
+	tw_object(O, State, Out),
+	format(Out, ' .~n', []),
+	tw_bnode_ntriples(T, Ref, State, Out).
+
 
 %%	tw_cyclic_bnodes(+Pairs, +BNode, +State, +Out, +Cycle)
 %
@@ -1332,7 +1353,8 @@ tw_literal(literal(lang(Lang, Value)), State, Out) :- !,
 	format(Out, '@~w', [TurtleLang]).
 tw_literal(literal(Value), State, Out) :-
 	atom(Value), !,
-	tw_quoted_string(Value, State, Out).
+	rdf_equal(xsd:string, TypeString),
+	tw_typed_literal(TypeString, Value, State, Out).
 						% Add types automatically
 tw_literal(literal(Value), State, Out) :-
 	integer(Value), !,
@@ -1351,6 +1373,7 @@ tw_literal(Literal, _State, _Out) :-
 
 
 tw_typed_literal(Type, Value, State, Out) :-
+	tw_state_abbreviate_literals(State, true),
 	tw_abbreviated_literal(Type, Value, State, Out), !.
 tw_typed_literal(Type, Value, State, Out) :-
 	(atom(Value) ; string(Value)), !,
@@ -1393,9 +1416,12 @@ tw_abbreviated_literal(xsd:integer, Value, State, Out) :-
 tw_abbreviated_literal(xsd:double, Value, State, Out) :-
 	(   tw_state_canonize_numbers(State, false)
 	->  write(Out, Value)
-	;   atom_number(Value, Float),
-	    format(Out, '~f', [Float])
+	;   ValueF is float(Value),
+	    xsd_number_string(ValueF, FloatS),
+	    format(Out, '~s', [FloatS])
 	).
+tw_abbreviated_literal(xsd:string, Value, State, Out) :-
+	tw_quoted_string(Value, State, Out).
 tw_abbreviated_literal(xsd:decimal, Value, _, Out) :-
 	format(Out, '~w', [Value]).
 tw_abbreviated_literal(xsd:boolean, Value, _, Out) :-
