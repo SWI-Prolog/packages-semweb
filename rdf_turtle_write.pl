@@ -67,6 +67,7 @@
 		       only_known_prefixes(boolean),
 		       comment(boolean),
 		       group(boolean),
+		       inline_bnodes(boolean),
 		       single_line_bnodes(boolean),
 		       canonize_numbers(boolean),
 		       canonical(boolean),
@@ -127,6 +128,7 @@ has the following properties:
 		 only_known_prefixes:boolean=false,% Only use known prefixes
 		 comment:boolean=true,	% write some comments into the file
 		 group:boolean=true,	% Group using ; and ,
+		 inline_bnodes:boolean=true, % Inline single-used bnodes
 		 single_line_bnodes:boolean=false, % No newline after ;
 		 canonize_numbers:boolean=false, % How to write numbers
 		 canonical:boolean=false,
@@ -176,6 +178,8 @@ has the following properties:
 %	    Save only the named graph
 %	    * group(+Boolean)
 %	    If =true= (default), using P-O and O-grouping.
+%	    * inline_bnodes(+Boolean)
+%	    if =true= (default), inline bnodes that are used once.
 %	    * only_known_prefixes(+Boolean)
 %	    Only use prefix notation for known prefixes.  Without, some
 %	    documents produce _huge_ amounts of prefixes.
@@ -293,7 +297,8 @@ rdf_save_ntriples(File, Options):-
 			  group(false),
 			  prefixes([]),
 			  subject_white_lines(0),
-			  a(false)
+			  a(false),
+			  inline_bnodes(false)
 			| Options
 			]).
 
@@ -993,7 +998,8 @@ tw_bnode_object(BNode, State, Out) :-
 	tw_state_nodeid_map(State, BNTree),
 	rb_lookup(BNode, Ref, BNTree), !,
 	(   var(Ref)
-	->  (   tw_unshared_bnode(BNode, State, Out)
+	->  (   tw_state_inline_bnodes(State, true),
+		tw_unshared_bnode(BNode, State, Out)
 	    ->	Ref = written
 	    ;	next_bnode_id(State, BNode, Ref),
 		tw_bnode_ref(Ref, Out)
