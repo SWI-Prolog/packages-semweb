@@ -77,7 +77,8 @@ for languages on top of RDF:
 	rdfs_subclass_of(r,r),
 	rdfs_class_property(r,r),
 	rdfs_individual_of(r,r),
-	rdfs_label(r,-).
+	rdfs_label(r,-),
+	rdfs_label(r,?,-).
 
 
 		 /*******************************
