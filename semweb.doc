@@ -872,7 +872,7 @@ a list using the \const{rdf:first} and \const{rdf:next} relations.
 \begin{description}
     \predicate{rdfs_member}{2}{?Resource, +Set}
 Test or generate the members of \arg{Set}.  \arg{Set} is either an
-individual of \const{rdf:List} or \const{rdf:Container}.
+individual of \const{rdf:List} or \const{rdfs:Container}.
 
     \predicate{rdfs_list_to_prolog_list}{2}{+Set, -List}
 Convert \arg{Set}, which must be an individual of \const{rdf:List} into
