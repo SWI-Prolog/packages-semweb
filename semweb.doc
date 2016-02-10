@@ -586,7 +586,7 @@ Unify \arg{Keys} with the total key-count of the index and
 		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \subsection{library(semweb/rdf_persistency): Providing persistent storage}
-\label{sec:persistency}
+\label{sec:rdf_persistency}
 
 \index{Persistent store}%
 The \pllib{semweb/rdf_persistency} provides reliable persistent storage
