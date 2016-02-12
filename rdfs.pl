@@ -77,7 +77,8 @@ for languages on top of RDF:
 	rdfs_subclass_of(r,r),
 	rdfs_class_property(r,r),
 	rdfs_individual_of(r,r),
-	rdfs_label(r,-).
+	rdfs_label(r,-),
+	rdfs_label(r,?,-).
 
 
 		 /*******************************
@@ -188,8 +189,8 @@ rdfs_individual_of_r_c(Resource, Class) :-
 %%	rdfs_label(-Resource, +Label).
 %
 %	Convert between class and label.  If the label is generated from
-%	the resource the it uses both rdf:label and its sub-properties,
-%	but labels registered with rdf:label are returned first.
+%	the resource the it uses both rdfs:label and its sub-properties,
+%	but labels registered with rdfs:label are returned first.
 
 rdfs_label(Resource, Label) :-
 	rdfs_label(Resource, _, Label).

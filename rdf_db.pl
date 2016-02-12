@@ -264,17 +264,17 @@ rdf_current_prefix(Alias, URI) :-
 %	@deprecated New code  must  modify   the  namespace  table using
 %	rdf_register_ns/3 and query using rdf_current_ns/2.
 
-ns(rdf,	    'http://www.w3.org/1999/02/22-rdf-syntax-ns#').
-ns(rdfs,    'http://www.w3.org/2000/01/rdf-schema#').
-ns(owl,	    'http://www.w3.org/2002/07/owl#').
-ns(xsd,	    'http://www.w3.org/2001/XMLSchema#').
 ns(dc,	    'http://purl.org/dc/elements/1.1/').
 ns(dcterms, 'http://purl.org/dc/terms/').
 ns(eor,	    'http://dublincore.org/2000/03/13/eor#').
-ns(skos,    'http://www.w3.org/2004/02/skos/core#').
 ns(foaf,    'http://xmlns.com/foaf/0.1/').
-ns(void,    'http://rdfs.org/ns/void#').
+ns(owl,	    'http://www.w3.org/2002/07/owl#').
+ns(rdf,	    'http://www.w3.org/1999/02/22-rdf-syntax-ns#').
+ns(rdfs,    'http://www.w3.org/2000/01/rdf-schema#').
 ns(serql,   'http://www.openrdf.org/schema/serql#').
+ns(skos,    'http://www.w3.org/2004/02/skos/core#').
+ns(void,    'http://rdfs.org/ns/void#').
+ns(xsd,	    'http://www.w3.org/2001/XMLSchema#').
 
 %%	rdf_register_prefix(+Prefix, +URI) is det.
 %%	rdf_register_prefix(+Prefix, +URI, +Options) is det.
@@ -296,15 +296,18 @@ ns(serql,   'http://www.openrdf.org/schema/serql#').
 %
 %	Predefined prefixes are:
 %
-%	| rdf	  | http://www.w3.org/1999/02/22-rdf-syntax-ns#' |
-%	| rdfs	  | http://www.w3.org/2000/01/rdf-schema#'	 |
-%	| owl	  | http://www.w3.org/2002/07/owl#'		 |
-%	| xsd	  | http://www.w3.org/2001/XMLSchema#'		 |
-%	| dc	  | http://purl.org/dc/elements/1.1/'		 |
-%	| dcterms | http://purl.org/dc/terms/'			 |
-%	| eor	  | http://dublincore.org/2000/03/13/eor#'	 |
-%	| skos	  | http://www.w3.org/2004/02/skos/core#'	 |
-%	| serql	  | http://www.openrdf.org/schema/serql#'	 |
+%	| **Alias** | **IRI prefix**                              |
+%	| dc        | http://purl.org/dc/elements/1.1/            |
+%	| dcterms   | http://purl.org/dc/terms/                   |
+%	| eor       | http://dublincore.org/2000/03/13/eor#       |
+%	| foaf      | http://xmlns.com/foaf/0.1/                  |
+%	| owl       | http://www.w3.org/2002/07/owl#              |
+%	| rdf       | http://www.w3.org/1999/02/22-rdf-syntax-ns# |
+%	| rdfs      | http://www.w3.org/2000/01/rdf-schema#       |
+%	| serql     | http://www.openrdf.org/schema/serql#        |
+%	| skos      | http://www.w3.org/2004/02/skos/core#        |
+%	| void      | http://rdfs.org/ns/void#                    |
+%	| xsd       | http://www.w3.org/2001/XMLSchema#           |
 
 
 rdf_register_prefix(Alias, URI) :-
