@@ -76,7 +76,6 @@ supposed to be local to the SWI-Prolog kernel are declared using
 #include "debug.h"
 #include "memory.h"
 #include "hash.h"
-#include "error.h"
 #include "skiplist.h"
 #ifdef WITH_MD5
 #include "md5.h"
@@ -443,6 +442,20 @@ typedef struct query_admin
 } query_admin;
 
 
+#define PREFIX_INITIAL_ENTRIES 16
+
+typedef struct prefix
+{ atom_t	 alias;
+  atom_info      uri;
+  struct prefix *next;
+} prefix;
+
+typedef struct prefix_table
+{ prefix       **entries;
+  size_t	 size;
+  size_t	 count;
+} prefix_table;
+
 #define JOINED_DEFER 1
 
 #ifdef JOINED_DEFER
@@ -467,6 +480,7 @@ typedef struct rdf_db
   size_t	agenda_created;		/* #visited nodes in agenda */
   graph_hash_table graphs;		/* Graph table */
   graph	       *last_graph;		/* last accessed graph */
+  prefix_table *prefixes;		/* alias->uri table */
   query_admin	queries;		/* Active query administration */
 
   size_t	duplicates;		/* #duplicate triples */
@@ -502,6 +516,7 @@ typedef struct rdf_db
     simpleMutex gc;			/* DB garbage collection lock */
     simpleMutex duplicates;		/* Duplicate init lock */
     simpleMutex erase;			/* Erase triples */
+    simpleMutex prefixes;		/* Prefix expansion */
   } locks;
 
   struct
@@ -639,5 +654,8 @@ COMMON(int)	rdf_broadcast(broadcast_id id, void *a1, void *a2);
 COMMON(int)	rdf_is_broadcasting(broadcast_id id);
 COMMON(void)	consider_triple_rehash(rdf_db *db, size_t extra);
 COMMON(int)	rdf_create_gc_thread(rdf_db *db);
+COMMON(atom_t)  expand_prefix(rdf_db *db, atom_t alias, atom_t local);
+
+#include "error.h"
 
 #endif /*RDFDB_H_INCLUDED*/

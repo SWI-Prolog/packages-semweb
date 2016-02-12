@@ -39,6 +39,18 @@ COMMON(int) is_literal(term_t t);
 COMMON(int) init_errors(void);
 COMMON(int) permission_error(const char *op, const char *type, const char *obj,
 			     const char *msg);
+COMMON(int) get_prefixed_iri(rdf_db *db, term_t t, atom_t *a);
+COMMON(void) flush_prefix_cache(void);
+
+static inline int
+get_iri_ex(rdf_db *db, term_t t, atom_t *a)
+{ if ( PL_get_atom(t, a) )
+    return TRUE;
+  if ( get_prefixed_iri(db, t, a) )
+    return TRUE;
+  return PL_type_error("iri", t);
+}
+
 
 static inline int
 get_atom_or_var_ex(term_t t, atom_t *a)
@@ -54,13 +66,15 @@ get_atom_or_var_ex(term_t t, atom_t *a)
 
 
 static inline int
-get_resource_or_var_ex(term_t t, atom_t *a)
+get_resource_or_var_ex(rdf_db *db, term_t t, atom_t *a)
 { if ( PL_get_atom(t, a) )
     return TRUE;
   if ( PL_is_variable(t) )
   { *a = 0L;
     return TRUE;
   }
+  if ( get_prefixed_iri(db, t, a) )
+    return TRUE;
   if ( is_literal(t) )
     return FALSE;			/* fail on rdf(literal(_), ...) */
 

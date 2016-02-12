@@ -319,7 +319,8 @@ rdf_register_prefix(Alias, URI, Options) :-
 	ns(Alias, _), !,
 	(   option(force(true), Options, false)
 	->  retractall(ns(Alias, _)),
-	    rdf_register_prefix(Alias, URI, Options)
+	    rdf_register_prefix(Alias, URI, Options),
+	    rdf_empty_prefix_cache
 	;   option(keep(true), Options, false)
 	->  true
 	;   throw(error(permission_error(register, namespace, Alias),
@@ -571,6 +572,15 @@ valid_arg(A) :-
 %	=rdf_meta=  is  declared   as   an    operator   exported   from
 %	library(semweb/rdf_db). Files using rdf_meta/1  must explicitely
 %	load this library.
+%
+%	Beginning with SWI-Prolog 7.3.17, the   low-level  RDF interface
+%	(rdf/3,  rdf_assert/3,  etc.)  perform    runtime  expansion  of
+%	`Prefix:Local` terms. This eliminates the   need  for rdf_meta/1
+%	for  simple  cases.  However,  runtime   expansion  comes  at  a
+%	significant overhead and having two  representations for IRIs (a
+%	plain atom and  a  term   `Prefix:Local`)  implies  that  simple
+%	operations such as comparison of IRIs   no  longer map to native
+%	Prolog operations such as `IRI1 == IRI2`.
 
 rdf_meta(Heads) :-
 	throw(error(context_error(nodirective, rdf_meta(Heads)), _)).

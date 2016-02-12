@@ -65,7 +65,7 @@ test_rdf_db :-
 	run_tests([ lang_matches,
 		    lit_ranges,
 		    num_ranges,
-		    rdf_misc
+		    rdf_prefix
 		  ]).
 
 
@@ -1199,13 +1199,45 @@ test(gt, all(L == [ type(xsd:integer,'12'),
 
 
 		 /*******************************
-		 *	       MISC		*
+		 *   DYNAMIC PREFIX EXPANSION	*
 		 *******************************/
 
-:- begin_tests(rdf_misc).
+prefix(I, Alias, URI) :-
+	atom_concat(prefix, I, Alias),
+	atomic_list_concat(['http://www.example.com/', I, '/'], URI).
 
-test(type, error(type_error(atom, P))) :-
+setup_prefixes(N) :-
+	rdf_reset_db,
+	forall(between(1, N, I),
+	      (	  prefix(I, Alias, URI),
+		  rdf_register_prefix(Alias, URI)
+	      )).
+
+
+:- begin_tests(rdf_prefix, [setup(setup_prefixes(100)), cleanup(rdf_reset_db)]).
+
+test(prefix, true) :-
+	S = rdf:s, P = rdf:p1, O = rdf:o,
+	rdf_assert(S,P,O),
+	assertion(rdf(S,P,O)).
+test(prefix, L==literal(type('http://www.w3.org/2001/XMLSchema#integer','42'))):-
+	S = rdf:s, P = rdf:p2, T=xsd:integer,
+	rdf_assert(S,P,literal(type(T, '42'))),
+	rdf(S,P,L).
+test(scale) :-
+	N = 100,
+	forall(between(1, N, I),
+	       (   prefix(I, Alias, _URI),
+		   S = Alias:s, P = Alias:p, O = Alias:o,
+		   rdf_assert(S,P,O))),
+	forall(between(1, N, I),
+	       (   prefix(I, _Alias, URI),
+		   atom_concat(URI, s, S),
+		   atom_concat(URI, p, P),
+		   atom_concat(URI, o, O),
+		   assertion(rdf(S,P,O)))).
+test(type, error(existence_error(rdf_prefix, p))) :-
 	P = p:n,
 	rdf_retractall(_, P, _).
 
-:- end_tests(rdf_misc).
+:- end_tests(rdf_prefix).

@@ -214,6 +214,7 @@ INIT_LOCK(rdf_db *db)
   simpleMutexInit(&db->locks.gc);
   simpleMutexInit(&db->locks.duplicates);
   simpleMutexInit(&db->locks.erase);
+  simpleMutexInit(&db->locks.prefixes);
 }
 
 static simpleMutex rdf_lock;
@@ -831,6 +832,221 @@ add_tripleset(search_state *state, tripleset *ts, triple *triple)
 
   return 1;
 }
+
+
+		 /*******************************
+		 *	      PREFIXES		*
+		 *******************************/
+
+static prefix_table *
+new_prefix_table(void)
+{ prefix_table *t = malloc(sizeof(*t));
+
+  if ( t )
+  { memset(t, 0, sizeof(*t));
+    t->size    = PREFIX_INITIAL_ENTRIES;
+    t->entries = malloc(t->size*sizeof(*t->entries));
+    if ( t->entries )
+    { memset(t->entries, 0, t->size*sizeof(*t->entries));
+    } else
+    { free(t);
+      t = NULL;
+    }
+  }
+
+  return t;
+}
+
+
+static void
+empty_prefix_table(rdf_db *db)
+{ int i;
+  prefix_table *t = db->prefixes;
+
+  simpleMutexLock(&db->locks.prefixes);
+  for(i=0; i<t->size; i++)
+  { prefix *p, *next;
+
+    p = t->entries[i];
+    t->entries[i] = NULL;
+    for(; p; p = next)
+    { next = p->next;
+
+      PL_unregister_atom(p->alias);
+      PL_unregister_atom(p->uri.handle);
+      free(p);
+    }
+  }
+  simpleMutexUnlock(&db->locks.prefixes);
+
+  flush_prefix_cache();
+}
+
+
+static void
+resize_prefix_table(prefix_table *t)
+{ size_t new_size = t->size*2;
+  prefix **new_entries = malloc(new_size*sizeof(*new_entries));
+
+  if ( new_entries )
+  { int i;
+
+    memset(new_entries, 0, new_size*sizeof(*new_entries));
+    for(i=0; i<t->size; i++)
+    { prefix *p, *next;
+
+      for(p=t->entries[i]; p; p = next)
+      { unsigned key = atom_hash(p->alias, MURMUR_SEED) & (new_size-1);
+
+	next = p->next;
+	p->next = new_entries[key];
+	new_entries[key] = p;
+      }
+    }
+
+    t->size = new_size;
+    free(t->entries);
+    t->entries = new_entries;
+  }
+}
+
+
+
+static prefix *
+add_prefix(rdf_db *db, atom_t alias, atom_t uri)
+{ prefix_table *t = db->prefixes;
+  unsigned key = atom_hash(alias, MURMUR_SEED) & (t->size-1);
+  prefix *p = malloc(sizeof(*p));
+
+  if ( !p )
+  { PL_resource_error("memory");
+    return NULL;
+  }
+
+  if ( t->count > t->size )
+    resize_prefix_table(t);
+
+  memset(p, 0, sizeof(*p));
+  p->alias      = alias;
+  p->uri.handle = uri;
+  PL_register_atom(alias);
+  PL_register_atom(uri);
+  fill_atom_info(&p->uri);
+
+  p->next = t->entries[key];
+  t->entries[key] = p;
+  t->count++;
+
+  return p;
+}
+
+
+static prefix *
+lookup_prefix(rdf_db *db, atom_t a)
+{ prefix_table *t;
+  prefix *pl;
+  fid_t fid;
+  static predicate_t pred = NULL;
+
+  simpleMutexLock(&db->locks.prefixes);
+  t = db->prefixes;
+  for(pl = t->entries[atom_hash(a, MURMUR_SEED)&(t->size-1)]; pl; pl=pl->next)
+  { if ( pl->alias == a )
+    { simpleMutexUnlock(&db->locks.prefixes);
+      return pl;
+    }
+  }
+
+  if ( !pred )
+    pred = PL_predicate("rdf_current_prefix", 2, "rdf_db");
+
+  assert(pl == NULL);
+  if ( (fid = PL_open_foreign_frame()) )
+  { term_t av = PL_new_term_refs(2);
+    atom_t uri_atom;
+
+    PL_put_atom(av+0, a);
+    if ( PL_call_predicate(NULL, PL_Q_PASS_EXCEPTION, pred, av) &&
+	 PL_get_atom_ex(av+1, &uri_atom) )
+      pl = add_prefix(db, a, uri_atom);
+    else if ( !PL_exception(0) )
+      PL_existence_error("rdf_prefix", av+0);
+
+    PL_close_foreign_frame(fid);
+  }
+
+  simpleMutexUnlock(&db->locks.prefixes);
+
+  return pl;
+}
+
+
+static wchar_t *
+add_text(wchar_t *w, const text *t)
+{ if ( t->a )
+  { const unsigned char *a = t->a;
+    const unsigned char *e = &a[t->length];
+
+    for(; a<e; a++)
+      *w++ = *a;
+  } else
+  { const wchar_t *a = t->w;
+    const wchar_t *e = &a[t->length];
+
+    for(; a<e; a++)
+      *w++ = *a;
+  }
+
+  return w;
+}
+
+
+atom_t
+expand_prefix(rdf_db *db, atom_t alias, atom_t local)
+{ prefix *p = lookup_prefix(db, alias);
+
+  if ( p )
+  { atom_info ai = {0};
+    ai.handle = local;
+    fill_atom_info(&ai);
+    atom_t uri;
+
+    if ( ai.text.a && p->uri.text.a )
+    { char buf[256];
+      size_t len = ai.text.length + p->uri.text.length;
+      char *a = len <= sizeof(buf) ? buf : malloc(len);
+
+      if ( !len )
+	return (atom_t)0;
+      memcpy(a, p->uri.text.a, p->uri.text.length);
+      memcpy(&a[p->uri.text.length], ai.text.a, ai.text.length);
+
+      uri = PL_new_atom_nchars(len, a);
+      if ( a != buf )
+	free(a);
+    } else
+    { wchar_t buf[256];
+      size_t len = ai.text.length + p->uri.text.length;
+      wchar_t *w = len <= sizeof(buf)/sizeof(wchar_t)
+				   ? buf
+				   : malloc(len*sizeof(wchar_t));
+
+      if ( !len )
+	return (atom_t)0;
+      w = add_text(w, &p->uri.text);
+      w = add_text(w, &ai.text);
+
+      uri = PL_new_atom_wchars(len, w);
+      if ( w != buf )
+	free(w);
+    }
+
+    return uri;
+  }
+
+  return (atom_t)0;
+}
+
 
 
 #ifdef COMPACT
@@ -4195,6 +4411,7 @@ new_db(void)
   init_tables(db);
   init_triple_array(db);
   init_query_admin(db);
+  db->prefixes = new_prefix_table();
 
   db->duplicate_admin_threshold = DUPLICATE_ADMIN_THRESHOLD;
   db->snapshots.keep = GEN_MAX;
@@ -6140,6 +6357,8 @@ get_object(rdf_db *db, term_t object, triple *t)
     _PL_get_arg(1, object, a);
     alloc_literal_triple(db, t);
     return get_literal(db, a, t->object.literal, 0);
+  } else if ( get_prefixed_iri(db, object, &t->object.resource) )
+  { assert(!t->object_is_literal);
   } else
     return PL_type_error("rdf_object", object);
 
@@ -6190,10 +6409,13 @@ get_existing_predicate(rdf_db *db, term_t t, predicate **p)
   if ( !PL_get_atom(t, &name ) )
   { if ( PL_is_functor(t, FUNCTOR_literal1) )
       return 0;				/* rdf(_, literal(_), _) */
-    PL_type_error("atom", t);
+    if ( get_prefixed_iri(db, t, &name) )
+      goto ok;
+    PL_type_error("rdf_predicate", t);
     return -1;
   }
 
+ok:
   if ( (*p = existing_predicate(db, name)) )
     return 1;
 
@@ -6206,7 +6428,7 @@ static int
 get_predicate(rdf_db *db, term_t t, predicate **p, query *q)
 { atom_t name;
 
-  if ( !PL_get_atom_ex(t, &name ) )
+  if ( !get_iri_ex(db, t, &name ) )
     return FALSE;
 
   *p = lookup_predicate(db, name);
@@ -6220,7 +6442,7 @@ get_triple(rdf_db *db,
 	   triple *t, query *q)
 { atom_t at;
 
-  if ( !PL_get_atom_ex(subject, &at) ||
+  if ( !get_iri_ex(db, subject, &at) ||
        !get_predicate(db, predicate, &t->predicate.r, q) ||
        !get_object(db, object, t) )
     return FALSE;
@@ -6254,7 +6476,7 @@ get_partial_triple(rdf_db *db,
   if ( subject )
   { atom_t at;
 
-    if ( !get_resource_or_var_ex(subject, &at) )
+    if ( !get_resource_or_var_ex(db, subject, &at) )
       return FALSE;
     t->subject_id = ATOM_ID(at);
   }
@@ -7308,16 +7530,16 @@ next_search_state(search_state *state)
   if ( (state->flags & MATCH_SUBPROPERTY) )
   { retpred = state->realpred;
     if ( retpred )
-    { if ( PL_is_variable(state->predicate) )
+    { if ( !p->predicate.r )		/* state->predicate is unbound */
       { if ( !PL_unify(state->predicate, retpred) )
 	  return FALSE;
       }
     } else
-    { if ( PL_is_variable(state->predicate) )
+    { if ( !p->predicate.r )
 	retpred = state->predicate;
     }
   } else
-  { retpred = state->predicate;
+  { retpred = p->predicate.r ? 0 : state->predicate;
   }
 
   if ( (t2=state->prefetched) )
@@ -9096,6 +9318,16 @@ rdf_warm_indexes(term_t indexes)
 }
 
 
+static foreign_t
+pl_empty_prefix_table(void)
+{ rdf_db *db = rdf_current_db();
+
+  empty_prefix_table(db);
+
+  return TRUE;
+}
+
+
 		 /*******************************
 		 *	       RESET		*
 		 *******************************/
@@ -9169,6 +9401,7 @@ reset_db(rdf_db *db)
   erase_predicates(db);
   erase_resources(&db->resources);
   erase_graphs(db);
+  empty_prefix_table(db);
   db->agenda_created = 0;
   skiplist_destroy(&db->literals);
 
@@ -9558,6 +9791,8 @@ install_rdf_db(void)
   PL_register_foreign("rdf_active_transactions_",
 					1, rdf_active_transactions, 0);
   PL_register_foreign("rdf_monitor_",   2, rdf_monitor,     META);
+  PL_register_foreign("rdf_empty_prefix_cache",
+					0, pl_empty_prefix_table, 0);
 /*PL_register_foreign("rdf_broadcast_", 2, rdf_broadcast,   0);*/
 #ifdef WITH_MD5
   PL_register_foreign("rdf_md5",	2, rdf_md5,	    0);
