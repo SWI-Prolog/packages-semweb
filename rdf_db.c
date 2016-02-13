@@ -878,6 +878,7 @@ empty_prefix_table(rdf_db *db)
     }
   }
   simpleMutexUnlock(&db->locks.prefixes);
+  t->count = 0;
 
   flush_prefix_cache();
 }
