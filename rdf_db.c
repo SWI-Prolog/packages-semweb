@@ -7243,12 +7243,12 @@ init_search_state(search_state *state, query *query)
     switch(p->match)
     { case STR_MATCH_LT:
       case STR_MATCH_LE:
-      case STR_MATCH_EQ:
 	rlitp = skiplist_find_first(&state->db->literals,
 				    NULL, &state->literal_state);
         break;
       case STR_MATCH_GT:
       case STR_MATCH_GE:
+      case STR_MATCH_EQ:
 	rlitp = skiplist_find_first(&state->db->literals,
 				    &state->lit_ex, &state->literal_state);
         break;
