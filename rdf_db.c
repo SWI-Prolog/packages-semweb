@@ -3303,9 +3303,9 @@ compare_literals(literal_ex *lex, literal *l2)
 	  { if ( nt1 && nt2 )
 	    { rc = cmp_xsd_info(nt1, &lex->atom, nt2, l2->value.string);
 	      if ( rc == 0 && nt1 != nt2 )
-		rc = nt1 < nt2 ? -1 : 1;
+		rc = nt1 < nt2 ? 1 : -1;
 	    } else
-	    { rc = nt1 ? 1 : -1;
+	    { rc = nt1 ? -1 : 1;
 	    }
 	  } else
 	  { rc = cmp_atom_info(&lex->atom, l2->value.string);
