@@ -1180,18 +1180,18 @@ num_data :-
 
 :- begin_tests(num_ranges, [setup(num_data), cleanup(rdf_reset_db)]).
 
-test(eq, all(L == [ type(xsd:byte,'10'),
+test(eq, set(L == [ type(xsd:byte,'10'),
 		    type(xsd:integer,'10'),
 		    type(xsd:double,'10.0E0')])) :-
 	rdf(s,p,literal(eq(type(xsd:integer, '10')), L)).
-test(eq, all(L == [ type(xsd:byte,'10'),
+test(eq, set(L == [ type(xsd:byte,'10'),
 		    type(xsd:integer,'10'),
 		    type(xsd:double,'10.0E0')])) :-
 	rdf(_,_,literal(eq(type(xsd:integer, '10')), L)).
-test(gt, all(L == [ type(xsd:integer,'12'),
+test(gt, set(L == [ type(xsd:integer,'12'),
 		    type(xsd:double,'1.5E1')])) :-
 	rdf(s,p,literal(gt(type(xsd:integer, '11')), L)).
-test(gt, all(L == [ type(xsd:integer,'12'),
+test(gt, set(L == [ type(xsd:integer,'12'),
 		    type(xsd:double,'1.5E1')])) :-
 	rdf(_,_,literal(gt(type(xsd:integer, '11')), L)).
 
