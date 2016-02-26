@@ -50,6 +50,7 @@
 
 #define URL_xsd		  "http://www.w3.org/2001/XMLSchema#"
 #define URL_xsdString     URL_xsd "string"
+#define URL_xsdDouble     URL_xsd "double"
 
 typedef enum xsd_primary
 { XSD_NONNUMERIC = 0,

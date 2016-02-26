@@ -161,6 +161,7 @@ static atom_t	ATOM_gt;		/* > */
 
 static atom_t	ATOM_subPropertyOf;
 static atom_t	ATOM_xsdString;
+static atom_t	ATOM_xsdDouble;
 
 static predicate_t PRED_call1;
 
@@ -7247,12 +7248,19 @@ init_search_state(search_state *state, query *query)
 				    NULL, &state->literal_state);
         break;
       case STR_MATCH_GT:
+	rlitp = skiplist_find_first(&state->db->literals,
+				    &state->lit_ex, &state->literal_state);
+        break;
       case STR_MATCH_GE:
       case STR_MATCH_EQ:
+	if ( (state->flags&MATCH_NUMERIC) ) /* xsd:double is lowest type */
+	  p->object.literal->type_or_lang = ATOM_ID(ATOM_xsdDouble);
 	rlitp = skiplist_find_first(&state->db->literals,
 				    &state->lit_ex, &state->literal_state);
         break;
       case STR_MATCH_BETWEEN:
+	if ( (state->flags&MATCH_NUMERIC) )
+	  p->object.literal->type_or_lang = ATOM_ID(ATOM_xsdDouble);
 	rlitp = skiplist_find_first(&state->db->literals,
 				    &state->lit_ex, &state->literal_state);
         state->lit_ex.literal = &p->tp.end;
@@ -9707,6 +9715,7 @@ install_rdf_db(void)
   ATOM_word		  = PL_new_atom("word");
   ATOM_subPropertyOf	  = PL_new_atom(URL_subPropertyOf);
   ATOM_xsdString	  = PL_new_atom(URL_xsdString);
+  ATOM_xsdDouble	  = PL_new_atom(URL_xsdDouble);
   ATOM_error		  = PL_new_atom("error");
   ATOM_begin		  = PL_new_atom("begin");
   ATOM_end		  = PL_new_atom("end");
