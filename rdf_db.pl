@@ -3358,7 +3358,8 @@ rdf_value(V, Base, Text, Encoding) :-
 	xml_quote_attribute(Local, Text, Encoding).
 rdf_value(V, _, Text, Encoding) :-
 	ns(NS, Full),
-	atom_concat(Full, Local, V), !,
+	atom_concat(Full, Local, V),
+	xml_is_name(Local), !,
 	xml_quote_attribute(Local, QLocal, Encoding),
 	atomic_list_concat(['&', NS, (';'), QLocal], Text).
 rdf_value(V, _, Q, Encoding) :-
