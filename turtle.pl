@@ -394,7 +394,7 @@ rdf_db:rdf_load_stream(trig, Stream, Options) :-
 
 load_turtle_stream(Stream, _Module:Options) :-
 	rdf_db:graph(Options, Graph),
-	atom_concat('__', Graph, BNodePrefix),
+	atom_concat('_:', Graph, BNodePrefix),
 	rdf_transaction((  rdf_process_turtle(Stream, assert_triples,
 					      [ anon_prefix(BNodePrefix)
 					      | Options

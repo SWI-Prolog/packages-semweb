@@ -136,7 +136,7 @@ support the format =ntriples= and =nquads=.
 %	  Prefix nodeIDs with this atom.  If AtomOrNode is the term
 %	  node(_), bnodes are returned as node(Id).
 %	  * base_uri(+Atom)
-%	  Defines the default anon_prefix as __<baseuri>_
+%	  Defines the default anon_prefix as _:<baseuri>_
 %	  * on_error(Action)
 %	  One of =warning= (default) or =error=
 %	  * error_count(-Count)
@@ -331,8 +331,8 @@ init_state(In, Options, State) :-
 	(   option(anon_prefix(Prefix), Options)
 	->  true
 	;   BaseURI == []
-	->  Prefix = '__bnode'
-	;   atom_concat('__', BaseURI, Prefix)
+	->  Prefix = '_:genid'
+	;   atom_concat('_:', BaseURI, Prefix)
 	),
 	option(on_error(OnError), Options, warning),
 	% If the format is not set explicitly we assume N-Triples.

@@ -120,12 +120,12 @@ user:portray(URL) :-
 	portray_url(Style, URL).
 user:portray(URL) :-
 	atom(URL),
-	atom_concat('__file://', URL2, URL),
+	atom_concat('_:file://', URL2, URL),
 	sub_atom(URL2, S, _, A, #),
 	sub_atom(URL2, _, A, 0, Local),
 	sub_atom(URL2, 0, S, _, Path),
 	file_base_name(Path, Base),
-	format('__~w#~w', [Base, Local]).
+	format('_:~w#~w', [Base, Local]).
 
 portray_url(writeq, URL) :-
 	writeq(URL).
