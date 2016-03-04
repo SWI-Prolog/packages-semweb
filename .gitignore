@@ -42,6 +42,8 @@ semweb.tex
 rdfcache.tex
 rdfdb.tex
 rdfa.tex
+rdf11.tex
+rdf11containers.tex
 doc/*.tex
 g1.rec
 .gdbinit

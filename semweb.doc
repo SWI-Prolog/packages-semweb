@@ -142,11 +142,39 @@ feasible on medium hardware (Intel i7/{2600} running Ubuntu 12.10).
 
 
 		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		 %	     RDF API		%
+		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Two RDF APIs}
+\label{sec:semweb-rdfapi}
+
+The current `semweb' package provides two sets of interface predicates.
+The original set is described in \secref{semweb-rdf-db}. The new API is
+described in \secref{semweb-rdf11}. The original API was designed when
+RDF was not yet standardised and did not yet support data types and
+language indicators. The new API is designed from the RDF 1.1
+specification, introducing consistent naming and access to literals
+using the \jargon{value space}. The new API is currently defined on top
+of the old API, so both APIs can be mixed in a single application.
+
+
+		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		 %	      RDF11		%
+		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{library(semweb/rdf11): The RDF database}
+\label{sec:semweb-rdf11}
+
+\input{rdf11}
+\input{rdf11containers}
+
+
+		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		 %	      RDF_DB		%
 		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-\section{library(semweb/rdf_db): The RDF database}
+\subsection{library(semweb/rdf_db): The RDF database}
 \label{sec:semweb-rdf-db}
 
 \input{rdfdb}
