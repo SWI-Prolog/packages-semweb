@@ -1240,7 +1240,7 @@ rdf_bnode(BNode) :-
 	current_bnode(BNode).
 
 current_bnode(BNode) :-
-	sub_atom(BNode, 0, _, _, '__'),
+	rdf_is_bnode(BNode),
 	visible_node(BNode).		% Assumes BNodes cannot be predicates
 
 %%	rdf_iri(?IRI) is nondet.
@@ -1250,11 +1250,11 @@ current_bnode(BNode) :-
 
 rdf_iri(IRI) :-
 	atom(IRI), !,
-	\+ sub_atom(IRI, 0, _, _, '__'),
+	\+ rdf_is_bnode(IRI),
 	visible_term(IRI).
 rdf_iri(IRI) :-
 	resource(IRI),
-	\+ sub_atom(IRI, 0, _, _, '__'),
+	\+ rdf_is_bnode(IRI),
 	visible_term(IRI).
 
 %%	rdf_name(?Name) is nondet.
@@ -1264,7 +1264,7 @@ rdf_iri(IRI) :-
 
 rdf_name(Name) :-
 	atom(Name), \+ boolean(Name), !,
-	\+ sub_atom(Name, 0, _, _, '__'),
+	\+ rdf_is_bnode(Name),
 	visible_term(Name).
 rdf_name(Name) :-
 	ground(Name), !,
@@ -1392,18 +1392,15 @@ rdf_create_bnode(BNode) :-
 
 rdf_is_iri(IRI) :-
 	atom(IRI),
-	\+ sub_atom(IRI, 0, _, _, '__').
+	\+ rdf_is_bnode(IRI).
 
 %%	rdf_is_bnode(@BNode) is semidet.
 %
 %	True if BNode is an RDF  blank   node  identifier. This does not
-%	imply that the blank node is known.
-
-:- if(\+current_predicate(rdf_is_bnode/1)).
-rdf_is_bnode(BNode) :-
-	atom(BNode),
-	sub_atom(BNode, 0, _, _, '__').
-:- endif.
+%	imply that the blank node is known.  A blank node is represented
+%	by an atom  that  does  not   start  with  =|_:|=.  For backward
+%	compatibility reason, =|__|= is also considered   to  be a blank
+%	node.
 
 
 %%	rdf_is_literal(@Term) is semidet.

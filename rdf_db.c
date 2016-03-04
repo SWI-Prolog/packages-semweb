@@ -9620,6 +9620,22 @@ rdf_compare(term_t dif, term_t a, term_t b)
 }
 
 
+		 /*******************************
+		 *	       TEST		*
+		 *******************************/
+
+static foreign_t
+rdf_is_bnode(term_t t)
+{ size_t len;
+  char *s;
+
+  if ( PL_get_nchars(t, &len, &s, CVT_ATOM) &&
+       s[0] == '_' && (s[1] == ':' || s[1] == '_') )
+    return TRUE;
+
+  return FALSE;
+}
+
 
 		 /*******************************
 		 *	       VERSION		*
@@ -9803,7 +9819,7 @@ install_rdf_db(void)
   PL_register_foreign("rdf_monitor_",   2, rdf_monitor,     META);
   PL_register_foreign("rdf_empty_prefix_cache",
 					0, pl_empty_prefix_table, 0);
-/*PL_register_foreign("rdf_broadcast_", 2, rdf_broadcast,   0);*/
+  PL_register_foreign("rdf_is_bnode",   1, rdf_is_bnode,    0);
 #ifdef WITH_MD5
   PL_register_foreign("rdf_md5",	2, rdf_md5,	    0);
   PL_register_foreign("rdf_graph_modified_", 3, rdf_graph_modified_, 0);

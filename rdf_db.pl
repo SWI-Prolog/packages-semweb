@@ -993,7 +993,7 @@ rdf_node(Resource) :-
 
 rdf_bnode(Value) :-
 	repeat,
-	gensym('__bnode', Value),
+	gensym('_:genid', Value),
 	\+ rdf(Value, _, _),
 	\+ rdf(_, _, Value),
 	\+ rdf(_, Value, _), !.
@@ -1006,14 +1006,12 @@ rdf_bnode(Value) :-
 
 %%	rdf_is_bnode(+Id)
 %
-%	Tests if a resource is a blank node (i.e. is an anonymous
-%	resource).
+%	Tests if a resource is  a  blank   node  (i.e.  is  an anonymous
+%	resource). A blank node is represented   as  an atom that starts
+%	with =|_:|=. For backward compatibility   reason, =|__|= is also
+%	considered to be a blank node.
 %
 %	@see rdf_bnode/1.
-
-rdf_is_bnode(Id) :-
-	atom(Id),
-	sub_atom(Id, 0, _, _, '__').
 
 %%	rdf_is_resource(@Term) is semidet.
 %
@@ -2439,7 +2437,7 @@ assert_triples([H|_], _) :-
 %		start with an empty database.
 
 rdf_reset_db :-
-	reset_gensym('__bnode'),
+	reset_gensym('_:genid'),
 	rdf_reset_db_.
 
 
