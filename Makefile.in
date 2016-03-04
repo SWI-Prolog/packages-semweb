@@ -125,6 +125,7 @@ rdf11.tex:	doc/rdf11.txt rdf11.pl
 
 check::
 		$(PL) -q -f test_rdf_db.pl -g test_rdf_db,halt -t 'halt(1)'
+		$(PL) -q -f test_rdf11.pl -g test_rdf11,halt -t 'halt(1)'
 		$(PL) -q -f litmap_test.pl -g test,halt -t 'halt(1)'
 		$(PL) -q -f test.pl -g run_tests,halt -t 'halt(1)'
 		$(PL) -q -f test_con.pl -g run,halt -t 'halt(1)'
