@@ -327,28 +327,14 @@ rdf_reachable(S,P,O,MaxD,D) :-
 %%	rdf_assert(+S, +P, +O) is det.
 %%	rdf_assert(+S, +P, +O, +G) is det.
 %
-%	Assert  a  new  triple.  If  O   is  a  literal,  the  following
-%	transformations are accepted without supplying a type:
-%
-%	  | Prolog term                   | Literal type   |
-%	  --------------------------------------------------
-%	  | integer                       | xsd:integer    |
-%	  | float                         | xsd:double     |
-%	  | string			  | xsd:string	   |
-%	  | true/false (atoms)            | xsd:boolean    |
-%	  | date(Y,M,D)                   | xsd:date	   |
-%	  | date_time(Y,M,D,HH,MM,SS)     | xsd:dateTime   |
-%	  | date_time(Y,M,D,HH,MM,SS,TZ)  | xsd:dateTime   |
-%	  | month_day(M,D)		  | xsd:gMonthDay  |
-%	  | year_month(Y,M)               | xsd:gYearMonth |
-%	  | time(HH,MM,SS)                | xsd:time       |
+%	Assert a new triple. If O is a literal, certain Prolog terms are
+%	translated  to  typed  RDF  literals.    These  conversions  are
+%	described with rdf_canonical_literal/2.
 %
 %	If a type  is  provided   using  Value^^Type  syntax, additional
 %	conversions are performed. All types accept   either  an atom or
 %	Prolog string holding a valid RDF lexical value for the type and
 %	xsd:float and xsd:double accept a Prolog integer.
-%
-%	@see rdf_canonical_literal/2.
 
 rdf_assert(S,P,O) :-
 	rdf_default_graph(G),
@@ -1103,10 +1089,11 @@ write_xml_literal(html, DOM, Text) :-
 %	rdf_assert/3 into its canonical form. The following Prolog terms
 %	are translated:
 %
-%	| **Prolog Term                 | **Datatype IRI** |
+%	| **Prolog Term**               | **Datatype IRI** |
 %	|:------------------------------|:-----------------|
 %	| float				| xsd:double       |
 %	| integer                       | xsd:integer      |
+%	| string                        | xsd:string       |
 %	| `true` or `false`             | xsd:boolean      |
 %	| date(Y,M,D)                   | xsd:date         |
 %	| date_time(Y,M,D,HH,MM,SS)     | xsd:dateTime     |
