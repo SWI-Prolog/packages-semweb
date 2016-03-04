@@ -3385,6 +3385,12 @@ rdf_value(V, _, Q, Encoding) :-
 %	    If equal, uppercase preceeds lowercase.  If still equal,
 %	    the types are compared lexically.
 
+%%	rdf_match_label(+How, +Pattern, +Label) is semidet.
+%
+%	True if Label matches Pattern according to   How.  How is one of
+%	`icase`, `substring`, `word`, `prefix` or   `like`. For backward
+%	compatibility, `exact` is a synonym for `icase`.
+
 
 		 /*******************************
 		 *	DEPRECATED MATERIAL	*
