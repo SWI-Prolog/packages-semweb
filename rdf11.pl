@@ -1116,14 +1116,22 @@ rdf_canonical_literal(In, Literal) :-
 rdf_canonical_literal(In, _) :-
 	must_be(ground, In).
 
-%%	rdf_lexical_form(++Literal, -Lexical) is det.
+%%	rdf_lexical_form(++Literal, -Lexical:compound) is det.
 %
-%	True when Lexical is the lexical form for the literal Literal.
+%	True when Lexical is the lexical   form for the literal Literal.
+%	Lexical is of one of the forms below. The ntriples serialization
+%	is obtained by transforming String into a proper ntriples string
+%	using double quotes and escaping where   needed and turning Type
+%	into a proper IRI reference.
+%
+%	  - String^^Type
+%	  - String@Lang
+
 %	For example,
 %
 %	==
 %	?- rdf_lexical_form(2.3^^xsd:double, L).
-%	L = "2.3E0".
+%	L = "2.3E0"^^'http://www.w3.org/2001/XMLSchema#double'.
 %	==
 
 rdf_lexical_form(Literal, Lexical) :-
@@ -1132,8 +1140,10 @@ rdf_lexical_form(Literal, Lexical) :-
 rdf_lexical_form(Literal, _) :-
 	type_error(rdf_literal, Literal).
 
-text_of0(type(_, LexicalS), Lexical) :- atom_string(LexicalS, Lexical).
-text_of0(lang(_, LexicalS), Lexical) :- atom_string(LexicalS, Lexical).
+text_of0(type(TypeA, LexicalA), LexicalS^^TypeA) :-
+	atom_string(LexicalA, LexicalS).
+text_of0(lang(LangA, LexicalA), LexicalS@LangA) :-
+	atom_string(LexicalA, LexicalS).
 
 
 		 /*******************************
