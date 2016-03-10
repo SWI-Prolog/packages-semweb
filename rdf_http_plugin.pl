@@ -58,12 +58,9 @@ the RDF database.
 */
 
 :- multifile
-	rdf_content_type/2.		% Allow defining additional
-					% content-type mappings.
-
-:- multifile
 	rdf_db:rdf_open_hook/8,
-	rdf_db:url_protocol/1.
+	rdf_db:url_protocol/1,
+	rdf_http_plugin:rdf_content_type/3.
 
 rdf_db:url_protocol(http).
 rdf_db:url_protocol(https).
@@ -180,7 +177,7 @@ open_envelope(_, _, Stream, Stream, Format) :-
 	nonvar(Format), !.
 open_envelope(ContentType, SourceURL, Stream, Stream, Format) :-
 	major_content_type(ContentType, Major),
-	(   rdf_content_type(Major, Format)
+	(   rdf_content_type(Major, _, Format)
 	->  true
 	;   Major == 'text/plain'	% server is not properly configured
 	->  file_name_extension(_, Ext, SourceURL),
@@ -191,24 +188,6 @@ major_content_type(ContentType, Major) :-
 	sub_atom(ContentType, Pre, _, _, (;)), !,
 	sub_atom(ContentType, 0, Pre, _, Major).
 major_content_type(Major, Major).
-
-%%	rdf_content_type(+ContentType, -URL) is semidet.
-%
-%	Deduce the RDF encoding from the   mime-type.  This predicate is
-%	defined as multifile such that the user can associate additional
-%	content types to RDF formats.
-%
-%	@bug	The turtle parser only parses a subset of n3.
-
-:- multifile
-	rdf_content_type/2.
-
-rdf_content_type('text/rdf+n3',		  turtle).	% Bit dubious
-rdf_content_type('text/html',		  xhtml).
-rdf_content_type('application/xhtml+xml', xhtml).
-rdf_content_type('application/x-gzip',	  gzip).
-rdf_content_type(MediaType, Format) :-
-	rdf_content_type(MediaType, _, Format).
 
 
 %% rdf_accept_header_value(?Format:rdf_format, -AcceptValue:atom) is det.
@@ -233,7 +212,7 @@ accept_value(Format, AcceptValue) :-
 %	2616. Quality values  are  determined   based  on  the following
 %	criteria:
 %
-%	    | **Label** | | **Criterion**           | **Value** |
+%	    | **Label** | **Criterion**             | **Value** |
 %	    | A         | Supported RDF parser      | 0.43      |
 %	    | B         | RDF-specific content type | 0.33      |
 %	    | C         | Official content type     | 0.23      |
@@ -245,8 +224,12 @@ accept_value(Format, AcceptValue) :-
 %	This intentionally allows the user to add another content type with
 %	a higher Q-value (i.e., >0.99).
 %
-%	Notice that the N3 format is treated as if it were Turtle.
+%	Deduce the RDF encoding from the   mime-type.  This predicate is
+%	defined as multifile such that the user can associate additional
+%	content types to RDF formats.
 %
+%	@bug The turtle parser only parses a subset of n3.
+%	     (The N3 format is treated as if it were Turtle.)
 %	@see Discussion http://richard.cyganiak.de/blog/2008/03/what-is-your-rdf-browsers-accept-header/
 %	@see N-Quadruples http://www.w3.org/ns/formats/N-Quads
 %	@see N-Triples http://www.w3.org/ns/formats/N-Triples
