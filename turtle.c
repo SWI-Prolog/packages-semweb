@@ -3048,7 +3048,8 @@ unify_turtle_parser(term_t parser, turtle_state *ts)
 { parser_symbol *ps;
 
   if ( (ps=malloc(sizeof(*ps))) )
-  { ps->magic = PARSER_MAGIC;
+  { memset(ps, 0, sizeof(*ps));		/* ensure padding is initialized */
+    ps->magic = PARSER_MAGIC;
     ps->state = ts;
 
     return PL_unify_blob(parser, ps, sizeof(*ps), &turtle_blob);
