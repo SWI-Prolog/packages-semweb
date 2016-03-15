@@ -55,7 +55,7 @@
 		 *******************************/
 
 int
-get_atom_text(atom_t atom, text *txt)
+fetch_atom_text(atom_t atom, text *txt)
 { if ( (txt->a = (const charA*)PL_atom_nchars(atom, &txt->length)) )
   { txt->w = NULL;
     return TRUE;
@@ -80,7 +80,7 @@ fill_atom_info(atom_info *info)
 { if ( !info->resolved )
   { info->resolved = TRUE;
 
-    if ( !(info->rc=get_atom_text(info->handle, &info->text)) )
+    if ( !(info->rc=fetch_atom_text(info->handle, &info->text)) )
     { info->text.a = NULL;
       info->text.w = NULL;
     }
@@ -143,7 +143,7 @@ cmp_atom_info(atom_info *info, atom_t a2)
     return 0;
 
   if ( !fill_atom_info(info) ||
-       !get_atom_text(a2, &t2) )
+       !fetch_atom_text(a2, &t2) )
   { goto cmphandles;			/* non-text atoms? */
   }
 
@@ -299,7 +299,7 @@ atom_t
 first_atom(atom_t a, int match)
 { text t;
 
-  if ( !get_atom_text(a, &t) )
+  if ( !fetch_atom_text(a, &t) )
   { return (atom_t)0;			/* not a textual atom */
   } else
   { size_t len = t.length;
@@ -499,8 +499,8 @@ int
 match_atoms(int how, atom_t search, atom_t label)
 { text l, f;
 
-  if ( !get_atom_text(label, &l) ||
-       !get_atom_text(search, &f) )
+  if ( !fetch_atom_text(label, &l) ||
+       !fetch_atom_text(search, &f) )
     return FALSE;			/* error? */
 
   return match_text(how, &f, &l);
@@ -713,8 +713,8 @@ atom_lang_matches(atom_t lang, atom_t pattern)
   if ( pattern == ATOM_star )		/* Everything matches "*" */
     return TRUE;
 
-  if ( !get_atom_text(lang, &s.l) ||
-       !get_atom_text(pattern, &s.p) )
+  if ( !fetch_atom_text(lang, &s.l) ||
+       !fetch_atom_text(pattern, &s.p) )
     return FALSE;			/* exception? */
 
   s.il=0; s.ip=0;

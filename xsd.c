@@ -129,7 +129,7 @@ cmp_xsd_info(xsd_primary type1, atom_info *v1,
 
   if ( fill_atom_info(v1) &&
        v1->text.a &&
-       get_atom_text(v2, &t2) &&
+       fetch_atom_text(v2, &t2) &&
        t2.a )
   { return xsd_compare_numeric(type1, v1->text.a, type2, t2.a);
   } else
