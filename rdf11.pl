@@ -94,6 +94,7 @@
 :- use_module(library(error)).
 :- use_module(library(debug)).
 :- use_module(library(lists)).
+:- use_module(library(memfile)).
 :- reexport(library(semweb/rdf_db),
 	    except([ rdf/3,
 		     rdf/4,
@@ -1058,17 +1059,25 @@ in_xml_literal(Type, Val, Val0) :-
 	xml_is_dom(Val), !,
 	write_xml_literal(Type, Val, Val0).
 in_xml_literal(xml, Val, Val0) :-
-	setup_call_cleanup(
-	    open_string(Val, In),
-	    load_xml(stream(In), DOM, []),
-	    close(In)),
+	parse_partial_xml(load_xml, Val, DOM),
 	write_xml_literal(xml, DOM, Val0).
 in_xml_literal(html, Val, Val0) :-
-	setup_call_cleanup(
-	    open_string(Val, In),
-	    load_html(stream(In), DOM, []),
-	    close(In)),
+	parse_partial_xml(load_html, Val, DOM),
 	write_xml_literal(html, DOM, Val0).
+
+parse_partial_xml(Parser, Val, DOM) :-
+	setup_call_cleanup(
+	    new_memory_file(MF),
+	    (	setup_call_cleanup(
+		    open_memory_file(MF, write, Out),
+		    format(Out, "<xml>~w</xml>", [Val]),
+		    close(Out)),
+		setup_call_cleanup(
+		    open_memory_file(MF, read, In),
+		    call(Parser, stream(In), [element(xml, _, DOM)], []),
+		    close(In))
+	    ),
+	    free_memory_file(MF)).
 
 
 write_xml_literal(xml, DOM, Text) :-
@@ -1186,6 +1195,10 @@ out_type(DateTimeType, Val, Val0) :-
 	out_date_time(DateTimeType, Val, Val0).
 out_type(xsd:boolean, Val, Val0) :- !,
 	Val = Val0.
+out_type(rdf:'XMLLiteral', XML, DOM) :-
+	xml_is_dom(DOM), !,
+	with_output_to(string(XML),
+		       xml_write(DOM, [header(false)])).
 out_type(_Unknown, Val, Val0) :-
 	atom_string(Val0, Val).
 
@@ -1682,3 +1695,4 @@ rdf_retract_list_(L) :-
 
 sandbox:safe_primitive(rdf11:in_xml_literal(_,_,_)).
 sandbox:safe_primitive(rdf11:pre_object(_,_)).
+sandbox:safe_primitive(rdf11:post_object(_,_)).
