@@ -1512,7 +1512,7 @@ rdf_list(L) :-
 rdf_list_g(rdf:nil) :- !.
 rdf_list_g(L) :-
 	rdf_has(L, rdf:rest, Rest),
-	(   rdf_equal(rdf:nil, L)
+	(   rdf_equal(rdf:nil, Rest)
 	->  once(rdf_has(L, rdf:first, _))
 	;   rdf_list_g(Rest)
 	).
