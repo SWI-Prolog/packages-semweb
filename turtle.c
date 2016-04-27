@@ -3472,6 +3472,7 @@ ttl_put_character(IOSTREAM *s, int c)
 static int
 ttl_put_echaracter(IOSTREAM *s, int c)
 { int c2;
+  int rc;
 
   switch(c)
   { case '\t': c2 = 't'; break;
@@ -3481,7 +3482,8 @@ ttl_put_echaracter(IOSTREAM *s, int c)
       return ttl_put_character(s, c);
   }
 
-  Sputcode('\\', s);
+  if ( (rc=Sputcode('\\', s)) < 0 )
+    return rc;
 
   return Sputcode(c2, s);
 }
@@ -3489,12 +3491,16 @@ ttl_put_echaracter(IOSTREAM *s, int c)
 
 static int
 ttl_put_scharacter(IOSTREAM *s, int c)
-{ switch(c)
+{ int rc;
+
+  switch(c)
   { case '"':
-      Sputcode('\\', s);
+      if ( (rc=Sputcode('\\', s)) < 0 )
+	return rc;
       return Sputcode('"', s);
     case '\\':
-      Sputcode('\\', s);
+      if ( (rc=Sputcode('\\', s)) < 0 )
+	return rc;
       return Sputcode('\\', s);
     default:
       return ttl_put_echaracter(s, c);
@@ -3508,6 +3514,9 @@ write_long_q(IOSTREAM *out)
   Sputcode('"', out);
   Sputcode('"', out);
 }
+
+#define StryPutcode(c, s) \
+	do { if ( Sputcode(c,s) < 0 ) goto error; } while(0)
 
 static foreign_t
 turtle_write_quoted_string(term_t Stream, term_t Value, term_t wlong)
@@ -3547,24 +3556,25 @@ turtle_write_quoted_string(term_t Stream, term_t Value, term_t wlong)
     { write_long_q(out);
       for(s=textA; s<e; s++)
       { if ( *s == '"' && ((s+1<e && s[1] != '"') || (s+2<e && s[2] != '"')) )
-	  Sputcode('"', out);
+	  StryPutcode('"', out);
 	else if ( *s == '\n' || *s == '\r' )
-	  Sputcode(*s, out);
+	  StryPutcode(*s, out);
 	else if ( ttl_put_scharacter(out, s[0]&0xff) < 0 )
-	  break;
+	  goto error;
       }
       write_long_q(out);
     } else
-    { Sputcode('"', out);
+    { StryPutcode('"', out);
       for(s=textA; s<e; s++)
       { if ( ttl_put_scharacter(out, s[0]&0xff) < 0 )
-	  break;
+	  goto error;
       }
-      Sputcode('"', out);
+      StryPutcode('"', out);
     }
 
     return PL_release_stream(out);
-  } else if ( PL_get_wchars(Value, &len, &textW, CVT_ATOM|CVT_EXCEPTION) )
+  } else if ( PL_get_wchars(Value, &len, &textW,
+			    CVT_ATOM|CVT_STRING|CVT_EXCEPTION) )
   { const pl_wchar_t *e = &textW[len];
     const pl_wchar_t *w;
 
@@ -3588,25 +3598,26 @@ turtle_write_quoted_string(term_t Stream, term_t Value, term_t wlong)
     { write_long_q(out);
       for(w=textW; w<e; w++)
       { if ( *w == '"' && ((w+1<e && w[1] != '"') || (w+2<e && w[2] != '"')) )
-	  Sputcode('"', out);
+	  StryPutcode('"', out);
 	else if ( *w == '\n' || *w == '\r' )
-	  Sputcode(*w, out);
+	  StryPutcode(*w, out);
 	else if ( ttl_put_scharacter(out, w[0]) < 0 )
-	  break;
+	  goto error;
       }
       write_long_q(out);
     } else
-    { Sputcode('"', out);
+    { StryPutcode('"', out);
       for(w=textW; w<e; w++)
       { if ( ttl_put_scharacter(out, w[0]) < 0 )
-	  break;
+	  goto error;
       }
-      Sputcode('"', out);
+      StryPutcode('"', out);
     }
 
     return PL_release_stream(out);
   } else
-  { PL_release_stream(out);
+  { error:
+    PL_release_stream(out);
     return FALSE;
   }
 }
@@ -3614,10 +3625,13 @@ turtle_write_quoted_string(term_t Stream, term_t Value, term_t wlong)
 
 static int
 ttl_put_ucharacter(IOSTREAM *s, int c)
-{ switch(c)
+{ int rc;
+
+  switch(c)
   { case '>':
     case '\\':
-      Sputcode('\\', s);
+      if ( (rc=Sputcode('\\', s)) < 0 )
+	return rc;
       return Sputcode(c, s);
     default:
       return ttl_put_character(s, c);
@@ -3641,25 +3655,26 @@ turtle_write_uri(term_t Stream, term_t Value)
   if ( PL_get_nchars(Value, &len, &s, CVT_ATOM|CVT_STRING) )
   { const char *e = &s[len];
 
-    Sputcode('<', out);
+    StryPutcode('<', out);
     for(; s<e; s++)
     { if ( ttl_put_ucharacter(out, s[0]&0xff) < 0 )
-	break;
+	goto error;
     }
-    Sputcode('>', out);
+    StryPutcode('>', out);
     return PL_release_stream(out);
   } else if ( PL_get_wchars(Value, &len, &w, CVT_ATOM|CVT_EXCEPTION) )
   { const pl_wchar_t *e = &w[len];
 
-    Sputcode('<', out);
+    StryPutcode('<', out);
     for(; w<e; w++)
     { if ( ttl_put_ucharacter(out, w[0]) < 0 )
-	break;
+	goto error;
     }
-    Sputcode('>', out);
+    StryPutcode('>', out);
     return PL_release_stream(out);
   } else
-  { PL_release_stream(out);
+  { error:
+    PL_release_stream(out);
     return FALSE;
   }
 }
