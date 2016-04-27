@@ -1743,7 +1743,7 @@ rdf_load_db(File) :-
 %	    deduced from the filename extension or the mime-type. The
 %	    core library understands the formats xml (RDF/XML) and
 %	    triples (internal quick load and cache format).  Plugins,
-%	    such as library)semweb/turtle) extend the set of recognised
+%	    such as library(semweb/turtle) extend the set of recognised
 %	    extensions.
 %
 %	    * graph(?Graph)
