@@ -100,6 +100,8 @@
 		     rdf/4,
 		     rdf_assert/3,
 		     rdf_assert/4,
+		     rdf_current_literal/1,
+		     rdf_current_predicate/1,
 		     rdf_has/3,
 		     rdf_has/4,
 		     rdf_reachable/3,
@@ -109,6 +111,7 @@
 		     rdf_node/1,
 		     rdf_bnode/1,
 		     rdf_is_literal/1,
+		     rdf_is_resource/1,
 		     rdf_literal_value/2,
 		     rdf_compare/3
 		   ])
