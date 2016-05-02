@@ -154,6 +154,9 @@ In a nutshell, the following issues are addressed:
 @version 2016/01
 */
 
+:- meta_predicate
+	parse_partial_xml(3, +, -).
+
 :- rdf_meta
 	rdf(r,r,o),
 	rdf(r,r,o,r),
