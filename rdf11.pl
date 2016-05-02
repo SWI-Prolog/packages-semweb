@@ -169,7 +169,6 @@ In a nutshell, the following issues are addressed:
 	rdf_where(t),
 	rdf_canonical_literal(o,-),
 	rdf_lexical_form(o,-),
-	rdf_literal_value(o,-),
 	rdf_compare(-,o,o),
 	rdf_iri(r),
 	rdf_is_iri(r),
