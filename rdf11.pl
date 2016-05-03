@@ -310,11 +310,12 @@ rdf_has(S,P,O,RealP) :-
 %%	rdf_reachable(?S, +P, ?O) is nondet.
 %%	rdf_reachable(?S, +P, ?O, +MaxD, -D) is nondet.
 %
-%	True when O can be from S using the transitive closure of P. The
-%	predicate uses (the internals  of)   rdf_has/3  and thus matches
-%	both rdfs:subPropertyOf and  the   `inverse_of`  and `symmetric`
-%	predicate properties. The version  rdf_reachable/5 maximizes the
-%	steps considered and returns the number of steps taken.
+%	True when O can be reached from S using the transitive closure
+%	of P. The predicate uses (the internals of) rdf_has/3 and thus
+%	matches both rdfs:subPropertyOf and the `inverse_of` and
+%	`symmetric` predicate properties. The version rdf_reachable/5
+%	maximizes the steps considered and returns the number of steps
+%	taken.
 %
 %	If both S and O are given,   these predicates are `semidet`. The
 %	number of steps D is  minimal   because  the implementation uses
