@@ -184,7 +184,7 @@ has the following properties:
 %	    * inline_bnodes(+Boolean)
 %	    if =true= (default), inline bnodes that are used once.
 %	    * abbreviate_literals(+Boolean)
-%	    if =true= (default), omit the typeif allowed by turtle.
+%	    if =true= (default), omit the type if allowed by turtle.
 %	    * only_known_prefixes(+Boolean)
 %	    Only use prefix notation for known prefixes.  Without, some
 %	    documents produce _huge_ amounts of prefixes.
