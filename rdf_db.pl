@@ -602,13 +602,14 @@ system:goal_expansion(G, Expanded) :-
 
 system:term_expansion(Fact, Expanded) :-
 	rdf_meta_specification(Fact, Module, Spec),
-	prolog_load_context(module, Module), !,
-	rdf_expand(Fact, Spec, Expanded).
+	prolog_load_context(module, Module),
+	rdf_expand(Fact, Spec, Expanded),
+	Fact \== Expanded.
 system:term_expansion((Head :- Body), (Expanded :- Body)) :-
 	rdf_meta_specification(Head, Module, Spec),
-	prolog_load_context(module, Module), !,
-	rdf_expand(Head, Spec, Expanded).
-
+	prolog_load_context(module, Module),
+	rdf_expand(Head, Spec, Expanded),
+	Head \== Expanded.
 
 right_module(M, _, M) :- !.
 right_module(LM, G, M) :-
