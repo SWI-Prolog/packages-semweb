@@ -222,11 +222,8 @@
 		     [ snapshot(any)
 		     ]).
 
-:- multifile
-	ns/2,
-	rdf_meta_specification/3.	% UnboundHead, Module, Head
-:- dynamic
-	ns/2.			% ID, URL
+:- multifile ns/2.
+:- dynamic   ns/2.			% ID, URL
 :- discontiguous
 	term_expansion/2.
 
@@ -490,19 +487,29 @@ rdf_global_graph(G, G).
 
 system:term_expansion((:- rdf_meta(Heads)), Clauses) :-
 	prolog_load_context(module, M),
-	mk_clauses(Heads, M, Clauses).
+	phrase(mk_clauses(Heads, M), Clauses).
 
-mk_clauses((A,B), M, [H|T]) :- !,
-	mk_clause(A, M, H),
-	mk_clauses(B, M, T).
-mk_clauses(A, M, [C]) :-
-	mk_clause(A, M, C).
+mk_clauses((A,B), M) -->
+	mk_clause(A, M),
+	mk_clauses(B, M).
+mk_clauses(A, M) -->
+	mk_clause(A, M).
 
-mk_clause(Head0, M0, rdf_db:rdf_meta_specification(Unbound, Module, Head)) :-
-	strip_module(M0:Head0, Module, Head),
-	valid_rdf_meta_head(Head),
-	functor(Head, Name, Arity),
-	functor(Unbound, Name, Arity).
+mk_clause(Head0, M0) -->
+	{ strip_module(M0:Head0, Module, Head),
+	  valid_rdf_meta_head(Head),
+	  functor(Head, Name, Arity),
+	  functor(Unbound, Name, Arity),
+	  qualify(Module, 'rdf meta specification'/2, Decl)
+	},
+	[ (:- multifile(Decl)),
+	  Module:'rdf meta specification'(Unbound, Head)
+	].
+
+qualify(Module, Decl, Decl) :-
+	prolog_load_context(module, Module), !.
+qualify(Module, Decl, Module:Decl).
+
 
 valid_rdf_meta_head(Head) :-
 	callable(Head), !,
@@ -585,35 +592,34 @@ valid_arg(A) :-
 rdf_meta(Heads) :-
 	throw(error(context_error(nodirective, rdf_meta(Heads)), _)).
 
+%%	rdf_meta_specification(+General, +Module, -Spec) is semidet.
+%
+%	True when Spec is the RDF meta specification for Module:General.
+%
+%	@arg	General is the term Spec with all arguments replaced with
+%		variables.
+
+rdf_meta_specification(Unbounded, Module, Spec) :-
+	'$flushed_predicate'(Module:'rdf meta specification'(_,_)),
+	call(Module:'rdf meta specification'(Unbounded, Spec)).
 
 system:goal_expansion(G, Expanded) :-
-	rdf_meta_specification(G, _, _), !,
+	\+ predicate_property(G, iso),
 	prolog_load_context(module, LM),
-	(   rdf_meta_specification(G, Module, Spec),
-	    right_module(LM, G, Module)
-	->  rdf_expand(G, Spec, Expanded)
-	;   debugging(rdf_meta),
-	    sub_term(G, NS:Local),
-	    atom(NS), atom(Local)
-	->  print_message(warning, rdf(meta(not_expanded(LM:G)))),
-	    fail
-	),
+	predicate_property(LM:G, implementation_module(IM)),
+	rdf_meta_specification(G, IM, Spec),
 	rdf_expand(G, Spec, Expanded).
 
 system:term_expansion(Fact, Expanded) :-
-	rdf_meta_specification(Fact, Module, Spec),
 	prolog_load_context(module, Module),
+	rdf_meta_specification(Fact, Module, Spec),
 	rdf_expand(Fact, Spec, Expanded),
 	Fact \== Expanded.
 system:term_expansion((Head :- Body), (Expanded :- Body)) :-
-	rdf_meta_specification(Head, Module, Spec),
 	prolog_load_context(module, Module),
+	rdf_meta_specification(Head, Module, Spec),
 	rdf_expand(Head, Spec, Expanded),
 	Head \== Expanded.
-
-right_module(M, _, M) :- !.
-right_module(LM, G, M) :-
-	predicate_property(LM:G, imported_from(M)).
 
 rdf_expand(G, Spec, Expanded) :-
 	functor(G, Name, Arity),
