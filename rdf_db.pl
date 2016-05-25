@@ -231,6 +231,14 @@
 
 The file library(semweb/rdf_db) provides the core  of the SWI-Prolog RDF
 store.
+
+@deprecated	New applications should use library(semweb/rdf11), which
+		provides a much more intuitive API to the RDF store, notably
+		for handling literals.  The library(semweb/rdf11) runs
+		currently on top of this library and both can run side-by-side
+		in the same application.  Terms retrieved from the database
+		however have a different shape and can not be exchanged without
+		precautions.
 */
 
 		 /*******************************
@@ -286,7 +294,7 @@ ns(xsd,	    'http://www.w3.org/2001/XMLSchema#').
 %
 %		* keep(Boolean)
 %		If =true= and Alias is already defined, keep the
-%		original message and succeed silently.
+%		original binding for Prefix and succeed silently.
 %
 %	Without options, an attempt  to  redefine   an  alias  raises  a
 %	permission error.
