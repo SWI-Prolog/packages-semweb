@@ -815,8 +815,8 @@ pre_object(Atom, URI) :-
 	URI = Atom.
 pre_object(Val@Lang, literal(lang(Lang, Val0))) :- !,
 	in_lang_string(Val, Val0).
-pre_object(Val^^Type, literal(type(Type, Val0))) :- !,
-	in_type(Type, Val, Val0).
+pre_object(Val^^Type, literal(type(Type0, Val0))) :- !,
+	in_type(Type, Val, Type0, Val0).
 pre_object(Obj, Val0) :-
 	ground(Obj), !,
 	pre_ground_object(Obj, Val0).
@@ -878,8 +878,8 @@ pre_ground_object(true, literal(type(xsd:boolean, true))) :- !.
 pre_ground_object(Val@Lang,  literal(lang(Lang0, Val0))) :- !,
 	downcase_atom(Lang, Lang0),
 	in_lang_string(Val, Val0).
-pre_ground_object(Val^^Type, literal(type(Type, Val0))) :- !,
-	in_type(Type, Val, Val0).
+pre_ground_object(Val^^Type, literal(type(Type0, Val0))) :- !,
+	in_type(Type, Val, Type0, Val0).
 pre_ground_object(Atom, URI) :-
 	atom(Atom), !,
 	URI = Atom.
@@ -894,10 +894,10 @@ in_lang_string(Val, Val0) :-
 	atom_string(Val0, Val).
 in_lang_string(_, _).
 
-in_type(Type, Val, Val0) :-
+in_type(Type, Val, Type, Val0) :-
 	nonvar(Type), ground(Val), !,
 	in_ground_type(Type, Val, Val0).
-in_type(_, _, _).
+in_type(_, _, _, _).
 
 :- rdf_meta
 	in_ground_type(r,?,?),
