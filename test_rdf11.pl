@@ -89,6 +89,9 @@ test(date_time, L == date_time(2015,12,13,15,40,0,0)^^xsd:dateTime) :-
 test(untyped, true) :-
 	rdf_assert(untyped, p1, "y"^^y),
 	\+ rdf(untyped, p1, "x"^^_Type).
+test(untyped_int, true) :-
+	rdf_assert(untyped, p1, "y"^^y),
+	\+ rdf(untyped, p1, "10"^^_Type).
 
 :- end_tests(literal).
 

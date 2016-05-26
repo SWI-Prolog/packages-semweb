@@ -897,6 +897,10 @@ in_lang_string(_, _).
 in_type(Type, Val, Type, Val0) :-
 	nonvar(Type), ground(Val), !,
 	in_ground_type(Type, Val, Val0).
+in_type(VarType, Val, VarType, Val0) :-
+	ground(Val),
+	\+ catch(xsd_number_string(_, Val), _, fail), !,
+	Val = Val0.
 in_type(_, _, _, _).
 
 :- rdf_meta
