@@ -1425,26 +1425,46 @@ rdf_create_bnode(BNode) :-
 
 %%	rdf_is_iri(@IRI) is semidet.
 %
-%	True if IRI is an RDF IRI  (atom,   but  not a blank node). This
-%	does not imply that the IRI is known.
+%	True if IRI is an RDF IRI term.
+%
+%	For performance reasons, this does not check for compliance to
+%	the syntax defined in [[RFC
+%	3987][http://www.ietf.org/rfc/rfc3987.txt]].  This checks
+%	whether the term is (1) an atom and (2) not a blank node
+%	identifier.
+%
+%	Success of this goal does not imply that the IRI is present in
+%	the database (see rdf_iri/1 for that).
 
 rdf_is_iri(IRI) :-
 	atom(IRI),
 	\+ rdf_is_bnode(IRI).
 
-%%	rdf_is_bnode(@BNode) is semidet.
+%%	rdf_is_bnode(@Term) is semidet.
 %
-%	True if BNode is an RDF  blank   node  identifier. This does not
-%	imply that the blank node is known.  A blank node is represented
-%	by an atom  that  does  not   start  with  =|_:|=.  For backward
-%	compatibility reason, =|__|= is also considered   to  be a blank
-%	node.
+%	True if Term is an RDF blank node identifier.
+%
+%	A blank node is represented by an atom that starts with
+%	=|_:|=.
+%
+%	Success of this goal does not imply that the blank node is
+%	present in the database (see rdf_bnode/1 for that).
+%
+%	For backwards compatibility, atoms that are represented with
+%	an atom that starts with =|__|= are also considered to be a
+%	blank node.
 
 
 %%	rdf_is_literal(@Term) is semidet.
 %
-%	True if Literal is an RDF literal  term. This does not mean that
-%	it is well-formed or that it is currently present in the DB.
+%	True if Term is an RDF literal term.
+%
+%	An RDF literal term is of the form `String@LanguageTag` or
+%	`Value^^Datatype`.
+%
+%	Success of this goal does not imply that the literal is
+%	well-formed or that it is present in the database (see
+%	rdf_literal/1 for that).
 
 rdf_is_literal(Literal) :-
 	literal_form(Literal), !,
@@ -1456,8 +1476,11 @@ literal_form(_^^_).
 
 %%	rdf_is_name(@Term) is semidet.
 %
-%	True if Term is a _public_ RDF   term,  i.e., an IRI or literal,
-%	not _not_ a blank node.
+%	True if Term is an RDF Name, i.e., an IRI or literal.
+%
+%	Success of this goal does not imply that the name is
+%	well-formed or that it is present in the database (see
+%	rdf_name/1) for that).
 
 rdf_is_name(T) :- rdf_is_iri(T), !.
 rdf_is_name(T) :- rdf_is_literal(T).
@@ -1465,8 +1488,13 @@ rdf_is_name(T) :- rdf_is_literal(T).
 
 %%	rdf_is_object(@Term) is semidet.
 %
-%	True if Term can appear in the object position of a triple. This
-%	is true for any  RDF  term   and  therefore  rdf_is_object/1  is
+%	True if Term can appear in the object position of a triple.
+%
+%	Success of this goal does not imply that the object term in
+%	well-formed or that it is present in the database (see
+%	rdf_object/1) for that).
+%
+%	Since any RDF term can appear in the object position, this is
 %	equaivalent to rdf_is_term/1.
 
 rdf_is_object(T) :- rdf_is_subject(T), !.
@@ -1476,8 +1504,12 @@ rdf_is_object(T) :- rdf_is_literal(T).
 %%	rdf_is_predicate(@Term) is semidet.
 %
 %	True if Term can appear in the   predicate position of a triple.
-%	This implies it is an IRI.
-%	=__=.
+%
+%	Success of this goal does not imply that the predicate term is
+%	present in the database (see rdf_predicate/1) for that).
+%
+%	Since only IRIs can appear in the predicate position, this is
+%	equivalent to rdf_is_iri/1.
 
 rdf_is_predicate(T) :- rdf_is_iri(T).
 
@@ -1485,15 +1517,25 @@ rdf_is_predicate(T) :- rdf_is_iri(T).
 %%	rdf_is_subject(@Term) is semidet.
 %
 %	True if Term can appear in  the   subject  position of a triple.
-%	This implies it is a bnode or IRI.  Note that a bnode is an atom
-%	starting with =|_:|= and an IRI is   an atom _not_ starting with
-%	=|_:|=, so this is equivalent to atom(Term).
+%
+%	Only blank nodes and IRIs can appear in the subject position.
+%
+%	Success of this goal does not imply that the subject term is
+%	present in the database (see rdf_subject/1) for that).
+%
+%	Since blank nodes are represented by atoms that start with
+%	`_:` and an IRIs are atoms as well, this is equivalent to
+%	atom(Term).
 
 rdf_is_subject(T) :- atom(T).
 
 %%	rdf_is_term(@Term) is semidet.
 %
-%	Term is a valid RDF term, i.e., an IRI, blank node or literal.
+%	True if Term can be used as an RDF term, i.e., if Term is
+%	either an IRI, a blank node or an RDF literal.
+%
+%	Success of this goal does not imply that the RDF term is
+%	present in the database (see rdf_term/1) for that).
 
 rdf_is_term(N) :- rdf_is_subject(N), !.
 rdf_is_term(N) :- rdf_is_literal(N).
