@@ -80,12 +80,12 @@
 
 	    rdf_assert_list/2,		% +PrologList, -RDFList
 	    rdf_assert_list/3,		% +PrologList, -RDFList, +G
-	    rdf_last/2,			% ?RDFList, ?Last
+	    rdf_last/2,			% +RDFList, ?Last
 	    rdf_list/1,			% ?RDFList
 	    rdf_list/2,			% +RDFList, -PrologList
 	    rdf_length/2,		% ?RDFList, ?Length
 	    rdf_member/2,		% ?Member, +RDFList
-	    rdf_nth0/3,			% ?Index, ?RDFList, ?X
+	    rdf_nth0/3,			% ?Index, +RDFList, ?X
 	    rdf_retract_list/1,		% +RDFList
 
 	    op(110, xfx, @),		% must be above .
