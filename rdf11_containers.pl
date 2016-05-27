@@ -45,8 +45,8 @@
 	    rdfs_container/2,			  % ?Container, -List
 	    rdfs_container_membership_property/1, % ?Property
 	    rdfs_container_membership_property/2, % ?Property, ?Number
-	    rdfs_member/2,			  % ?Container, ?Member
-	    rdfs_nth0/3				  % ?Index, ?Container, ?Member
+	    rdfs_member/2,			  % ?Elem, ?Container
+	    rdfs_nth0/3				  % ?N, ?Container, ?Elem
 	  ]).
 :- use_module(library(apply)).
 :- use_module(library(pairs)).
@@ -92,7 +92,7 @@ A container may be contained in itself.
 
 %%	rdf_alt(+Alt, ?Default, ?Others) is nondet.
 %
-%	True when Alt is  an  instance   of  rdf:Alt  with  first member
+%	True when Alt is an instance of `rdf:Alt` with first member
 %	Default and remaining members Others.
 %
 %	Notice that this construct adds no machine-processable semantics
@@ -176,16 +176,16 @@ rdf_assert_seq(Seq, L, G) :-
 	rdfs_assert_container(Seq, rdf:'Seq', L, G).
 
 
-%%	rdfs_assert_container(?Container, +Class, +Members, +Graph)
+%%	rdfs_assert_container(?Container, +Class, +Elems, +Graph)
 
-rdfs_assert_container(Container, Class, Members, G) :-
-	must_be(list, Members),
-	rdf_transaction(rdfs_assert_container_(Container, Class, Members, G)).
+rdfs_assert_container(Container, Class, Elems, G) :-
+	must_be(list, Elems),
+	rdf_transaction(rdfs_assert_container_(Container, Class, Elems, G)).
 
-rdfs_assert_container_(Container, Class, Members, G) :-
+rdfs_assert_container_(Container, Class, Elems, G) :-
 	(var(Container) -> rdf_create_bnode(Container) ; true),
 	rdf_assert(Container, rdf:type, Class, G),
-	rdfs_assert_members(Members, 1, Container, G).
+	rdfs_assert_members(Elems, 1, Container, G).
 
 rdfs_assert_members([], _, _, _).
 rdfs_assert_members([H|T], N1, Resource, G) :- !,
@@ -206,7 +206,7 @@ rdfs_assert_members([H|T], N1, Resource, G) :- !,
 
 rdfs_container(Container, List) :-
 	rdf_is_subject(Container), !,
-	findall(N-Member, rdfs_member(Container, N, Member), Pairs),
+	findall(N-Elem, rdfs_member(Container, N, Elem), Pairs),
 	keysort(Pairs, Sorted),
 	group_pairs_by_key(Sorted, GroupedPairs),
 	pairs_values(GroupedPairs, Groups),
@@ -227,6 +227,9 @@ rdfs_container_membership_property(P) :-
 %%	rdfs_container_membership_property(?Property, ?Number:nonneg) is nondet.
 %
 %	True when Property is the Nth container membership property.
+%
+%	Success of this goal does not imply that Property is present
+%	in the database.
 
 rdfs_container_membership_property(P, N) :-
 	var(P), !,
@@ -242,26 +245,46 @@ rdfs_container_membership_property(P, N) :-
 	N >= 0.
 
 
-%%	rdfs_member(?Container, ?Member) is nondet.
+%!	rdfs_member(?Elem, ?Container) is nondet.
 %
-%	True if rdf(Container, P, Member) is true   and P is a container
+%	True if rdf(Container, P, Elem) is true   and P is a container
 %	membership property.
 
-rdfs_member(Container, Member) :-
-	rdfs_member(Container, _, Member).
+rdfs_member(Elem, Container) :-
+	rdfs_member0(Container, _, Elem).
 
-%%	rdfs_nth0(?Index, ?Container, ?Member) is nondet.
+%!	rdfs_nth0(?N, ?Container, ?Elem) is nondet.
 %
-%	True if rdf(Container, P, Member)  is  true   and  P  is the nth
+%	True if rdf(Container, P, Elem)  is  true   and  P  is the N-th
 %	(0-based) container membership property.
 
-rdfs_nth0(Index, Container, Member) :-
-	rdfs_member(Container, Index, Member).
+rdfs_nth0(N, Container, Elem) :-
+	rdfs_member0(Container, N, Elem).
 
-rdfs_member(Container, N, Member) :-
-	(nonvar(Container) ; nonvar(Member)), !,
-	rdf_has(Container, P, Member),
+
+%!	rdfs_member0(?Container, ?N, ?Elem) is nondet.
+%
+%	What is the most efficient way to enumerate
+%	`rdfs_member(-,-)`?
+%
+%	1. If we enumerate over all container membership properties (=
+%	the current implementation) then it takes N steps before we
+%	get to triple `〈Container, rdf:_N, Elem〉`, for arbitrary
+%	N.
+%
+%	2. The alternative is to enumerate over all triples and check
+%	whether the predicate term is a container membership property.
+%
+%	3. The choice between (1) and (2) depends on whether the
+%	number of currently loaded triples in larger/smaller than the
+%	largest number that appears in a container membership
+%	property.  This means enumerating over all predicate terms
+%	using rdf_predicate/1.
+
+rdfs_member0(Container, N, Elem) :-
+	(nonvar(Container) ; nonvar(Elem)), !,
+	rdf_has(Container, P, Elem),
 	rdfs_container_membership_property(P, N).
-rdfs_member(Container, N, Member) :-
+rdfs_member0(Container, N, Elem) :-
 	rdfs_container_membership_property(P, N),
-	rdf_has(Container, P, Member).
+	rdf_has(Container, P, Elem).
