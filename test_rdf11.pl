@@ -474,6 +474,40 @@ test(lang, set(T == ["hallo"])) :-
 
 
 		 /*******************************
+		 *       COLLECTIONS		*
+		 *******************************/
+
+assert_collections_graph(G) :-
+	rdf_assert_list([a,b,c], _, G),
+	rdf_assert_list([d,b,e], _, G).
+
+:- begin_tests(collections,
+	       [ setup(assert_collections_graph(default)),
+		 cleanup(rdf_reset_db)
+	       ]).
+
+test(rdf_length, all(Len =:= [3,3])) :-
+	rdf_list(L),
+	rdf_length(L, Len).
+
+test(rdf_member, set(X == [a,b,c,d,e])) :-
+	rdf_member(X, _).
+
+test(rdf_nextto, set(X-Y == [a-b,b-c,b-e,d-b])) :-
+	rdf_nextto(X, Y).
+
+test(rdf_nth0, set(I-X == [0-a,0-d,1-b,2-c,2-e])) :-
+	rdf_list(L),
+	rdf_nth0(I, L, X).
+
+test(rdf_last, set(X == [c,e])) :-
+	rdf_list(L),
+	rdf_last(L, X).
+
+:- end_tests(collections).
+
+
+		 /*******************************
 		 *	     TEST DATA		*
 		 *******************************/
 
