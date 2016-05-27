@@ -85,14 +85,16 @@
 	    rdf_list/2,			% +RDFList, -PrologList
 	    rdf_length/2,		% ?RDFList, ?Length
 	    rdf_member/2,		% ?Member, +RDFList
+	    rdf_nextto/2,		% ?X, ?Y
+	    rdf_nextto/3,		% ?X, ?Y, ?RdfList
 	    rdf_nth0/3,			% ?Index, +RDFList, ?X
 	    rdf_retract_list/1,		% +RDFList
 
 	    op(110, xfx, @),		% must be above .
 	    op(650, xfx, ^^)		% must be above :
 	  ]).
-:- use_module(library(error)).
 :- use_module(library(debug)).
+:- use_module(library(error)).
 :- use_module(library(lists)).
 :- use_module(library(memfile)).
 :- reexport(library(semweb/rdf_db),
@@ -117,6 +119,7 @@
 		   ])
 	   ).
 :- use_module(library(sgml)).
+:- use_module(library(solution_sequences)).
 
 /** <module> RDF 1.1 API
 
@@ -154,11 +157,11 @@ In a nutshell, the following issues are addressed:
 @author Jan Wielemaker
 @author Wouter Beek
 @see https://github.com/SWI-Prolog/packages-semweb/wiki/Proposal-for-Semweb-library-redesign
-@version 2016/01
+@version 2016
 */
 
 :- meta_predicate
-	parse_partial_xml(3, +, -).
+	parse_partial_xml(3,+,-).
 
 :- rdf_meta
 	rdf(r,r,o),
@@ -188,14 +191,15 @@ In a nutshell, the following issues are addressed:
 	rdf_literal(o),
 	rdf_name(o),
 	rdf_object(o),
-	rdf_assert_list(t, r),
-	rdf_assert_list(t, r, r),
-	rdf_last(r, o),
+	rdf_assert_list(t,r),
+	rdf_assert_list(t,r,r),
+	rdf_last(r,o),
 	rdf_list(r),
-	rdf_list(r, -),
-	rdf_length(r, -),
-	rdf_member(o, r),
-	rdf_nth0(?, r, o),
+	rdf_list(r,-),
+	rdf_length(r,-),
+	rdf_member(o,r),
+	rdf_nextto(o,o),
+	rdf_nth0(?,r,o),
 	rdf_retract_list(r).
 
 
@@ -1637,6 +1641,24 @@ rdf_member2(M, L) :-
 rdf_member2(M, L) :-
 	rdf_has(L, rdf:rest, L1),
 	rdf_member2(M, L1).
+
+
+%! rdf_nextto(?X, ?Y) is nondet.
+%! rdf_nextto(?X, ?Y, ?RdfList) is nondet.
+%
+%	True if Y directly follows X in RdfList.
+
+rdf_nextto(X, Y) :-
+  distinct(X-Y, rdf_nextto(X, Y, _)).
+
+
+rdf_nextto(X, Y, L) :-
+	var(X), ground(Y), !,
+	rdf_nextto(Y, X, L).
+rdf_nextto(X, Y, L) :-
+	rdf_has(L, rdf:first, X),
+	rdf_has(L, rdf:rest, T),
+	rdf_has(T, rdf:first, Y).
 
 
 %%	rdf_nth0(?Index, +RDFList, ?X) is nondet.
