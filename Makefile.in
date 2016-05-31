@@ -34,7 +34,7 @@ all:		$(TARGETS)
 
 rdf_db.@SO@:	$(RDFDBOBJ)
 		$(LD) $(LDSOFLAGS) -o $@ $(RDFDBOBJ) $(LIBS) $(LIBPLSO)
-turtle.@SO@:	turtle.o
+turtle.@SO@:	turtle.o murmur.o
 		$(LD) $(LDSOFLAGS) -o $@ turtle.o murmur.o $(LIBS) $(LIBPLSO)
 ntriples.@SO@:	ntriples.o
 		$(LD) $(LDSOFLAGS) -o $@ ntriples.o $(LIBS) $(LIBPLSO)
