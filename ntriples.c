@@ -101,16 +101,6 @@ is_eol(int c)
 }
 
 static inline int
-is_digit(int c)
-{ return (c < 128 ? (char_type[c] & DI) != 0 : FALSE);
-}
-
-static inline int
-is_scheme_char(int c)
-{ return (c < 128 ? (char_type[c] & (LC|UC)) != 0 : FALSE);
-}
-
-static inline int
 is_lang_char1(int c)
 { return (c < 128 ? (char_type[c] & (LC|UC)) != 0 : FALSE);
 }
@@ -118,16 +108,6 @@ is_lang_char1(int c)
 static inline int
 is_lang_char(int c)
 { return (c < 128 ? (char_type[c] & (LC|UC|DI)) != 0 : FALSE) || c == '-';
-}
-
-static inline int
-is_local_escape(int c)
-{ return (c < 128 ? (char_type[c] & EC) != 0 : FALSE);
-}
-
-static inline int
-is_iri_char(int c)
-{ return (c < 128 ? (char_type[c] & NI) == 0 : TRUE);
 }
 
 static const char hexval0[] =
@@ -154,14 +134,6 @@ static inline int
 wcis_pn_chars_u(int c)			/* 164s */
 { return ( wcis_pn_chars_base(c) ||
 	   c == '_'
-	 );
-}
-
-
-static inline int
-wcis_pn_chars(int c)
-{ return ( wcis_pn_chars_u(c) ||
-	   wcis_pn_chars_extra(c)
 	 );
 }
 
