@@ -160,6 +160,14 @@ In a nutshell, the following issues are addressed:
 @version 2016
 */
 
+:- dynamic
+	rdf11:in_ground_type_hook/3,
+	rdf11:out_type_hook/3.
+
+:- multifile
+	rdf11:in_ground_type_hook/3,
+	rdf11:out_type_hook/3.
+
 :- meta_predicate
 	parse_partial_xml(3,+,-).
 
@@ -917,6 +925,8 @@ in_type(_, _, _, _).
 %	lexical form. The lecical form  is   represented  as an atom. In
 %	future versions this is likely to become a string.
 
+in_ground_type(Type, Input, Lex) :-
+	rdf11:in_ground_type_hook(Type, Input, Lex), !.
 in_ground_type(IntType, Val, Val0) :-
 	xsd_numerical(IntType, Domain, PrologType), !,
 	in_number(PrologType, Domain, IntType, Val, Val0).
@@ -1201,6 +1211,8 @@ post_object(Val^^xsd:string, literal(_, Plain)) :-
 
 out_type(xsd:string, Val, Val0) :- !,	% catches unbound type too
 	atom_string(Val0, Val).
+out_type(Type, Val, Val0) :-
+	rdf11:out_type_hook(Type, Val, Val0), !.
 out_type(IntType, Val, Val0) :-
 	xsd_numerical(IntType, _Domain, _BasicType), !,
 	xsd_number_string(Val, Val0).
