@@ -1307,7 +1307,10 @@ tw_resource(Resource, State, Out) :-
 	tw_state_prefix_map(State, PrefixMap),
 	member(Prefix-Full, PrefixMap),
 	atom_concat(Full, Name, Resource),
-	turtle:turtle_pn_local(Name), !,
+	(   turtle:turtle_pn_local(Name)
+	->  true
+	;   Name == ''
+	), !,
 	format(Out, '~w:~w', [Prefix, Name]).
 tw_resource(Resource, State, Out) :-
 	tw_relative_uri(Resource, State, Out).
