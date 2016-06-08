@@ -131,22 +131,28 @@ hexd(int c)
 
 
 static inline int
-wcis_pn_chars_u(int c)			/* 164s */
+wcis_pn_chars_u(int c)			/* 158s */
 { return ( wcis_pn_chars_base(c) ||
-	   c == '_'
+	   c == '_' || c == ':'
 	 );
 }
 
 
-static inline int			/* 2.4 RDF Blank Nodes */
+static inline int			/* 141s RDF Blank Nodes */
 wcis_pn_chars_du(int c)
-{ return ( wcis_pn_chars_base(c) ||
+{ return ( wcis_pn_chars_u(c) ||
+	   (c >= '0' && c <= '9')
+	 );
+}
+
+static inline int
+wcis_pn_chars(int c)			/* 160s */
+{ return ( wcis_pn_chars_u(c) ||
+	   c == '-' ||
 	   (c >= '0' && c <= '9') ||
-	   c == '_' ||
 	   wcis_pn_chars_extra(c)
 	 );
 }
-
 
 		 /*******************************
 		 *	      ERROR		*
@@ -465,10 +471,10 @@ read_node_id(IOSTREAM *in, term_t subject, int *cp)
 
       c = Sgetcode(in);
 
-      if ( wcis_pn_chars_du(c) )
+      if ( wcis_pn_chars(c) )
       { addBuf(&buf, c);
       } else if ( c == '.' &&
-		  (wcis_pn_chars_du((c2=Speekcode(in))) || c2 == '.') )
+		  (wcis_pn_chars((c2=Speekcode(in))) || c2 == '.') )
       { addBuf(&buf, c);
       } else
       { term_t av = PL_new_term_refs(1);
