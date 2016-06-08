@@ -45,6 +45,8 @@
 	    rdf_assert/4,		% +S, +P, +O, ?G
 	    rdf_retractall/3,		% ?S, ?P, ?O
 	    rdf_retractall/4,		% ?S, ?P, ?O, ?G
+	    rdf_update/4,		% +S, +P, +O, +Action
+	    rdf_update/5,		% +S, +P, +O, +G, +Action
 
 	    {}/1,			% +Where
 	    rdf_where/1,		% +Where
@@ -110,6 +112,8 @@
 		     rdf_reachable/5,
 		     rdf_retractall/3,
 		     rdf_retractall/4,
+		     rdf_update/4,
+		     rdf_update/5,
 		     rdf_node/1,
 		     rdf_bnode/1,
 		     rdf_is_literal/1,
@@ -178,6 +182,8 @@ In a nutshell, the following issues are addressed:
 	rdf_reachable(r,r,o,+,-),
 	rdf_retractall(r,r,o),
 	rdf_retractall(r,r,o,r),
+	rdf_update(r,r,o,t),
+	rdf_update(r,r,o,r,t),
 	{}(t),
 	rdf_where(t),
 	rdf_canonical_literal(o,-),
@@ -211,7 +217,7 @@ In a nutshell, the following issues are addressed:
 %%	rdf(?S, ?P, ?O, ?G) is nondet.
 %
 %	True if an RDF triple <S,P,O> exists, optionally in the graph G.
-%	The _Object_ is either a resource  (atom)   or  one of the terms
+%	The object O is either a resource  (atom)   or  one of the terms
 %	listed below. The described types apply for  the case where O is
 %	unbound. If O is instantiated it   is converted according to the
 %	rules described with rdf_assert/3.
@@ -256,11 +262,12 @@ In a nutshell, the following issues are addressed:
 %
 %	Notes:
 %
-%	  (1) xsd:decimal is formally incorrect.  Future versions
-%	      of SWI-Prolog may introduce decimal as a subtype of
+%	  (1) The current implementation of xsd:decimal values as
+%	      floats is formally incorrect.  Future versions of
+%	      SWI-Prolog may introduce decimal as a subtype of
 %	      rational.
-%	  (2) `SS` fields are seconds that can either be integer
-%	      or float.
+%	  (2) `SS` fields denote the number of seconds.  This can
+%	      either be an integer or a float.
 %	  (3) The `date_time` structure can have a 7th field that
 %	      denotes the timezone offset *in seconds* as an
 %	      integer.
@@ -282,7 +289,7 @@ In a nutshell, the following issues are addressed:
 %
 %	@see [Triple pattern querying](http://www.w3.org/TR/sparql11-query/#sparqlTriplePatterns)
 %	@see xsd_number_string/2 and xsd_time_string/3 are used to
-%	     convert between the lexical representation and Prolog term.
+%	     convert between lexical representations and Prolog terms.
 
 rdf(S,P,O) :-
 	pre_object(O,O0),
@@ -376,6 +383,29 @@ rdf_retractall(S,P,O,G) :-
 	pre_object(O,O0),
 	pre_graph(G,G0),
 	rdf_db:rdf_retractall(S,P,O0,G0).
+
+
+%! rdf_update(+S, +P, +O, +Action) is det.
+%! rdf_update(+S, +P, +O, +G, +Action) is det.
+%
+% Allows the subject, predicate or object term of an RDF tuple to be
+% replaced.
+
+rdf_update(S, P, O, Action) :-
+	rdf_update(S, P, O, _, Action).
+
+rdf_update(S, P, O, G, Action) :-
+	must_be(ground, O),
+	rdf11:pre_ground_object(O, O0),
+	(   Action = object(NewO)
+	->  rdf11:pre_ground_object(NewO, NewO0),
+	    Action0 = object(NewO0)
+	;   Action0 = Action
+	),
+	(   var(G)
+	->  rdf_db:rdf_update(S, P, O0, Action0)
+	;   rdf_db:rdf_update(S, P, O0, G, Action0)
+	).
 
 
 %%	rdf_compare(-Diff, +Left, +Right) is det.
