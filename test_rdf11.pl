@@ -92,6 +92,9 @@ test(untyped, true) :-
 test(untyped, Type == y) :-
 	rdf_assert(untyped, p1, "y"^^y),
 	rdf(untyped, p1, "y"^^Type).
+test(int_string, fail) :-
+	rdf_assert(int_string, p1, 1),
+	rdf(int_string, p1, _^^xsd:string).
 test(untyped_int, true) :-
 	rdf_assert(untyped, p1, "y"^^y),
 	\+ rdf(untyped, p1, "10"^^_Type).
