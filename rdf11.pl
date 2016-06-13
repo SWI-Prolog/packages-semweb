@@ -1199,6 +1199,7 @@ post_object(Val@Lang, literal(lang(Lang, Val0))) :-
 post_object(Val^^Type, literal(type(Type, Val0))) :- !,
 	out_type(Type, Val, Val0).
 post_object(Val^^xsd:string, literal(Plain)) :- !,
+	atomic(Plain),
 	atom_string(Plain, Val).
 post_object(Val@Lang, literal(_, lang(Lang, Val0))) :-
 	nonvar(Lang), !,
