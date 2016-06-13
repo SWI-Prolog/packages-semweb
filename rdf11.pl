@@ -823,8 +823,12 @@ pre_object(Atom, URI) :-
 	URI = Atom.
 pre_object(Val@Lang, literal(lang(Lang, Val0))) :- !,
 	in_lang_string(Val, Val0).
-pre_object(Val^^Type, literal(type(Type0, Val0))) :- !,
-	in_type(Type, Val, Type0, Val0).
+pre_object(Val^^Type, literal(Literal)) :- !,
+	in_type(Type, Val, Type0, Val0),
+	(   var(Type0), var(Val0)
+	->  true
+	;   Literal = type(Type0, Val0)
+	).
 pre_object(Obj, Val0) :-
 	ground(Obj), !,
 	pre_ground_object(Obj, Val0).
