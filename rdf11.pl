@@ -38,6 +38,8 @@
 	    rdf/4,			% ?S, ?P, ?O, G
 	    rdf_has/3,			% ?S, ?P, ?O
 	    rdf_has/4,			% ?S, ?P, ?O, -RealP
+	    rdf_update/4,		% +S, +P, +O, +Action
+	    rdf_update/5,		% +S, +P, +O, +G, +Action
 	    rdf_reachable/3,		% ?S, ?P, ?O
 	    rdf_reachable/5,		% ?S, ?P, ?O, +MaxD, -D
 
@@ -106,6 +108,8 @@
 		     rdf_current_predicate/1,
 		     rdf_has/3,
 		     rdf_has/4,
+		     rdf_update/4,
+		     rdf_update/5,
 		     rdf_reachable/3,
 		     rdf_reachable/5,
 		     rdf_retractall/3,
@@ -174,6 +178,8 @@ In a nutshell, the following issues are addressed:
 	rdf_assert(r,r,o,r),
 	rdf_has(r,r,o),
 	rdf_has(r,r,o,-),
+	rdf_update(r,r,o,t),
+	rdf_update(r,r,o,r,t),
 	rdf_reachable(r,r,o),
 	rdf_reachable(r,r,o,+,-),
 	rdf_retractall(r,r,o),
@@ -313,6 +319,42 @@ rdf_has(S,P,O,RealP) :-
 	pre_object(O,O0),
 	rdf_db:rdf_has(S,P,O0,RealP),
 	post_object(O,O0).
+
+
+
+
+
+%%	rdf_update(+S, +P, +O, +Action) is det.
+%%	rdf_update(+S, +P, +O, +G, +Action) is det.
+
+rdf_update(S, P, O, Action) :-
+	rdf_update(S, P, O, _, Action).
+
+
+rdf_update(S1, P, O, G, subject(S2)) :- !,
+	(   S1 \== S2
+	->  rdf_retractall(S1, P, O, G),
+	    rdf_assert(S2, P, O, G)
+	;   true
+	).
+rdf_update(S, P1, O, G, predicate(P2)) :- !,
+	(   P1 \== P2
+	->  rdf_retractall(S, P1, O, G),
+	    rdf_assert(S, P2, O, G)
+	;   true
+	).
+rdf_update(S, P, O1, G, object(O2)) :- !,
+	(   O1 \== O2
+	->  rdf_retractall(S, P, O1, G),
+	    rdf_assert(S, P, O2, G)
+	;   true
+	).
+rdf_update(S, P, O, G1, graph(G2)) :-
+	(   G1 \== G2
+	->  rdf_retractall(S, P, O, G1),
+	    rdf_assert(S, P, O, G2)
+	;   true
+	).
 
 
 %%	rdf_reachable(?S, +P, ?O) is nondet.
