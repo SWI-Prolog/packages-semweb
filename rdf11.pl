@@ -38,6 +38,8 @@
 	    rdf/4,			% ?S, ?P, ?O, G
 	    rdf_has/3,			% ?S, ?P, ?O
 	    rdf_has/4,			% ?S, ?P, ?O, -RealP
+	    rdf_update/4,		% +S, +P, +O, +Action
+	    rdf_update/5,		% +S, +P, +O, +G, +Action
 	    rdf_reachable/3,		% ?S, ?P, ?O
 	    rdf_reachable/5,		% ?S, ?P, ?O, +MaxD, -D
 
@@ -106,6 +108,8 @@
 		     rdf_current_predicate/1,
 		     rdf_has/3,
 		     rdf_has/4,
+		     rdf_update/4,
+		     rdf_update/5,
 		     rdf_reachable/3,
 		     rdf_reachable/5,
 		     rdf_retractall/3,
@@ -174,6 +178,8 @@ In a nutshell, the following issues are addressed:
 	rdf_assert(r,r,o,r),
 	rdf_has(r,r,o),
 	rdf_has(r,r,o,-),
+	rdf_update(r,r,o,t),
+	rdf_update(r,r,o,r,t),
 	rdf_reachable(r,r,o),
 	rdf_reachable(r,r,o,+,-),
 	rdf_retractall(r,r,o),
@@ -316,6 +322,79 @@ rdf_has(S,P,O,RealP) :-
 	pre_object(O,O0),
 	rdf_db:rdf_has(S,P,O0,RealP),
 	post_object(O,O0).
+
+
+%%	rdf_update(+S, +P, +O, ++Action) is det.
+%%	rdf_update(+S, +P, +O, +G, ++Action) is det.
+%
+%	Replaces one of  the  three  fields   on  the  matching  triples
+%	depending on Action:
+%
+%	  * subject(Resource)
+%	  Changes the first field of the triple.
+%	  * predicate(Resource)
+%         Changes the second field of the triple.
+%	  * object(Object)
+%	  Changes the last field of the triple to the given resource or
+%	  literal(Value).
+%	  * graph(Graph)
+%	  Moves the triple from its current named graph to Graph.
+%
+%	The argument matching  the  action  must   be  ground.  If  this
+%	argument is equivalent to  the  current   value,  no  action  is
+%	performed. Otherwise, the requested action   is performed on all
+%	matching triples.  For example, all resources typed `rdfs:Class`
+%	can be changed to `owl:Class` using
+%
+%	  ```
+%	  ?- rdf_update(_, rdf:type, rdfs:'Class',
+%			object(owl:'Class')).
+%	  ```
+%
+%	@error instantiation_error if Action or the matching argument is
+%	       not ground.
+%	@error domain_error(rdf_update_action, Action) if Action is not
+%	       one of the above terms.
+
+rdf_update(S, P, O, Action) :-
+	rdf_update(S, P, O, _, Action).
+rdf_update(S, P, O, G, Action) :-
+	must_be(ground, Action),
+	(   update_column(Action, S,P,O,G, On)
+	->  must_be(ground, On),
+	    arg(1, Action, Old),
+	    (	On == Old
+	    ->	true
+	    ;	rdf_transaction(rdf_update_(S, P, O, G, Action), update)
+	    )
+	;   domain_error(rdf_update_action, Action)
+	).
+
+update_column(subject(_),   S,_,_,_, S).
+update_column(predicate(_), _,P,_,_, P).
+update_column(object(_),    _,_,O,_, O).
+update_column(graph(_),     _,_,_,G, G).
+
+rdf_update_(S1, P, O, G, subject(S2)) :- !,
+	forall(rdf(S1, P, O, G),
+	       ( rdf_retractall(S1, P, O, G),
+		 rdf_assert(S2, P, O, G)
+	       )).
+rdf_update_(S, P1, O, G, predicate(P2)) :- !,
+	forall(rdf(S, P1, O, G),
+	       ( rdf_retractall(S, P1, O, G),
+		 rdf_assert(S, P2, O, G)
+	       )).
+rdf_update_(S, P, O1, G, object(O2)) :- !,
+	forall(rdf(S, P, O1, G),
+	       ( rdf_retractall(S, P, O1, G),
+		 rdf_assert(S, P, O2, G)
+	       )).
+rdf_update_(S, P, O, G1, graph(G2)) :- !,
+	forall(rdf(S, P, O, G1),
+	       ( rdf_retractall(S, P, O, G1),
+		 rdf_assert(S, P, O, G2)
+	       )).
 
 
 %%	rdf_reachable(?S, +P, ?O) is nondet.
