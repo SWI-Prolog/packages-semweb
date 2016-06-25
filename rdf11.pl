@@ -211,7 +211,7 @@ In a nutshell, the following issues are addressed:
 %%	rdf(?S, ?P, ?O, ?G) is nondet.
 %
 %	True if an RDF triple <S,P,O> exists, optionally in the graph G.
-%	The _Object_ is either a resource  (atom)   or  one of the terms
+%	The object O is either a resource  (atom)   or  one of the terms
 %	listed below. The described types apply for  the case where O is
 %	unbound. If O is instantiated it   is converted according to the
 %	rules described with rdf_assert/3.
@@ -256,11 +256,14 @@ In a nutshell, the following issues are addressed:
 %
 %	Notes:
 %
-%	  (1) xsd:decimal is formally incorrect.  Future versions
-%	      of SWI-Prolog may introduce decimal as a subtype of
-%	      rational.
-%	  (2) `SS` fields are seconds that can either be integer
-%	      or float.
+%	  (1) The current implementation of `xsd:decimal` values
+%             as floats is formally incorrect.  Future versions
+%             of SWI-Prolog may introduce decimal as a subtype
+%	      of rational.
+%
+%	  (2) `SS` fields denote the number of seconds.  This can
+%             either be an integer or a float.
+%
 %	  (3) The `date_time` structure can have a 7th field that
 %	      denotes the timezone offset *in seconds* as an
 %	      integer.
@@ -282,7 +285,7 @@ In a nutshell, the following issues are addressed:
 %
 %	@see [Triple pattern querying](http://www.w3.org/TR/sparql11-query/#sparqlTriplePatterns)
 %	@see xsd_number_string/2 and xsd_time_string/3 are used to
-%	     convert between the lexical representation and Prolog term.
+%	     convert between lexical representations and Prolog terms.
 
 rdf(S,P,O) :-
 	pre_object(O,O0),
