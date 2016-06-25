@@ -1568,24 +1568,27 @@ rdf_is_term(N) :- rdf_is_literal(N).
 %%	rdf_list(?RDFTerm) is semidet.
 %
 %	True if RDFTerm is a proper RDF   list.  This implies that every
-%	node in the list has an  rdf:first   and  rdf:rest and the lists
-%	ends in rdf:nil. If RDFTerm is unbound, RDFTerm is bound to each
-%	_maximal_ RDF list. An RDF list  is   _maximal_  if  there is no
-%	triple rdf(_, rdf:rest, RDFList).
+%	node in the list has an  `rdf:first` and `rdf:rest` property and
+%	the list ends in `rdf:nil`.
+%
+%	If RDFTerm is unbound, RDFTerm is   bound  to each _maximal_ RDF
+%	list. An RDF list is _maximal_  if   there  is  no triple rdf(_,
+%	rdf:rest, RDFList).
 
 rdf_list(L) :-
 	var(L), !,
 	rdf_has(L, rdf:first, _),
 	\+ rdf_has(_, rdf:rest, L),
-	rdf_list_g(L).
+	rdf_list_g(L), !.
 rdf_list(L) :-
-	rdf_list_g(L).
+	rdf_list_g(L), !.
 
 rdf_list_g(rdf:nil) :- !.
 rdf_list_g(L) :-
+	once(rdf_has(L, rdf:first, _)),
 	rdf_has(L, rdf:rest, Rest),
 	(   rdf_equal(rdf:nil, Rest)
-	->  once(rdf_has(L, rdf:first, _))
+	->  true
 	;   rdf_list_g(Rest)
 	).
 
