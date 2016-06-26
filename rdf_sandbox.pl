@@ -89,7 +89,7 @@ sandbox:safe_primitive(rdf_api:rdf(_,_,_,_)).
 		 *	       RDF_DB		*
 		 *******************************/
 
-:- if(current_predicate(rdf_db:rdf(_,_,_))).
+:- if(current_predicate(rdf_db:rdf/3)).
 sandbox:safe_primitive(rdf_db:rdf(_,_,_)).
 sandbox:safe_primitive(rdf_db:rdf(_,_,_,_)).
 sandbox:safe_primitive(rdf_db:rdf_has(_,_,_)).
@@ -122,7 +122,7 @@ sandbox:safe_primitive(rdf_db:rdf_statistics_literal_map(_,_)).
 		 *	      RDF11		*
 		 *******************************/
 
-:- if(current_predicate(rdf11:in_xml_literal(_,_,_))).
+:- if(current_predicate(rdf11:in_xml_literal/3)).
 sandbox:safe_primitive(rdf11:in_xml_literal(_,_,_)).
 sandbox:safe_primitive(rdf11:pre_object(_,_)).
 sandbox:safe_primitive(rdf11:post_object(_,_)).
@@ -133,7 +133,7 @@ sandbox:safe_primitive(rdf11:post_object(_,_)).
 		 *	   RDF-LITINDEX		*
 		 *******************************/
 
-:- if(current_predicate(rdf_litindex:rdf_find_literals(_,_))).
+:- if(current_predicate(rdf_litindex:rdf_find_literals/2)).
 sandbox:safe_primitive(rdf_litindex:rdf_find_literals(_,_)).
 sandbox:safe_primitive(rdf_litindex:rdf_tokenize_literal(_,_)).
 sandbox:safe_primitive(rdf_litindex:rdf_literal_index(_,_)).
@@ -143,6 +143,6 @@ sandbox:safe_primitive(rdf_litindex:rdf_literal_index(_,_)).
 		 *	   SPARQL-CLIENT	*
 		 *******************************/
 
-:- if(current_predicate(sparql_client:sparql_query(_,_,_))).
+:- if(current_predicate(sparql_client:sparql_query/3)).
 sandbox:safe_primitive(sparql_client:sparql_query(_,_,_)).
 :- endif.
