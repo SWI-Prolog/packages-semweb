@@ -3616,41 +3616,8 @@ rdf_url_namespace(URL, Prefix) :-
 %	generate-and-test loops slow.
 %
 %	@deprecated. New code should  use   the  library(crypt)  library
-%	provided by the clib package.
-
-
-		 /*******************************
-		 *	 SANDBOX SUPPORT	*
-		 *******************************/
-
-:- multifile
-	sandbox:safe_primitive/1.
-
-sandbox:safe_primitive(rdf_db:rdf(_,_,_)).
-sandbox:safe_primitive(rdf_db:rdf(_,_,_,_)).
-sandbox:safe_primitive(rdf_db:rdf_has(_,_,_)).
-sandbox:safe_primitive(rdf_db:rdf_has(_,_,_,_)).
-sandbox:safe_primitive(rdf_db:rdf_reachable(_,_,_)).
-sandbox:safe_primitive(rdf_db:rdf_reachable(_,_,_,_,_)).
-sandbox:safe_primitive(rdf_db:rdf_resource(_)).
-sandbox:safe_primitive(rdf_db:rdf_subject(_)).
-sandbox:safe_primitive(rdf_db:rdf_predicate_property(_,_)).
-sandbox:safe_primitive(rdf_db:rdf_current_predicate(_)).
-sandbox:safe_primitive(rdf_db:rdf_current_literal(_)).
-sandbox:safe_primitive(rdf_db:rdf_graph(_)).
-sandbox:safe_primitive(rdf_db:rdf_generation(_)).
-sandbox:safe_primitive(rdf_db:rdf_estimate_complexity(_,_,_,_)).
-sandbox:safe_primitive(rdf_db:rdf_statistics(_)).
-sandbox:safe_primitive(rdf_db:lang_matches(_,_)).
-sandbox:safe_primitive(rdf_db:lang_equal(_,_)).
-sandbox:safe_primitive(rdf_db:rdf_version(_)).
-sandbox:safe_primitive(rdf_db:rdf_md5(_,_)).
-sandbox:safe_primitive(rdf_db:rdf_graph_modified_(_,_,_)).
-sandbox:safe_primitive(rdf_db:rdf_graph_source_(_,_,_)).
-sandbox:safe_primitive(rdf_db:rdf_graph_(_,_)).
-sandbox:safe_primitive(rdf_db:rdf_find_literal_map(_,_,_)).
-sandbox:safe_primitive(rdf_db:rdf_keys_in_literal_map(_,_,_)).
-sandbox:safe_primitive(rdf_db:rdf_statistics_literal_map(_,_)).
+%	provided  by  the  clib  package  for  password  encryption  and
+%	library(md5) to compute MD5 hashes.
 
 
 		 /*******************************

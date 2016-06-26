@@ -1857,14 +1857,3 @@ rdf_retract_list_(L) :-
 	       rdf_retract_list_(L1)),
 	rdf_retractall(L, rdf:rest, _),
 	rdf_retractall(L, rdf:type, rdf:'List').
-
-
-		 /*******************************
-		 *	      SANDBOX		*
-		 *******************************/
-
-:- multifile sandbox:safe_primitive/1.
-
-sandbox:safe_primitive(rdf11:in_xml_literal(_,_,_)).
-sandbox:safe_primitive(rdf11:pre_object(_,_)).
-sandbox:safe_primitive(rdf11:post_object(_,_)).

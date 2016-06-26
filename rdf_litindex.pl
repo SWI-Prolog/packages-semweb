@@ -971,13 +971,3 @@ progress(Map, Which) :-
 	       [Which, Keys, Values]).
 progress(_,_).
 
-
-		 /*******************************
-		 *	      SANDBOX		*
-		 *******************************/
-
-:- multifile sandbox:safe_primitive/1.
-
-sandbox:safe_primitive(rdf_litindex:rdf_find_literals(_,_)).
-sandbox:safe_primitive(rdf_litindex:rdf_tokenize_literal(_,_)).
-sandbox:safe_primitive(rdf_litindex:rdf_literal_index(_,_)).

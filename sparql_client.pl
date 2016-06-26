@@ -495,12 +495,3 @@ jvalue('typed-literal', JValue, literal(type(Type, Value))) :-
 jvalue(bnode, JValue, URI) :-
 	memberchk(value=NodeID, JValue),
 	bnode(NodeID, URI).
-
-		 /*******************************
-		 *	      SANDBOX		*
-		 *******************************/
-
-:- multifile
-	sandbox:safe_primitive/1.
-
-sandbox:safe_primitive(sparql_client:sparql_query(_,_,_)).
