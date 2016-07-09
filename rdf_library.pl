@@ -92,7 +92,7 @@ The typical usage scenario is
 @author Jan Wielemaker
 */
 
-:- rdf_register_ns(lib,  'http://www.swi-prolog.org/rdf/library/').
+:- rdf_register_ns(swi_lib,  'http://www.swi-prolog.org/rdf/library/').
 :- rdf_register_ns(void, 'http://rdfs.org/ns/void#').
 :- rdf_register_ns(vann, 'http://purl.org/vocab/vann/').
 
@@ -730,8 +730,8 @@ process_triples(Manifest, Triples) :-
 %	True if Mnemonic is an abbreviation of NameSpace.
 
 extract_namespace(Triples, Mnemonic, Namespace) :-
-	edge(Triples, Decl, lib:mnemonic, literal(Mnemonic)),
-	edge(Triples, Decl, lib:namespace, Namespace).
+	edge(Triples, Decl, swi_lib:mnemonic, literal(Mnemonic)),
+	edge(Triples, Decl, swi_lib:namespace, Namespace).
 extract_namespace(Triples, Mnemonic, Namespace) :-
 	edge(Triples, Decl, vann:preferredNamespacePrefix, literal(Mnemonic)),
 	edge(Triples, Decl, vann:preferredNamespaceUri, literal(Namespace)).
@@ -761,9 +761,9 @@ generalized(imports(ontology, Path), imports(Other, Path)) :-
 	dif(Other, ontology).
 
 ontology_type(X) :-
-	(   rdf_equal(X, lib:'Ontology')
-	;   rdf_equal(X, lib:'Schema')
-	;   rdf_equal(X, lib:'Instances')
+	(   rdf_equal(X, swi_lib:'Ontology')
+	;   rdf_equal(X, swi_lib:'Schema')
+	;   rdf_equal(X, swi_lib:'Instances')
 	;   rdf_equal(X, void:'Dataset')
 	;   rdf_equal(X, void:'Linkset')
 	).
@@ -780,32 +780,32 @@ facet(Triples, File, version(Version)) :-
 facet(Triples, File, comment(Comment)) :-
 	edge(Triples, File, rdfs:comment, literal(Comment)).
 facet(Triples, File, base_uri(BaseURI)) :-
-	edge(Triples, File, lib:baseURI, BaseURI).
+	edge(Triples, File, swi_lib:baseURI, BaseURI).
 facet(Triples, File, claimed_source(Source)) :-
-	edge(Triples, File, lib:source, Source).
+	edge(Triples, File, swi_lib:source, Source).
 facet(Triples, File, format(Format)) :-
-	edge(Triples, File, lib:format, literal(Format)).
+	edge(Triples, File, swi_lib:format, literal(Format)).
 facet(Triples, File, blank_nodes(Mode)) :-
-	edge(Triples, File, lib:blankNodes, literal(Mode)),
+	edge(Triples, File, swi_lib:blankNodes, literal(Mode)),
 	must_be(oneof([share,noshare]), Mode).
 facet(Triples, File, imports(ontology, Path)) :-
 	edge(Triples, File, owl:imports, Path).
 facet(Triples, File, imports(schema, Path)) :-
-	edge(Triples, File, lib:schema, Path).
+	edge(Triples, File, swi_lib:schema, Path).
 facet(Triples, File, imports(instances, Path)) :-
-	edge(Triples, File, lib:instances, Path).
+	edge(Triples, File, swi_lib:instances, Path).
 facet(Triples, File, imports(subset, Path)) :-
 	edge(Triples, File, void:subset, Path).
 facet(Triples, File, imports(data_dump, Path)) :-
 	edge(Triples, File, void:dataDump, Path).
 facet(Triples, File, provides_ns(NS)) :-
-	edge(Triples, File, lib:providesNamespace, NSDecl),
-	edge(Triples, NSDecl, lib:namespace, NS).
+	edge(Triples, File, swi_lib:providesNamespace, NSDecl),
+	edge(Triples, NSDecl, swi_lib:namespace, NS).
 facet(Triples, File, uses_ns(NS)) :-
-	edge(Triples, File, lib:usesNamespace, NSDecl),
-	edge(Triples, NSDecl, lib:namespace, NS).
+	edge(Triples, File, swi_lib:usesNamespace, NSDecl),
+	edge(Triples, NSDecl, swi_lib:namespace, NS).
 facet(Triples, File, virtual) :-
-	(   edge(Triples, File, rdf:type, lib:'Virtual')
+	(   edge(Triples, File, rdf:type, swi_lib:'Virtual')
 	;   edge(Triples, File, rdf:type, void:'Dataset')
 	;   edge(Triples, File, rdf:type, void:'Linkset')
 	) -> true.
