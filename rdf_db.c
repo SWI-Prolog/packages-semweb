@@ -9314,7 +9314,7 @@ rdf_warm_indexes(term_t indexes)
 	  break;
       }
       if ( i == ic )
-	il[ic++] = by;
+	il[ic++] = ICOL(by);
     } else
       return 0;
   }

@@ -911,6 +911,14 @@ unload(1) :-
 	assertion(T0 == T2),
 	assertion(T1 == 0).
 
+
+		 /*******************************
+		 *	     INDEXES		*
+		 *******************************/
+
+warm(1) :-
+	rdf_warm_indexes.
+
 		 /*******************************
 		 *	      SCRIPTS		*
 		 *******************************/
@@ -1006,6 +1014,7 @@ testset(duplicates).
 testset(source).
 testset(delete).
 testset(unload).
+testset(warm).
 
 %	testdir(Dir)
 %
