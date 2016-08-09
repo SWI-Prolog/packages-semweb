@@ -9292,7 +9292,7 @@ rdf_warm_indexes(term_t indexes)
   while(PL_get_list_ex(tail, head, tail))
   { char *s;
 
-    if ( PL_get_chars(head, &s, CVT_ATOM|CVT_EXCEPTION) )
+    if ( PL_get_chars(head, &s, CVT_ATOM|CVT_STRING|CVT_EXCEPTION) )
     { int by = 0;
       int i;
 
