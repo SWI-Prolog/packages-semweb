@@ -91,7 +91,7 @@ expand_option(Opt, Opt).
 %%	rdf_cache_file(+URL, +ReadWrite, -File) is semidet.
 %
 %	File is the cache file  for  URL.   If  ReadWrite  is =read=, it
-%	returns the name of an existing file.  If =write= it returns the
+%	returns the name of an existing file.  If =write= it returns
 %	where a new cache file can be overwritten or created.
 
 rdf_cache_file(_URL, _, _File) :-
