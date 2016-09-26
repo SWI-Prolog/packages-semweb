@@ -82,7 +82,8 @@ sandbox:safe_primitive(rdf_api:rdf(_,_,_,_)).
 */
 
 :- multifile
-	sandbox:safe_primitive/1.
+	sandbox:safe_primitive/1,
+	safe_primitive:safe_meta_predicate/1.
 
 
 		 /*******************************
@@ -115,6 +116,8 @@ sandbox:safe_primitive(rdf_db:rdf_graph_(_,_)).
 sandbox:safe_primitive(rdf_db:rdf_find_literal_map(_,_,_)).
 sandbox:safe_primitive(rdf_db:rdf_keys_in_literal_map(_,_,_)).
 sandbox:safe_primitive(rdf_db:rdf_statistics_literal_map(_,_)).
+
+sandbox:safe_meta_predicate(rdf_db:rdf_current_prefix/2).
 :- endif.
 
 

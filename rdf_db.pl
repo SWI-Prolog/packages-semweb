@@ -113,15 +113,16 @@
 	    lang_equal/2,		% +Lang1, +Lang2
 	    lang_matches/2,		% +Lang, +Pattern
 
-	    rdf_current_prefix/2,	% ?Alias, ?URI
+	    rdf_prefix/2,		% :Alias, +URI
+	    rdf_current_prefix/2,	% :Alias, ?URI
 	    rdf_register_prefix/2,	% +Alias, +URI
 	    rdf_register_prefix/3,	% +Alias, +URI, +Options
-	    rdf_current_ns/2,		% ?Alias, ?URI
+	    rdf_current_ns/2,		% :Alias, ?URI
 	    rdf_register_ns/2,		% +Alias, +URI
 	    rdf_register_ns/3,		% +Alias, +URI, +Options
-	    rdf_global_id/2,		% ?NS:Name, ?Global
-	    rdf_global_object/2,	% ?Object, ?NSExpandedObject
-	    rdf_global_term/2,		% Term, WithExpandedNS
+	    rdf_global_id/2,		% ?NS:Name, :Global
+	    rdf_global_object/2,	% ?Object, :NSExpandedObject
+	    rdf_global_term/2,		% Term, :WithExpandedNS
 
 	    rdf_compare/3,		% -Dif, +Object1, +Object2
 	    rdf_match_label/3,		% +How, +String, +Label
@@ -153,6 +154,7 @@
 	  ]).
 :- use_module(library(rdf)).
 :- use_module(library(lists)).
+:- use_module(library(pairs)).
 :- use_module(library(shlib)).
 :- use_module(library(gensym)).
 :- use_module(library(sgml)).
@@ -172,6 +174,11 @@
 :- public rdf_print_predicate_cloud/2.	% print matrix of reachable predicates
 
 :- meta_predicate
+	rdf_current_prefix(:, -),
+	rdf_current_ns(:, -),
+	rdf_global_id(+, :),
+	rdf_global_term(+, :),
+	rdf_global_object(+, :),
 	rdf_transaction(0),
 	rdf_transaction(0, +),
 	rdf_transaction(0, +, +),
@@ -245,11 +252,12 @@ store.
 		 *	     PREFIXES		*
 		 *******************************/
 
-%%	rdf_current_prefix(?Alias, ?URI) is nondet.
+%%	rdf_current_prefix(:Alias, ?URI) is nondet.
 %
 %	Query   predefined   prefixes   and    prefixes   defined   with
-%	rdf_register_prefix/2.  If Alias is unbound and one URI is the prefix
-%	of another, the longest is returned first. This allows turning a
+%	rdf_register_prefix/2   and   local   prefixes    defined   with
+%	rdf_prefix/2. If Alias is unbound and one   URI is the prefix of
+%	another, the longest is returned first.   This  allows turning a
 %	resource into a prefix/local couple using the simple enumeration
 %	below. See rdf_global_id/2.
 %
@@ -258,8 +266,44 @@ store.
 %	  atom_concat(Expansion, Local, URI),
 %	  ==
 
-rdf_current_prefix(Alias, URI) :-
+rdf_current_prefix(Module:Alias, URI) :-
+	nonvar(Alias), !,
+	rdf_current_prefix(Module, Alias, URI), !.
+rdf_current_prefix(Module:Alias, URI) :-
+	rdf_current_prefix(Module, Alias, URI).
+
+rdf_current_prefix(system, Alias, URI) :- !,
 	ns(Alias, URI).
+rdf_current_prefix(Module, Alias, URI) :-
+	default_module(Module, M),
+	(   M == system
+	->  ns(Alias, URI)
+	;   '$flushed_predicate'(M:'rdf prefix'(_,_)),
+	    call(M:'rdf prefix'(Alias,URI))
+	).
+
+%%	rdf_prefix(:Alias, +URI) is det.
+%
+%	Register a _local_ prefix.  This   declaration  takes precedence
+%	over globally defined prefixes   using  rdf_register_prefix/2,3.
+%	Module local prefixes are notably required   to deal with SWISH,
+%	where users need to  be  able   to  have  independent  namespace
+%	declarations.
+
+rdf_prefix(Alias, URI) :-
+	throw(error(context_error(nodirective, rdf_prefix(Alias, URI)), _)).
+
+system:term_expansion((:- rdf_prefix(AliasSpec, URI)), Clauses) :-
+	prolog_load_context(module, Module),
+	strip_module(Module:AliasSpec, TM, Alias),
+	must_be(atom, Alias),
+	must_be(atom, URI),
+	(   rdf_current_prefix(TM:Alias, URI)
+	->  Clauses = []
+	;   TM == Module
+	->  Clauses = 'rdf prefix'(Alias, URI)
+	;   Clauses = TM:'rdf prefix'(Alias, URI)
+	).
 
 %%	ns(?Alias, ?URI) is nondet.
 %
@@ -318,9 +362,19 @@ ns(xsd,	    'http://www.w3.org/2001/XMLSchema#').
 rdf_register_prefix(Alias, URI) :-
 	rdf_register_prefix(Alias, URI, []).
 
-rdf_register_prefix(Alias, URI, _) :-
-	ns(Alias, URI), !.
 rdf_register_prefix(Alias, URI, Options) :-
+	must_be(atom, Alias),
+	must_be(atom, URI),
+	(   rdf_current_prefix(system:Alias, URI)
+	->  true
+	;   register_global_prefix(Alias, URI, Options)
+	).
+
+%%	register_global_prefix(+Alias, +URI, +Options)
+%
+%	Register a global prefix.
+
+register_global_prefix(Alias, URI, Options) :-
 	ns(Alias, _), !,
 	(   option(force(true), Options, false)
 	->  retractall(ns(Alias, _)),
@@ -331,7 +385,7 @@ rdf_register_prefix(Alias, URI, Options) :-
 	;   throw(error(permission_error(register, namespace, Alias),
 			context(_, 'Already defined')))
 	).
-rdf_register_prefix(Alias, URI, _) :-
+register_global_prefix(Alias, URI, _) :-
 	findall(P-U, prefix_conflict(URI, P, U), Pairs),
 	order_prefixes([Alias-URI|Pairs], Ordered),
 	forall(member(P-U, Pairs), retract(ns(P,U))),
@@ -352,26 +406,24 @@ order_prefixes(Pairs, Sorted) :-
 prefix_uri_length(_-URI, Len) :-
 	atom_length(URI, Len).
 
-%%	rdf_current_ns(?Prefix, ?URI) is nondet.
+%%	rdf_current_ns(:Prefix, ?URI) is nondet.
 %
 %	@deprecated.  Use rdf_current_prefix/2.
 
 rdf_current_ns(Prefix, URI) :-
 	rdf_current_prefix(Prefix, URI).
 
-%%	rdf_register_ns(?Prefix, ?URI) is det.
+%%	rdf_register_ns(:Prefix, ?URI) is det.
+%%	rdf_register_ns(:Prefix, ?URI, +Options) is det.
 %
-%	@deprecated.  Use rdf_register_prefix/2.
-
-%%	rdf_register_ns(?Prefix, ?URI, +Options) is det.
+%	Register an RDF prefix.
 %
-%	@deprecated.  Use rdf_register_prefix/3.
+%	@deprecated. Use rdf_register_prefix/2 or rdf_register_prefix/3.
 
 rdf_register_ns(Prefix, URI) :-
 	rdf_register_prefix(Prefix, URI).
 rdf_register_ns(Prefix, URI, Options) :-
 	rdf_register_prefix(Prefix, URI, Options).
-
 
 
 %%	register_file_ns(+Map:list(pair)) is det.
@@ -402,87 +454,107 @@ register_file_ns(NS-URL) :-
 	).
 
 
-%%	rdf_global_id(?Id, ?GlobalId) is det.
+%%	rdf_global_id(?Id, :GlobalId) is det.
 %
-%	Convert between NS:Local and global atomic identifier.
-%	To be completed.
+%	Convert between NS:Local and  global   atomic  identifier. To be
+%	completed. Note that the predicate is   a  meta-predicate on the
+%	output argument. This is necessary  to   get  the module context
+%	while the first argument may be of the form (:)/2.
 
-rdf_global_id(NS:Local, Global) :-
-	global(NS, Local, Global), !.
-rdf_global_id(Global, Global).
+rdf_global_id(Id, Module:Global) :-
+	rdf_global_id(Id, Global, Module).
+
+rdf_global_id(NS:Local, Global, Module) :-
+	global(NS, Local, Global, Module), !.
+rdf_global_id(Global, Global, _).
 
 
-%%	rdf_global_object(+Object, -GlobalObject) is semidet.
-%%	rdf_global_object(-Object, +GlobalObject) is semidet.
+%%	rdf_global_object(+Object, :GlobalObject) is semidet.
+%%	rdf_global_object(-Object, :GlobalObject) is semidet.
 %
 %	Same as rdf_global_id/2,  but  intended   for  dealing  with the
 %	object part of a  triple,  in   particular  the  type  for typed
-%	literals.
+%	literals. Note that the predicate  is   a  meta-predicate on the
+%	output argument. This is necessary  to   get  the module context
+%	while the first argument may be of the form (:)/2.
 %
-%	@error	existence_error(rdf_namespace, NS)
+%	@error	existence_error(rdf_prefix, Prefix)
 
-rdf_global_object(Var, Global) :-
+rdf_global_object(Object, Module:GlobalObject) :-
+	rdf_global_object(Object, GlobalObject, Module).
+
+rdf_global_object(Var, Global, _M) :-
 	var(Var), !,
 	Global = Var.
-rdf_global_object(NS:Local, Global) :-
-	global(NS, Local, Global), !.
-rdf_global_object(literal(type(NS:Local, Value)),
-		  literal(type(Global, Value))) :-
-	global(NS, Local, Global), !.
-rdf_global_object(^^(Value,NS:Local),
-		  ^^(Value,Global)) :-
-	global(NS, Local, Global), !.
-rdf_global_object(literal(Query0, type(NS:Local, Value)),
-		  literal(Query1, type(Global, Value))) :-
-	global(NS, Local, Global), !,
-	rdf_global_term(Query0, Query1).
+rdf_global_object(Prefix:Local, Global, M) :-
+	global(Prefix, Local, Global, M), !.
+rdf_global_object(literal(type(Prefix:Local, Value)),
+		  literal(type(Global, Value)), M) :-
+	global(Prefix, Local, Global, M), !.
+rdf_global_object(^^(Value,Prefix:Local),
+		  ^^(Value,Global), M) :-
+	global(Prefix, Local, Global, M), !.
+rdf_global_object(literal(Query0, type(Prefix:Local, Value)),
+		  literal(Query1, type(Global, Value)), M) :-
+	global(Prefix, Local, Global, M), !,
+	rdf_global_term(Query0, Query1, M).
 rdf_global_object(literal(Query0, Value),
-		  literal(Query1, Value)) :- !,
-	rdf_global_term(Query0, Query1).
-rdf_global_object(Global, Global).
+		  literal(Query1, Value), M) :- !,
+	rdf_global_term(Query0, Query1, M).
+rdf_global_object(Global, Global, _).
 
-global(NS, Local, Global) :-
+global(Prefix, Local, Global, Module) :-
 	(   atom(Global)
-	->  ns(NS, Full),
+	->  rdf_current_prefix(Module:Prefix, Full),
 	    atom_concat(Full, Local, Global)
-	;   atom(NS), atom(Local)
-	->  (   ns(NS, Full)
+	;   atom(Prefix), atom(Local)
+	->  (   rdf_current_prefix(Module:Prefix, Full)
 	    *->	atom_concat(Full, Local, Global)
 	    ;	current_prolog_flag(xref, true)
-	    ->	Global = NS:Local
-	    ;	existence_error(rdf_namespace, NS)
+	    ->	Global = Prefix:Local
+	    ;	existence_error(rdf_prefix, Prefix)
 	    )
 	).
 
 
-%%	rdf_global_term(+TermIn, -GlobalTerm) is det.
+%%	rdf_global_term(+TermIn, :GlobalTerm) is det.
 %
-%	Does rdf_global_id/2 on all terms NS:Local by recursively analysing
-%	the term.
+%	Does  rdf_global_id/2  on  all  terms  NS:Local  by  recursively
+%	analysing the term. Note that the  predicate is a meta-predicate
+%	on the output argument. This  is   necessary  to  get the module
+%	context while the first argument may be of the form (:)/2.
+%
+%	Terms of the form Prefix:Local that   appear in TermIn for which
+%	Prefix is not defined are   not replaced. Unlike rdf_global_id/2
+%	and rdf_global_object/2, no error is raised.
 
-rdf_global_term(Var, Var) :-
+rdf_global_term(TermIn, Module:TermOut) :-
+	rdf_global_term(TermIn, TermOut, Module).
+
+rdf_global_term(Var, Var, _M) :-
 	var(Var), !.
-rdf_global_term(NS:Local, Global) :-
-	atom(NS), atom(Local), ns(NS, Full), !,
+rdf_global_term(Prefix:Local, Global, Module) :-
+	atom(Prefix), atom(Local),
+	rdf_current_prefix(Module:Prefix, Full), !,
 	atom_concat(Full, Local, Global).
-rdf_global_term([H0|T0], [H|T]) :- !,
-	rdf_global_term(H0, H),
-	rdf_global_term(T0, T).
-rdf_global_term(Term0, Term) :-
+rdf_global_term([H0|T0], [H|T], M) :- !,
+	rdf_global_term(H0, H, M),
+	rdf_global_term(T0, T, M).
+rdf_global_term(Term0, Term, M) :-
 	compound(Term0), !,
 	Term0 =.. [H|L0],
-	rdf_global_term(L0, L),
+	rdf_global_term(L0, L, M),
 	Term =.. [H|L].
-rdf_global_term(Term, Term).
+rdf_global_term(Term, Term, _).
 
-%%	rdf_global_graph(+TermIn, -GlobalTerm) is det.
+%%	rdf_global_graph(+TermIn, -GlobalTerm, +Module) is det.
 %
 %	Preforms rdf_global_id/2 on rdf/4, etc graph arguments
 
-rdf_global_graph(NS:Local, Global) :-
-	atom(NS), atom(Local), !,
-	global(NS, Local, Global).
-rdf_global_graph(G, G).
+rdf_global_graph(Prefix:Local, Global, Module) :-
+	atom(Prefix), atom(Local), !,
+	global(Prefix, Local, Global, Module).
+rdf_global_graph(G, G, _).
 
 
 		 /*******************************
@@ -616,62 +688,62 @@ system:goal_expansion(G, Expanded) :-
 	prolog_load_context(module, LM),
 	predicate_property(LM:G, implementation_module(IM)),
 	rdf_meta_specification(G, IM, Spec),
-	rdf_expand(G, Spec, Expanded).
+	rdf_expand(G, Spec, Expanded, LM).
 
 system:term_expansion(Fact, Expanded) :-
 	prolog_load_context(module, Module),
 	rdf_meta_specification(Fact, Module, Spec),
-	rdf_expand(Fact, Spec, Expanded),
+	rdf_expand(Fact, Spec, Expanded, Module),
 	Fact \== Expanded.
 system:term_expansion((Head :- Body), (Expanded :- Body)) :-
 	prolog_load_context(module, Module),
 	rdf_meta_specification(Head, Module, Spec),
-	rdf_expand(Head, Spec, Expanded),
+	rdf_expand(Head, Spec, Expanded, Module),
 	Head \== Expanded.
 
-rdf_expand(G, Spec, Expanded) :-
+rdf_expand(G, Spec, Expanded, M) :-
 	functor(G, Name, Arity),
 	functor(Expanded, Name, Arity),
-	rdf_expand_args(0, Arity, G, Spec, Expanded).
+	rdf_expand_args(0, Arity, G, Spec, Expanded, M).
 
-rdf_expand_args(Arity, Arity, _, _, _) :- !.
-rdf_expand_args(I0, Arity, Goal, Spec, Expanded) :-
+rdf_expand_args(Arity, Arity, _, _, _, _) :- !.
+rdf_expand_args(I0, Arity, Goal, Spec, Expanded, M) :-
 	I is I0 + 1,
 	arg(I, Goal, GA),
 	arg(I, Spec, SA),
 	arg(I, Expanded, EA),
-	rdf_expand_arg(SA, GA, EA),
-	rdf_expand_args(I, Arity, Goal, Spec, Expanded).
+	rdf_expand_arg(SA, GA, EA, M),
+	rdf_expand_args(I, Arity, Goal, Spec, Expanded, M).
 
-rdf_expand_arg(r, A, E) :-
-	mk_global(A, E), !.
-rdf_expand_arg(o, A, E) :-
-	rdf_global_object(A, E), !.
-rdf_expand_arg(t, A, E) :-
-	rdf_global_term(A, E), !.
-rdf_expand_arg(g, A, E) :-
-	rdf_global_graph(A, E), !.
-rdf_expand_arg(:, A, E) :- !,
+rdf_expand_arg(r, A, E, M) :-
+	mk_global(A, E, M), !.
+rdf_expand_arg(o, A, E, M) :-
+	rdf_global_object(A, E, M), !.
+rdf_expand_arg(t, A, E, M) :-
+	rdf_global_term(A, E, M), !.
+rdf_expand_arg(g, A, E, M) :-
+	rdf_global_graph(A, E, M), !.
+rdf_expand_arg(:, A, E, _M) :- !,
 	expand_goal(A, E).
-rdf_expand_arg(_, A, A).
+rdf_expand_arg(_, A, A, _M).
 
-%%	mk_global(+Src, -Resource)
+%%	mk_global(+Src, -Resource, +Module)
 %
 %	Realised rdf_global_id(+, -), but adds compiletime checking,
 %	notably to see whether a namespace is not yet defined.
 
-mk_global(X, X) :-
+mk_global(X, X, _) :-
 	var(X), !.
-mk_global(X, X) :-
+mk_global(X, X, _) :-
 	atom(X), !.
-mk_global(NS:Local, Global) :-
-	must_be(atom, NS),
+mk_global(Prefix:Local, Global, Module) :-
+	must_be(atom, Prefix),
 	must_be(atom, Local),
-	(   ns(NS, Full)
+	(   rdf_current_prefix(Module:Prefix, Full)
 	->  atom_concat(Full, Local, Global)
 	;   current_prolog_flag(xref, true)
-	->  Global = NS:Local
-	;   existence_error(namespace, NS)
+	->  Global = Prefix:Local
+	;   existence_error(rdf_prefix, Prefix)
 	).
 
 :- rdf_meta
