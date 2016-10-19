@@ -1660,7 +1660,7 @@ rdf_list(L) :-
 	var(L), !,
 	rdf_has(L, rdf:first, _),
 	\+ rdf_has(_, rdf:rest, L),
-	rdf_list_g(L), !.
+	rdf_list_g(L).
 rdf_list(L) :-
 	rdf_list_g(L), !.
 
