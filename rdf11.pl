@@ -90,6 +90,7 @@
 	    rdf_nextto/2,		% ?X, ?Y
 	    rdf_nextto/3,		% ?X, ?Y, ?RdfList
 	    rdf_nth0/3,			% ?Index, +RDFList, ?X
+	    rdf_nth1/3,			% ?Index, +RDFList, ?X
 	    rdf_retract_list/1,		% +RDFList
 
 	    op(110, xfx, @),		% must be above .
@@ -210,6 +211,7 @@ In a nutshell, the following issues are addressed:
 	rdf_member(o,r),
 	rdf_nextto(o,o),
 	rdf_nth0(?,r,o),
+	rdf_nth1(?,r,o),
 	rdf_retract_list(r).
 
 
@@ -1760,31 +1762,38 @@ rdf_nextto(X, Y, L) :-
 
 
 %%	rdf_nth0(?Index, +RDFList, ?X) is nondet.
+%%	rdf_nth1(?Index, +RDFList, ?X) is nondet.
 %
-%	True when X is the Index-th   element (0-based) of RDFList. This
-%	predicate is deterministic if Index is given and the list has no
-%	multiple rdf:first or rdf:rest values.
+%	True when X is the Index-th element (0-based or 1-based) of
+%	RDFList. This predicate is deterministic if Index is given and the
+%	list has no multiple rdf:first or rdf:rest values.
 
 rdf_nth0(I, L, X) :-
+	rdf_nth(0, I, L, X).
+
+rdf_nth1(I, L, X) :-
+	rdf_nth(1, I, L, X).
+
+rdf_nth(Offset, I, L, X) :-
 	rdf_is_subject(L), !,
 	(   var(I)
 	->  true
 	;   must_be(nonneg, I)
 	),
-	rdf_nth0(I, 0, L, X).
-rdf_nth0(_, L, _) :-
+	rdf_nth_(I, Offset, L, X).
+rdf_nth(_, L, _) :-
 	type_error(rdf_subject, L).
 
-rdf_nth0(I, I0, L, X) :-
+rdf_nth_(I, I0, L, X) :-
 	(   I0 == I
 	->  !
 	;   I0 = I
 	),
 	rdf_has(L, rdf:first, X).
-rdf_nth0(I, I0, L, X) :-
+rdf_nth_(I, I0, L, X) :-
 	rdf_has(L, rdf:rest, T),
 	I1 is I0+1,
-	rdf_nth0(I, I1, T, X).
+	rdf_nth_(I, I1, T, X).
 
 
 %%	rdf_last(+RDFList, -Last) is det.
