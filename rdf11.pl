@@ -80,8 +80,8 @@
 	    rdf_default_graph/1,	% -Graph
 	    rdf_default_graph/2,	% -Old, +New
 
-	    rdf_assert_list/2,		% +PrologList, -RDFList
-	    rdf_assert_list/3,		% +PrologList, -RDFList, +G
+	    rdf_assert_list/2,		% +PrologList, ?RDFList
+	    rdf_assert_list/3,		% +PrologList, ?RDFList, +G
 	    rdf_last/2,			% +RDFList, ?Last
 	    rdf_list/1,			% ?RDFList
 	    rdf_list/2,			% +RDFList, -PrologList
