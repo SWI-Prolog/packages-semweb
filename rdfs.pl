@@ -212,7 +212,7 @@ rdfs_label(Resource, Lang, Label) :-
 %%	rdfs_ns_label(+Resource, ?Lang, -Label) is multi.
 %
 %	Present label with  namespace  indication.   This  predicate  is
-%	indented  to  provide  meaningful  short   names  applicable  to
+%	intended  to  provide  meaningful  short   names  applicable  to
 %	ontology maintainers.  Note that this predicate is non-deterministic
 %	if the resource has multiple rdfs:label properties
 

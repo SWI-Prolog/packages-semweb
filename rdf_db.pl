@@ -1460,7 +1460,7 @@ rdf_current_predicate(P, DB) :-
 %	  there are no triples the value 0.0 is returned. This value is
 %	  cached with the predicate and recomputed only after
 %	  substantial changes to the triple set associated to this
-%	  relation. This property is indented for path optimalisation
+%	  relation. This property is intended for path optimalisation
 %	  when solving conjunctions of rdf/3 goals.
 %
 %	  * rdf_object_branch_factor(-Float)
