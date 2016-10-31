@@ -46,6 +46,7 @@
 
 	    rdfs_member/2,		% ?Object, +Set
 	    rdfs_list_to_prolog_list/2,	% +Set, -List
+	    rdfs_list_to_prolog_list/3,	% +Set, -List, +DB
 	    rdfs_assert_list/3,		% +List, -Resource, +DB
 	    rdfs_assert_list/2,		% +List, -Resource
 
@@ -334,6 +335,7 @@ rdfs_collection_member(Element, Set) :-
 
 
 %%	rdfs_list_to_prolog_list(+RDFSList, -PrologList)
+%%	rdfs_list_to_prolog_list(+RDFSList, -PrologList, +DB)
 %
 %	Convert ann RDFS list (result from parseType=Collection) into a
 %	Prolog list of elements.
@@ -345,6 +347,12 @@ rdfs_list_to_prolog_list(Set, [H|T]) :-
 	rdf_has(Set, rdf:rest, Tail), !,
 	rdfs_list_to_prolog_list(Tail, T).
 
+rdfs_list_to_prolog_list(Set, [], _) :-
+	rdf_equal(Set, rdf:nil), !.
+rdfs_list_to_prolog_list(Set, [H|T], DB) :-
+	rdf(Set, rdf:first, H, DB),
+	rdf(Set, rdf:rest, Tail, DB), !,
+	rdfs_list_to_prolog_list(Tail, T, DB).
 
 %%	rdfs_assert_list(+Resources, -List) is det.
 %%	rdfs_assert_list(+Resources, -List, +DB) is det.
