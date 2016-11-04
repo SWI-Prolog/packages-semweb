@@ -1365,11 +1365,11 @@ set_prefix(turtle_state *ts, const wchar_t *prefix, resource *r)
 
 
 static char *
-r_name(resource *r, char *buf)
+r_name(resource *r, char *buf, size_t size)
 { if ( r->type == R_RESOURCE )
-    Ssprintf(buf, "<%Ws>", r->v.r.name);
+    Ssnprintf(buf, size, "<%Ws>", r->v.r.name);
   else if ( r->type == R_BNODE )
-    Ssprintf(buf, "bnode(%ld)", (long)r->v.bnode_id);
+    Ssnprintf(buf, size, "bnode(%ld)", (long)r->v.bnode_id);
   else
     assert(0);
 
@@ -1378,17 +1378,17 @@ r_name(resource *r, char *buf)
 
 
 static char *
-o_name(object *o, char *buf)
+o_name(object *o, char *buf, size_t size)
 { if ( o->type == O_RESOURCE )
-    return r_name(o->value.r, buf);
+    return r_name(o->value.r, buf, size);
   if ( o->type == O_LITERAL )
   { if ( o->value.l.lang )
-      Ssprintf(buf, "\"%Ws\"@%Ws", o->value.l.string, o->value.l.lang);
+      Ssnprintf(buf, size, "\"%Ws\"@%Ws", o->value.l.string, o->value.l.lang);
     else if ( o->value.l.type )
-      Ssprintf(buf, "\"%Ws\"^^<%Ws>", o->value.l.string,
+      Ssnprintf(buf, size, "\"%Ws\"^^<%Ws>", o->value.l.string,
 	       o->value.l.type->v.r);
     else
-      Ssprintf(buf, "\"%Ws\"", o->value.l.string);
+      Ssnprintf(buf, size, "\"%Ws\"", o->value.l.string);
 
     return buf;
   }
@@ -1514,9 +1514,9 @@ got_triple(turtle_state *ts, resource *s, resource *p, object *o)
     char obuf[256];
 
     Sdprintf("Got %s %s %s\n",
-	     r_name(s, sbuf),
-	     r_name(p, pbuf),
-	     o_name(o, obuf));
+	     r_name(s, sbuf, sizeof(sbuf)),
+	     r_name(p, pbuf, sizeof(pbuf)),
+	     o_name(o, obuf, sizeof(obuf)));
 
     return TRUE;
   }
