@@ -4,6 +4,7 @@
 	  ]).
 :- include(local_test).
 :- use_module(library(semweb/rdf11)).
+:- use_module(library(semweb/rdf11_containers)).
 :- use_module(library(plunit)).
 :- use_module(library(debug)).
 :- use_module(library(yall)).
@@ -503,11 +504,51 @@ test(rdf_nth0, set(I-X == [0-a,0-d,1-b,2-c,2-e])) :-
 	rdf_list(L),
 	rdf_nth0(I, L, X).
 
+test(rdf_nth1, set(I-X == [1-a,1-d,2-b,3-c,3-e])) :-
+	rdf_list(L),
+	rdf_nth1(I, L, X).
+
 test(rdf_last, set(X == [c,e])) :-
 	rdf_list(L),
 	rdf_last(L, X).
 
 :- end_tests(collections).
+
+
+		 /*******************************
+		 *	     CONTAINERS		*
+		 *******************************/
+
+assert_containers_graph(G) :-
+	rdf_assert_alt(a, [b,c], _, G),
+	rdf_assert_bag([d,b,e], _, G),
+	rdf_assert_seq([f,g,h], _, G).
+
+:- begin_tests(containers,
+	       [ setup(assert_containers_graph(default)),
+		 cleanup(rdf_reset_db)
+	       ]).
+
+test(rdf_alt, all(Default-Others == [a-[b,c]])) :-
+	rdf_alt(_, Default, Others).
+
+test(rdf_bag, all(Set == [[d,b,e]])) :-
+	rdf_bag(_, Set).
+
+test(rdf_seq, all(List == [[f,g,h]])) :-
+	rdf_seq(_, List).
+
+test(rdfs_member, all(X == [a,b,c])) :-
+	rdf_alt(Alt),
+	rdfs_member(X, Alt).
+test(rdfs_member, all(X == [d,b,e])) :-
+	rdf_bag(Bag),
+	rdfs_member(X, Bag).
+test(rdfs_member, all(X == [f,g,h])) :-
+	rdf_seq(Seq),
+	rdfs_member(X, Seq).
+
+:- end_tests(containers).
 
 
 		 /*******************************

@@ -80,8 +80,8 @@
 	    rdf_default_graph/1,	% -Graph
 	    rdf_default_graph/2,	% -Old, +New
 
-	    rdf_assert_list/2,		% +PrologList, -RDFList
-	    rdf_assert_list/3,		% +PrologList, -RDFList, +G
+	    rdf_assert_list/2,		% +PrologList, ?RDFList
+	    rdf_assert_list/3,		% +PrologList, ?RDFList, +G
 	    rdf_last/2,			% +RDFList, ?Last
 	    rdf_list/1,			% ?RDFList
 	    rdf_list/2,			% +RDFList, -PrologList
@@ -90,11 +90,13 @@
 	    rdf_nextto/2,		% ?X, ?Y
 	    rdf_nextto/3,		% ?X, ?Y, ?RdfList
 	    rdf_nth0/3,			% ?Index, +RDFList, ?X
+	    rdf_nth1/3,			% ?Index, +RDFList, ?X
 	    rdf_retract_list/1,		% +RDFList
 
 	    op(110, xfx, @),		% must be above .
 	    op(650, xfx, ^^)		% must be above :
 	  ]).
+:- use_module(library(c14n2)).
 :- use_module(library(debug)).
 :- use_module(library(error)).
 :- use_module(library(lists)).
@@ -210,6 +212,7 @@ In a nutshell, the following issues are addressed:
 	rdf_member(o,r),
 	rdf_nextto(o,o),
 	rdf_nth0(?,r,o),
+	rdf_nth1(?,r,o),
 	rdf_retract_list(r).
 
 
@@ -1188,10 +1191,7 @@ parse_partial_xml(Parser, Val, DOM) :-
 
 write_xml_literal(xml, DOM, Text) :-
 	with_output_to(atom(Text),
-		       xml_write(current_output, DOM,
-				 [ header(false),
-				   layout(false)
-				 ])).
+		       xml_write_canonical(current_output, DOM, [])).
 write_xml_literal(html, DOM, Text) :-
 	with_output_to(atom(Text),
 		       html_write(current_output, DOM,
@@ -1658,7 +1658,7 @@ rdf_list(L) :-
 	var(L), !,
 	rdf_has(L, rdf:first, _),
 	\+ rdf_has(_, rdf:rest, L),
-	rdf_list_g(L), !.
+	rdf_list_g(L).
 rdf_list(L) :-
 	rdf_list_g(L), !.
 
@@ -1760,31 +1760,38 @@ rdf_nextto(X, Y, L) :-
 
 
 %%	rdf_nth0(?Index, +RDFList, ?X) is nondet.
+%%	rdf_nth1(?Index, +RDFList, ?X) is nondet.
 %
-%	True when X is the Index-th   element (0-based) of RDFList. This
-%	predicate is deterministic if Index is given and the list has no
-%	multiple rdf:first or rdf:rest values.
+%	True when X is the Index-th element (0-based or 1-based) of
+%	RDFList. This predicate is deterministic if Index is given and the
+%	list has no multiple rdf:first or rdf:rest values.
 
 rdf_nth0(I, L, X) :-
+	rdf_nth(0, I, L, X).
+
+rdf_nth1(I, L, X) :-
+	rdf_nth(1, I, L, X).
+
+rdf_nth(Offset, I, L, X) :-
 	rdf_is_subject(L), !,
 	(   var(I)
 	->  true
 	;   must_be(nonneg, I)
 	),
-	rdf_nth0(I, 0, L, X).
-rdf_nth0(_, L, _) :-
+	rdf_nth_(I, Offset, L, X).
+rdf_nth(_, L, _) :-
 	type_error(rdf_subject, L).
 
-rdf_nth0(I, I0, L, X) :-
+rdf_nth_(I, I0, L, X) :-
 	(   I0 == I
 	->  !
 	;   I0 = I
 	),
 	rdf_has(L, rdf:first, X).
-rdf_nth0(I, I0, L, X) :-
+rdf_nth_(I, I0, L, X) :-
 	rdf_has(L, rdf:rest, T),
 	I1 is I0+1,
-	rdf_nth0(I, I1, T, X).
+	rdf_nth_(I, I1, T, X).
 
 
 %%	rdf_last(+RDFList, -Last) is det.
