@@ -1054,7 +1054,7 @@ delete_db(DB) :-
 
 delete_db_(DB) :-
 	close_journal_(DB),
-	db_abs_files(DB, Snapshot, Journal),
+	db_abs_files(DB, Snapshot, Journal), !,
 	(   exists_file(Journal)
 	->  delete_file(Journal)
 	;   true
@@ -1063,7 +1063,7 @@ delete_db_(DB) :-
 	->  delete_file(Snapshot)
 	;   true
 	).
-
+delete_db_(_).
 
 		 /*******************************
 		 *	       LOCKING		*
