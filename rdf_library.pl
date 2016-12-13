@@ -57,6 +57,7 @@
 :- use_module(library(http/http_open)).
 :- use_module(library(thread)).
 :- use_module(library(apply)).
+:- use_module(library(solution_sequences)).
 
 :- predicate_options(rdf_list_library/2, 2,
 		     [ indent(atom),
@@ -742,14 +743,16 @@ extract_namespace(Triples, Mnemonic, Namespace) :-
 %	Extract definition of an ontology
 
 extract_ontology(Triples, library(Name, URL, Options)) :-
+	distinct(URL, ontology(Triples, URL)),
+	file_base_name(URL, BaseName),
+	file_name_extension(Name, _, BaseName),
+	findall(Facet, facet(Triples, URL, Facet), Options0),
+	sort(Options0, Options1),
+	keep_specialized_facets(Options1, Options).
+
+ontology(Triples, URL) :-
 	edge(Triples, URL, rdf:type, Type),
-	(   ontology_type(Type)
-	->  file_base_name(URL, BaseName),
-	    file_name_extension(Name, _, BaseName),
-	    findall(Facet, facet(Triples, URL, Facet), Options0),
-	    sort(Options0, Options1),
-	    keep_specialized_facets(Options1, Options)
-	).
+	ontology_type(Type).
 
 keep_specialized_facets(All, Special) :-
 	exclude(more_general(All), All, Special).
