@@ -543,6 +543,7 @@ plain_string(String, String) :-
 	atomic(String), !.
 plain_string(lang(en, String), String) :- !.
 plain_string(lang(_, String), String) :- !.
+plain_string(type(_, String), String) :- !.
 
 %%	rdf_library_index(?Id, ?Facet) is nondet.
 %
