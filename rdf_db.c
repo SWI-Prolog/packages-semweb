@@ -4466,7 +4466,9 @@ free_triple(rdf_db *db, triple *t, int linger)
   if ( !t->allocated )
   { unlock_atoms(db, t);
     if ( t->object_is_literal && t->object.literal )
-      free_literal(db, t->object.literal);
+    { free_literal(db, t->object.literal);
+      t->object_is_literal = FALSE;
+    }
   } else
   { unalloc_triple(db, t, linger);
   }
