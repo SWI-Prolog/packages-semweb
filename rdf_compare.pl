@@ -33,8 +33,8 @@
 */
 
 :- module(rdf_compare,
-	  [ rdf_equal_graphs/3		% +Graph1, +Graph2, -Substitutions
-	  ]).
+          [ rdf_equal_graphs/3          % +Graph1, +Graph2, -Substitutions
+          ]).
 :- use_module(library(semweb/rdf_db)).
 :- use_module(library(apply)).
 :- use_module(library(debug)).
@@ -51,64 +51,68 @@ such as diffing two graphs.
 */
 
 
-%%	rdf_equal_graphs(+GraphA, +GraphB, -Substition) is semidet.
+%!  rdf_equal_graphs(+GraphA, +GraphB, -Substition) is semidet.
 %
-%	True if GraphA  and  GraphB  are   the  same  under  Substition.
-%	Substition is a list of BNodeA = BNodeB, where BNodeA is a blank
-%	node that appears in GraphA and  BNodeB   is  a  blank node that
-%	appears in GraphB.
+%   True if GraphA  and  GraphB  are   the  same  under  Substition.
+%   Substition is a list of BNodeA = BNodeB, where BNodeA is a blank
+%   node that appears in GraphA and  BNodeB   is  a  blank node that
+%   appears in GraphB.
 %
-%	@param GraphA is a list of rdf(S,P,O) terms
-%	@param GraphB is a list of rdf(S,P,O) terms
-%	@param Substition is a list if NodeA = NodeB terms.
-%	@tbd	The current implementation is rather naive.  After
-%		dealing with the subgraphs that contain no bnodes,
-%		it performs a fully non-deterministic substitution.
+%   @param GraphA is a list of rdf(S,P,O) terms
+%   @param GraphB is a list of rdf(S,P,O) terms
+%   @param Substition is a list if NodeA = NodeB terms.
+%   @tbd    The current implementation is rather naive.  After
+%           dealing with the subgraphs that contain no bnodes,
+%           it performs a fully non-deterministic substitution.
 
 rdf_equal_graphs(A, B, Substitutions) :-
-	sort(A, SA),
-	sort(B, SB),
-	partition(contains_bnodes, SA, VA, GA),
-	partition(contains_bnodes, SB, VB, GB),
-	(   GA == GB
-	->  true
-	;   maplist(compare_triple, GA, GB)
-	),
-	compare_list(VA, VB, [], Substitutions), !.
+    sort(A, SA),
+    sort(B, SB),
+    partition(contains_bnodes, SA, VA, GA),
+    partition(contains_bnodes, SB, VB, GB),
+    (   GA == GB
+    ->  true
+    ;   maplist(compare_triple, GA, GB)
+    ),
+    compare_list(VA, VB, [], Substitutions), 
+    !.
 
 contains_bnodes(rdf(S,P,O)) :-
-	(   node_id(S)
-	;   node_id(P)
-	;   node_id(O)
-	), !.
+    (   node_id(S)
+    ;   node_id(P)
+    ;   node_id(O)
+    ), 
+    !.
 
 compare_list([], [], S, S).
 compare_list([H1|T1], In2, S0, S) :-
-	select(H2, In2, T2),
-	compare_triple(H1, H2, S0, S1),
-	compare_list(T1, T2, S1, S).
+    select(H2, In2, T2),
+    compare_triple(H1, H2, S0, S1),
+    compare_list(T1, T2, S1, S).
 
 compare_triple(T1, T2) :-
-	compare_triple(T1,T2,[],[]).
+    compare_triple(T1,T2,[],[]).
 
 compare_triple(rdf(Subj1,P1,O1), rdf(Subj2, P2, O2), S0, S) :-
-	compare_field(Subj1, Subj2, S0, S1),
-	compare_field(P1, P2, S1, S2),
-	compare_field(O1, O2, S2, S).
+    compare_field(Subj1, Subj2, S0, S1),
+    compare_field(P1, P2, S1, S2),
+    compare_field(O1, O2, S2, S).
 
 compare_field(X, X, S, S) :- !.
 compare_field(literal(X), xml(X), S, S) :- !. % TBD
-compare_field(literal(lang(L1,X)), literal(lang(L2,X)), S, S) :- !,
-	lang_equal(L1, L2).
+compare_field(literal(lang(L1,X)), literal(lang(L2,X)), S, S) :-
+    !,
+    lang_equal(L1, L2).
 compare_field(X, Id, S, S) :-
-	memberchk(X=Id, S), !.
+    memberchk(X=Id, S), 
+    !.
 compare_field(X, Y, S, [X=Y|S]) :-
-	\+ memberchk(X=_, S),
-	node_id(X),
-	node_id(Y),
-	debug(rdf_compare, 'Assume ~w = ~w~n', [X, Y]).
+    \+ memberchk(X=_, S),
+    node_id(X),
+    node_id(Y),
+    debug(rdf_compare, 'Assume ~w = ~w~n', [X, Y]).
 
 node_id(node(_)) :- !.
 node_id(X) :-
-	rdf_is_bnode(X).
+    rdf_is_bnode(X).
 

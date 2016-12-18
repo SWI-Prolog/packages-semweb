@@ -1,6 +1,6 @@
 :- module(unicode_collate_info,
-	  [ write_unicode_collate_map/2	% +File, +Options
-	  ]).
+          [ write_unicode_collate_map/2 % +File, +Options
+          ]).
 :- use_module(library(unicode/unicode_data)).
 :- use_module(library(dcg/basics)).
 :- use_module(library(debug)).
@@ -12,13 +12,13 @@ characters and mapping them  to  lowercase.   It  defines  tables  and a
 function "int sort_point(int code)". The  sort   points  are  defined as
 follows:
 
-	* The high 24-bit contains the character code after mapping to
-	  lowercase and removing possible diacritics.
-	* Bit 8 is 0 for characters that are mapped from upper to
-	  lowercase and 1 for all other characters
-	* The low 7 bits encode the removed diacritics.  All removed
-	  diacritics are ordered by their Unicode codepoint
-	  and numbered.sequentially.
+        * The high 24-bit contains the character code after mapping to
+          lowercase and removing possible diacritics.
+        * Bit 8 is 0 for characters that are mapped from upper to
+          lowercase and 1 for all other characters
+        * The low 7 bits encode the removed diacritics.  All removed
+          diacritics are ordered by their Unicode codepoint
+          and numbered.sequentially.
 
 As a result, text will be  ordered   by  its basic character, upper case
 before lowercase and text with diacritics after text without.
@@ -52,257 +52,264 @@ uppercase version for sorting.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 :- dynamic
-	diacritic/1,			% known diacritics
-	diacritic_code/2.		% +Diacritic, -Code (1..N)
+    diacritic/1,                    % known diacritics
+    diacritic_code/2.               % +Diacritic, -Code (1..N)
 
-		 /*******************************
-		 *	     C TABLES		*
-		 *******************************/
+                 /*******************************
+                 *           C TABLES           *
+                 *******************************/
 
-%	write_unicode_collate_map(+File, +Options)
+%       write_unicode_collate_map(+File, +Options)
 %
-%	Options supported are:
+%       Options supported are:
 %
-%		# first_codepage [0]
-%		Code page to start
+%               # first_codepage [0]
+%               Code page to start
 %
-%		# last_codepage [127]
-%		Code page to end.
+%               # last_codepage [127]
+%               Code page to end.
 %
-%		# case(UpperOrLower)
-%		Canonicalise to upper (default) or lower case.
+%               # case(UpperOrLower)
+%               Canonicalise to upper (default) or lower case.
 
 write_unicode_collate_map(File, Options) :-
-	open(File, write, Out),
-	call_cleanup(write_sort_map(Out, Options),
-		     close(Out)).
+    open(File, write, Out),
+    call_cleanup(write_sort_map(Out, Options),
+                 close(Out)).
 
 write_sort_map(Out, Options) :-
-	gen_tables(Tables, Options),
-	write_header(Out, Options),
-	forall(member(table(CP, Map), Tables),
-	       write_codepage(Out, CP, Map)),
-	write_map(Out, Tables, Options),
-	write_footer(Out, Options).
+    gen_tables(Tables, Options),
+    write_header(Out, Options),
+    forall(member(table(CP, Map), Tables),
+           write_codepage(Out, CP, Map)),
+    write_map(Out, Tables, Options),
+    write_footer(Out, Options).
 
 write_codepage(Out, CP, Map) :-
-	assertion(length(Map, 256)),
-	cp_name(CP, CPN),
-	format(Out, 'static const int32_t ~w[256] =~n', [CPN]),
-	format(Out, '{ ', []),
-	map_entries(Map, 0, Out),
-	format(Out, '~N};~n~n', []).
+    assertion(length(Map, 256)),
+    cp_name(CP, CPN),
+    format(Out, 'static const int32_t ~w[256] =~n', [CPN]),
+    format(Out, '{ ', []),
+    map_entries(Map, 0, Out),
+    format(Out, '~N};~n~n', []).
 
 cp_name(CP, CPN) :-
-	sformat(CPN, 'ucp0x~|~`0t~16r~2+', [CP]).
+    sformat(CPN, 'ucp0x~|~`0t~16r~2+', [CP]).
 
 map_entries([], _, _).
 map_entries([H|T], I, Out) :-
-	(   I == 0
-	->  true
-	;   0 =:= I mod 8
-	->  format(Out, ',~n  ', [])
-	;   format(Out, ', ', [])
-	),
-	format(Out, '~|0x~`0t~16r~8+', [H]),
-	I2 is I + 1,
-	map_entries(T, I2, Out).
+    (   I == 0
+    ->  true
+    ;   0 =:= I mod 8
+    ->  format(Out, ',~n  ', [])
+    ;   format(Out, ', ', [])
+    ),
+    format(Out, '~|0x~`0t~16r~8+', [H]),
+    I2 is I + 1,
+    map_entries(T, I2, Out).
 
 write_map(Out, Tables, Options) :-
-	option(last_codepage(Last), Options, 127),
-	format(Out,
-	       'static const int32_t* const ucoll_map[UNICODE_MAP_SIZE] =~n',
-	       []),
-	format(Out, '{ ', []),
-	map_tables(0, Last, Tables, Out),
-	format(Out, '~N};~n~n', []).
+    option(last_codepage(Last), Options, 127),
+    format(Out,
+           'static const int32_t* const ucoll_map[UNICODE_MAP_SIZE] =~n',
+           []),
+    format(Out, '{ ', []),
+    map_tables(0, Last, Tables, Out),
+    format(Out, '~N};~n~n', []).
 
 map_tables(CP, Last, _, _) :-
-	CP > Last, !.
+    CP > Last, 
+    !.
 map_tables(CP, Last, Tables, Out) :-
-	(   CP == 0
-	->  true
-	;   0 =:= CP mod 8
-	->  format(Out, ',~n  ', [])
-	;   format(Out, ', ', [])
-	),
-	(   memberchk(table(CP, _), Tables)
-	->  cp_name(CP, CPN),
-	    format(Out, '~w', [CPN])
-	;   format(Out, '~|~tNULL~7+', [])
-	),
-	CP2 is CP + 1,
-	map_tables(CP2, Last, Tables, Out).
+    (   CP == 0
+    ->  true
+    ;   0 =:= CP mod 8
+    ->  format(Out, ',~n  ', [])
+    ;   format(Out, ', ', [])
+    ),
+    (   memberchk(table(CP, _), Tables)
+    ->  cp_name(CP, CPN),
+        format(Out, '~w', [CPN])
+    ;   format(Out, '~|~tNULL~7+', [])
+    ),
+    CP2 is CP + 1,
+    map_tables(CP2, Last, Tables, Out).
 
 
 write_header(Out, Options) :-
-	option(last_codepage(Last), Options, 127),
-	Size is Last+1,
-	format(Out,
-	       '#ifdef WIN32\n\c
-		typedef int int32_t;\n\c
-		#else\n\c
-		#include <inttypes.h>\n\c
-		#endif\n\n', []),
-	format(Out,
-	       '#ifndef NULL\n\c
-		#define NULL ((void*)0)\n\c
-		#endif\n\n', []),
-	format(Out,
-	       '#define UNICODE_MAP_SIZE ~d~n~n', [Size]).
+    option(last_codepage(Last), Options, 127),
+    Size is Last+1,
+    format(Out,
+           '#ifdef WIN32\n\c
+                typedef int int32_t;\n\c
+                #else\n\c
+                #include <inttypes.h>\n\c
+                #endif\n\n', []),
+    format(Out,
+           '#ifndef NULL\n\c
+                #define NULL ((void*)0)\n\c
+                #endif\n\n', []),
+    format(Out,
+           '#define UNICODE_MAP_SIZE ~d~n~n', [Size]).
 
 write_footer(Out, Options) :-
-	(   memberchk(case(lower), Options)
-	->  Add = '+0x80'
-	;   Add = ''
-	),
-	format(Out,
-	       'static int\n\c
-		sort_point(int code)\n\c
-		{ int cp = code / 256;\n\c
-		\n  \c
-		  if ( cp < UNICODE_MAP_SIZE && ucoll_map[cp] )\n    \c
-		    return ucoll_map[cp][code&0xff];\n\c
-		\n  \c
-		  return (code<<8)~w;\n\c
-		}\n\n', [Add]),
-	format(Out,
-	       'static int\n\c
-		sort_pointA(int code)\n\c
-		{ return ucp0x00[code&0xff];\n\c
-		}\n\n', []).
+    (   memberchk(case(lower), Options)
+    ->  Add = '+0x80'
+    ;   Add = ''
+    ),
+    format(Out,
+           'static int\n\c
+                sort_point(int code)\n\c
+                { int cp = code / 256;\n\c
+                \n  \c
+                  if ( cp < UNICODE_MAP_SIZE && ucoll_map[cp] )\n    \c
+                    return ucoll_map[cp][code&0xff];\n\c
+                \n  \c
+                  return (code<<8)~w;\n\c
+                }\n\n', [Add]),
+    format(Out,
+           'static int\n\c
+                sort_pointA(int code)\n\c
+                { return ucp0x00[code&0xff];\n\c
+                }\n\n', []).
 
 
-		 /*******************************
-		 *	       TABLES		*
-		 *******************************/
+                 /*******************************
+                 *             TABLES           *
+                 *******************************/
 
 gen_tables(Tables, Options) :-
-	forall(rm_diacritics(_, _, _), true),
-	assign_diacritic_codes,
-	findall(table(CP,Map), table(CP, Map, Options), Tables).
+    forall(rm_diacritics(_, _, _), true),
+    assign_diacritic_codes,
+    findall(table(CP,Map), table(CP, Map, Options), Tables).
 
 table(CP, Map, Options) :-
-	option(first_codepage(First), Options, 0),
-	option(last_codepage(Last), Options, 127),
-	between(First, Last, CP),
-	findall(M, char(CP, M, Options), Map),	% now
-	non_empty_map(CP, Map, Options).
+    option(first_codepage(First), Options, 0),
+    option(last_codepage(Last), Options, 127),
+    between(First, Last, CP),
+    findall(M, char(CP, M, Options), Map),  % now
+    non_empty_map(CP, Map, Options).
 
 char(CP, Value, Options) :-
-	between(0, 255, I),
-	Code is 256*CP+I,
-	(   char_to_code(Code, Value, Options)
-	->  true
-	;   format('Failed on ~d~n', [Code]),
-	    Value is Code<<8
-	).
+    between(0, 255, I),
+    Code is 256*CP+I,
+    (   char_to_code(Code, Value, Options)
+    ->  true
+    ;   format('Failed on ~d~n', [Code]),
+        Value is Code<<8
+    ).
 
 char_to_code(Code, Value, Options) :-
-	memberchk(case(lower), Options), !,
-	(   utolower(Code, Lower),
-	    Lower \== Code
-	->  Cc = Lower,
-	    CFlags = 0x00
-	;   Cc = Code,
-	    CFlags = 0x80
-	),
-	assertion(integer(Cc)),
-	(   rm_diacritics(Cc, Base, Dia),
-	    assertion(integer(Base))
-	->  diacritic_code(Dia, DiaV),
-	    Value is Base << 8 \/ CFlags \/ DiaV
-	;   Value is Cc << 8 \/ CFlags
-	).
+    memberchk(case(lower), Options),
+    !,
+    (   utolower(Code, Lower),
+        Lower \== Code
+    ->  Cc = Lower,
+        CFlags = 0x00
+    ;   Cc = Code,
+        CFlags = 0x80
+    ),
+    assertion(integer(Cc)),
+    (   rm_diacritics(Cc, Base, Dia),
+        assertion(integer(Base))
+    ->  diacritic_code(Dia, DiaV),
+        Value is Base << 8 \/ CFlags \/ DiaV
+    ;   Value is Cc << 8 \/ CFlags
+    ).
 char_to_code(Code, Value, _Options) :-
-	(   utoupper(Code, Upper),
-	    Upper \== Code
-	->  Cc = Upper,
-	    CFlags = 0x80
-	;   Cc = Code,
-	    CFlags = 0x00
-	),
-	assertion(integer(Cc)),
-	(   rm_diacritics(Cc, Base, Dia),
-	    assertion(integer(Base))
-	->  diacritic_code(Dia, DiaV),
-	    Value is Base << 8 \/ CFlags \/ DiaV
-	;   Value is Cc << 8 \/ CFlags
-	).
+    (   utoupper(Code, Upper),
+        Upper \== Code
+    ->  Cc = Upper,
+        CFlags = 0x80
+    ;   Cc = Code,
+        CFlags = 0x00
+    ),
+    assertion(integer(Cc)),
+    (   rm_diacritics(Cc, Base, Dia),
+        assertion(integer(Base))
+    ->  diacritic_code(Dia, DiaV),
+        Value is Base << 8 \/ CFlags \/ DiaV
+    ;   Value is Cc << 8 \/ CFlags
+    ).
 
 non_empty_map(CP, Map, Options) :-
-	(   memberchk(case(lower), Options)
-	->  Add is 0x80
-	;   Add = 0
-	),
-	\+ empty_map(Map, 0, CP, Add).
+    (   memberchk(case(lower), Options)
+    ->  Add is 0x80
+    ;   Add = 0
+    ),
+    \+ empty_map(Map, 0, CP, Add).
 
 empty_map([], _, _, _).
 empty_map([H|T], I, CP, Add) :-
-	H =:= ((CP*256+I)<<8) + Add,
-	I2 is I + 1,
-	empty_map(T, I2, CP, Add).
+    H =:= ((CP*256+I)<<8) + Add,
+    I2 is I + 1,
+    empty_map(T, I2, CP, Add).
 
 
-		 /*******************************
-		 *	 CASE CONVERSION	*
-		 *******************************/
+                 /*******************************
+                 *       CASE CONVERSION        *
+                 *******************************/
 
 utolower(Code, Lower) :-
-	unicode_property(Code, simple_lowercase_mapping(Lower)).
+    unicode_property(Code, simple_lowercase_mapping(Lower)).
 
 utoupper(Code, Upper) :-
-	unicode_property(Code, simple_uppercase_mapping(Upper)).
+    unicode_property(Code, simple_uppercase_mapping(Upper)).
 
 
-		 /*******************************
-		 *	     DIACRITICS		*
-		 *******************************/
+                 /*******************************
+                 *           DIACRITICS         *
+                 *******************************/
 
 rm_diacritics(Code, Plain, Dia) :-
-	unicode_property(Code, decomposition_type(List)),
-	List \== '',
-	atomic_list_concat(AtomList, ' ', List),
-	to_plain(AtomList, Code, Plain, Dia).
+    unicode_property(Code, decomposition_type(List)),
+    List \== '',
+    atomic_list_concat(AtomList, ' ', List),
+    to_plain(AtomList, Code, Plain, Dia).
 
 to_plain([Special, PlainA], _, Plain, 0) :-
-	special(Special), !,
-	atom_hex(PlainA, Plain).
-to_plain([PlainA], _Code, Plain, 1) :- !,
-	atom_hex(PlainA, Plain).
+    special(Special),
+    !,
+    atom_hex(PlainA, Plain).
+to_plain([PlainA], _Code, Plain, 1) :-
+    !,
+    atom_hex(PlainA, Plain).
 to_plain(List, Code, Plain, Dia) :-
-	maplist(atom_hex, List, Numbers),
-	Numbers = [Plain, Dia],
-	diacritic(Dia, Code), !.
+    maplist(atom_hex, List, Numbers),
+    Numbers = [Plain, Dia],
+    diacritic(Dia, Code), 
+    !.
 
-diacritic(Code, For) :- !,
-	unicode_property(Code, canonical_combining_class(Cc)),
-	(  Cc > 0
-	-> assert_diacritic(Code)
-	;  debug(diacritic, '~16r: ~16r: Cc = ~d~n', [For, Code, Cc]),
-	   fail
-	).
+diacritic(Code, For) :-
+    !,
+    unicode_property(Code, canonical_combining_class(Cc)),
+    (  Cc > 0
+    -> assert_diacritic(Code)
+    ;  debug(diacritic, '~16r: ~16r: Cc = ~d~n', [For, Code, Cc]),
+           fail
+    ).
 
 assign_diacritic_codes :-
-	retractall(diacritic_code(_,_)),
-	findall(D, diacritic(D), Ds),
-	sort([0,1|Ds], Sorted),		% 0 and 1 are specials
-	assign_codes(Sorted, 1).
+    retractall(diacritic_code(_,_)),
+    findall(D, diacritic(D), Ds),
+    sort([0,1|Ds], Sorted),         % 0 and 1 are specials
+    assign_codes(Sorted, 1).
 
 assign_codes([], _).
 assign_codes([H|T], I) :-
-	assert(diacritic_code(H, I)),
-	I2 is I + 1,
-	assign_codes(T, I2).
+    assert(diacritic_code(H, I)),
+    I2 is I + 1,
+    assign_codes(T, I2).
 
 assert_diacritic(Code) :-
-	diacritic(Code), !.
+    diacritic(Code), 
+    !.
 assert_diacritic(Code) :-
-	assert(diacritic(Code)).
+    assert(diacritic(Code)).
 
 atom_hex(Atom, Hex) :-
-	atom_codes(Atom, Codes),
-	phrase(xinteger(Hex), Codes).
+    atom_codes(Atom, Codes),
+    phrase(xinteger(Hex), Codes).
 
 special('<font>').
 special('<noBreak>').

@@ -36,14 +36,14 @@
 :- include(local_test).
 
 run_zlib_tests :-
-	absolute_file_name(foreign(zlib4pl), _,
-			   [ file_type(executable),
-			     access(execute),
-			     file_errors(fail)
-			   ]).
+    absolute_file_name(foreign(zlib4pl), _,
+                       [ file_type(executable),
+                         access(execute),
+                         file_errors(fail)
+                       ]).
 
 run_network_tests :-
-	\+ getenv('USE_PUBLIC_NETWORK_TESTS', false).
+    \+ getenv('USE_PUBLIC_NETWORK_TESTS', false).
 
 :- use_module(library(plunit)).
 :- use_module(library(uri)).
@@ -55,49 +55,49 @@ run_network_tests :-
 
 
 :- begin_tests(load,
-	       [ setup(rdf_reset_db),
-		 cleanup(rdf_reset_db)
-	       ]).
+               [ setup(rdf_reset_db),
+                 cleanup(rdf_reset_db)
+               ]).
 
 test(file, [true(N == 1), cleanup(rdf_reset_db)]) :-
-	rdf_load('Tests/test-001.rdf', [silent(true)]),
-	rdf_statistics(triples(N)).
+    rdf_load('Tests/test-001.rdf', [silent(true)]),
+    rdf_statistics(triples(N)).
 
 test(file, [true(N == 1), cleanup(rdf_reset_db)]) :-
-	uri_file_name(URI, 'Tests/test-001.rdf'),
-	rdf_load(URI, [silent(true)]),
-	rdf_statistics(triples(N)).
+    uri_file_name(URI, 'Tests/test-001.rdf'),
+    rdf_load(URI, [silent(true)]),
+    rdf_statistics(triples(N)).
 
 test(gzip_file, [condition(run_zlib_tests), true(N == 1), cleanup(rdf_reset_db)]) :-
-	rdf_load('Tests/test-002.rdf', [silent(true)]),
-	rdf_statistics(triples(N)).
+    rdf_load('Tests/test-002.rdf', [silent(true)]),
+    rdf_statistics(triples(N)).
 
 test(gzip_file, [condition(run_zlib_tests), true(N == 1), cleanup(rdf_reset_db)]) :-
-	uri_file_name(URI, 'Tests/test-002.rdf'),
-	rdf_load(URI, [silent(true)]),
-	rdf_statistics(triples(N)).
+    uri_file_name(URI, 'Tests/test-002.rdf'),
+    rdf_load(URI, [silent(true)]),
+    rdf_statistics(triples(N)).
 
 test(http, [condition(run_network_tests), true(N == 1), cleanup(rdf_reset_db)]) :-
-	rdf_load('http://www.swi-prolog.org/Tests/semweb/test-001.rdf', [silent(true)]),
-	rdf_statistics(triples(N)).
+    rdf_load('http://www.swi-prolog.org/Tests/semweb/test-001.rdf', [silent(true)]),
+    rdf_statistics(triples(N)).
 
 test(gzip_http, [condition((run_network_tests, run_zlib_tests)), true(N == 1), cleanup(rdf_reset_db)]) :-
-	rdf_load('http://www.swi-prolog.org/Tests/semweb/test-002.rdf.gz', [silent(true)]),
-	rdf_statistics(triples(N)).
+    rdf_load('http://www.swi-prolog.org/Tests/semweb/test-002.rdf.gz', [silent(true)]),
+    rdf_statistics(triples(N)).
 
 :- end_tests(load).
 
 :- begin_tests(inverse).
 
 test(set,  [cleanup(rdf_reset_db)]) :-
-	rdf_assert(r1, p1, r2),
-	rdf_set_predicate(p2, inverse_of(p1)),
-	rdf_has(r2, p2, r1).
+    rdf_assert(r1, p1, r2),
+    rdf_set_predicate(p2, inverse_of(p1)),
+    rdf_has(r2, p2, r1).
 test(clear,  [cleanup(rdf_reset_db)]) :-
-	rdf_assert(r1, p1, r2),
-	rdf_set_predicate(p2, inverse_of(p1)),
-	rdf_has(r2, p2, r1),
-	rdf_set_predicate(p2, inverse_of([])),
-	\+ rdf_has(r2, p2, r1).
+    rdf_assert(r1, p1, r2),
+    rdf_set_predicate(p2, inverse_of(p1)),
+    rdf_has(r2, p2, r1),
+    rdf_set_predicate(p2, inverse_of([])),
+    \+ rdf_has(r2, p2, r1).
 
 :- end_tests(inverse).

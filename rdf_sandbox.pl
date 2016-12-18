@@ -45,7 +45,7 @@ while `sparql_client` is not (unless   sparql_client  was already loaded
 before this sequence).
 
   ```
-  :- use_module(library(semweb/rdf11)).		% safe
+  :- use_module(library(semweb/rdf11)).         % safe
   :- use_module(library(semweb/rdf_sandbox)).
   :- use_module(library(semweb/sparql_client)). % Not safe
   ```
@@ -64,17 +64,17 @@ example below defines a wrapper around   rdf/4 that provides safe access
 to certain graphs.
 
 ``` :- module(rdf_api,
-	  [ rdf/4
-	  ]).
+          [ rdf/4
+          ]).
 :- use_module(library(semweb/rdf11)).
 
 :- rdf_meta rdf(r,r,o,r).
 
 rdf(S,P,O,G) :-
-	public_graph(G), !,
-	rdf11:rdf(S,P,O,G).
+        public_graph(G), !,
+        rdf11:rdf(S,P,O,G).
 rdf(S,P,O,G) :-
-	permission_error(access, graph, G).
+        permission_error(access, graph, G).
 
 :- multifile sandbox:safe_primitive/1.
 
@@ -82,13 +82,13 @@ sandbox:safe_primitive(rdf_api:rdf(_,_,_,_)).
 */
 
 :- multifile
-	sandbox:safe_primitive/1,
-	safe_primitive:safe_meta_predicate/1.
+    sandbox:safe_primitive/1,
+    safe_primitive:safe_meta_predicate/1.
 
 
-		 /*******************************
-		 *	       RDF_DB		*
-		 *******************************/
+                 /*******************************
+                 *             RDF_DB           *
+                 *******************************/
 
 :- if(current_predicate(rdf_db:rdf/3)).
 sandbox:safe_primitive(rdf_db:rdf(_,_,_)).
@@ -121,9 +121,9 @@ sandbox:safe_meta_predicate(rdf_db:rdf_current_prefix/2).
 :- endif.
 
 
-		 /*******************************
-		 *	      RDF11		*
-		 *******************************/
+                 /*******************************
+                 *            RDF11             *
+                 *******************************/
 
 :- if(current_predicate(rdf11:in_xml_literal/3)).
 sandbox:safe_primitive(rdf11:in_xml_literal(_,_,_)).
@@ -132,9 +132,9 @@ sandbox:safe_primitive(rdf11:post_object(_,_)).
 :- endif.
 
 
-		 /*******************************
-		 *	   RDF-LITINDEX		*
-		 *******************************/
+                 /*******************************
+                 *         RDF-LITINDEX         *
+                 *******************************/
 
 :- if(current_predicate(rdf_litindex:rdf_find_literals/2)).
 sandbox:safe_primitive(rdf_litindex:rdf_find_literals(_,_)).
@@ -142,9 +142,9 @@ sandbox:safe_primitive(rdf_litindex:rdf_tokenize_literal(_,_)).
 sandbox:safe_primitive(rdf_litindex:rdf_literal_index(_,_)).
 :- endif.
 
-		 /*******************************
-		 *	   SPARQL-CLIENT	*
-		 *******************************/
+                 /*******************************
+                 *         SPARQL-CLIENT        *
+                 *******************************/
 
 :- if(current_predicate(sparql_client:sparql_query/3)).
 sandbox:safe_primitive(sparql_client:sparql_query(_,_,_)).

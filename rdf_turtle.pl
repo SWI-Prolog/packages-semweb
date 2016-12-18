@@ -33,11 +33,11 @@
 */
 
 :- module(rdf_turtle,
-	  [ rdf_load_turtle/3,		% +Input, -Triples, +Options
-	    rdf_read_turtle/3,		% +Input, -Triples, +Options
-	    rdf_process_turtle/3	% +Input, :OnObject, +Options
-	  ]).
-:- use_module(library(semweb/turtle)).	% re-export
+          [ rdf_load_turtle/3,          % +Input, -Triples, +Options
+            rdf_read_turtle/3,          % +Input, -Triples, +Options
+            rdf_process_turtle/3        % +Input, :OnObject, +Options
+          ]).
+:- use_module(library(semweb/turtle)).  % re-export
 
 /** <module> Turtle reader
 
@@ -45,6 +45,6 @@ This module provides a parser for the Turtle language. The parser itself
 has been moved to library(semweb/turtle),   which  encapsulates a single
 foreign object that provides the common Turtle infrastructure.
 
-@deprecated	The Turtle reading and writing facilities have been merged
-		into library(semweb/turtle).
+@deprecated     The Turtle reading and writing facilities have been merged
+                into library(semweb/turtle).
 */

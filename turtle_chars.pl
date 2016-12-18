@@ -34,80 +34,82 @@
 */
 
 :- module(turtle_unicode,
-	  [ mkclassify/1,
-	    run/0
-	  ]).
+          [ mkclassify/1,
+            run/0
+          ]).
 
 /** <module> Generate turtle_chars.c
 */
 
 run :-
-	mkclassify('turtle_chars.c', 'static ').
+    mkclassify('turtle_chars.c', 'static ').
 
-%%	mkclassify(+File)
+%!  mkclassify(+File)
 %
-%	Generate the core of xml_unicode.c.
+%   Generate the core of xml_unicode.c.
 
 mkclassify(File) :-
-	mkclassify(File, '').
+    mkclassify(File, '').
 
 mkclassify(File, Decl) :-
-	tell(File),
-	call_cleanup(forall(list(List, _),
-			    mkfunc(List, Decl)),
-		     told).
+    tell(File),
+    call_cleanup(forall(list(List, _),
+                        mkfunc(List, Decl)),
+                 told).
 
 mkfunc(Name, Decl) :-
-	format('~wint~n', [Decl]),
-	format('wcis_~w(int c)~n', [Name]),
-	format('{ '),
-	list(Name, List),
-	mkswitch(List),
-	format('}~n~n').
+    format('~wint~n', [Decl]),
+    format('wcis_~w(int c)~n', [Name]),
+    format('{ '),
+    list(Name, List),
+    mkswitch(List),
+    format('}~n~n').
 
 mkswitch(List) :-
-	mkswitch(List, 2).
+    mkswitch(List, 2).
 
-mkswitch([Low-High], Indent) :- !,
-	indent(Indent),
-	format('return (c >= 0x~|~`0t~16r~4+ && c <= 0x~|~`0t~16r~4+);~n', [Low, High]).
-mkswitch([Value], Indent) :- !,
-	indent(Indent),
-	format('return (c == 0x~|~`0t~16r~4+);', [Value]).
+mkswitch([Low-High], Indent) :-
+    !,
+    indent(Indent),
+    format('return (c >= 0x~|~`0t~16r~4+ && c <= 0x~|~`0t~16r~4+);~n', [Low, High]).
+mkswitch([Value], Indent) :-
+    !,
+    indent(Indent),
+    format('return (c == 0x~|~`0t~16r~4+);', [Value]).
 mkswitch(List, Indent) :-
-	split(List, Low, High),
-	end(Low, MaxLow),
-	indent(Indent),
-	NextIndent is Indent + 2,
-	format('if ( c <= 0x~|~`0t~16r~4+ )~n', [MaxLow]),
-	indent(Indent),
-	format('{ '),
-	mkswitch(Low, NextIndent),
-	indent(Indent),
-	format('} else~n'),
-	indent(Indent),
-	format('{ '),
-	mkswitch(High, NextIndent),
-	indent(Indent),
-	format('}~n').
+    split(List, Low, High),
+    end(Low, MaxLow),
+    indent(Indent),
+    NextIndent is Indent + 2,
+    format('if ( c <= 0x~|~`0t~16r~4+ )~n', [MaxLow]),
+    indent(Indent),
+    format('{ '),
+    mkswitch(Low, NextIndent),
+    indent(Indent),
+    format('} else~n'),
+    indent(Indent),
+    format('{ '),
+    mkswitch(High, NextIndent),
+    indent(Indent),
+    format('}~n').
 
 end(List, Max) :-
-	last(List, Last),
-	(   Last = _-Max
-	->  true
-	;   Max = Last
-	).
+    last(List, Last),
+    (   Last = _-Max
+    ->  true
+    ;   Max = Last
+    ).
 
 split(List, Low, High) :-
-	length(List, Len),
-	Mid is Len//2,
-	length(Low, Mid),
-	append(Low, High, List).
+    length(List, Len),
+    Mid is Len//2,
+    length(Low, Mid),
+    append(Low, High, List).
 
 indent(N) :-
-	line_position(current_output, Pos),
-	Spaces is N - Pos,
-	format('~*c', [Spaces, 32]).
+    line_position(current_output, Pos),
+    Spaces is N - Pos,
+    format('~*c', [Spaces, 32]).
 
 
 

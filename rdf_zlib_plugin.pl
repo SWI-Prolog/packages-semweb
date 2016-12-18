@@ -43,10 +43,10 @@ rdf_load/2 to seemlessly load .gz files.
 */
 
 :- multifile
-	rdf_db:rdf_open_decode/4,
-	rdf_db:rdf_storage_encoding/2.
+    rdf_db:rdf_open_decode/4,
+    rdf_db:rdf_storage_encoding/2.
 
 rdf_db:rdf_open_decode(gzip, File, Stream, close(Stream)) :-
-	gzopen(File, read, Stream).
+    gzopen(File, read, Stream).
 
 rdf_db:rdf_storage_encoding(gz, gzip).
