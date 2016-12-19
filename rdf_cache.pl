@@ -110,7 +110,7 @@ rdf_cache_file(URL, read, File) :-
     ;   cache_option(global_directory(Dir)),
         url_cache_file(URL, Dir, trp, read, File)
     ),
-    access_file(File, read), 
+    access_file(File, read),
     !.
 rdf_cache_file(URL, write, File) :-
     !,
@@ -128,12 +128,12 @@ rdf_cache_file(URL, write, File) :-
         ensure_global_cache(Dir),
         url_cache_file(URL, Dir, trp, write, File)
     ),
-    access_file(File, write), 
+    access_file(File, write),
     !.
 
 
 ensure_global_cache(Dir) :-
-    exists_directory(Dir), 
+    exists_directory(Dir),
     !.
 ensure_global_cache(Dir) :-
     cache_option(create_global_directory(true)),
@@ -193,7 +193,7 @@ ensure_dir(D0, Sub, RW, Dir) :-
 
 ensure_ext(File, '', File) :- !.
 ensure_ext(File, Ext, File) :-
-    file_name_extension(_, Ext, File), 
+    file_name_extension(_, Ext, File),
     !.
 ensure_ext(File, Ext, FileExt) :-
     file_name_extension(File, Ext, FileExt).

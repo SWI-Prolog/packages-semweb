@@ -290,7 +290,7 @@ rdf_persistency_property(Property) :-
     !,
     rdf_persistency_property_(Property).
 rdf_persistency_property(Property) :-
-    rdf_persistency_property_(Property), 
+    rdf_persistency_property_(Property),
     !.
 
 rdf_persistency_property_(Property) :-
@@ -421,7 +421,7 @@ make_goals([DB|T0], Silent, I,  Total,
     make_goals(T0, Silent, I2, Total, T).
 
 verbosity(Silent) :-
-    rdf_option(silent(Silent)), 
+    rdf_option(silent(Silent)),
     !.
 verbosity(Silent) :-
     current_prolog_flag(verbose, silent),
@@ -435,11 +435,11 @@ verbosity(brief).
 %   Number of jobs to run concurrently.
 
 concurrency(Jobs) :-
-    rdf_option(concurrency(Jobs)), 
+    rdf_option(concurrency(Jobs)),
     !.
 concurrency(Jobs) :-
     current_prolog_flag(cpu_count, Jobs),
-    Jobs > 0, 
+    Jobs > 0,
     !.
 concurrency(1).
 
@@ -560,7 +560,7 @@ load_source(DB, Silent, Nth, Total) :-
 
 
 graph_triple_count(Graph, Count) :-
-    rdf_statistics(triples_by_graph(Graph, Count)), 
+    rdf_statistics(triples_by_graph(Graph, Count)),
     !.
 graph_triple_count(_, 0).
 
@@ -906,7 +906,7 @@ iterative_expand(In, Size, Last) :-     % Scan growing sections from the end
     skip(In, 10),                   % records are line-based
     read(In, T0),
     last_transaction_id(T0, In, 0, Last),
-    Last > 0, 
+    Last > 0,
     !.
 iterative_expand(In, _, Last) :-        % Scan the whole file
     seek(In, 0, bof, _),
@@ -968,7 +968,7 @@ sync_loaded_graphs(Graphs) :-
 %   full coverage of Unicode.
 
 journal_fd(DB, Fd) :-
-    source_journal_fd(DB, Fd), 
+    source_journal_fd(DB, Fd),
     !.
 journal_fd(DB, Fd) :-
     with_mutex(rdf_journal_file,
@@ -976,7 +976,7 @@ journal_fd(DB, Fd) :-
     Fd = Out.
 
 journal_fd_(DB, Fd) :-
-    source_journal_fd(DB, Fd), 
+    source_journal_fd(DB, Fd),
     !.
 journal_fd_(DB, Fd) :-
     limit_fd_pool,
@@ -1022,7 +1022,7 @@ close_oldest_journal.
 %   end of the transaction.
 
 sync_journal(DB, _) :-
-    transaction_db(_, DB, _), 
+    transaction_db(_, DB, _),
     !.
 sync_journal(_, Fd) :-
     flush_output(Fd).
@@ -1168,7 +1168,7 @@ lockfile(Dir, LockFile) :-
     atomic_list_concat([Dir, /, lock], LockFile).
 
 directory_levels(Levels) :-
-    rdf_option(directory_levels(Levels)), 
+    rdf_option(directory_levels(Levels)),
     !.
 directory_levels(2).
 
@@ -1187,7 +1187,7 @@ open_db(Base, Mode, Stream, Options) :-
     open(File, Mode, Stream, [encoding(utf8)|Options]).
 
 create_directory_levels(_File) :-
-    rdf_option(directory_levels(0)), 
+    rdf_option(directory_levels(0)),
     !.
 create_directory_levels(File) :-
     file_directory_name(File, Dir),
@@ -1286,7 +1286,7 @@ rdf_snapshot_file(Graph, Snapshot) :-
 %   to be unique by the W3C standards.
 
 rdf_db_to_file(DB, File) :-
-    file_base_db(File, DB), 
+    file_base_db(File, DB),
     !.
 rdf_db_to_file(DB, File) :-
     url_to_filename(DB, File),
@@ -1334,7 +1334,7 @@ url_encode(Enc) -->
     },
     url_encode(T).
 url_encode([]) -->
-    eos, 
+    eos,
     !.
 url_encode([0'%,D1,D2|T]) -->
     [C],
@@ -1478,7 +1478,7 @@ read_prefixes(Term, _) :-
 %   Create a directory if it does not already exist.
 
 mkdir(Directory) :-
-    exists_directory(Directory), 
+    exists_directory(Directory),
     !.
 mkdir(Directory) :-
     make_directory(Directory).

@@ -229,10 +229,10 @@ sparql_setting(port(80)).
 sparql_setting(path('/sparql/')).
 
 sparql_param(Param, Options0, Options) :-
-    select_option(Param, Options0, Options), 
+    select_option(Param, Options0, Options),
     !.
 sparql_param(Param, Options, Options) :-
-    sparql_setting(Param), 
+    sparql_setting(Param),
     !.
 sparql_param(Param, Options, Options) :-
     functor(Param, Name, _),
@@ -283,7 +283,7 @@ http://www.w3.org/TR/rdf-sparql-XMLres/, version 6 April 2006.
 %       readability of the remainder of the code.
 
 term_subst(V, _, _, V) :-
-    var(V), 
+    var(V),
     !.
 term_subst(F, F, T, T) :- !.
 term_subst(C, F, T, C2) :-
@@ -347,7 +347,7 @@ dom_to_result(DOM, Result) :-
         Result = select(VarTerm, Rows),
         sub_element(DOM, sparql:results, _RAtt, RContent)
     ->  rows(RContent, Vars, Rows)
-    ), 
+    ),
     !.                                   % Guarantee finalization
 
 %!  variables(+DOM, -Varnames)
@@ -412,7 +412,7 @@ sub_element([H|T], Name, Att, Content) :-
 
 
 bnode(Name, URI) :-
-    bnode_map(Name, URI), 
+    bnode_map(Name, URI),
     !.
 bnode(Name, URI) :-
     gensym('__bnode', URI0),

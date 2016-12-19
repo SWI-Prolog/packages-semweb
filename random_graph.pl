@@ -74,7 +74,7 @@ animate_graph(Graph, Steps, Delay) :-
            )).
 
 select_action(P, [A-PA|_], A) :-
-    P < PA, 
+    P < PA,
     !.
 select_action(P, [_-PA|T], A) :-
     P2 is P-PA,
@@ -137,7 +137,7 @@ graph_action(Graph, add_leaf) :-
     assert_edge(Graph, Node, Leaf).
 graph_action(Graph, disconnect_leaf) :-
     leaf_node(Graph, Leaf),
-    retract_edge(Graph, Leaf, _Parent), 
+    retract_edge(Graph, Leaf, _Parent),
     !.
 graph_action(Graph, connect_clouds) :-
     clouds(Graph, Clouds),
@@ -208,7 +208,7 @@ assert_node(Graph, Id) :-
     show(Graph, add_node(Id)).
 
 assert_edge(Graph, Child, Parent) :-
-    edge(Child, Parent, Graph), 
+    edge(Child, Parent, Graph),
     !.
 assert_edge(Graph, Child, Parent) :-
     assert(edge(Child, Parent, Graph)),
@@ -256,7 +256,7 @@ clouds([H|T], [CH|CT], Graph) :-
 connected(Graph, N1, Dir, N2) :-
     nonvar(N1), nonvar(N2),
     !,
-    connected([N1], [N1], Dir, N2, Graph), 
+    connected([N1], [N1], Dir, N2, Graph),
     !.
 connected(Graph, N1, Dir, N2) :-
     nonvar(N1),
@@ -353,7 +353,7 @@ show(Graph, Action) :-
 %   broadcasts messages, updating if the graph changes.
 
 show_graph(Graph) :-
-    in_pce_thread_sync(broadcast_request(graph(Graph))), 
+    in_pce_thread_sync(broadcast_request(graph(Graph))),
     !.
 show_graph(Graph) :-
     in_pce_thread_sync(pce_show_graph(Graph)).

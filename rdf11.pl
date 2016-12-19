@@ -623,7 +623,7 @@ add_value_constraint(Term, Constraint, ValueIn) :-
     add_value_constraint_cann(Value, Constraint, Term).
 
 constraint_literal_value(Value, Value^^_Type) :-
-    number(Value), 
+    number(Value),
     !.
 constraint_literal_value(Value, Literal) :-
     rdf_canonical_literal(Value, Literal).
@@ -750,7 +750,7 @@ best_literal_cond(Conditions, Best, Rest) :-
 
 best_literal_cond2(Conds, Best, Rest) :-
     select(Cond, Conds, Rest0),
-    rdf10_cond(Cond, Best, Rest0, Rest), 
+    rdf10_cond(Cond, Best, Rest0, Rest),
     !.
 
 rdf10_cond(value(=<, URef, UType), Cond, Rest0, Rest) :-
@@ -918,10 +918,10 @@ rdf_default_graph(Old, New) :-
 
 
 pre_graph(G, _G0) :-
-    var(G), 
+    var(G),
     !.
 pre_graph(G, G) :-
-    atom(G), 
+    atom(G),
     !.
 pre_graph(G, _) :-
     type_error(rdf_graph, G).
@@ -942,7 +942,7 @@ pre_object(Literal, literal(Value)) :-
     !,
     debug(literal_index, 'Search literal using ~p', [literal(Value)]).
 pre_object(Var, _Var) :-
-    var(Var), 
+    var(Var),
     !.
 pre_object(Atom, URI) :-
     atom(Atom),
@@ -967,7 +967,7 @@ pre_object(Obj, _) :-
     type_error(rdf_object, Obj).
 
 literal_value0(Var, _) :-
-    var(Var), 
+    var(Var),
     !.
 literal_value0(_ @Lang, lang(Lang, _)).
 literal_value0(_^^Type, type(Type, _)).
@@ -1067,7 +1067,7 @@ in_type(_, _, _, _).
 %   future versions this is likely to become a string.
 
 in_ground_type(Type, Input, Lex) :-
-    in_ground_type_hook(Type, Input, Lex), 
+    in_ground_type_hook(Type, Input, Lex),
     !.
 in_ground_type(IntType, Val, Val0) :-
     xsd_numerical(IntType, Domain, PrologType),
@@ -1173,7 +1173,7 @@ in_number(PrologType, _, _, Val, _) :-
     type_error(PrologType, Val).
 
 check_integer_domain(PLType, _, Val) :-
-    is_of_type(PLType, Val), 
+    is_of_type(PLType, Val),
     !.
 check_integer_domain(_, XSDType, Val) :-
     domain_error(XSDType, Val).
@@ -1349,7 +1349,7 @@ text_of0(lang(LangA, LexicalA), LexicalS@LangA) :-
     out_type(r,-,+).
 
 post_object(Val, _) :-
-    ground(Val), 
+    ground(Val),
     !.                 % already specified and matched
 post_object(URI, URI0) :-
     atom(URI0),
@@ -1381,7 +1381,7 @@ out_type(xsd:string, Val, Val0) :-     % catches unbound type too
     !,
     atom_string(Val0, Val).
 out_type(Type, Val, Val0) :-
-    out_type_hook(Type, Val, Val0), 
+    out_type_hook(Type, Val, Val0),
     !.
 out_type(IntType, Val, Val0) :-
     xsd_numerical(IntType, _Domain, _BasicType),
@@ -1579,10 +1579,10 @@ resource(R) :-
     !,
     gen_resource(R).
 resource(R) :-
-    rdf_db:rdf_resource(R), 
+    rdf_db:rdf_resource(R),
     !.
 resource(R) :-
-    rdf_db:rdf_current_predicate(R), 
+    rdf_db:rdf_current_predicate(R),
     !.
 
 gen_resource(R) :-
@@ -1596,7 +1596,7 @@ visible_node(Term) :-
     !,
     (   rdf_db:rdf(Term,_,_)
     ;   rdf_db:rdf(_,_,Term)
-    ), 
+    ),
     !.
 visible_node(Term) :-
     rdf_db:rdf(_,_,Term).
@@ -1607,7 +1607,7 @@ visible_term(Term) :-
     (   rdf_db:rdf(Term,_,_)
     ;   rdf_db:rdf(_,Term,_)
     ;   rdf_db:rdf(_,_,Term)
-    ), 
+    ),
     !.
 visible_term(Term) :-
     rdf_db:rdf(_,_,Term).
@@ -1768,10 +1768,10 @@ rdf_list(L) :-
     !,
     rdf_has(L, rdf:first, _),
     \+ rdf_has(_, rdf:rest, L),
-    rdf_list_g(L), 
+    rdf_list_g(L),
     !.
 rdf_list(L) :-
-    rdf_list_g(L), 
+    rdf_list_g(L),
     !.
 
 rdf_list_g(rdf:nil) :- !.

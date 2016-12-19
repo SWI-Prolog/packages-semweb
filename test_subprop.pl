@@ -152,7 +152,7 @@ loop(I, N, G) :-
 
 update_graph_true(G, Action) :-
     debug(subprop, '~q: ~p', [G, Action]),
-    update_graph(G, Action), 
+    update_graph(G, Action),
     !.
 update_graph_true(_, _Action) :-
     assertion(false).
@@ -240,7 +240,7 @@ superPropertyOf_1(Graph, Gen, Super, Sub) :-
 subPropertyOf(Graph, Gen, Sub, Super) :-
     nonvar(Sub), nonvar(Super),
     !,
-    bf_expand(subPropertyOf_1(Graph, Gen), Sub, [Super|_]), 
+    bf_expand(subPropertyOf_1(Graph, Gen), Sub, [Super|_]),
     !.
 subPropertyOf(Graph, Sub, Super, Gen) :-
     nonvar(Sub),

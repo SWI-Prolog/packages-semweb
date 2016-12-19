@@ -33,7 +33,7 @@
 */
 
 assert_search_paths :-
-    current_prolog_flag(xref, true), 
+    current_prolog_flag(xref, true),
     !.
 assert_search_paths :-
     asserta(user:file_search_path(foreign, '../sgml')),
@@ -49,7 +49,7 @@ assert_search_paths :-
     asserta(user:file_search_path(foreign, '.')).
 
 fix_load_path :-
-    current_prolog_flag(xref, true), 
+    current_prolog_flag(xref, true),
     !.
 fix_load_path :-
     prolog_load_context(directory, Dir),

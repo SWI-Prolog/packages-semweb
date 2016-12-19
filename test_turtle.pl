@@ -171,7 +171,7 @@ canonical_node(node(GenId), node(N)) :-
 canonical_node(Node, Node).
 
 report_diff(OK, Result) :-
-    rdf_equal_graphs(OK, Result, _), 
+    rdf_equal_graphs(OK, Result, _),
     !.
 report_diff(OK, Result) :-
     subtract(OK, Result, Missing),

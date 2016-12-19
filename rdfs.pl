@@ -347,7 +347,7 @@ rdfs_collection_member(Element, Set) :-
 %   Prolog list of elements.
 
 rdfs_list_to_prolog_list(Set, []) :-
-    rdf_equal(Set, rdf:nil), 
+    rdf_equal(Set, rdf:nil),
     !.
 rdfs_list_to_prolog_list(Set, [H|T]) :-
     rdf_has(Set, rdf:first, H),
@@ -413,7 +413,7 @@ rdfs_find(String, Domain, Fields, Method, Subject) :-
     owl_satisfies(Domain, Subject).
 
 owl_satisfies(Domain, _) :-
-    rdf_equal(rdfs:'Resource', Domain), 
+    rdf_equal(rdfs:'Resource', Domain),
     !.
                                         % Descriptions
 owl_satisfies(class(Domain), Resource) :-
@@ -425,7 +425,7 @@ owl_satisfies(class(Domain), Resource) :-
 owl_satisfies(union_of(Domains), Resource) :-
     !,
     member(Domain, Domains),
-    owl_satisfies(Domain, Resource), 
+    owl_satisfies(Domain, Resource),
     !.
 owl_satisfies(intersection_of(Domains), Resource) :-
     !,
@@ -441,7 +441,7 @@ owl_satisfies(all_values_from(Domain), Resource) :-
     (   rdf_equal(Domain, rdfs:'Resource')
     ->  true
     ;   rdfs_individual_of(Resource, Domain)
-    ), 
+    ),
     !.
 owl_satisfies(some_values_from(_Domain), _Resource) :- !.
 owl_satisfies(has_value(Value), Resource) :-

@@ -74,14 +74,14 @@ rdf_equal_graphs(A, B, Substitutions) :-
     ->  true
     ;   maplist(compare_triple, GA, GB)
     ),
-    compare_list(VA, VB, [], Substitutions), 
+    compare_list(VA, VB, [], Substitutions),
     !.
 
 contains_bnodes(rdf(S,P,O)) :-
     (   node_id(S)
     ;   node_id(P)
     ;   node_id(O)
-    ), 
+    ),
     !.
 
 compare_list([], [], S, S).
@@ -104,7 +104,7 @@ compare_field(literal(lang(L1,X)), literal(lang(L2,X)), S, S) :-
     !,
     lang_equal(L1, L2).
 compare_field(X, Id, S, S) :-
-    memberchk(X=Id, S), 
+    memberchk(X=Id, S),
     !.
 compare_field(X, Y, S, [X=Y|S]) :-
     \+ memberchk(X=_, S),

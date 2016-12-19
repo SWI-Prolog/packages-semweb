@@ -837,7 +837,7 @@ reachable(2) :-
 reachable(3) :-
     graph(false),
     rdf_reachable(a, p, X),
-    X == c, 
+    X == c,
     !.
 reachable(4) :-
     graph(false),
@@ -928,7 +928,7 @@ warm(1) :-
     script_dir/1.
 
 set_script_dir :-
-    script_dir(_), 
+    script_dir(_),
     !.
 set_script_dir :-
     find_script_dir(Dir),
@@ -940,7 +940,7 @@ find_script_dir(Dir) :-
     file_directory_name(RealFile, Dir).
 
 follow_links(File, RealFile) :-
-    read_link(File, _, RealFile), 
+    read_link(File, _, RealFile),
     !.
 follow_links(File, File).
 

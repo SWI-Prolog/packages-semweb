@@ -159,7 +159,7 @@ merge_close(true, Close, Close) :- !.
 merge_close(Close, _, Close).
 
 to_uri(URI0, URI) :-
-    to_uri2(URI0, URI), 
+    to_uri2(URI0, URI),
     !.
 to_uri(URI0, URI) :-
     absolute_file_name(URI0, Path),
@@ -220,14 +220,14 @@ guess_dialect(_, xml).
 
 html_doctype(html5) -->
     blanks,
-    "<!DOCTYPE", blank, blanks, "html", blanks, ">", 
+    "<!DOCTYPE", blank, blanks, "html", blanks, ">",
     !.
 html_doctype(html4) -->
     blanks,
     "<!", icase_string(`doctype`), blank, blanks, icase_string(`html`),
     blank, blanks,
     icase_string(`public`),
-    blank, 
+    blank,
     !.
 
 icase_string([]) --> [].
@@ -273,7 +273,7 @@ xml_rdfa(DOM, RDF, Options) :-
     apply_patterns(RDF0, RDF).
 % XML Processing Instruction (PI).
 xml_rdfa(DOM, [], _) :-
-    DOM = pi(_), 
+    DOM = pi(_),
     !.
 xml_rdfa(DOM, _, _) :-
     type_error(xml_dom, DOM).
@@ -294,7 +294,7 @@ process_node(DOM, EvalContext) :-
     update_property_value(DOM, LocalContext),       % 7.5.11
     complete_triples(LocalContext),                 % 7.5.12
     descent(DOM, LocalContext),                     % 7.5.13
-    complete_lists(LocalContext), 
+    complete_lists(LocalContext),
     !.                % 7.5.14
 process_node(DOM, EvalContext) :-
     print_message(warning, rdfa(failed(DOM, EvalContext))),
@@ -343,11 +343,11 @@ rdfa_evaluation_context(DOM, Context, Options) :-
     mapping(terms(TermMappings), Options).
 
 base(DOM, _Options, Base) :-
-    xpath(DOM, //base(@href=Base), _), 
+    xpath(DOM, //base(@href=Base), _),
     !.
 base(_DOM, Options, Base) :-
     option(base(Base0), Options),
-    rdf_global_id(Base0, Base), 
+    rdf_global_id(Base0, Base),
     !.
 base(_, _, 'http://www.example.org/').
 
@@ -681,7 +681,7 @@ list_mapping_pairs(list_mapping(Dict), Pairs) :-
 %!  step_7_5_9(+DOM, +Context)
 
 step_7_5_9(_DOM, Context) :-
-    Context.current_object_resource == null, 
+    Context.current_object_resource == null,
     !.
 step_7_5_9(DOM, Context) :-
     DOM = element(_,Attrs,_),
@@ -719,7 +719,7 @@ rev_triple(Context, IRI) :-
 %   Similar to step_7_5_9, but adding to incomplete triples.
 
 step_7_5_10(_DOM, Context) :-
-    Context.current_object_resource \== null, 
+    Context.current_object_resource \== null,
     !.
 step_7_5_10(DOM, Context) :-
     DOM = element(_,Attrs,_),
@@ -839,11 +839,11 @@ add_property(Context, Subject, Object, Pred) :-
     add_triple(Context, Subject, Pred, Object).
 
 content_text(element(_,Attrs,_), Text, _Context) :-
-    memberchk(content=Text, Attrs), 
+    memberchk(content=Text, Attrs),
     !.
 content_text(element(_,Attrs,_), Text, Context) :-
     memberchk(datetime=Text, Attrs),
-    html_markup(Context.eval_context.markup), 
+    html_markup(Context.eval_context.markup),
     !.
 content_text(element(_,_,Content), Text, _Context) :-
     !,
@@ -947,7 +947,7 @@ descent_no_skip(_, _).
 %   7.5.14: Complete possibly pending lists
 
 complete_lists(Context) :-
-    empty_list_mapping(Context.list_mapping), 
+    empty_list_mapping(Context.list_mapping),
     !.
 complete_lists(Context) :-
     (   CurrentSubject = Context.new_subject,
@@ -959,7 +959,7 @@ complete_lists(Context) :-
     maplist(complete_list(Context, CurrentSubject), Pairs).
 
 complete_list(Context, _, IRI-_) :-
-    get_list_mapping(IRI, Context.eval_context.list_mapping, _), 
+    get_list_mapping(IRI, Context.eval_context.list_mapping, _),
     !.
 complete_list(Context, CurrentSubject, IRI-list(List0)) :-
     reverse(List0, List),
@@ -1005,7 +1005,7 @@ html_non_empty_rel(Spec, Context) :-
     Sep = "\s\t\n\r",
     split_string(Spec, Sep, Sep, SpecList),
     member(Spec1, SpecList),
-    safe_curie_or_curie_or_absiri(Spec1, _, Context), 
+    safe_curie_or_curie_or_absiri(Spec1, _, Context),
     !.
 
 
@@ -1091,7 +1091,7 @@ abs_iri(Spec, IRI) :-
 %   @about and @resource
 
 safe_curie_or_curie_or_iri(Spec, IRI, Context) :-
-    safe_curie_or_curie_or_absiri(Spec, IRI, Context), 
+    safe_curie_or_curie_or_absiri(Spec, IRI, Context),
     !.
 safe_curie_or_curie_or_iri(Spec, IRI, Context) :-
     uri_normalized(Spec, Context.eval_context.base, IRI).
@@ -1372,7 +1372,7 @@ valid_predicate(P) :- P \== null, \+ rdf_is_bnode(P).
 valid_object(O)    :- O \== null, ( atom(O) -> true ; valid_literal(O) ).
 
 valid_literal(literal(Plain)) :-
-    atom(Plain), 
+    atom(Plain),
     !.
 valid_literal(literal(type(T, _))) :-
     !,

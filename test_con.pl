@@ -164,7 +164,7 @@ o(Name, T) :-
 
 
 true(G) :-
-    G, 
+    G,
     !.
 true(G) :-
     print_message(error, false(G)),

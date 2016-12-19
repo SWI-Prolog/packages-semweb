@@ -234,7 +234,7 @@ canonical_node(node(GenId), node(N)) :-
 canonical_node(Node, Node).
 
 report_diff(OK, Result) :-
-    rdf_equal_graphs(OK, Result, _), 
+    rdf_equal_graphs(OK, Result, _),
     !.
 report_diff(OK, Result) :-
     subtract(OK, Result, Missing),
@@ -369,7 +369,7 @@ prolog:message(test_turtle(blocked, Test)) -->
     [ 'Turtle test ~q: ~`.t(blocked)~72|'-[Test] ].
 
 show_debugging -->
-    { debugging(test_turtle) }, 
+    { debugging(test_turtle) },
     !.
 show_debugging -->
     [ nl,

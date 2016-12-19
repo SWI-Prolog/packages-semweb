@@ -250,7 +250,7 @@ no_sources_in_same_graph(Commands) :-
     ).
 
 command_graph(rdf_load(_, Options), Graph) :-
-    option(graph(Graph), Options), 
+    option(graph(Graph), Options),
     !.
 command_graph(rdf_load(URL, _), URL) :- !.
 command_graph(_, _).                    % Other command.  Each variable it its own key
@@ -467,7 +467,7 @@ rdf_list_library(Id, Options) :-
     maplist(print_load(Options), Commands).
 
 print_load(Options, _Level-virtual(_)) :-
-    option(show_virtual(false), Options), 
+    option(show_virtual(false), Options),
     !.
 print_load(Options, Level-Command) :-
     option(indent(Indent), Options, '. '),
@@ -505,7 +505,7 @@ exists_url(URL, Ext) :-
     uri_file_name(URL, Path),
     !,
     add_storage_extension(Path, Ext, PathEx),
-    access_file(PathEx, read), 
+    access_file(PathEx, read),
     !.
 exists_url(URL, Ext) :-
     uri_components(URL, Components),
@@ -549,7 +549,7 @@ rdf_list_library :-
     ).
 
 plain_string(String, String) :-
-    atomic(String), 
+    atomic(String),
     !.
 plain_string(lang(en, String), String) :- !.
 plain_string(lang(_, String), String) :- !.
@@ -673,7 +673,7 @@ rdf_update_library_index :-
            process_manifest(Location)).
 
 attach_dir(Path, Visited) :-
-    memberchk(Path, Visited), 
+    memberchk(Path, Visited),
     !.
 attach_dir(Path, Visited) :-
     atom_concat(Path, '/*', Pattern),

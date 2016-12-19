@@ -339,7 +339,7 @@ rdfe_snapshot_file(File) :-
 %   Encapsulation of rdf_register_ns(Id, URI)
 
 rdfe_register_ns(Id, URI) :-
-    rdf_db:ns(Id, URI), 
+    rdf_db:ns(Id, URI),
     !.
 rdfe_register_ns(Id, URI) :-
     save_system_ns,
@@ -370,7 +370,7 @@ rdfe_reset_ns :-
     ).
 
 save_system_ns :-
-    system_ns(_, _), 
+    system_ns(_, _),
     !.             % already done
 save_system_ns :-
     forall(rdf_db:ns(Id, URI), assert(system_ns(Id, URI))).
@@ -422,7 +422,7 @@ rdfe_begin_transaction(Name) :-         % toplevel transaction
     assert(transaction_name(TID, Name)).
 
 rdfe_current_transaction(TID) :-
-    current_transaction(TID), 
+    current_transaction(TID),
     !.
 rdfe_current_transaction(_) :-
     throw(error(existence_error(rdf_transaction, _), _)).
@@ -563,7 +563,7 @@ find_previous_undo(-1, _) :-
     !,
     fail.
 find_previous_undo(TID, TID) :-
-    undo_log([TID|_], _, _, _, _), 
+    undo_log([TID|_], _, _, _, _),
     !.
 find_previous_undo(TID0, TID) :-
     TID1 is TID0 - 1,
@@ -574,7 +574,7 @@ undo_previous(TID, Undone) :-
     rdfe_transaction(undo([Undone])).
 
 last_transaction(TID) :-
-    undo_log([TID|_], _, _, _, _), 
+    undo_log([TID|_], _, _, _, _),
     !.
 
 %!  rdfe_redo
@@ -745,7 +745,7 @@ to_uri(URL, URL) :-
     uri_components(URL, Components),
     uri_data(scheme, Components, Scheme),
     nonvar(Scheme),
-    uri_scheme(Scheme), 
+    uri_scheme(Scheme),
     !.
 to_uri(File, URL) :-
     uri_file_name(URL, File).
@@ -858,7 +858,7 @@ journal_version(1).
 %           modifications to the File.
 
 rdfe_open_journal(_, _) :-              % already open
-    journal(_, _, _), 
+    journal(_, _, _),
     !.
 rdfe_open_journal(File, read) :-
     !,
@@ -1019,7 +1019,7 @@ replay_transaction(Term0, Stream) :-
     ).
 
 collect_transaction(End, _, [], End) :-
-    ends_transaction(End), 
+    ends_transaction(End),
     !.
 collect_transaction(A, Stream, [A|T], End) :-
     read(Stream, Term),
@@ -1100,12 +1100,12 @@ replay_action(watermark(_, _Name)) :-
     true.
 
 find_file(File, _, File) :-
-    exists_file(File), 
+    exists_file(File),
     !.
 find_file(File, Options, Path) :-
     memberchk(pwd(PWD), Options),
     make_path(File, PWD, Path),
-    exists_file(Path), 
+    exists_file(Path),
     !.
 
 %!  make_path(+File, +PWD, -Path)

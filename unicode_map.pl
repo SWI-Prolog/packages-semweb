@@ -118,7 +118,7 @@ write_map(Out, Tables, Options) :-
     format(Out, '~N};~n~n', []).
 
 map_tables(CP, Last, _, _) :-
-    CP > Last, 
+    CP > Last,
     !.
 map_tables(CP, Last, Tables, Out) :-
     (   CP == 0
@@ -277,7 +277,7 @@ to_plain([PlainA], _Code, Plain, 1) :-
 to_plain(List, Code, Plain, Dia) :-
     maplist(atom_hex, List, Numbers),
     Numbers = [Plain, Dia],
-    diacritic(Dia, Code), 
+    diacritic(Dia, Code),
     !.
 
 diacritic(Code, For) :-
@@ -302,7 +302,7 @@ assign_codes([H|T], I) :-
     assign_codes(T, I2).
 
 assert_diacritic(Code) :-
-    diacritic(Code), 
+    diacritic(Code),
     !.
 assert_diacritic(Code) :-
     assert(diacritic(Code)).

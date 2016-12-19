@@ -269,7 +269,7 @@ store.
 rdf_current_prefix(Module:Alias, URI) :-
     nonvar(Alias),
     !,
-    rdf_current_prefix(Module, Alias, URI), 
+    rdf_current_prefix(Module, Alias, URI),
     !.
 rdf_current_prefix(Module:Alias, URI) :-
     rdf_current_prefix(Module, Alias, URI).
@@ -471,7 +471,7 @@ rdf_global_id(Id, Module:Global) :-
     rdf_global_id(Id, Global, Module).
 
 rdf_global_id(NS:Local, Global, Module) :-
-    global(NS, Local, Global, Module), 
+    global(NS, Local, Global, Module),
     !.
 rdf_global_id(Global, Global, _).
 
@@ -495,15 +495,15 @@ rdf_global_object(Var, Global, _M) :-
     !,
     Global = Var.
 rdf_global_object(Prefix:Local, Global, M) :-
-    global(Prefix, Local, Global, M), 
+    global(Prefix, Local, Global, M),
     !.
 rdf_global_object(literal(type(Prefix:Local, Value)),
                   literal(type(Global, Value)), M) :-
-    global(Prefix, Local, Global, M), 
+    global(Prefix, Local, Global, M),
     !.
 rdf_global_object(^^(Value,Prefix:Local),
                   ^^(Value,Global), M) :-
-    global(Prefix, Local, Global, M), 
+    global(Prefix, Local, Global, M),
     !.
 rdf_global_object(literal(Query0, type(Prefix:Local, Value)),
                   literal(Query1, type(Global, Value)), M) :-
@@ -545,7 +545,7 @@ rdf_global_term(TermIn, Module:TermOut) :-
     rdf_global_term(TermIn, TermOut, Module).
 
 rdf_global_term(Var, Var, _M) :-
-    var(Var), 
+    var(Var),
     !.
 rdf_global_term(Prefix:Local, Global, Module) :-
     atom(Prefix), atom(Local),
@@ -605,7 +605,7 @@ mk_clause(Head0, M0) -->
     ].
 
 qualify(Module, Decl, Decl) :-
-    prolog_load_context(module, Module), 
+    prolog_load_context(module, Module),
     !.
 qualify(Module, Decl, Module:Decl).
 
@@ -737,16 +737,16 @@ rdf_expand_args(I0, Arity, Goal, Spec, Expanded, M) :-
     rdf_expand_args(I, Arity, Goal, Spec, Expanded, M).
 
 rdf_expand_arg(r, A, E, M) :-
-    mk_global(A, E, M), 
+    mk_global(A, E, M),
     !.
 rdf_expand_arg(o, A, E, M) :-
-    rdf_global_object(A, E, M), 
+    rdf_global_object(A, E, M),
     !.
 rdf_expand_arg(t, A, E, M) :-
-    rdf_global_term(A, E, M), 
+    rdf_global_term(A, E, M),
     !.
 rdf_expand_arg(g, A, E, M) :-
-    rdf_global_graph(A, E, M), 
+    rdf_global_graph(A, E, M),
     !.
 rdf_expand_arg(:, A, E, _M) :-
     !,
@@ -759,10 +759,10 @@ rdf_expand_arg(_, A, A, _M).
 %   notably to see whether a namespace is not yet defined.
 
 mk_global(X, X, _) :-
-    var(X), 
+    var(X),
     !.
 mk_global(X, X, _) :-
-    atom(X), 
+    atom(X),
     !.
 mk_global(Prefix:Local, Global, Module) :-
     must_be(atom, Prefix),
@@ -1112,7 +1112,7 @@ rdf_bnode(Value) :-
     gensym('_:genid', Value),
     \+ rdf(Value, _, _),
     \+ rdf(_, _, Value),
-    \+ rdf(_, Value, _), 
+    \+ rdf(_, Value, _),
     !.
 
 
@@ -1313,7 +1313,7 @@ rdf_gc.
 
 has_garbage :-
     rdf_gc_info_(Info),
-    has_garbage(Info), 
+    has_garbage(Info),
     !.
 
 has_garbage(Info) :- arg(2, Info, Garbage),     Garbage > 0.
@@ -1339,7 +1339,7 @@ consider_gc(_CPU) :-
         )
     ;   print_message(error, rdf(invalid_gc_info)),
         sleep(10)
-    ), 
+    ),
     !.
 
 
@@ -2055,7 +2055,7 @@ rdf_load_file(_Ref, _Spec, SourceURL, Protocol, Graph, M, Options) :-
     report_loaded(Action, SourceURL, Graph, Triples, T0, Options).
 
 supported_format(Format, _Cleanup) :-
-    rdf_file_type(_, Format), 
+    rdf_file_type(_, Format),
     !.
 supported_format(Format, Cleanup) :-
     call(Cleanup),
@@ -2179,7 +2179,7 @@ source_url(FileURL, Protocol, SourceURL) :-             % or return FileURL?
     !,
     source_file(File, Protocol, SourceURL).
 source_url(SourceURL0, Protocol, SourceURL) :-
-    is_url(SourceURL0, Protocol, SourceURL), 
+    is_url(SourceURL0, Protocol, SourceURL),
     !.
 source_url(File, Protocol, SourceURL) :-
     source_file(File, Protocol, SourceURL).
@@ -2191,7 +2191,7 @@ source_file(Spec, file(SExt), SourceURL) :-
     uri_file_name(SourceURL, Plain).
 
 to_url(URL, URL) :-
-    uri_is_global(URL), 
+    uri_is_global(URL),
     !.
 to_url(File, URL) :-
     absolute_file_name(File, Path),
@@ -2200,7 +2200,7 @@ to_url(File, URL) :-
 storage_extension(Plain, SExt, File) :-
     file_name_extension(Plain, SExt, File),
     SExt \== '',
-    rdf_storage_encoding(SExt, _), 
+    rdf_storage_encoding(SExt, _),
     !.
 storage_extension(File, '', File).
 
@@ -2224,19 +2224,19 @@ load_graph(Source, Graph, Options) :-
     load_graph2(Source, Graph, Options).
 
 load_graph2(_, Graph, _) :-
-    ground(Graph), 
+    ground(Graph),
     !.
 load_graph2(_Source, Graph, Options) :-
     option(base_uri(Graph), Options),
     Graph \== [],
-    ground(Graph), 
+    ground(Graph),
     !.
 load_graph2(Source, Graph, _) :-
     load_graph(Source, Graph).
 
 load_graph(SourceURL, BaseURI) :-
     file_name_extension(BaseURI, Ext, SourceURL),
-    rdf_storage_encoding(Ext, _), 
+    rdf_storage_encoding(Ext, _),
     !.
 load_graph(SourceURL, SourceURL).
 
@@ -2415,7 +2415,7 @@ rdf_unload(_).
     warned/0.
 
 warn_deprecated_unload(_) :-
-    warned, 
+    warned,
     !.
 warn_deprecated_unload(Graph) :-
     assertz(warned),
@@ -2685,7 +2685,7 @@ save_meta_option(convert_typed_literal).
 
 to_file(URL, File) :-
     atom(URL),
-    uri_file_name(URL, File), 
+    uri_file_name(URL, File),
     !.
 to_file(File, File).
 
@@ -2744,7 +2744,7 @@ rdf_do_save(Out, Options0) :-
     ;   forall(rdf_subject(Subject, Options),
                rdf_save_non_anon_subject(Out, Subject, Options))
     ),
-    rdf_save_footer(Out), 
+    rdf_save_footer(Out),
     !.        % dubious cut; without the
                                         % cleanup handlers isn't called!?
 
@@ -2969,7 +2969,7 @@ add_ns(_, _, _, _, _).
 
 add_ns(Full, Context) :-
     graph_prefix(Full, _, Contexts),
-    memberchk(Context, Contexts), 
+    memberchk(Context, Contexts),
     !.
 add_ns(Full, Context) :-
     retract(graph_prefix(Full, C0, Contexts)),
@@ -3037,7 +3037,7 @@ decl_used_predicate_ns(DB) :-
     ).
 
 decl_predicate_ns(Pred) :-
-    predicate_ns(Pred, _), 
+    predicate_ns(Pred, _),
     !.
 decl_predicate_ns(Pred) :-
     rdf_global_id(NS:Local, Pred),
@@ -3070,7 +3070,7 @@ xml_codes([H|T]) :-
     xml_codes(T).
 
 xml_code(X) :-
-    code_type(X, csym), 
+    code_type(X, csym),
     !.
 xml_code(0'-).                          % Match 0'-
 
@@ -3096,7 +3096,7 @@ rdf_save_non_anon_subject(_Out, Subject, Options) :-
     (   memberchk(anon(false), Options)
     ;   graph(Options, DB),
         rdf_db(_, _, Subject, DB)
-    ), 
+    ),
     !.
 rdf_save_non_anon_subject(Out, Subject, Options) :-
     rdf_save_subject(Out, Subject, Options),
@@ -3138,7 +3138,7 @@ rdf_save_subject(Out, Subject, DB) :-
 %   @param Indent   Current indentation
 
 rdf_save_subject(_, Subject, _, _, _) :-
-    inlined(Subject), 
+    inlined(Subject),
     !.
 rdf_save_subject(Out, Subject, BaseURI, Indent, Options) :-
     do_save_subject(Out, Subject, BaseURI, Indent, Options).
@@ -3235,7 +3235,7 @@ save_attributes(Atts, BaseURI, Out, Element, Indent, Options) :-
 %   and appear only one time in the attribute list.
 
 split_attributes(Atts, [], Atts, Options) :-
-    option(xml_attributes(false), Options), 
+    option(xml_attributes(false), Options),
     !.
 split_attributes(Atts, HeadAttr, BodyAttr, _) :-
     duplicate_attributes(Atts, Dupls, Singles),
@@ -3369,7 +3369,7 @@ save_attribute(body, Name=Value, BaseURI, Out, Indent, _DB) :-
 
 has_attributes(URI, Options) :-
     graph(Options, DB),
-    rdf_db(URI, _, _, DB), 
+    rdf_db(URI, _, _, DB),
     !.
 
 %!  save_body_literal(+Literal, +NameText, +BaseURI,
@@ -3496,7 +3496,7 @@ collection_p(rdf:type, rdf:'List').
 %!  rdf_save_list(+Out, +List, +BaseURI, +Indent, +Options)
 
 rdf_save_list(_, List, _, _, _) :-
-    rdf_equal(List, rdf:nil), 
+    rdf_equal(List, rdf:nil),
     !.
 rdf_save_list(Out, List, BaseURI, Indent, Options) :-
     rdf_has(List, rdf:first, First),
@@ -3524,16 +3524,16 @@ rdf_save_list(Out, List, BaseURI, Indent, Options) :-
 rdf_id(Id, BaseURI, Local) :-
     assertion(atom(BaseURI)),
     atom_concat(BaseURI, Local, Id),
-    sub_atom(Local, 0, 1, _, #), 
+    sub_atom(Local, 0, 1, _, #),
     !.
 rdf_id(Id, _, NS:Local) :-
     iri_xml_namespace(Id, Full, Local),
-    ns(NS, Full), 
+    ns(NS, Full),
     !.
 rdf_id(Id, _, NS:Local) :-
     ns(NS, Full),
     Full \== '',
-    atom_concat(Full, Local, Id), 
+    atom_concat(Full, Local, Id),
     !.
 rdf_id(Id, _, Id).
 

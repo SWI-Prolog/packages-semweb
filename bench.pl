@@ -37,7 +37,7 @@ bench_first(N) :-
                        first_triple(Q)))).
 
 first_triple(Q) :-
-    rdf(Q,_,_), 
+    rdf(Q,_,_),
     !.
 first_triple(_).
 

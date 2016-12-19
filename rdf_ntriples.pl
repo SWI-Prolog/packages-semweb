@@ -247,7 +247,7 @@ format_read_ntuple(nquads, Stream, Quad, State) :-
     to_quad(Tuple, Quad, State).
 
 to_quad(Quad, Quad, _) :-
-    functor(Quad, quad, 4), 
+    functor(Quad, quad, 4),
     !.
 to_quad(triple(S,P,O), quad(S,P,O,Graph), State) :-
     nt_state_graph(State, Graph).

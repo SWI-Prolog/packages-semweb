@@ -251,7 +251,7 @@ error_option(Parser, Options) :-
 
 
 process_turtle(_Parser, Stream, _OnObject, _Graph, _Options) :-
-    at_end_of_stream(Stream), 
+    at_end_of_stream(Stream),
     !.
 process_turtle(Parser, Stream, OnObject, Graph, Options) :-
     line_count(Stream, LineNo),
@@ -315,10 +315,10 @@ unicode_encoding(unicode_le).
 %   Determine the base uri to use for processing.
 
 base_uri(_Input, BaseURI, Options) :-
-    option(base_uri(BaseURI), Options), 
+    option(base_uri(BaseURI), Options),
     !.
 base_uri(_Input, BaseURI, Options) :-
-    option(graph(BaseURI), Options), 
+    option(graph(BaseURI), Options),
     !.
 base_uri(stream(Input), BaseURI, _Options) :-
     stream_property(Input, file_name(Name)),

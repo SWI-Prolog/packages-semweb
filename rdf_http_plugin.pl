@@ -152,7 +152,7 @@ ssl_verify(_SSL,
 %   time-stamp.
 
 modified_since_header(HaveModified, []) :-
-    var(HaveModified), 
+    var(HaveModified),
     !.
 modified_since_header(HaveModified,
                       [ request_header('If-modified-since' =
@@ -176,7 +176,7 @@ open_envelope('application/x-gzip', SourceURL, Stream0, Stream, Format) :-
     ),
     rdf_zlib_plugin:zopen(Stream0, Stream, []).
 open_envelope(_, _, Stream, Stream, Format) :-
-    nonvar(Format), 
+    nonvar(Format),
     !.
 open_envelope(ContentType, SourceURL, Stream, Stream, Format) :-
     major_content_type(ContentType, Major),

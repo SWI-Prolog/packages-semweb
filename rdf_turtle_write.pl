@@ -419,7 +419,7 @@ open_output(Spec, Encoding, Out,
 
 out_to_file(URL, File) :-
     atom(URL),
-    file_name_to_url(File, URL), 
+    file_name_to_url(File, URL),
     !.
 out_to_file(File, File).
 
@@ -514,7 +514,7 @@ prefix_length(_-URI, Len) :- atom_length(URI, Len).
 
 turtle_prefix(true, _, Prefix, _) :-
     !,
-    rdf_current_prefix(_, Prefix), 
+    rdf_current_prefix(_, Prefix),
     !.
 turtle_prefix(_, _, Prefix, URI) :-
     sub_atom(Prefix, _, 1, 0, Last),
@@ -581,11 +581,11 @@ strip_keys(L, _, L, R, R).
 %   ones.
 
 propose_abbrev(_, _, URI, Abbrev) :-
-    well_known_ns(Abbrev, URI), 
+    well_known_ns(Abbrev, URI),
     !.
 propose_abbrev(State, _, URI, Abbrev) :-
     tw_state_user_prefixes(State, true),
-    rdf_current_prefix(Abbrev, URI), 
+    rdf_current_prefix(Abbrev, URI),
     !.
 propose_abbrev(_, Len, URI, Abbrev) :-
     namespace_parts(URI, Parts),
@@ -617,7 +617,7 @@ well_known_extension(owl).
 
 namespace_parts(URL, Parts) :-
     atom_codes(URL, Codes),
-    phrase(parts(Parts), Codes), 
+    phrase(parts(Parts), Codes),
     !.
 namespace_parts(URL, _) :-
     format(user_error, 'Couldn\'t split ~q~n', [URL]),
@@ -1116,7 +1116,7 @@ tw_collection([H|T], Indent, State, Out) :-
 %   triples.
 
 unshared_collection(C, _, []) :-
-    rdf_equal(C, rdf:nil), 
+    rdf_equal(C, rdf:nil),
     !.
 unshared_collection(C, State, List) :-
     rdf_is_bnode(C),
@@ -1415,7 +1415,7 @@ tw_literal(Literal, _State, _Out) :-
 
 tw_typed_literal(Type, Value, State, Out) :-
     tw_state_abbreviate_literals(State, true),
-    tw_abbreviated_literal(Type, Value, State, Out), 
+    tw_abbreviated_literal(Type, Value, State, Out),
     !.
 tw_typed_literal(Type, Value, State, Out) :-
     (atom(Value) ; string(Value)),

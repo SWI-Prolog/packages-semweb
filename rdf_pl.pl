@@ -115,13 +115,13 @@ next_generation(1) :-
     assertz(generation(1)).
 
 assert_subject(S) :-
-    subject(S), 
+    subject(S),
     !.
 assert_subject(S) :-
     assertz(subject(S)).
 
 assert_predicate(P) :-
-    predicate(P), 
+    predicate(P),
     !.
 assert_predicate(P) :-
     assertz(predicate(P)).

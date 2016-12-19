@@ -357,7 +357,7 @@ expand_fuzzy(Token, _) :-
     throw(error(type_error(Token, boolean_expression), _)).
 
 simplify(Expr0, Expr) :-
-    simple(Expr0, Expr), 
+    simple(Expr0, Expr),
     !.
 simplify(Expr, Expr).
 
@@ -748,7 +748,7 @@ del_tokens([H|T], Literal, Map) :-
 %   generally domain dependent.
 
 rdf_tokenize_literal(Literal, Tokens) :-
-    tokenization(Literal, Tokens), 
+    tokenization(Literal, Tokens),
     !.               % Hook
 rdf_tokenize_literal(Literal, Tokens) :-
     text_of(Literal, _Lang, Text),
