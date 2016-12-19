@@ -126,6 +126,8 @@ cache_expansion(atom_t alias, atom_t local, atom_t uri)
       c->alias = alias;
       c->local = local;
 
+      PL_register_atom(local);
+      PL_register_atom(uri);
       if ( olocal) PL_unregister_atom(olocal);
       if ( ouri)   PL_unregister_atom(ouri);
 
