@@ -1,6 +1,6 @@
 :- module(lit,
-	  [ lit/0
-	  ]).
+          [ lit/0
+          ]).
 :- use_module('../rdf_db').
 
 data(string, '').
@@ -17,25 +17,25 @@ data(term, [let, us, test, a, list]).
 data(term, [let, us, test, another, list]).
 
 create :-
-	(   data(Type, Value),
-	    rdf_assert(subject, Type, literal(Value)),
-	    fail
-	;   true
-	).
+    (   data(Type, Value),
+        rdf_assert(subject, Type, literal(Value)),
+        fail
+    ;   true
+    ).
 
 lookup :-
-	findall(T-V, (rdf(subject, T, X), X = literal(V)), Pairs),
-	findall(T-V, data(T, V), Data),
-	Data == Pairs.
+    findall(T-V, (rdf(subject, T, X), X = literal(V)), Pairs),
+    findall(T-V, data(T, V), Data),
+    Data == Pairs.
 
 
-		 /*******************************
-		 *		MAIN		*
-		 *******************************/
+                 /*******************************
+                 *              MAIN            *
+                 *******************************/
 
 lit :-
-	rdf_reset_db,
-	create,
-	lookup.
+    rdf_reset_db,
+    create,
+    lookup.
 
 
