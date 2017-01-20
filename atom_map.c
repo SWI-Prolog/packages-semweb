@@ -1049,9 +1049,9 @@ rdf_keys_in_literal_map_proteced(atom_map *map, term_t spec, term_t keys)
     if ( (data = skiplist_find(&map->list, &search)) )
     { intptr_t size = (intptr_t)data->values.size;
 
-      assert(size > 0);
-
-      return PL_unify_integer(keys, size);
+      if ( size > 0 )
+	return PL_unify_integer(keys, size);
+      assert(size == 0);
     }
 
     return FALSE;
