@@ -121,8 +121,8 @@
             rdf_register_ns/2,          % +Alias, +URI
             rdf_register_ns/3,          % +Alias, +URI, +Options
             rdf_global_id/2,            % ?NS:Name, :Global
-            rdf_global_object/2,        % ?Object, :NSExpandedObject
-            rdf_global_term/2,          % Term, :WithExpandedNS
+            rdf_global_object/2,        % +Object, :NSExpandedObject
+            rdf_global_term/2,          % +Term, :WithExpandedNS
 
             rdf_compare/3,              % -Dif, +Object1, +Object2
             rdf_match_label/3,          % +How, +String, +Label
@@ -176,7 +176,7 @@
 :- meta_predicate
     rdf_current_prefix(:, -),
     rdf_current_ns(:, -),
-    rdf_global_id(+, :),
+    rdf_global_id(?, :),
     rdf_global_term(+, :),
     rdf_global_object(+, :),
     rdf_transaction(0),
@@ -460,12 +460,25 @@ register_file_ns(NS-URL) :-
     ).
 
 
-%!  rdf_global_id(?Id, :GlobalId) is det.
+%!  rdf_global_id(?IRISpec, :IRI) is semidet.
 %
-%   Convert between NS:Local and  global   atomic  identifier. To be
-%   completed. Note that the predicate is   a  meta-predicate on the
-%   output argument. This is necessary  to   get  the module context
-%   while the first argument may be of the form (:)/2.
+%   Convert between Prefix:Local and full IRI   (an atom). If IRISpec is
+%   an atom, it  is  simply  unified   with  IRI.  This  predicate fails
+%   silently if IRI is an RDF literal.
+%
+%   Note that this predicate is a meta-predicate on its output argument.
+%   This is necessary to get the module context while the first argument
+%   may be of the form (:)/2. The above mode description is correct, but
+%   should be interpreted as (?,?).
+%
+%   @error existence_error(rdf_prefix, Prefix)
+%   @see   rdf_equal/2 provides a compile time alternative
+%   @see   The rdf_meta/1 directive asks for compile time expansion
+%          of arguments.
+%   @bug   Error handling is incomplete.  In its current implementation
+%	   the same code is used for compile-time expansion and to
+%	   facilitate runtime conversion and checking.  These use cases
+%	   have different requirements.
 
 rdf_global_id(Id, Module:Global) :-
     rdf_global_id(Id, Global, Module).
