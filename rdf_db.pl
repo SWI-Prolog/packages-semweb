@@ -520,7 +520,7 @@ global(Prefix, Local, Global, Module) :-
     (   atom(Global)
     ->  rdf_current_prefix(Module:Prefix, Full),
         atom_concat(Full, Local, Global)
-    ;   atom(Prefix), atom(Local)
+    ;   atom(Prefix), atom(Local), var(Global)
     ->  (   rdf_current_prefix(Module:Prefix, Full)
         *-> atom_concat(Full, Local, Global)
         ;   current_prolog_flag(xref, true)
