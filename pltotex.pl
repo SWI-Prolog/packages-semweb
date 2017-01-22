@@ -36,7 +36,6 @@
           [ pltotex/2,
             pltotex/0
           ]).
-:- include(local_test).
 
 :- use_module(library(doc_latex)).
 :- use_module(library(main)).
