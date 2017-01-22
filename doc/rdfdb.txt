@@ -96,7 +96,7 @@ _transactions_ and _snapshots_.
 
 The RDF library can read and write triples in RDF/XML and a proprietary
 binary format. There is a plugin interface defined to support additional
-formats.  The library(semweb/rdf_turtle) uses this plugin API to support
+formats.  The library(semweb/turtle) uses this plugin API to support
 loading Turtle files using rdf_load/2.
 
   * [[rdf_load/1]]

@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2013, VU University Amsterdam
+    Copyright (c)  2013-2017, VU University Amsterdam
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -44,7 +44,7 @@
 :- use_module(library(debug)).
 :- use_module(library(apply)).
 :- use_module(library(aggregate)).
-:- use_module(library(semweb/rdf_turtle)).
+:- use_module(library(semweb/turtle)).
 :- use_module(library(semweb/rdf_db)).
 :- use_module(library(semweb/rdf_portray), []).
 :- use_module(library(semweb/rdf_compare)).

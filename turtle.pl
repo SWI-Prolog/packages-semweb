@@ -94,8 +94,8 @@ the W3C RDF working group.
 This module acts as a plugin to   rdf_load/2,  for processing files with
 one of the extensions =|.ttl|= or =|.n3|=.
 
-@see    http://www.w3.org/TR/turtle/ (used Candidate Recommendation 19
-        February 2013)
+@see    http://www.w3.org/TR/turtle/ (used W3C Recommendation 25
+        February 2014)
 */
 
 %!  rdf_read_turtle(+Input, -Triples, +Options)

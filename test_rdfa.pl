@@ -40,8 +40,7 @@
 :- use_module(library(semweb/rdfa)).
 :- use_module(library(semweb/rdf_db)).
 :- use_module(library(semweb/rdf_persistency)).
-:- use_module(library(semweb/turtle), []).
-:- use_module(library(semweb/rdf_turtle_write)).
+:- use_module(library(semweb/turtle)).
 :- use_module(library(sgml)).
 :- use_module(library(uri)).
 :- use_module(library(apply)).

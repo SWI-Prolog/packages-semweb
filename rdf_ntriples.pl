@@ -54,7 +54,7 @@ The library(semweb/rdf_ntriples) provides a  fast   reader  for  the RDF
 N-Triples and N-Quads format. N-Triples is   a simple format, originally
 used to support the W3C RDF  test   suites.  The current format has been
 extended   and   is   a   subset    of     the    Turtle   format   (see
-library(semweb/rdf_turtle)).
+library(semweb/turtle)).
 
 The API of this library is   almost identical to library(semweb/turtle).
 This module provides a plugin  into   rdf_load/2,  making this predicate

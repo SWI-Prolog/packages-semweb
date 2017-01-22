@@ -32,8 +32,7 @@ config.status
 semweb.html
 semweb.pdf
 rdfcompare.tex
-rdfturtle.tex
-rdfturtlewrite.tex
+turtle.tex
 rdfntriples.tex
 rdfportray.tex
 rdflib.tex

@@ -45,7 +45,7 @@
             rdf_current_manifest/1      % -Manifest
           ]).
 :- use_module(library(semweb/rdf_db)).
-:- use_module(library(semweb/rdf_turtle)).
+:- use_module(library(semweb/turtle)).
 :- use_module(library(rdf)).
 :- use_module(library(lists)).
 :- use_module(library(option)).

@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2010-2015, University of Amsterdam
+    Copyright (c)  2010-2017, University of Amsterdam
                               VU University Amsterdam
     All rights reserved.
 
@@ -43,7 +43,7 @@
 :- use_module(library(http/json)).
 :- use_module(library(lists)).
 :- use_module(library(rdf)).
-:- use_module(library(semweb/rdf_turtle)).
+:- use_module(library(semweb/turtle)).
 :- use_module(library(option)).
 
 /** <module> SPARQL client library

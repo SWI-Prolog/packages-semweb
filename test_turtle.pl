@@ -50,7 +50,7 @@ fix_load_path.
 
 :- fix_load_path.
 
-:- use_module(rdf_turtle).
+:- use_module(turtle).
 :- use_module(rdf_db).
 :- use_module(rdf_compare).
 :- use_module(library(rdf_ntriples)).
