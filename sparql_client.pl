@@ -133,10 +133,10 @@ sparql_query(Query, Row, Options) :-
 sparql_extra_headers(
         [ request_header('Accept' = 'application/sparql-results+xml, \c
                                      application/n-triples, \c
-                                     application/x-turtle, \c
-                                     application/turtle, \c
+                                     application/x-turtle; q=0.9, \c
+                                     application/turtle; q=0.9, \c
+                                     text/turtle, \c
                                      application/sparql-results+json, \c
-                                     text/turtle; q=0.9, \c
                                      application/rdf+xml, \c
                                      text/rdf+xml; q=0.8, \c
                                      */*; q=0.1'),

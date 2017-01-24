@@ -250,7 +250,7 @@ rdf_content_type('application/rdf+turtle', 0.76, turtle  ). %AB
 rdf_content_type('application/rdf+xml',    0.76, xml     ). %AB
 rdf_content_type('application/rss+xml',    0.66, xml     ). %AC
 rdf_content_type('application/trig',       0.99, trig    ). %ABC
-rdf_content_type('application/turtle',     0.99, turtle  ). %ABC
+rdf_content_type('application/turtle',     0.76, turtle  ). %AB
 rdf_content_type('application/x-trig',     0.76, trig    ). %AB
 rdf_content_type('application/x-turtle',   0.76, turtle  ). %AB
 rdf_content_type('application/xhtml+xml',  0.66, rdfa    ). %AC
@@ -260,6 +260,6 @@ rdf_content_type('text/n3',                0.56, turtle  ). %BC (N3)
 rdf_content_type('text/rdf',               0.76, xml     ). %AB
 rdf_content_type('text/rdf+n3',            0.33, turtle  ). %B (N3)
 rdf_content_type('text/rdf+xml',           0.76, xml     ). %AB
-rdf_content_type('text/turtle',            0.76, turtle  ). %AB
+rdf_content_type('text/turtle',            0.99, turtle  ). %ABC
 rdf_content_type('text/xml',               0.66, xml     ). %AC
 rdf_content_type('application/x-gzip',     0.23, gzip    ). %C
