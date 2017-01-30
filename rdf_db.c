@@ -4354,7 +4354,7 @@ record with the following members:
 static foreign_t
 rdf_gc_info(term_t info)
 { rdf_db *db     = rdf_current_db();
-  size_t life    = db->created - db->gc.reclaimed_triples;
+  size_t life    = db->created   - db->gc.reclaimed_triples;
   size_t garbage = db->erased    - db->gc.reclaimed_triples;
   size_t reindex = db->reindexed - db->gc.reclaimed_reindexed;
   gen_t keep_reindex;
