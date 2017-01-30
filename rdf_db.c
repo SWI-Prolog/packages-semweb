@@ -4759,14 +4759,14 @@ erase_triple(rdf_db *db, triple *t, query *q)
 
   simpleMutexLock(&db->locks.erase);
   if ( !t->erased )
-  { t->erased = TRUE;
+  { db->erased++;			/* incr. must be before setting erased */
+    t->erased = TRUE;			/* to make sure #garbage >= 0 */
     simpleMutexUnlock(&db->locks.erase);
 
     unregister_graph(db, t);		/* Updates count and MD5 */
     unregister_predicate(db, t);	/* Updates count */
     if ( t->is_duplicate )
       ATOMIC_SUB(&db->duplicates, 1);
-    ATOMIC_ADD(&db->erased, 1);
   } else
   { simpleMutexUnlock(&db->locks.erase);
   }
