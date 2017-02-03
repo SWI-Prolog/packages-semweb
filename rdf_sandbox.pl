@@ -83,7 +83,7 @@ sandbox:safe_primitive(rdf_api:rdf(_,_,_,_)).
 
 :- multifile
     sandbox:safe_primitive/1,
-    safe_primitive:safe_meta_predicate/1.
+    sandbox:safe_meta_predicate/1.
 
 
                  /*******************************
