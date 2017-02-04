@@ -469,7 +469,8 @@ graph_prefixes(State0, Graph, Prefixes) :-
     rdf_graph_prefixes(Graph, Prefixes,
                        [ filter(turtle_prefix(OnlyKnown)),
                          expand(Expand),
-                         min_count(2)
+                         min_count(2),
+                         get_prefix(turtle:iri_turtle_prefix)
                        ]).
 
 prefix_map(State, Prefixes, PrefixMap) :-
@@ -1341,7 +1342,8 @@ tw_resource(Resource, State, Out) :-
     ;   Name == ''
     ),
     !,
-    format(Out, '~w:~w', [Prefix, Name]).
+    format(Out, '~w:', [Prefix]),
+    turtle:turtle_write_pn_local(Out, Name).
 tw_resource(Resource, State, Out) :-
     tw_relative_uri(Resource, State, Out).
 
