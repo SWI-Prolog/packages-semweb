@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2009-2015, VU University Amsterdam
+    Copyright (c)  2009-2017, VU University Amsterdam
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -3402,9 +3402,99 @@ turtle_format(term_t parser, term_t format)
 
 /** turtle_pn_local(+Atom) is semidet.
 
-True if Atom is a valid Turtle   local  following the old standard. Note
-that in the current standard, any IRI is a valid pn_local string.
+True if Atom is a valid Turtle local name.
 */
+
+static const char *
+skip_plx(const char *s, const char *e)
+{ if ( s+3 < e && *s == '%' && hexd(s[1]) >= 0 && hexd(s[2]) >= 0 )
+    return s+3;
+
+  return NULL;
+}
+
+static int
+is_pn_local(const char *s, size_t len)
+{ if ( len > 0 )
+  { const char *e = &s[len];
+    int c = s[0]&0xff;
+
+    if ( pn_local_start(c) || is_local_escape(c) )
+      s++;
+    else if ( !(s=skip_plx(s, e)) )
+      return FALSE;
+
+    while(s<e)
+    { int c = s[0]&0xff;
+
+      if ( wcis_pn_chars(c) || c == ':' || is_local_escape(c) )
+      { s++;
+	continue;
+      }
+      if ( (s = skip_plx(s,e)) )
+	continue;
+      if ( c == '.' )
+      { if ( s+1 < e )
+	{ c = s[1]&0xff;
+	  if ( wcis_pn_chars(c) || c == ':' || c == '.' || c == '%' )
+	  { s++;
+	    continue;
+	  }
+	}
+      }
+      return FALSE;
+    }
+  }
+  return TRUE;
+}
+
+
+static const pl_wchar_t *
+wskip_plx(const pl_wchar_t *s, const pl_wchar_t *e)
+{ if ( s+3 < e && *s == '%' && hexd(s[1]) >= 0 && hexd(s[2]) >= 0 )
+    return s+3;
+
+  return NULL;
+}
+
+
+static int
+wis_pn_local(const pl_wchar_t *s, size_t len)
+{ if ( len > 0 )
+  { const pl_wchar_t *e = &s[len];
+    int c = s[0];
+
+    if ( pn_local_start(c) || is_local_escape(c) )
+      s++;
+    else if ( !(s=wskip_plx(s, e)) )
+      return FALSE;
+
+    while(s<e)
+    { int c = s[0];
+
+      if ( wcis_pn_chars(c) || c == ':' || is_local_escape(c) )
+      { s++;
+	continue;
+      }
+      if ( (s = wskip_plx(s,e)) )
+	continue;
+      if ( c == '.' )
+      { if ( s+1 < e )
+	{ c = s[1];
+	  if ( wcis_pn_chars(c) || c == ':' || c == '.' || c == '%' )
+	  { s++;
+	    continue;
+	  }
+	}
+      }
+      return FALSE;
+    }
+  }
+  return TRUE;
+}
+
+
+
 
 static foreign_t
 turtle_pn_local(term_t name)
@@ -3413,28 +3503,39 @@ turtle_pn_local(term_t name)
   size_t len;
 
   if ( PL_get_nchars(name, &len, &s, CVT_ATOM) )
-  { const char *e = &s[len];
-
-    if ( !wcis_pn_chars_u(s[0]&0xff) )
-      return FALSE;
-    for(s++; s<e; s++)
-    { if ( !wcis_pn_chars(s[0]&0xff) )
-	return FALSE;
-    }
-    return TRUE;
-  } else if ( PL_get_wchars(name, &len, &w, CVT_ATOM|CVT_EXCEPTION) )
-  { const pl_wchar_t *e = &w[len];
-
-    if ( !wcis_pn_chars_u(w[0]) )
-      return FALSE;
-    for(w++; w<e; w++)
-    { if ( !wcis_pn_chars(w[0]) )
-	return FALSE;
-    }
-    return TRUE;
-  } else
+    return is_pn_local(s, len);
+  else if ( PL_get_wchars(name, &len, &w, CVT_ATOM|CVT_EXCEPTION) )
+    return wis_pn_local(w, len);
+  else
     return FALSE;
 }
+
+
+static foreign_t
+iri_turtle_prefix(term_t iri, term_t prefix)
+{ char *s;
+  pl_wchar_t *w;
+  size_t len;
+
+  if ( PL_get_nchars(iri, &len, &s, CVT_ATOM) )
+  { const char *e = &s[len];
+
+    while(e>s && e[0] != '/' && e[0] != '#')
+      e--;
+    if ( is_pn_local(e, &s[len]-e) )
+      return PL_unify_atom_nchars(prefix, e-s, s);
+  } else if ( PL_get_wchars(iri, &len, &w, CVT_ATOM|CVT_EXCEPTION) )
+  { const pl_wchar_t *e = &w[len];
+
+    while(e>w && e[0] != '/' && e[0] != '#')
+      e--;
+    if ( wis_pn_local(e, &w[len]-e) )
+      return PL_unify_wchars(prefix, PL_ATOM, e-w, e);
+  }
+
+  return FALSE;
+}
+
 
 
 		 /*******************************
@@ -3680,6 +3781,44 @@ turtle_write_uri(term_t Stream, term_t Value)
 }
 
 
+static foreign_t
+turtle_write_pn_local(term_t Stream, term_t Value)
+{ size_t len;
+  char *s;
+  pl_wchar_t *w;
+  IOSTREAM *out;
+
+  if ( !PL_get_stream_handle(Stream, &out) )
+    return FALSE;
+
+  if ( PL_get_nchars(Value, &len, &s, CVT_ATOM|CVT_STRING) )
+  { const char *e = &s[len];
+
+    for(; s<e; s++)
+    { if ( is_local_escape(s[0]&0xff) )
+	StryPutcode('\\', out);
+      if ( Sputcode(s[0]&0xff, out) < 0 )
+	goto error;
+    }
+    return PL_release_stream(out);
+  } else if ( PL_get_wchars(Value, &len, &w, CVT_ATOM|CVT_EXCEPTION) )
+  { const pl_wchar_t *e = &w[len];
+
+    for(; w<e; w++)
+    { if ( is_local_escape(s[0]&0xff) )
+	StryPutcode('\\', out);
+      if ( Sputcode(w[0], out) < 0 )
+	goto error;
+    }
+    return PL_release_stream(out);
+  } else
+  { error:
+    PL_release_stream(out);
+    return FALSE;
+  }
+}
+
+
 		 /*******************************
 		 *	      REGISTER		*
 		 *******************************/
@@ -3733,7 +3872,9 @@ install_turtle(void)
   PL_register_foreign("turtle_format",	       2, turtle_format,         0);
 
   PL_register_foreign("turtle_pn_local",       1, turtle_pn_local,       0);
+  PL_register_foreign("iri_turtle_prefix",     2, iri_turtle_prefix,     0);
   PL_register_foreign("turtle_write_uri",      2, turtle_write_uri,      0);
+  PL_register_foreign("turtle_write_pn_local", 2, turtle_write_pn_local, 0);
   PL_register_foreign("turtle_write_quoted_string",
 					    3, turtle_write_quoted_string, 0);
 }
