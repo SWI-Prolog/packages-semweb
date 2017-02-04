@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2003-2016, University of Amsterdam
+    Copyright (c)  2003-2017, University of Amsterdam
                               VU University Amsterdam
     All rights reserved.
 
@@ -2928,6 +2928,10 @@ header_namespaces(Options, List) :-
 %       Only include prefixes that appear at least N times.  Default
 %       is 1. Declared prefixes are always returned if found at
 %       least one time.
+%
+%       * get_prefix(:GetPrefix)
+%       Predicate to extract the candidate prefix from an IRI.  Default
+%       is iri_xml_namespace/2.
 
 
 :- thread_local
@@ -2945,7 +2949,8 @@ rdf_graph_prefixes(Graph, List, M:QOptions) :-
     option(filter(Filter), Options, true),
     option(expand(Expand), Options, rdf_db),
     option(min_count(MinCount), Options, 1),
-    call_cleanup(prefixes(Expand, Graph, Prefixes, Filter, MinCount),
+    option(get_prefix(GetPrefix), Options, iri_xml_namespace),
+    call_cleanup(prefixes(Expand, Graph, Prefixes, Filter, MinCount, GetPrefix),
                  retractall(graph_prefix(_,_,_))),
     sort(Prefixes, List).
 rdf_graph_prefixes(Graph, List, M:Filter) :-
@@ -2953,21 +2958,22 @@ rdf_graph_prefixes(Graph, List, M:Filter) :-
 
 is_meta(filter).
 is_meta(expand).
+is_meta(get_prefix).
 
 
-prefixes(Expand, Graph, Prefixes, Filter, MinCount) :-
+prefixes(Expand, Graph, Prefixes, Filter, MinCount, GetPrefix) :-
     (   call(Expand, S, P, O, Graph),
-        add_ns(subject, Filter, S, MinCount, s(S)),
-        add_ns(predicate, Filter, P, MinCount, sp(S,P)),
-        add_ns_obj(Filter, O, MinCount, spo(S,P,O)),
+        add_ns(subject, GetPrefix, Filter, S, MinCount, s(S)),
+        add_ns(predicate, GetPrefix, Filter, P, MinCount, sp(S,P)),
+        add_ns_obj(GetPrefix, Filter, O, MinCount, spo(S,P,O)),
         fail
     ;   true
     ),
     findall(Prefix, graph_prefix(Prefix, MinCount, _), Prefixes).
 
-add_ns(Where, Filter, S, MinCount, Context) :-
+add_ns(Where, GetPrefix, Filter, S, MinCount, Context) :-
     \+ rdf_is_bnode(S),
-    iri_xml_namespace(S, Full),
+    call(GetPrefix, S, Full),
     Full \== '',
     !,
     (   graph_prefix(Full, MinCount, _)
@@ -2978,7 +2984,7 @@ add_ns(Where, Filter, S, MinCount, Context) :-
     ->  add_ns(Full, Context)
     ;   true
     ).
-add_ns(_, _, _, _, _).
+add_ns(_, _, _, _, _, _).
 
 add_ns(Full, Context) :-
     graph_prefix(Full, _, Contexts),
@@ -2997,15 +3003,15 @@ add_ns(Full, Context) :-
     asserta(graph_prefix(Full, 1, [Context])).
 
 
-add_ns_obj(Filter, O, MinCount, Context) :-
+add_ns_obj(GetPrefix, Filter, O, MinCount, Context) :-
     atom(O),
     !,
-    add_ns(object, Filter, O, MinCount, Context).
-add_ns_obj(Filter, literal(type(Type, _)), MinCount, _) :-
+    add_ns(object, GetPrefix, Filter, O, MinCount, Context).
+add_ns_obj(GetPrefix, Filter, literal(type(Type, _)), MinCount, _) :-
     atom(Type),
     !,
-    add_ns(type, Filter, Type, MinCount, t(Type)).
-add_ns_obj(_, _, _, _).
+    add_ns(type, GetPrefix, Filter, Type, MinCount, t(Type)).
+add_ns_obj(_, _, _, _, _).
 
 
 %!  used_namespace_entities(-List, ?Graph) is det.
