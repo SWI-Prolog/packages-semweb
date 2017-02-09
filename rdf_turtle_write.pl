@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2009-2014, University of Amsterdam
+    Copyright (c)  2009-2017, University of Amsterdam
                               VU University Amsterdam
     All rights reserved.
 
@@ -597,7 +597,7 @@ propose_abbrev(_, Len, URI, Abbrev) :-
     atomic_list_concat(Use, -, Abbrev).
 
 abbrev_part(X) :-
-    turtle:turtle_pn_local(X),
+    xml_name(X),
     \+ well_known_ns(X, _),
     \+ well_known_extension(X).
 
