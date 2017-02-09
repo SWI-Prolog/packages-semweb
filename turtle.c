@@ -3784,6 +3784,14 @@ turtle_write_uri(term_t Stream, term_t Value)
 }
 
 
+/* Local escape characters are: ~.-!$&'()*+,;=/?#@%_
+*/
+
+static inline int
+wr_is_local_escape(int c)
+{ return is_local_escape(c) && !strchr("_-%", c);
+}
+
 static foreign_t
 turtle_write_pn_local(term_t Stream, term_t Value)
 { size_t len;
@@ -3795,23 +3803,47 @@ turtle_write_pn_local(term_t Stream, term_t Value)
     return FALSE;
 
   if ( PL_get_nchars(Value, &len, &s, CVT_ATOM|CVT_STRING) )
-  { const char *e = &s[len];
+  { if ( len > 0 )
+    { const char *e = &s[len];
+      int c = s[0]&0xff;
 
-    for(; s<e; s++)
-    { if ( is_local_escape(s[0]&0xff) )
+      if ( !pn_local_start(c) )
 	StryPutcode('\\', out);
-      if ( Sputcode(s[0]&0xff, out) < 0 )
-	goto error;
+      StryPutcode(c, out);
+
+      for(s++; s<e; s++)
+      { c = s[0]&0xff;
+
+	if ( c == '.' && s+1 < e && !strchr(":.%", s[1]) )
+	{ StryPutcode(c, out);
+	} else
+	{ if ( wr_is_local_escape(c) )
+	    StryPutcode('\\', out);
+	  StryPutcode(c, out);
+	}
+      }
     }
     return PL_release_stream(out);
   } else if ( PL_get_wchars(Value, &len, &w, CVT_ATOM|CVT_EXCEPTION) )
-  { const pl_wchar_t *e = &w[len];
+  { if ( len > 0 )
+    { const pl_wchar_t *e = &w[len];
+      int c = w[0];
 
-    for(; w<e; w++)
-    { if ( is_local_escape(s[0]&0xff) )
+      if ( !pn_local_start(c) )
 	StryPutcode('\\', out);
-      if ( Sputcode(w[0], out) < 0 )
-	goto error;
+      StryPutcode(c, out);
+
+      for(w++; w<e; w++)
+      { c = w[0];
+
+	if ( c == '.' && w+1 < e && !strchr(":.%", w[1]) )
+	{ StryPutcode(c, out);
+	} else
+	{ if ( wr_is_local_escape(c) )
+	    StryPutcode('\\', out);
+	  StryPutcode(c, out);
+	}
+      }
     }
     return PL_release_stream(out);
   } else
