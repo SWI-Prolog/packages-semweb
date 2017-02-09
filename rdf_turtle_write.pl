@@ -1515,11 +1515,22 @@ inc_subject_count(State, Count) :-
     prolog:message//1.
 
 prolog:message(rdf(saved(File, Time, SavedSubjects, SavedTriples))) -->
-    [ 'Saved ~D triples about ~D subjects into ~p (~3f sec)'-
-      [SavedTriples, SavedSubjects, File, Time]
-    ].
+    [ 'Saved ~D triples about ~D subjects into '-[SavedTriples, SavedSubjects] ],
+    rdf_output(File),
+    [ ' (~3f sec)'-[Time] ].
 prolog:message(rdf(saved(File, Time, SavedSubjects, SavedTriples,
                          SavedGraphs))) -->
-    [ 'Saved ~D graphs, ~D triples about ~D subjects into ~p (~3f sec)'-
-      [SavedGraphs, SavedTriples, SavedSubjects, File, Time]
-    ].
+    [ 'Saved ~D graphs, ~D triples about ~D subjects into '-
+      [SavedGraphs, SavedTriples, SavedSubjects] ],
+    rdf_output(File),
+    [ ' (~3f sec)'-[Time] ].
+
+rdf_output(Stream) -->
+    { is_stream(Stream),
+      stream_property(Stream, file_name(File))
+    },
+    !,
+    [ '~p'-[File] ].
+rdf_output(File) -->
+    [ '~p'-[File] ].
+
