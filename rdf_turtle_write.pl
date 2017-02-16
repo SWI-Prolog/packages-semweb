@@ -1525,12 +1525,15 @@ prolog:message(rdf(saved(File, Time, SavedSubjects, SavedTriples,
     rdf_output(File),
     [ ' (~3f sec)'-[Time] ].
 
-rdf_output(Stream) -->
-    { is_stream(Stream),
+rdf_output(StreamSpec) -->
+    { (   StreamSpec = stream(Stream)
+      ->  true
+      ;   Stream = StreamSpec
+      ),
+      is_stream(Stream),
       stream_property(Stream, file_name(File))
     },
     !,
     [ '~p'-[File] ].
 rdf_output(File) -->
     [ '~p'-[File] ].
-
