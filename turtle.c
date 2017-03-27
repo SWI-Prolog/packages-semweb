@@ -3736,6 +3736,11 @@ ttl_put_ucharacter(IOSTREAM *s, int c)
   { case '>':
     case '<':
     case '\\':
+    case '|':
+    case '{':
+    case '}':
+    case '"':
+    case '`':
       if ( (rc=Sfprintf(s, "\\\\u%04x", c)) < 0 )
 	return rc;
       return 0;
