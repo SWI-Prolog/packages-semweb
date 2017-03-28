@@ -447,13 +447,15 @@ is_scheme_char(int c)
 }
 
 static inline int
-is_lang_char1(int c)
-{ return (c < 128 ? (char_type[c] & (LC|UC)) != 0 : FALSE);
-}
+is_lang_char(int c, int minus)
+{ if ( c < 128 )
+  { if ( minus == 0 )			/* main language */
+      return (char_type[c] & (LC|UC));
+    else				/* sub language */
+      return (char_type[c] & (LC|UC|DI));
+  }
 
-static inline int
-is_lang_char(int c)
-{ return (c < 128 ? (char_type[c] & (LC|UC|DI)) != 0 : FALSE) || c == '-';
+  return FALSE;
 }
 
 static inline int
@@ -2223,23 +2225,27 @@ read_long_string(turtle_state *ts, int q, string_buffer *text)
 
 static int
 read_lang(turtle_state *ts, string_buffer *b)
-{ initBuf(b);
+{ int minus = 0;
+  int fminus = TRUE;
 
-  if ( is_lang_char1(ts->current_char) )
-  { addBuf(b, ts->current_char);
-  } else
-  { return syntax_error(ts, "LANGTAG expected");
-  }
+  initBuf(b);
 
   for(;;)
-  { if ( next(ts) )
-    { if ( is_lang_char(ts->current_char) )
-      { addBuf(b, ts->current_char);
-      } else
-      { addBuf(b, EOS);
-	return TRUE;
-      }
+  { if ( is_lang_char(ts->current_char, minus) )
+    { addBuf(b, ts->current_char);
+      fminus = FALSE;
+    } else if ( ts->current_char == '-' && fminus == FALSE )
+    { addBuf(b, ts->current_char);
+      minus++;
+      fminus = TRUE;
+    } else if ( fminus == FALSE )
+    { addBuf(b, EOS);
+      return TRUE;
     } else
+    { return syntax_error(ts, "LANGTAG expected");
+    }
+
+    if ( !next(ts) )
       return FALSE;
   }
 }
