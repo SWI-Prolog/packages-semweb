@@ -3739,7 +3739,7 @@ ttl_put_ucharacter(IOSTREAM *s, int c)
 { int rc;
 
   switch(c)
-  { case '>':
+  { case '>':				/* not allowed in rfc3987.txt */
     case '<':
     case '\\':
     case '^':
@@ -3748,9 +3748,6 @@ ttl_put_ucharacter(IOSTREAM *s, int c)
     case '}':
     case '"':
     case '`':
-      if ( (rc=Sfprintf(s, "\\\\u%04x", c)) < 0 )
-	return rc;
-      return 0;
     case ' ':
       if ( (rc=Sfprintf(s, "%%%02x", c)) < 0 )
 	return rc;
