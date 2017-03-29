@@ -3742,6 +3742,7 @@ ttl_put_ucharacter(IOSTREAM *s, int c)
   { case '>':
     case '<':
     case '\\':
+    case '^':
     case '|':
     case '{':
     case '}':
