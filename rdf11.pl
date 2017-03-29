@@ -345,6 +345,8 @@ rdf_has(S,P,O,RealP) :-
 %     literal(Value).
 %     * graph(Graph)
 %     Moves the triple from its current named graph to Graph.
+%     This only works with rdf_update/4 and will throw an error when
+%     used with rdf_update/3.
 %
 %   The argument matching  the  action  must   be  ground.  If  this
 %   argument is equivalent to  the  current   value,  no  action  is
