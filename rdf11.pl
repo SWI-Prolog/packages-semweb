@@ -80,6 +80,7 @@
             rdf_default_graph/1,        % -Graph
             rdf_default_graph/2,        % -Old, +New
 
+            rdf_estimate_complexity/4,  % ?S, ?P, ?O, -Estimate
             rdf_assert_list/2,          % +PrologList, ?RDFList
             rdf_assert_list/3,          % +PrologList, ?RDFList, +G
             rdf_last/2,                 % +RDFList, ?Last
@@ -120,7 +121,8 @@
                      rdf_is_literal/1,
                      rdf_is_resource/1,
                      rdf_literal_value/2,
-                     rdf_compare/3
+                     rdf_compare/3,
+                     rdf_estimate_complexity/4
                    ])
            ).
 :- use_module(library(sgml)).
@@ -202,6 +204,7 @@ In a nutshell, the following issues are addressed:
     rdf_literal(o),
     rdf_name(o),
     rdf_object(o),
+    rdf_estimate_complexity(r,r,o,-),
     rdf_assert_list(t,r),
     rdf_assert_list(t,r,r),
     rdf_last(r,o),
@@ -1922,6 +1925,13 @@ rdf_last(L, Last) :-
     ).
 rdf_last(L, _) :-
     type_error(rdf_subject, L).
+
+
+%!  rdf_estimate_complexity(?S, ?P, ?O, -Estimate) is det.
+
+rdf_estimate_complexity(S, P, O, Estimate) :-
+    pre_object(O,O0),
+    rdf_db:rdf_estimate_complexity(S,P,O0,Estimate).
 
 
 %!  rdf_assert_list(+PrologList, ?RDFList) is det.
