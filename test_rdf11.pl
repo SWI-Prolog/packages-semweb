@@ -503,6 +503,10 @@ test(rdf_nth0, set(I-X == [0-a,0-d,1-b,2-c,2-e])) :-
     rdf_list(L),
     rdf_nth0(I, L, X).
 
+test(rdf_nth1, set(I-X == [1-a,1-d,2-b,3-c,3-e])) :-
+    rdf_list(L),
+    rdf_nth1(I, L, X).
+
 test(rdf_last, set(X == [c,e])) :-
     rdf_list(L),
     rdf_last(L, X).
