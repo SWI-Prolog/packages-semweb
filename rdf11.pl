@@ -98,6 +98,7 @@
             op(650, xfx, ^^),           % must be above :
             op(1150, fx, rdf_meta)
           ]).
+:- use_module(library(c14n2)).
 :- use_module(library(debug)).
 :- use_module(library(error)).
 :- use_module(library(lists)).
@@ -1272,10 +1273,7 @@ parse_partial_xml(Parser, Val, DOM) :-
 
 write_xml_literal(xml, DOM, Text) :-
     with_output_to(atom(Text),
-                   xml_write(current_output, DOM,
-                             [ header(false),
-                               layout(false)
-                             ])).
+                   xml_write_canonical(current_output, DOM, [])).
 write_xml_literal(html, DOM, Text) :-
     with_output_to(atom(Text),
                    html_write(current_output, DOM,
