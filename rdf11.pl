@@ -1067,6 +1067,7 @@ in_type(_, _, _, _).
 %   future versions this is likely to become a string.
 
 in_ground_type(Type, Input, Lex) :-
+    \+ string(Input),
     in_ground_type_hook(Type, Input, Lex),
     !.
 in_ground_type(IntType, Val, Val0) :-
