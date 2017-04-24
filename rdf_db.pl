@@ -2200,8 +2200,8 @@ source_url(File, Protocol, SourceURL) :-
 source_file(Spec, file(SExt), SourceURL) :-
     findall(Ext, valid_extension(Ext), Exts),
     absolute_file_name(Spec, File, [access(read), extensions([''|Exts])]),
-    storage_extension(Plain, SExt, File),
-    uri_file_name(SourceURL, Plain).
+    storage_extension(_Plain, SExt, File),
+    uri_file_name(SourceURL, File).
 
 to_url(URL, URL) :-
     uri_is_global(URL),
@@ -2264,8 +2264,8 @@ open_input_if_modified(stream(In), SourceURL, _, In, true,
 open_input_if_modified(file(SExt), SourceURL, HaveModified, Stream, Cleanup,
                        Modified, Format, _) :-
     !,
-    uri_file_name(SourceURL, File0),
-    file_name_extension(File0, SExt, File),
+    uri_file_name(SourceURL, File),
+    (   SExt == '' -> Plain = File; file_name_extension(Plain, SExt, File)),
     time_file(File, LastModified),
     (   nonvar(HaveModified),
         HaveModified >= LastModified
@@ -2274,7 +2274,7 @@ open_input_if_modified(file(SExt), SourceURL, HaveModified, Stream, Cleanup,
     ;   storage_open(SExt, File, Stream, Cleanup),
         Modified = last_modified(LastModified),
         (   var(Format)
-        ->  guess_format(File0, Format)
+        ->  guess_format(Plain, Format)
         ;   true
         )
     ).
