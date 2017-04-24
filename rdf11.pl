@@ -35,7 +35,7 @@
 
 :- module(rdf11,
           [ rdf/3,                      % ?S, ?P, ?O
-            rdf/4,                      % ?S, ?P, ?O, G
+            rdf/4,                      % ?S, ?P, ?O, ?G
             rdf_has/3,                  % ?S, ?P, ?O
             rdf_has/4,                  % ?S, ?P, ?O, -RealP
             rdf_update/4,               % +S, +P, +O, +Action
