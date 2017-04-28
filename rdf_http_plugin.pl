@@ -174,7 +174,8 @@ open_envelope('application/x-gzip', SourceURL, Stream0, Stream, Format) :-
         rdf_db:rdf_file_type(Ext, Format)
     ;   true
     ),
-    rdf_zlib_plugin:zopen(Stream0, Stream, []).
+    stream_pair(Stream0, Read, _),
+    rdf_zlib_plugin:zopen(Read, Stream, []).
 open_envelope(_, _, Stream, Stream, Format) :-
     nonvar(Format),
     !.
