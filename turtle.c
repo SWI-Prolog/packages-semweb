@@ -3069,7 +3069,7 @@ static foreign_t
 create_turtle_parser(term_t parser, term_t in, term_t options)
 { IOSTREAM *stream;
 
-  if ( PL_get_stream_handle(in, &stream) )
+  if ( PL_get_stream(in, &stream, SIO_INPUT) )
   { turtle_state *ts;
 
     if ( (ts=new_turtle_parser(stream)) )
