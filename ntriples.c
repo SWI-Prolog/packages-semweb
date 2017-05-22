@@ -784,7 +784,7 @@ read_ntuple(term_t from, term_t triple, int arity)
   int rc;
   int c;
 
-  if ( !PL_get_stream_handle(from, &in) )
+  if ( !PL_get_stream(from, &in, SIO_INPUT) )
     return FALSE;
 
   c=Sgetcode(in);
