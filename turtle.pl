@@ -254,7 +254,8 @@ process_turtle(_Parser, Stream, _OnObject, _Graph, _Options) :-
     at_end_of_stream(Stream),
     !.
 process_turtle(Parser, Stream, OnObject, Graph, Options) :-
-    line_count(Stream, LineNo),
+    stream_pair(Stream, In, _),
+    line_count(In, LineNo),
     turtle_parse(Parser, Triples,
                  [ parse(statement)
                  | Options
