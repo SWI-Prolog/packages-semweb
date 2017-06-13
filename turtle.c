@@ -3524,23 +3524,23 @@ iri_turtle_prefix(term_t iri, term_t prefix)
   size_t len;
 
   if ( PL_get_nchars(iri, &len, &s, CVT_ATOM) )
-  { const char *e = &s[len];
+  { const char *e = &s[len]-1;
 
     while(e>s && e[0] != '/' && e[0] != '#')
       e--;
     if ( e < &s[len] && (e[0] == '/' || e[0] == '#') )
       e++;
     if ( is_pn_local(e, &s[len]-e) )
-      return PL_unify_atom_nchars(prefix, e-s, s);
+      return PL_unify_atom_nchars(prefix, &s[len]-e, s);
   } else if ( PL_get_wchars(iri, &len, &w, CVT_ATOM|CVT_EXCEPTION) )
-  { const pl_wchar_t *e = &w[len];
+  { const pl_wchar_t *e = &w[len]-1;
 
     while(e>w && e[0] != '/' && e[0] != '#')
       e--;
     if ( e < &w[len] && (e[0] == '/' || e[0] == '#') )
       e++;
     if ( wis_pn_local(e, &w[len]-e) )
-      return PL_unify_wchars(prefix, PL_ATOM, e-w, e);
+      return PL_unify_wchars(prefix, PL_ATOM, &w[len]-e, e);
   }
 
   return FALSE;
