@@ -3531,7 +3531,7 @@ iri_turtle_prefix(term_t iri, term_t prefix)
     if ( e < &s[len] && (e[0] == '/' || e[0] == '#') )
       e++;
     if ( is_pn_local(e, &s[len]-e) )
-      return PL_unify_atom_nchars(prefix, &s[len]-e, s);
+      return PL_unify_atom_nchars(prefix, e-s, s);
   } else if ( PL_get_wchars(iri, &len, &w, CVT_ATOM|CVT_EXCEPTION) )
   { const pl_wchar_t *e = &w[len]-1;
 
@@ -3540,7 +3540,7 @@ iri_turtle_prefix(term_t iri, term_t prefix)
     if ( e < &w[len] && (e[0] == '/' || e[0] == '#') )
       e++;
     if ( wis_pn_local(e, &w[len]-e) )
-      return PL_unify_wchars(prefix, PL_ATOM, &w[len]-e, e);
+      return PL_unify_wchars(prefix, PL_ATOM, e-w, w);
   }
 
   return FALSE;
