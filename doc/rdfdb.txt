@@ -217,7 +217,6 @@ preprocessor using expand_goal/2.
 
   * [[rdf_current_prefix/2]]
   * [[rdf_register_prefix/2]]
-  * [[rdf_register_prefix/3]]
 
 _Explicit_ expansion is achieved using the predicates below. The
 predicate rdf_equal/2 performs this expansion at compile time, while the
