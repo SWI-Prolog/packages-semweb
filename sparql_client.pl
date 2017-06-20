@@ -79,7 +79,8 @@ Or, querying a local server using an =ASK= query:
 %       * host(+Host)
 %       * port(+Port)
 %       * path(+Path)
-%       The above three options set the location of the server.
+%       * scheme(+Scheme)
+%       The above four options set the location of the server.
 %       * search(+ListOfParams)
 %       Provide additional query parameters, such as the graph.
 %       * variable_names(-ListOfNames)
@@ -102,26 +103,28 @@ Or, querying a local server using an =ASK= query:
 %     ==
 
 sparql_query(Query, Row, Options) :-
-    sparql_param(host(Host), Options,  Options1),
-    sparql_param(port(Port), Options1, Options2),
-    sparql_param(path(Path), Options2, Options3),
-    select_option(search(Extra), Options3, Options4, []),
-    select_option(variable_names(VarNames), Options4, Options5, _),
+    sparql_param(scheme(Scheme), Options,  Options1),
+    sparql_port(Scheme, Port,    Options1, Options2),
+    sparql_param(host(Host),     Options2, Options3),
+    sparql_param(path(Path),     Options3, Options4),
+    select_option(search(Extra), Options4, Options5, []),
+    select_option(variable_names(VarNames), Options5, Options6, _),
     sparql_extra_headers(HTTPOptions),
-    http_open([ protocol(http),
+    http_open([ scheme(Scheme),
                 host(Host),
                 port(Port),
                 path(Path),
                 search([ query = Query
                        | Extra
                        ])
-              | Options5
+              | Options6
               ], In,
-              [ header(content_type, ContentType)
+              [ header(content_type, ContentType),
+                status_code(Status)
               | HTTPOptions
               ]),
     plain_content_type(ContentType, CleanType),
-    read_reply(CleanType, In, VarNames, Row).
+    read_reply(Status, CleanType, In, VarNames, Row).
 
 %!  sparql_extra_headers(-List)
 %
@@ -153,6 +156,15 @@ ssl_verify(_SSL,
            _ProblemCertificate, _AllCertificates, _FirstCertificate,
            _Error).
 
+%!  read_reply(+Status, +ContentType, +In, -Close, -Row)
+
+read_reply(200, ContentType, In, Close, Row) :-
+    !,
+    read_reply(ContentType, In, Close, Row).
+read_reply(Status, _ContentType, In, _Close, _Row) :-
+    call_cleanup(read_string(In, _, Reply),
+                 close(In, [force(true)])),
+    throw(error(sparql_error(Status, Reply), _)).
 
 read_reply('application/rdf+xml', In, _, Row) :-
     !,
@@ -225,7 +237,7 @@ varnames(select(VarTerm, _Rows), VarNames) :-
 :- dynamic
     sparql_setting/1.
 
-sparql_setting(port(80)).
+sparql_setting(scheme(http)).
 sparql_setting(path('/sparql/')).
 
 sparql_param(Param, Options0, Options) :-
@@ -237,6 +249,18 @@ sparql_param(Param, Options, Options) :-
 sparql_param(Param, Options, Options) :-
     functor(Param, Name, _),
     throw(error(existence_error(option, Name), _)).
+
+sparql_port(_Scheme, Port, Options0, Options) :-
+    select_option(port(Port), Options0, Options),
+    !.
+sparql_port(_Scheme, Port, Options, Options) :-
+    sparql_setting(port(Port)),
+    !.
+sparql_port(http, 80, Options, Options) :-
+    !.
+sparql_port(https, 443, Options, Options) :-
+    !.
+
 
 %!  sparql_set_server(+OptionOrList)
 %
