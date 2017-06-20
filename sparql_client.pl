@@ -65,6 +65,17 @@ Or, querying a local server using an =ASK= query:
                     [ host('localhost'), port(3020), path('/sparql/')]).
     Row = true.
     ==
+
+HTTPS servers are supported using the scheme(https) option:
+
+    ==
+    ?- sparql_query('select * where { ?x rdfs:label "Amsterdam"@nl }',
+		    Row,
+                    [ scheme(https),
+                      host('query.wikidata.org'),
+                      path('/sparql')
+                    ]).
+    ==
 */
 
 
