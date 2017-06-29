@@ -1044,8 +1044,25 @@ pre_ground_object(Atom, URI) :-
 %pre_ground_object(NS:Local, URI) :-            % still leaves S and P.
 %       atom(NS), atom(Local), !,
 %       rdf_global_id(NS:Local, URI).
+pre_ground_object(literal(Lit0), literal(Lit)) :-
+    old_literal(Lit0, Lit),
+    !.
 pre_ground_object(Value, _) :-
     type_error(rdf_object, Value).
+
+old_literal(Lit0, Lit) :-
+    old_literal(Lit0),
+    !,
+    Lit = Lit0.
+old_literal(Atom, Lit) :-
+    atom(Atom),
+    rdf_equal(xsd:string, XSDString),
+    Lit = type(XSDString, Atom).
+
+old_literal(type(Type, Value)) :-
+    atom(Type), atom(Value).
+old_literal(lang(Lang, Value)) :-
+    atom(Lang), atom(Value).
 
 in_lang_string(Val, Val0) :-
     atomic(Val),
