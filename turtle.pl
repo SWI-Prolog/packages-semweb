@@ -368,7 +368,7 @@ name_uri(Name, BaseURI) :-
 %     Use Turtle's long string syntax. Embeded newlines and
 %     single or double quotes are are emitted verbatim.
 %     * false
-%     Use Turtle's shotr string syntax.
+%     Use Turtle's short string syntax.
 %     * Var
 %     If WriteLong is unbound, this predicate uses long syntax
 %     if newlines appear in the string and short otherwise.  WriteLong
