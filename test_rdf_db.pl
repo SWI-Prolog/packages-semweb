@@ -875,6 +875,14 @@ source(1) :-
     rdf_db:rdf_set_graph_source(test, 'test.rdf', Now),
     rdf_source(test, X),
     X == 'test.rdf'.
+source(2) :-
+    rdf_assert(s,p,o,test),
+    rdf_graph_property(test, hash(MD5a)),
+    rdf_unload_graph(test),
+    rdf_assert(s,p,o,test),
+    rdf_graph_property(test, hash(MD5z)),
+    assertion(MD5a == MD5z).
+
 
                  /*******************************
                  *             RETRACT          *

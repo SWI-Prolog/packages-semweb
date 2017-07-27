@@ -2629,7 +2629,12 @@ lookup_graph(rdf_db *db, atom_t name)
   LOCK_MISC(db);
   if ( (g=existing_graph(db, name)) )
   { if ( g->erased )
+    { memset(g->digest,            0, sizeof(g->digest));
+      memset(g->unmodified_digest, 0, sizeof(g->unmodified_digest));
+      g->md5    = TRUE;
       g->erased = FALSE;
+      db->graphs.erased--;
+    }
 
     UNLOCK_MISC(db);
     return g;
@@ -2972,6 +2977,7 @@ rdf_destroy_graph(term_t graph_name)
 
   if ( (g = existing_graph(db, gn)) )
   { LOCK_MISC(db);
+    g->md5 = FALSE;
     memset(g->digest,            0, sizeof(g->digest));
     memset(g->unmodified_digest, 0, sizeof(g->unmodified_digest));
     clean_atom(&g->source);
