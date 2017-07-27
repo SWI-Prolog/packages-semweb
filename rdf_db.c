@@ -2726,9 +2726,7 @@ register_graph(rdf_db *db, triple *t)
   if ( !t->graph_id )
     return;
 
-  if ( db->last_graph && db->last_graph->name == ID_ATOM(t->graph_id) )
-  { src = db->last_graph;
-  } else
+  if ( !((src=db->last_graph) && src->name == ID_ATOM(t->graph_id)) )
   { src = lookup_graph(db, ID_ATOM(t->graph_id));
     db->last_graph = src;
   }
@@ -2980,6 +2978,8 @@ rdf_destroy_graph(term_t graph_name)
     g->modified = 0.0;
     g->erased = TRUE;
     db->graphs.erased++;
+    if ( db->last_graph == g )
+      db->last_graph = NULL;
     UNLOCK_MISC(db);
   }
 
