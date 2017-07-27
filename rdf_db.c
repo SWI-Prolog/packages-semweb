@@ -9030,7 +9030,7 @@ unify_statistics(rdf_db *db, term_t key, functor_t f)
   } else if ( f == FUNCTOR_predicates1 )
   { v = db->predicates.count;
   } else if ( f == FUNCTOR_graphs1 )
-  { v = db->graphs.count;
+  { v = db->graphs.count - db->graphs.erased;
   } else if ( f == FUNCTOR_indexed16 )
   { int i;
     term_t a = PL_new_term_ref();

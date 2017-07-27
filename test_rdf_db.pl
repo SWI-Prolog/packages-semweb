@@ -882,6 +882,13 @@ source(2) :-
     rdf_assert(s,p,o,test),
     rdf_graph_property(test, hash(MD5z)),
     assertion(MD5a == MD5z).
+source(3) :-
+    rdf_assert(s,p,o,g),
+    assertion(rdf_statistics(graphs(1))),
+    rdf_unload_graph(g),
+    assertion(rdf_statistics(graphs(0))),
+    rdf_assert(s,p,o,g),
+    assertion(rdf_statistics(graphs(1))).
 
 
                  /*******************************
