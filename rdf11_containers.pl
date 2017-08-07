@@ -208,7 +208,7 @@ rdfs_assert_members([H|T], N1, Resource, G) :-
 rdfs_container(Container, List) :-
     rdf_is_subject(Container),
     !,
-    findall(N-Elem, rdfs_member(Container, N, Elem), Pairs),
+    findall(N-Elem, rdfs_member0(Container, N, Elem), Pairs),
     keysort(Pairs, Sorted),
     group_pairs_by_key(Sorted, GroupedPairs),
     pairs_values(GroupedPairs, Groups),
