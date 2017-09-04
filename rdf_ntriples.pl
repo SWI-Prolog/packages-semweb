@@ -88,8 +88,8 @@ support the format =ntriples= and =nquads=.
 
 %!  read_ntriple(+Stream, -Triple) is det.
 %
-%   Read the next triple from Stream as   Triple. Stream must have a
-%   byte-oriented encoding and must contain pure ASCII text.
+%   Read the next triple from Stream as Triple. Stream must have UTF-8
+%   encoding.
 %
 %   @param  Triple is a term triple(Subject,Predicate,Object).
 %           Arguments follow the normal conventions of the RDF
@@ -100,8 +100,8 @@ support the format =ntriples= and =nquads=.
 
 %!  read_nquad(+Stream, -Quad) is det.
 %
-%   Read the next quad from  Stream  as   Quad.  Stream  must have a
-%   byte-oriented encoding and must contain pure ASCII text.
+%   Read the next quad from Stream as Quad.  Stream must have UTF-8
+%   encoding.
 %
 %   @param  Quad is a term quad(Subject,Predicate,Object,Graph).
 %           Arguments follow the normal conventions of the RDF
