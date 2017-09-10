@@ -9,7 +9,7 @@ manages sets of RDF files spread over different locations, including
 file and network locations. The original version of this library
 supported metadata about collections of RDF sources in an RDF file
 called \jargon{Manifest}. The current version supports both the
-\url[VoID]{http://www.w3.org/TR/void/} format and the original format.
+\href{http://www.w3.org/TR/void/}{VoID} format and the original format.
 VoID files (typically named \file{void.ttl}) can use elements from the
 RDF Manifest vocabulary to support features that are not supported by
 VoID.
@@ -19,7 +19,7 @@ VoID.
 \label{sec:semweb-rdf-manifest}
 
 A manifest file is an RDF file, often in
-\url[Turtle]{http://www.w3.org/TeamSubmission/turtle/} format, that
+\href{http://www.w3.org/TeamSubmission/turtle/}{Turtle} format, that
 provides meta-data about RDF resources. Often, a manifest will describe
 RDF files in the current directory, but it can also describe RDF
 resources at arbitrary URL locations. The RDF schema for RDF library
@@ -96,9 +96,9 @@ declarations.  E.g.\
 \subsubsection{Support for the VoID and VANN vocabularies}
 \label{sec:semweb-void}
 
-The \url[VoID]{http://www.w3.org/TR/void/} aims at resolving the same
+The \href{http://www.w3.org/TR/void/}{VoID} aims at resolving the same
 problem as the Manifest files described here. In addition, the
-\url[VANN]{http://vocab.org/vann/} vocabulary provides the information
+\href{http://vocab.org/vann/}{VANN} vocabulary provides the information
 about preferred namepaces prefixes.  The RDF library manager can deal
 with VoID files.  The following relations apply:
 

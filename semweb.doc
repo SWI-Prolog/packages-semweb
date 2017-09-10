@@ -35,7 +35,7 @@ tightly connected to Prolog. Additional libraries provide reading and
 writing RDF/XML and Turtle data, caching loaded RDF documents and
 persistent storage. This package is the core of a ready-to-run platform
 for developing Semantic Web applications named
-\url[ClioPatria]{http://cliopatria.swi-prolog.org}, which is distributed
+\href{http://cliopatria.swi-prolog.org}{ClioPatria}, which is distributed
 seperately. The SWI-Prolog RDF store is amoung the most memory efficient
 main-memory stores for
 RDF\footnote{\url{http://cliopatria.swi-prolog.org/help/source/doc/home/vnc/prolog/src/ClioPatria/web/help/memusage.txt}}
@@ -73,7 +73,7 @@ of this Prolog-based RDF store.
 
 \paragraph{Application prototyping platform}
 
-Bundled with \url[ClioPatria]{http://cliopatria.swi-prolog.org}, the
+Bundled with \href{http://cliopatria.swi-prolog.org}{ClioPatria}, the
 store is an efficient platform for prototyping a wide range of semantic
 web applications. Prolog, connected to the main-memory based store is a
 productive platform for writing application logic that can be made
@@ -115,7 +115,7 @@ be prototyped efficiently on the Prolog based store. This includes
 concurrent loading capabilities, make the platform well equiped to
 collect relevant data from large external stores for intensive
 reasoning. Finally, the
-\url[TIPC]{http://www.swi-prolog.org/pldoc/package/tipc.html} package
+\href{http://www.swi-prolog.org/pldoc/package/tipc.html}{TIPC} package
 can be used to create networks of cooperating RDF based agents.
 
 
@@ -937,14 +937,14 @@ database \arg{DB}.
 \index{ClioPatria}\index{SPARQL}%
 The core infrastructure for storing and querying RDF is provided by this
 package, which is distributed as a core package with SWI-Prolog.
-\url[ClioPatria]{http://cliopatria.swi-prolog.org} provides a
+\href{http://cliopatria.swi-prolog.org}{ClioPatria} provides a
 comprehensive server infrastructure on top of the \textit{semweb} and
 \textit{http} packages. ClioPatria provides a SPARQL~1.1 endpoint,
 linked open data (LOD) support, user management, a web interface and an
 extension infrastructure for programming (semantic) web applications.
 
 \index{Thea}\index{OWL2}%
-\url[Thea]{http://www.semanticweb.gr/TheaOWLLib/} provides access to OWL
+\href{http://www.semanticweb.gr/TheaOWLLib/}{Thea} provides access to OWL
 ontologies at the level of the abstract syntax. Can interact with
 external DL reasoner using DIG.
 
