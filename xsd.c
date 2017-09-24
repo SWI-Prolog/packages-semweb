@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2016, VU University Amsterdam
+    Copyright (c)  2017, VU University Amsterdam
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -35,6 +35,7 @@
 #include "xsd.h"
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 static xsd_type xsd_types[] =
 {
@@ -84,6 +85,58 @@ is_numeric_type(atom_t type)
   return XSD_NONNUMERIC;
 }
 
+/* BUG: goes wrong if locale is switched at runtime.  But, doing
+   this dynamically is a more than 100% overhead on xsd_number_string/2
+   and changing locale after process initialization is uncommon and
+   a bad idea anyway.
+*/
+
+static int
+decimal_dot(void)
+{ static int ddot = '\0';
+
+  if ( ddot )
+    return ddot;
+
+  char buf[10];
+  sprintf(buf, "%f", 1.0);
+  ddot = buf[1];
+
+  return ddot;
+}
+
+static double
+strtod_C(const char *in, char **eptr)
+{ int dot;
+
+  if ( (dot=decimal_dot()) != '.' )
+  { char fast[64];
+    size_t len = strlen(in);
+    char *fs = len < sizeof(fast) ? fast : malloc(len+1);
+    char *o;
+    double v;
+    char *eptr2;
+    const char *s;
+
+    if ( !fs )
+      return strtod("NaN", &eptr2);
+    for(s=in,o=fs; *s; s++,o++)
+    { if ( (*o=*s) == '.' )
+	*o = dot;
+    }
+    *o = '\0';
+    v = strtod(fs, &eptr2);
+    *eptr = (char*)in+(fs-eptr2);
+    if ( fs != fast )
+      free(fs);
+
+    return v;
+  } else
+  { return strtod(in, eptr);
+  }
+}
+
+
 
 int
 xsd_compare_numeric(xsd_primary type1, const unsigned char *s1,
@@ -109,8 +162,8 @@ xsd_compare_numeric(xsd_primary type1, const unsigned char *s1,
     return strcmp((const char*)s1, (const char*)s2) * mul;
   } else
   { char *e1, *e2;
-    double v1 = strtod((const char*)s1, &e1);
-    double v2 = strtod((const char*)s2, &e2);
+    double v1 = strtod_C((const char*)s1, &e1);
+    double v2 = strtod_C((const char*)s2, &e2);
 
     if ( !*e1 && !*e2 )
     { return v1 < v2 ? -1 :
