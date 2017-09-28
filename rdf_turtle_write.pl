@@ -362,7 +362,7 @@ tw_trig_graphs([H|T], Stream, State0, State) :-
     set_graph_of_tw_state(H, State0, State1),
     nl(Stream),
     tw_resource(H, State1, Stream),
-    format(Stream, ' = {~n', []),
+    format(Stream, ' {~n', []),
     tw_graph(State1, Stream),
     format(Stream, '~N}~n', []),
     set_bnode_id_of_tw_state(0, State1, State2),
