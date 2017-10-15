@@ -45,6 +45,7 @@
 :- use_module(library(rdf)).
 :- use_module(library(semweb/turtle)).
 :- use_module(library(option)).
+:- use_module(library(uri)).
 
 /** <module> SPARQL client library
 
@@ -87,6 +88,9 @@ HTTPS servers are supported using the scheme(https) option:
 %   =SELECT= queries and  =true=  or   =false=  for  =ASK=  queries.
 %   Options are
 %
+%	* endpoint(+URL)
+%	  May be used as alternative to Scheme, Host, Port and Path
+%	  to specify the endpoint in a single option.
 %       * host(+Host)
 %       * port(+Port)
 %       * path(+Path)
@@ -114,11 +118,26 @@ HTTPS servers are supported using the scheme(https) option:
 %     ==
 
 sparql_query(Query, Row, Options) :-
-    sparql_param(scheme(Scheme), Options,  Options1),
-    sparql_port(Scheme, Port,    Options1, Options2),
-    sparql_param(host(Host),     Options2, Options3),
-    sparql_param(path(Path),     Options3, Options4),
-    select_option(search(Extra), Options4, Options5, []),
+    (   select_option(endpoint(URL), Options, Options5)
+    ->  uri_components(URL, Components),
+        uri_data(scheme, Components, Scheme),
+        uri_data(authority, Components, Auth),
+        uri_data(path, Components, Path),
+        uri_data(search, Components, Extra),
+        ignore(Extra = []),
+        uri_authority_components(Auth, AComp),
+        uri_authority_data(host, AComp, Host),
+        uri_authority_data(port, AComp, Port),
+        (   var(Port)
+        ->  sparql_port(Scheme, Port, _, _)
+        ;   true
+        )
+    ;   sparql_param(scheme(Scheme), Options,  Options1),
+        sparql_port(Scheme, Port,    Options1, Options2),
+        sparql_param(host(Host),     Options2, Options3),
+        sparql_param(path(Path),     Options3, Options4),
+        select_option(search(Extra), Options4, Options5, [])
+    ),
     select_option(variable_names(VarNames), Options5, Options6, _),
     sparql_extra_headers(HTTPOptions),
     http_open([ scheme(Scheme),
