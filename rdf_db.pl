@@ -1393,8 +1393,9 @@ consider_gc(_CPU) :-
 %     rdf_reachable/5.
 %
 %     * lookup(rdf(S,P,O,G), Count)
-%     Number of queries for this particular instantiation pattern.
-%     Each of S,P,O,G is either + or -.
+%     Number of queries that have been performed for this particular
+%     instantiation pattern.  Each of S,P,O,G is either + or -.
+%     Fails in case the number of performed queries is zero.
 %
 %     * hash_quality(rdf(S,P,O,G), Buckets, Quality, PendingResize)
 %     Statistics on the index for this pattern.  Indices are created
