@@ -88,6 +88,9 @@ HTTPS servers are supported using the scheme(https) option:
 %   =SELECT= queries and  =true=  or   =false=  for  =ASK=  queries.
 %   Options are
 %
+%   Variables that are unbound in SPARQL (e.g., due to SPARQL optional
+%   clauses), are bound in Prolog to the atom `'$null$'`.
+%
 %	* endpoint(+URL)
 %	  May be used as alternative to Scheme, Host, Port and Path
 %	  to specify the endpoint in a single option.
