@@ -545,13 +545,14 @@ global(Prefix, Local, Global, Module) :-
 
 %!  rdf_global_term(+TermIn, :GlobalTerm) is det.
 %
-%   Does  rdf_global_id/2  on  all  terms  NS:Local  by  recursively
-%   analysing the term. Note that the  predicate is a meta-predicate
-%   on the output argument. This  is   necessary  to  get the module
-%   context while the first argument may be of the form (:)/2.
+%   Performs rdf_global_id/2 on predixed IRIs and rdf_global_object/2
+%   on RDF literals, by recursively analysing the term.  Note that the
+%   predicate is a meta-predicate on the output argument.  This is
+%   necessary to get the module context while the first argument may
+%   be of the form (:)/2.
 %
-%   Terms of the form Prefix:Local that   appear in TermIn for which
-%   Prefix is not defined are   not replaced. Unlike rdf_global_id/2
+%   Terms of the form `Prefix:Local` that appear in TermIn for which
+%   `Prefix` is not defined are not replaced.  Unlike rdf_global_id/2
 %   and rdf_global_object/2, no error is raised.
 
 rdf_global_term(TermIn, Module:TermOut) :-
