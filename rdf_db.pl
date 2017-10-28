@@ -3829,9 +3829,9 @@ rdf_url_namespace(URL, Prefix) :-
 %   This can be used for  password   encryption  algorithms  to make
 %   generate-and-test loops slow.
 %
-%   @deprecated. New code should  use   the  library(crypt)  library
-%   provided  by  the  clib  package  for  password  encryption  and
-%   library(md5) to compute MD5 hashes.
+%   @deprecated. New code should use library(crypto) for computing MD5
+%   hashes, or the more lightweight library(md5) if the former cannot
+%   be used.
 
 
                  /*******************************
