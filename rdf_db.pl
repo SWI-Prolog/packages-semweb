@@ -545,15 +545,15 @@ global(Prefix, Local, Global, Module) :-
 
 %!  rdf_global_term(+TermIn, :GlobalTerm) is det.
 %
-%   Performs rdf_global_id/2 on predixed IRIs and rdf_global_object/2
-%   on RDF literals, by recursively analysing the term.  Note that the
-%   predicate is a meta-predicate on the output argument.  This is
-%   necessary to get the module context while the first argument may
-%   be of the form (:)/2.
+%   Performs rdf_global_id/2 on predixed IRIs and rdf_global_object/2 on
+%   RDF literals, by recursively  analysing  the   term.  Note  that the
+%   predicate is a meta-predicate  on  the   output  argument.  This  is
+%   necessary to get the module context while  the first argument may be
+%   of the form (:)/2.
 %
-%   Terms of the form `Prefix:Local` that appear in TermIn for which
-%   `Prefix` is not defined are not replaced.  Unlike rdf_global_id/2
-%   and rdf_global_object/2, no error is raised.
+%   Terms of the form `Prefix:Local`  that   appear  in TermIn for which
+%   `Prefix` is not defined are not replaced. Unlike rdf_global_id/2 and
+%   rdf_global_object/2, no error is raised.
 
 rdf_global_term(TermIn, Module:TermOut) :-
     rdf_global_term(TermIn, TermOut, Module).
@@ -3823,15 +3823,18 @@ rdf_url_namespace(URL, Prefix) :-
 
 %!  rdf_atom_md5(+Text, +Times, -MD5) is det.
 %
-%   Computes the MD5 hash from Text,  which   is  an atom, string or
-%   list of character codes. Times is an integer >= 1. When > 0, the
-%   MD5 algorithm is repeated Times  times   on  the generated hash.
-%   This can be used for  password   encryption  algorithms  to make
-%   generate-and-test loops slow.
+%   Computes the MD5 hash from Text, which is an atom, string or list of
+%   character codes. Times is  an  integer  >=   1.  When  >  0, the MD5
+%   algorithm is repeated Times times on the generated hash. This can be
+%   used for password encryption algorithms   to  make generate-and-test
+%   loops slow.
 %
-%   @deprecated. New code should use library(crypto) for computing MD5
-%   hashes, or the more lightweight library(md5) if the former cannot
-%   be used.
+%   @deprecated Obviously, password hash  primitives   do  not belong in
+%   this library. The  library(crypto)  from   the  \const{ssl}  package
+%   provides extensive support for  hashes.   The  \const{clib}  package
+%   provides library(crypt) to  access  the   OS  (Unix)  password  hash
+%   implementation as well as  lightweight   implementations  of several
+%   popular hashes.
 
 
                  /*******************************

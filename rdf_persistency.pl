@@ -276,12 +276,12 @@ option_type(access(X),                  must_be(oneof([read_write,
 
 %!  rdf_persistency_property(?Property) is nondet.
 %
-%   True if Property is a property of the current persistent database.
-%   Exposes the properties that can be passed as options to
-%   rdf_attach_db/2. Specifically,
+%   True when Property is a property of the current persistent database.
+%   Exposes  the  properties  that  can   be    passed   as  options  to
+%   rdf_attach_db/2.                                       Specifically,
 %   rdf_persistency_property(access(read_only)) is true iff the database
-%   is mounted in read-only mode. In addition, the following property
-%   is supported:
+%   is mounted in read-only mode. In addition, the following property is
+%   supported:
 %
 %     - directory(Dir)
 %     The directory in which the database resides.
