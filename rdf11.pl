@@ -1919,7 +1919,7 @@ rdf_nth(Offset, I, L, X) :-
     ;   must_be(nonneg, I)
     ),
     rdf_nth_(I, Offset, L, X).
-rdf_nth(_, L, _) :-
+rdf_nth(_, _, L, _) :-
     type_error(rdf_subject, L).
 
 rdf_nth_(I, I0, L, X) :-
