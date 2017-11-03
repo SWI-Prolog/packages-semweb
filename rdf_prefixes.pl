@@ -52,6 +52,7 @@
 :- use_module(library(error)).
 :- use_module(library(lists)).
 :- use_module(library(option)).
+:- use_module(library(pairs)).
 
 :- meta_predicate
     rdf_current_prefix(:, -),

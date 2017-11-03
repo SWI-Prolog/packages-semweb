@@ -154,7 +154,6 @@
           ]).
 :- use_module(library(rdf)).
 :- use_module(library(lists)).
-:- use_module(library(pairs)).
 :- use_module(library(shlib)).
 :- use_module(library(gensym)).
 :- use_module(library(sgml)).
