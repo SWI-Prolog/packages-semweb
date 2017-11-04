@@ -110,7 +110,7 @@ is_lang_char(int c)
 { return (c < 128 ? (char_type[c] & (LC|UC|DI)) != 0 : FALSE) || c == '-';
 }
 
-static const char hexval0[] =
+static const signed char hexval0[] =
 {/*0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F  */
   -1,
   -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, /* 00-0f */
@@ -122,7 +122,7 @@ static const char hexval0[] =
   -1, 10, 11, 12, 13, 14, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1  /* 60-6F */
 };
 
-static const char* hexval = &hexval0[1];
+static const char* signed hexval = &hexval0[1];
 
 static inline int
 hexd(int c)
