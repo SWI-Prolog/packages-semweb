@@ -122,7 +122,7 @@ static const signed char hexval0[] =
   -1, 10, 11, 12, 13, 14, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1  /* 60-6F */
 };
 
-static const char* signed hexval = &hexval0[1];
+static const signed char* hexval = &hexval0[1];
 
 static inline int
 hexd(int c)
