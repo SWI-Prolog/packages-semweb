@@ -105,7 +105,7 @@ read_rdfa(Input, Triples, Options) :-
         open_input(Input, In, NewOptions, Close, Options),
         read_dom(In, DOM, Options),
         close_input(Close)),
-    merge_options(NewOptions, Options, RDFaOptions),
+    merge_options(Options, NewOptions, RDFaOptions),
     xml_rdfa(DOM, Triples, RDFaOptions).
 
 open_input(Input, In, NewOptions, Close, Options) :-
