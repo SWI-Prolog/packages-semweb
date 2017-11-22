@@ -168,6 +168,7 @@ to_uri(URI0, URI) :-
 to_uri2(URI0, Base) :-
     uri_components(URI0, Components),
     uri_data(scheme, Components, Scheme),
+    ground(Scheme),
     http_scheme(Scheme),
     !,
     uri_data(fragment, Components, _, Components2),
