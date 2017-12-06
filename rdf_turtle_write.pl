@@ -151,6 +151,7 @@ has the following properties:
 :- meta_predicate
     rdf_save_turtle(+, :),
     rdf_save_canonical_turtle(+, :),
+    rdf_save_canonical_trig(+, :),
     rdf_save_trig(+, :).
 
 %!  rdf_save_turtle(+Out, :Options) is det.
