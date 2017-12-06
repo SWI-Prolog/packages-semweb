@@ -2238,7 +2238,6 @@ rdf_subject(Subject, Options) :-
     rdf_subject(Subject).
 rdf_subject(Subject, Options) :-
     graph(Options, DB),
-    rdf_subject(Subject),
     (   rdf(Subject, _, _, DB:_)
     ->  true
     ).
