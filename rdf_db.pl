@@ -2752,28 +2752,49 @@ cleanup_save(Reason,
 
 rdf_do_save(Out, Options0) :-
     rdf_save_header(Out, Options0, Options),
+    graph(Options, DB),
     (   option(sorted(true), Options, false)
-    ->  setof(Subject, rdf_subject(Subject, Options), Subjects),
+    ->  (   var(DB)
+        ->  setof(Subject, rdf_subject(Subject), Subjects)
+        ;   findall(Subject, rdf(Subject, _, _, DB:_), SubjectList),
+            sort(SubjectList, Subjects)
+        ),
         forall(member(Subject, Subjects),
                rdf_save_non_anon_subject(Out, Subject, Options))
-    ;   forall(rdf_subject(Subject, Options),
+    ;   forall(rdf_subject_in_graph(Subject, DB),
                rdf_save_non_anon_subject(Out, Subject, Options))
     ),
     rdf_save_footer(Out),
-    !.        % dubious cut; without the
+    !.                                  % dubious cut; without the
                                         % cleanup handlers isn't called!?
 
-rdf_subject(Subject, Options) :-
-    graph(Options, DB),
+%!  rdf_subject_in_graph(-Subject, ?DB) is nondet.
+%
+%   True when Subject is a subject in the   graph  DB. If DB is unbound,
+%   all  subjects  are  enumerated.  Otherwise   we  have  two  options:
+%   enumerate all subjects and filter by graph or collect all triples of
+%   the graph and get the unique subjects.   The  first is attractive if
+%   the graph is big compared  to  the   DB,  also  because  it does not
+%   require memory, the second if the graph is small compared to the DB.
+
+rdf_subject_in_graph(Subject, DB) :-
     var(DB),
     !,
     rdf_subject(Subject).
-rdf_subject(Subject, Options) :-
-    graph(Options, DB),
-    rdf_subject(Subject),
+rdf_subject_in_graph(Subject, DB) :-
+    rdf_statistics(triples(AllTriples)),
+    rdf_graph_property(DB, triples(DBTriples)),
+    DBTriples > AllTriples // 10,
+    !,
+    rdf_resource(Subject),
     (   rdf(Subject, _, _, DB:_)
     ->  true
     ).
+rdf_subject_in_graph(Subject, DB) :-
+    findall(Subject, rdf(Subject, _, _, DB:_), SubjectList),
+    list_to_set(SubjectList, Subjects),
+    member(Subjects, Subjects).
+
 
 graph(Options0, DB) :-
     strip_module(Options0, _, Options),
@@ -2781,7 +2802,7 @@ graph(Options0, DB) :-
     ->  DB = DB0
     ;   memberchk(db(DB0), Options)
     ->  DB = DB0
-    ;   true                        % leave unbound
+    ;   true                            % leave unbound
     ).
 
 
