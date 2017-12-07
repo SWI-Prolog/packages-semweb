@@ -2233,14 +2233,15 @@ rdf_do_save(Out, Options0) :-
 
 rdf_subject(Subject, Options) :-
     graph(Options, DB),
-    var(DB),
-    !,
-    rdf_subject(Subject).
-rdf_subject(Subject, Options) :-
-    graph(Options, DB),
-    (   rdf(Subject, _, _, DB:_)
-    ->  true
+    (   var(DB)
+    ->  rdf_subject(Subject)
+    ;   rdf_subject_db(Subject, DB)
     ).
+
+rdf_subject_db(Subject, DB) :-
+    findall(S, rdf(S, _, _, DB:_), List),
+    sort(List, Subjects),
+    member(Subject, Subjects).
 
 graph(Options0, DB) :-
     strip_module(Options0, _, Options),
