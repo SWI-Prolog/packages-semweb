@@ -2220,28 +2220,24 @@ cleanup_save(Reason,
 
 rdf_do_save(Out, Options0) :-
     rdf_save_header(Out, Options0, Options),
+    graph(Options, DB),
     (   option(sorted(true), Options, false)
-    ->  setof(Subject, rdf_subject(Subject, Options), Subjects),
-        forall(member(Subject, Subjects),
-               rdf_save_non_anon_subject(Out, Subject, Options))
-    ;   forall(rdf_subject(Subject, Options),
-               rdf_save_non_anon_subject(Out, Subject, Options))
+    ->  (   var(DB)
+        ->  setof(Subject, rdf_subject(Subject), Subjects)
+        ;   findall(Subject, rdf(Subject, _, _, DB:_), SubjectList),
+            sort(SubjectList, Subjects)
+        )
+    ;   (   var(DB)
+        ->  findall(Subject, rdf_subject(Subject), Subjects)
+        ;   findall(Subject, rdf(Subject, _, _, DB:_), SubjectList),
+            list_to_set(SubjectList, Subjects)
+        )
     ),
+    forall(member(Subject, Subjects),
+        rdf_save_non_anon_subject(Out, Subject, Options)),
     rdf_save_footer(Out),
     !.        % dubious cut; without the
                                         % cleanup handlers isn't called!?
-
-rdf_subject(Subject, Options) :-
-    graph(Options, DB),
-    (   var(DB)
-    ->  rdf_subject(Subject)
-    ;   rdf_subject_db(Subject, DB)
-    ).
-
-rdf_subject_db(Subject, DB) :-
-    findall(S, rdf(S, _, _, DB:_), List),
-    sort(List, Subjects),
-    member(Subject, Subjects).
 
 graph(Options0, DB) :-
     strip_module(Options0, _, Options),
