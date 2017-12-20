@@ -996,6 +996,18 @@ literal_value0(_^^Type, type(Type, _)).
 %     Converted to true^^xsd:boolean
 %     - false
 %     Converted to false^^xsd:boolean
+%     - date(Y,M,D)
+%     Converted to date(Y,M,D)^^xsd:date
+%     - date_time(Y,M,D,HH,MM,SS)
+%     Converted to date_time(Y,M,D,HH,MM,SS)^^xsd:dateTime
+%     - date_time(Y,M,D,HH,MM,SS,TZ)
+%     Converted to date_time(Y,M,D,HH,MM,SS,TZ)^^xsd:dateTime
+%     - month_day(M,D)
+%     Converted to month_day(M,D)^^xsd:gMonthDay
+%     - year_month(Y,M)
+%     Converted to year_month(Y,M)^^xsd:gYearMonth
+%     - time(HH,MM,SS)
+%     Converted to time(HH,MM,SS)^^xsd:time
 %     - Text@Lang
 %     Converted to Text@Lang.  Uses canonical (lowercase) lang.
 %     Text is converted into an atom.
@@ -1012,24 +1024,38 @@ literal_value0(_^^Type, type(Type, _)).
 :- rdf_meta
     pre_ground_object(+, o).
 
+% Interpret Prolog integer as xsd:integer.
 pre_ground_object(Int, Object) :-
     integer(Int),
     !,
     rdf_equal(Object, literal(type(xsd:integer, Atom))),
     atom_number(Atom, Int).
+% Interpret Prolog floating-point value as xsd:double.
 pre_ground_object(Float, Object) :-
     float(Float),
     !,
     rdf_equal(Object, literal(type(xsd:double, Atom))),
     xsd_number_string(Float, String),
     atom_string(Atom, String).
+% Interpret SWI string as xsd:string.
 pre_ground_object(String, Object) :-
     string(String),
     !,
     rdf_equal(Object, literal(type(xsd:string, Atom))),
     atom_string(Atom, String).
+% Interpret `false' and `true' as the Boolean values.
 pre_ground_object(false, literal(type(xsd:boolean, false))) :- !.
 pre_ground_object(true, literal(type(xsd:boolean, true))) :- !.
+% Interpret date(Y,M,D) as xsd:date,
+%           date_time(Y,M,D,HH,MM,SS) as xsd:dateTime,
+%           date_time(Y,M,D,HH,MM,SS,TZ) as xsd:dateTime,
+%           month_day(M,D) as xsd:gMonthDay,
+%           year_month(Y,M) as xsd:gYearMonth, and
+%           time(HH,MM,SS) as xsd:time.
+pre_ground_object(Term, literal(type(Type, Atom))) :-
+    xsd_date_time_term(Term),
+    !,
+    xsd_time_string(Term, Type, Atom).
 pre_ground_object(Val@Lang,  literal(lang(Lang0, Val0))) :-
     !,
     downcase_atom(Lang, Lang0),
@@ -1049,6 +1075,13 @@ pre_ground_object(literal(Lit0), literal(Lit)) :-
     !.
 pre_ground_object(Value, _) :-
     type_error(rdf_object, Value).
+
+xsd_date_time_term(date(_,_,_)).
+xsd_date_time_term(date_time(_,_,_,_,_,_)).
+xsd_date_time_term(date_time(_,_,_,_,_,_,_)).
+xsd_date_time_term(month_day(_,_)).
+xsd_date_time_term(year_month(_,_)).
+xsd_date_time_term(time(_,_,_)).
 
 old_literal(Lit0, Lit) :-
     old_literal(Lit0),
