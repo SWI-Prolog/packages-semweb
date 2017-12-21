@@ -2261,7 +2261,7 @@ rdf_subject_in_graph(Subject, DB) :-
 rdf_subject_in_graph(Subject, DB) :-
     findall(Subject, rdf(Subject, _, _, DB:_), SubjectList),
     list_to_set(SubjectList, Subjects),
-    member(Subjects, Subjects).
+    member(Subject, Subjects).
 
 
 graph(Options0, DB) :-
