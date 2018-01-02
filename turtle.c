@@ -2393,6 +2393,7 @@ read_object(turtle_state *ts)
 	free_resource(ts, r);
 	return rc;
       }
+      return FALSE;
     }
     case '[':
     { resource *r;
