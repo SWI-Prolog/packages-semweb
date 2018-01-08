@@ -1139,7 +1139,7 @@ make_absolute_resource(turtle_state *ts, const wchar_t *uri)
 		 *	   PARSER OBJECT	*
 		 *******************************/
 
-static void	clear_turtle_parser(turtle_state *ts);
+static int	clear_turtle_parser(turtle_state *ts);
 static int	init_base_uri(turtle_state *ts);
 static int	read_predicate_object_list(turtle_state *ts, const char *end);
 static int	read_object(turtle_state *ts);
@@ -1170,13 +1170,18 @@ new_turtle_parser(IOSTREAM *s)
 }
 
 
-static void
+static int
 clear_turtle_parser(turtle_state *ts)
-{ if ( ts->base_uri )	     free(ts->base_uri);
+{ int rc;
+
+  if ( ts->base_uri )	     free(ts->base_uri);
   if ( ts->empty_prefix )    free(ts->empty_prefix);
   if ( ts->bnode.buffer )    free(ts->bnode.buffer);
 
-  if ( ts->input ) PL_release_stream(ts->input);
+  if ( ts->input )
+    rc = PL_release_stream(ts->input);
+  else
+    rc = TRUE;
 
   set_subject(ts, NULL, NULL);
   set_predicate(ts, NULL, NULL);
@@ -1189,6 +1194,8 @@ clear_turtle_parser(turtle_state *ts)
   clear_hash_table(&ts->blank_node_map);
 
   memset(ts, 0, sizeof(*ts));			/* second call does nothing */
+
+  return rc;
 }
 
 
@@ -3190,10 +3197,7 @@ destroy_turtle_parser(term_t parser)
 { turtle_state *ts;
 
   if ( get_turtle_parser(parser, &ts) )
-  { clear_turtle_parser(ts);
-
-    return TRUE;
-  }
+    return clear_turtle_parser(ts);
 
   return FALSE;
 }
