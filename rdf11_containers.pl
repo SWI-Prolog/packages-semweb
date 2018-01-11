@@ -267,22 +267,19 @@ rdfs_nth0(N, Container, Elem) :-
 
 %!  rdfs_member0(?Container, ?N, ?Elem) is nondet.
 %
-%   What is the most efficient way to enumerate
-%   `rdfs_member(-,-)`?
+%   What is the most efficient way to enumerate rdfs_member(-,-)?
 %
-%   1. If we enumerate over all container membership properties (=
-%   the current implementation) then it takes N steps before we
-%   get to triple `〈Container, rdf:_N, Elem〉`, for arbitrary
-%   N.
+%   1. If we enumerate over all   container membership properties (= the
+%   current implementation) then it  takes  N   steps  before  we get to
+%   triple `<Container, rdf:_N, Elem>`, for arbitrary N.
 %
-%   2. The alternative is to enumerate over all triples and check
+%   2. The alternative is  to  enumerate   over  all  triples  and check
 %   whether the predicate term is a container membership property.
 %
-%   3. The choice between (1) and (2) depends on whether the
-%   number of currently loaded triples in larger/smaller than the
-%   largest number that appears in a container membership
-%   property.  This means enumerating over all predicate terms
-%   using rdf_predicate/1.
+%   3. The choice between (1) and (2)   depends on whether the number of
+%   currently loaded triples in larger/smaller   than the largest number
+%   that  appears  in  a  container   membership  property.  This  means
+%   enumerating over all predicate terms using rdf_predicate/1.
 
 rdfs_member0(Container, N, Elem) :-
     (nonvar(Container) ; nonvar(Elem)),
