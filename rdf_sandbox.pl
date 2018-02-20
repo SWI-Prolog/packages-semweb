@@ -117,8 +117,8 @@ sandbox:safe_primitive(rdf_db:rdf_find_literal_map(_,_,_)).
 sandbox:safe_primitive(rdf_db:rdf_keys_in_literal_map(_,_,_)).
 sandbox:safe_primitive(rdf_db:rdf_statistics_literal_map(_,_)).
 
-sandbox:safe_meta_predicate(rdf_db:rdf_current_prefix/2).
-sandbox:safe_meta_predicate(rdf_db:rdf_global_id/2).
+sandbox:safe_meta_predicate(rdf_prefixes:rdf_current_prefix/2).
+sandbox:safe_meta_predicate(rdf_prefixes:rdf_global_id/2).
 :- endif.
 
 
