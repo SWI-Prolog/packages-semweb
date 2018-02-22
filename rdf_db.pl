@@ -197,6 +197,7 @@
                        graph(atom),
                        if(oneof([true,changed,not_loaded])),
                        modified(-float),
+                       prefixes(-list),
                        silent(boolean),
                        register_namespaces(boolean)
                      ]).
@@ -1915,6 +1916,10 @@ rdf_load_db(File) :-
 %       If =true=, the message reporting completion is printed using
 %       level =silent=. Otherwise the level is =informational=. See
 %       also print_message/2.
+%
+%       * prefixes(-Prefixes)
+%       Returns the prefixes defined in the source   data file as a list
+%       of pairs.
 %
 %   Other  options  are  forwarded  to  process_rdf/3.  By  default,
 %   rdf_load/2 only loads RDF/XML from files.  It can be extended to
