@@ -165,7 +165,7 @@ typedef enum format
 { D_AUTO = 0,
   D_TURTLE,
   D_TRIG,
-  D_TRIG_NO_GRAPH			/* read TRiG as Turtle */
+  D_TRIG_NO_GRAPH			/* read TriG as Turtle */
 } format;
 
 typedef enum recover_mode
@@ -2784,7 +2784,7 @@ graph_or_final_predicate_object_list(turtle_state *ts, resource *r)
 	}
       case D_TURTLE:
 	syntax_warning(ts, "Unexpected \"<graph> {\" in Turtle format "
-		       "(assuming TRiG, ignoring graphs)");
+		       "(assuming TriG, ignoring graphs)");
         set_format(ts, D_TRIG_NO_GRAPH);
 	/*FALLTHROUGH*/
       case D_TRIG_NO_GRAPH:
@@ -2841,7 +2841,7 @@ statement(turtle_state *ts)
 	  }
 	case D_TURTLE:
 	  syntax_warning(ts, "Unexpected \"{\" in Turtle format "
-			 "(assuming TRiG, ignoring graphs)");
+			 "(assuming TriG, ignoring graphs)");
 	  set_format(ts, D_TRIG_NO_GRAPH);
 	  /*FALLTHROUGH*/
         case D_TRIG_NO_GRAPH:
