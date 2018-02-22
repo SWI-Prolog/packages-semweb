@@ -1391,7 +1391,7 @@ rdf_load_db(File) :-
 %   locations is below:
 %
 %     ==
-%     :- use_module(library(semweb/turtle)).        % Turtle and TRiG
+%     :- use_module(library(semweb/turtle)).        % Turtle and TriG
 %     :- use_module(library(semweb/rdf_ntriples)).
 %     :- use_module(library(semweb/rdf_zlib_plugin)).
 %     :- use_module(library(semweb/rdf_http_plugin)).
