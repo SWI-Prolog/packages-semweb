@@ -511,7 +511,7 @@ rdf_compare(Diff, Left, Right) :-
 %   and/or predicate hash or the ordered literal table.
 %
 %     ==
-%         { Date >= "2000-01-01"^^xsd:dateTime },
+%         { Date >= "2000-01-01"^^xsd:date },
 %         rdf(S, P, Date)
 %     ==
 %
