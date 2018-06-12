@@ -130,6 +130,7 @@ sandbox:safe_meta_predicate(rdf_prefixes:rdf_global_id/2).
 sandbox:safe_primitive(rdf11:in_xml_literal(_,_,_)).
 sandbox:safe_primitive(rdf11:pre_object(_,_)).
 sandbox:safe_primitive(rdf11:post_object(_,_)).
+sandbox:safe_primitive(rdf11:rdf_where(_)).
 :- endif.
 
 
