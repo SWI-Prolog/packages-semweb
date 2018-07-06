@@ -129,7 +129,6 @@ rdf_load/2 under certain conditions as well as for maintaining
 persistent snapshots of the database using
 library(semweb/rdf_persistency).
 
-  * [[rdf_save_db/1]]
   * [[rdf_save_db/2]]
   * [[rdf_load_db/1]]
 
