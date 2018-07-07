@@ -703,7 +703,8 @@ rdfe_get_file_property(FileOrURL, access(Access)) :-
     ),
     (   rdf_source_permission(URL, Access0)
     ->  Access0 = Access
-    ;   access_file(URL, write)
+    ;   uri_file_name(URL, File),
+        access_file(File, write)
     ->  assert(rdf_source_permission(URL, rw)),
         Access = rw
     ;   assert(rdf_source_permission(URL, ro)),
