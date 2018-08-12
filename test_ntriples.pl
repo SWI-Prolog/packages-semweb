@@ -85,6 +85,8 @@ test(quote, T == triple(a,b,literal('\n'))) :-
     atom_triple('<a> <b> "\\n" .', T).
 test(quote, T == triple(a,b,literal('\r'))) :-
     atom_triple('<a> <b> "\\r" .', T).
+test(quote, T == triple(a,b,literal('\''))) :-
+    atom_triple('<a> <b> "\'" .', T).
 test(quote, T == triple(a,b,literal('\\'))) :-
     atom_triple('<a> <b> "\\\\" .', T).
 test(escape, T == triple(a,b,literal('\u1234'))) :-

@@ -626,6 +626,7 @@ get_string_code(IOSTREAM *in, int *cp)
 	case 'n':	*cp = '\n'; return ESCAPED_CODE;
 	case 'r':	*cp = '\r'; return ESCAPED_CODE;
 	case '"':	*cp =  '"'; return ESCAPED_CODE;
+	case '\'':	*cp = '\''; return ESCAPED_CODE;
 	case '\\':	*cp = '\\'; return ESCAPED_CODE;
 	case 'u':	return read_hex(in, cp, 4);
 	case 'U':	return read_hex(in, cp, 8);
