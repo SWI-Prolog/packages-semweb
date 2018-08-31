@@ -60,6 +60,8 @@ the RDF database.
 :- multifile
     rdf_db:rdf_open_hook/8,
     rdf_db:url_protocol/1,
+    rdf_db:rdf_storage_encoding/2,
+    rdf_db:rdf_file_type/2,
     rdf_content_type/3.
 
 rdf_db:url_protocol(http).
@@ -165,7 +167,12 @@ modified_since_header(HaveModified,
 %
 %   Open possible envelope formats.
 
-open_envelope('application/x-gzip', SourceURL, Stream0, Stream, Format) :-
+open_envelope(ContentType, SourceURL, Stream0, Stream, Format) :-
+    (   ContentType == 'application/x-gzip'
+    ;   ContentType == 'application/octet-stream',
+        file_name_extension(_, gz, SourceURL)
+    ),
+    !,
     rdf_db:rdf_storage_encoding(_, gzip),
     !,
     (   var(Format)
