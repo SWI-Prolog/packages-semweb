@@ -126,7 +126,7 @@ strtod_C(const char *in, char **eptr)
     }
     *o = '\0';
     v = strtod(fs, &eptr2);
-    *eptr = (char*)in+(fs-eptr2);
+    *eptr = (char*)in+(eptr2-fs);
     if ( fs != fast )
       free(fs);
 
