@@ -21,6 +21,7 @@ swipl_plugin(
 	      hash.c murmur.c query.c resource.c error.c skiplist.c
 	      snapshot.c xsd.c
     C_LIBS
+    PL_LIB_SUBDIR semweb
     PL_LIBS rdf_db.pl rdfs.pl rdf_edit.pl rdf_litindex.pl
 	    rdf_persistency.pl rdf_turtle.pl rdf_cache.pl
             rdf_http_plugin.pl rdf_zlib_plugin.pl rdf_portray.pl
@@ -32,13 +33,22 @@ swipl_plugin(
     turtle
     C_SOURCES turtle.c murmur.c
     C_LIBS
+    PL_LIB_SUBDIR semweb
     PL_LIBS turtle.pl rdf_turtle_write.pl)
 
 swipl_plugin(
     ntriples
     C_SOURCES ntriples.c
     C_LIBS
+    PL_LIB_SUBDIR semweb
     PL_LIBS rdf_ntriples.pl)
 
 install(FILES ${SWIPL_SEMWEB_DATA}
 	DESTINATION ${SWIPL_INSTALL_LIBRARY}/semweb)
+
+# FIXME: test_rdfa.pl is not used.  Was also the case in the
+# autoconf version
+test_libs(con litmap load ntriples rdf11 rdf_db
+	  subprop turtle2 turtle
+	  PACKAGES sgml clib zlib http plunit RDF
+	  PARENT_LIB)
