@@ -124,8 +124,8 @@ rdf11.tex:	doc/rdf11.txt rdf11.pl
 check::
 		$(PL) -q -f test_rdf_db.pl -g test_rdf_db -t halt
 		$(PL) -q -f test_rdf11.pl -g test_rdf11 -t halt
-		$(PL) -q -f litmap_test.pl -g test -t halt
-		$(PL) -q -f test.pl -g run_tests -t halt
+		$(PL) -q -f test_litmap.pl -g test_litmap -t halt
+		$(PL) -q -f test_load.pl -g run_load -t halt
 		$(PL) -q -f test_con.pl -g run -t halt
 		$(PL) -q -f test_subprop.pl -g test_subprop -t halt
 		$(PL) -q -f test_turtle.pl -g test_turtle -t halt
