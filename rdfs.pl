@@ -182,6 +182,12 @@ rdfs_individual_of(_Resource, _Class) :-
 rdfs_individual_of_r_c(literal(_), Class) :-
     !,
     rdfs_subclass_of(Class, rdfs:'Literal').
+rdfs_individual_of_r_c(^^(_,_), Class) :-
+    !,
+    rdfs_subclass_of(Class, rdfs:'Literal').
+rdfs_individual_of_r_c(@(_,_), Class) :-
+    !,
+    rdfs_subclass_of(Class, rdfs:'Literal').
 rdfs_individual_of_r_c(Resource, Class) :-
     (   rdf_has(Resource, rdf:type, MyClass)
     *-> rdfs_subclass_of(MyClass, Class)
