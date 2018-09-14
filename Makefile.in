@@ -109,9 +109,9 @@ rdf11containers.tex:	rdf11_containers.pl
 sparqlclient.tex:       sparql_client.pl
 		$(PLTOTEX) --section 'library(semweb/sparql_client)'
 rdfdb.tex:	doc/rdfdb.txt rdf_db.pl
-		$(PLTOTEX) --rdfdb --subsection doc/rdfdb.txt
+		$(PLTOTEX) --rdfdb --subsection doc/rdfdb.md
 rdf11.tex:	doc/rdf11.txt rdf11.pl
-		$(PLTOTEX) --rdf11 --subsection doc/rdf11.txt
+		$(PLTOTEX) --rdf11 --subsection doc/rdf11.md
 
 ################################################################
 # Check

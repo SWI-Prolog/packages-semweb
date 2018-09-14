@@ -52,3 +52,14 @@ test_libs(con litmap load ntriples rdf11 rdf_db
 	  subprop turtle2 turtle
 	  PACKAGES sgml clib zlib http plunit RDF
 	  PARENT_LIB)
+
+pkg_doc(semweb
+	LIBSUBDIR
+	    semweb
+	SECTION
+	    turtle.pl rdfa.pl rdf_ntriples.pl rdf_compare.pl rdf_portray.pl
+	    sparql_client.pl
+	SUBSECTION
+	    rdf_cache.pl rdf11_containers.pl
+	    SOURCE doc/rdfdb.md rdfdb.tex --rdfdb
+	    SOURCE doc/rdf11.md rdf11.tex --rdf11)
