@@ -56,6 +56,8 @@ test_libs(con litmap load ntriples rdf11 rdf_db
 pkg_doc(semweb
 	LIBSUBDIR
 	    semweb
+	SOURCES
+	    rdflib.doc
 	SECTION
 	    turtle.pl rdfa.pl rdf_ntriples.pl rdf_compare.pl rdf_portray.pl
 	    sparql_client.pl
