@@ -1,6 +1,6 @@
-:- module(rdf_test,
-          [ run/0,                      % Run all tests
-            run/1,                      % +Test
+:- module(test_con,
+          [ test_con/0,                 % Run all tests
+            test_con/1,                 % +Test
             (+)/1,                      % Assert
             (-)/1,                      % Retract
             v/1,                        % Visible
@@ -513,15 +513,15 @@ test dup3 :-
     passed/1,
     failed/1.
 
-%!  run
+%!  test_con
 %
 %   Run all tests
 
-run :-
+test_con :-
     retractall(passed(_)),
     retractall(failed(_)),
     forall(test(Head),
-           run(Head)),
+           test_con(Head)),
     aggregate_all(count, passed(_), Passed),
     aggregate_all(count, failed(_), Failed),
     (   Failed =:= 0
@@ -530,11 +530,11 @@ run :-
         fail
     ).
 
-%!  run(+Test)
+%!  test_con(+Test)
 %
 %   Run one individual test.
 
-run(Head) :-
+test_con(Head) :-
     r,
     catch(Head, E, true),
     !,
@@ -548,7 +548,7 @@ run(Head) :-
         ;   print_message(error, test_failed(Head, E))
         )
     ).
-run(Head) :-
+test_con(Head) :-
     j,
     assert(failed(Head)),
     print_message(error, test_failed(Head)).

@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2007-2015, University of Amsterdam
+    Copyright (c)  2007-2018, University of Amsterdam
                               VU University Amsterdam
     All rights reserved.
 
@@ -33,6 +33,9 @@
     POSSIBILITY OF SUCH DAMAGE.
 */
 
+:- module(test_load,
+          [ test_load/0
+          ]).
 :- include(local_test).
 
 run_zlib_tests :-
@@ -53,6 +56,8 @@ run_network_tests :-
 :- endif.
 :- use_module(rdf_http_plugin).
 
+test_load :-
+    run_tests([load]).
 
 :- begin_tests(load,
                [ setup(rdf_reset_db),
