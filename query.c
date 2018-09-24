@@ -302,6 +302,7 @@ open_transaction(rdf_db *db,
   if ( ss && ss != SNAPSHOT_ANONYMOUS )
   { int ss_tid = snapshot_thread(ss);
     assert(!ss_tid || ss_tid == tid);
+    (void)ss_tid;
 
     q->rd_gen = ss->rd_gen;
     q->tr_gen = ss->tr_gen;

@@ -485,8 +485,10 @@ static const int alt_index[16] =
 
 
 static void
-check_index_tables()
-{ int i, ic;
+check_index_tables(void)
+{
+#ifndef NDEBUG
+  int i, ic;
 
   for(i=0; i<16; i++)
   { if ( (ic=index_col[i]) != ~0 )
@@ -504,6 +506,7 @@ check_index_tables()
   { ic = col_index[i];
     assert(alt_index[ic] == ic);
   }
+#endif
 }
 
 
