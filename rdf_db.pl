@@ -775,12 +775,12 @@ rdf_gc(CPU) :-
 
 %!  rdf_gc is det.
 %
-%   Run the RDF-DB garbage collector until   no  garbage is left and
-%   all  tables  are  fully  optimized.  Under  normal  operation  a
-%   seperate thread with  identifier   =__rdf_GC=  performs  garbage
-%   collection as long as it is considered `useful'.
+%   Run the RDF-DB garbage collector until no   garbage  is left and all
+%   tables are fully optimized. Under normal operation a seperate thread
+%   with identifier =|__rdf_GC|= performs garbage  collection as long as
+%   it is considered `useful'.
 %
-%   Using rdf_gc/0 should only be  needed   to  ensure a fully clean
+%   Using rdf_gc/0 should  only  be  needed   to  ensure  a  fully clean
 %   database for analysis purposes such as leak detection.
 
 rdf_gc :-
