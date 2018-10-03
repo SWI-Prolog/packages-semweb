@@ -43,8 +43,8 @@ swipl_plugin(
     PL_LIB_SUBDIR semweb
     PL_LIBS rdf_ntriples.pl)
 
-install(FILES ${SWIPL_SEMWEB_DATA}
-	DESTINATION ${SWIPL_INSTALL_LIBRARY}/semweb)
+install_src(FILES ${SWIPL_SEMWEB_DATA}
+	    DESTINATION ${SWIPL_INSTALL_LIBRARY}/semweb)
 
 # FIXME: test_rdfa.pl is not used.  Was also the case in the
 # autoconf version
