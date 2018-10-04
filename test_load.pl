@@ -59,26 +59,36 @@ run_network_tests :-
 test_load :-
     run_tests([load]).
 
+test_input(Name, Path) :-
+    source_file(test_load, MyFile),
+    file_directory_name(MyFile, MyDir),
+    atomic_list_concat([MyDir, Name], /, Path).
+
+
 :- begin_tests(load,
                [ setup(rdf_reset_db),
                  cleanup(rdf_reset_db)
                ]).
 
 test(file, [true(N == 1), cleanup(rdf_reset_db)]) :-
-    rdf_load('Tests/test-001.rdf', [silent(true)]),
+    test_input('Tests/test-001.rdf', Input),
+    rdf_load(Input, [silent(true)]),
     rdf_statistics(triples(N)).
 
 test(file, [true(N == 1), cleanup(rdf_reset_db)]) :-
-    uri_file_name(URI, 'Tests/test-001.rdf'),
+    test_input('Tests/test-001.rdf', Input),
+    uri_file_name(URI, Input),
     rdf_load(URI, [silent(true)]),
     rdf_statistics(triples(N)).
 
 test(gzip_file, [condition(run_zlib_tests), true(N == 1), cleanup(rdf_reset_db)]) :-
-    rdf_load('Tests/test-002.rdf', [silent(true)]),
+    test_input('Tests/test-002.rdf', Input),
+    rdf_load(Input, [silent(true)]),
     rdf_statistics(triples(N)).
 
 test(gzip_file, [condition(run_zlib_tests), true(N == 1), cleanup(rdf_reset_db)]) :-
-    uri_file_name(URI, 'Tests/test-002.rdf'),
+    test_input('Tests/test-002.rdf', Input),
+    uri_file_name(URI, Input),
     rdf_load(URI, [silent(true)]),
     rdf_statistics(triples(N)).
 

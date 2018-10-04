@@ -68,6 +68,10 @@ test_rdf_db :-
                 rdf_prefix
               ]).
 
+test_input(Name, Path) :-
+    source_file(test_rdf_db, MyFile),
+    file_directory_name(MyFile, MyDir),
+    atomic_list_concat([MyDir, Name], /, Path).
 
                  /*******************************
                  *           TEST DATA          *
@@ -918,11 +922,12 @@ delete(3) :-
                  *******************************/
 
 unload(1) :-
-    rdf_load(dc),
+    test_input('dc.rdfs', File),
+    rdf_load(File),
     rdf_statistics(triples(T0)),
-    rdf_unload(dc),
+    rdf_unload(File),
     rdf_statistics(triples(T1)),
-    rdf_load(dc),
+    rdf_load(File),
     rdf_statistics(triples(T2)),
     assertion(T0 == T2),
     assertion(T1 == 0).
