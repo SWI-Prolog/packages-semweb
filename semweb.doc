@@ -309,7 +309,7 @@ source-code if you want to add new formats or locations.
 
 \begin{description}
     \item[\pllib{library(semweb/turtle)}]
-Load files in the Turtle format.  See \secref{rdfturtle}.
+Load files in the Turtle format.  See \secref{turtle}.
     \item[\pllib{library(semweb/rdf_zlib_plugin)}]
 Load \program{gzip} compressed files transparently. See
 \secref{semweb-zlib}.
