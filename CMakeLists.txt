@@ -47,6 +47,9 @@ install_src(pkg_semweb_data
 	    FILES ${SWIPL_SEMWEB_DATA}
 	    DESTINATION ${SWIPL_INSTALL_LIBRARY}/semweb)
 
+add_custom_target(semweb)
+add_dependencies(semweb rdf_db turtle ntriples pkg_semweb_data)
+
 # FIXME: test_rdfa.pl is not used.  Was also the case in the
 # autoconf version
 test_libs(con litmap load ntriples rdf11 rdf_db
