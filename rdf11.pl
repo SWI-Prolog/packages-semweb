@@ -3,7 +3,8 @@
     Author:        Jan Wielemaker and Wouter Beek
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2015-2016, VU University Amsterdam
+    Copyright (c)  2015-2018, VU University Amsterdam
+                              CWI, Amsterdam
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -171,7 +172,8 @@ In a nutshell, the following issues are addressed:
 
 :- multifile
     in_ground_type_hook/3,                  % +Type, +Input, -Lexical:atom
-    out_type_hook/3.                        % +Type, -Output, +Lexical:atom
+    out_type_hook/3,                        % +Type, -Output, +Lexical:atom
+    invalid_lexical_form_hook/3.            % +Type, +Lexical, -Prolog
 
 :- meta_predicate
     parse_partial_xml(3,+,-).
@@ -1465,7 +1467,16 @@ out_type(_Unknown, Val, Val0) :-
 %   into the cannical form as defined by xsd_time_string/3.
 
 out_date_time(Type, Prolog, Lexical) :-
-    xsd_time_string(Prolog, Type, Lexical).
+    catch(xsd_time_string(Prolog, Type, Lexical),
+          error(_,_),
+          invalid_lexical_form_hook(Type, Lexical, Prolog)).
+
+
+%!  invalid_lexical_form_hook(+Type, +Lexical, -Prolog)
+%
+%   This hook is called if translation of the lexical form to the Prolog
+%   representation fails due to a syntax  error.   By  default it is not
+%   defined, causing such invalid triples to be silently ignored.
 
 
                  /*******************************
