@@ -3,7 +3,8 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2017, VU University Amsterdam
+    Copyright (c)  2018, VU University Amsterdam
+			 CWI, Amsterdam
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -37,6 +38,7 @@
             rdf_current_prefix/2,       % :Alias, ?URI
             rdf_register_prefix/2,      % +Alias, +URI
             rdf_register_prefix/3,      % +Alias, +URI, +Options
+            rdf_unregister_prefix/1,    % +Alias
             register_file_prefixes/1,   % +Pairs
 
             rdf_current_ns/2,           % :Alias, ?URI
@@ -253,6 +255,15 @@ order_prefixes(Pairs, Sorted) :-
 
 prefix_uri_length(_-URI, Len) :-
     atom_length(URI, Len).
+
+%!  rdf_unregister_prefix(+Alias) is det.
+%
+%   Delete a prefix global registration.
+
+rdf_unregister_prefix(Alias) :-
+    must_be(atom, Alias),
+    retractall(rdf_db:ns(Alias, _)).
+
 
 %!  rdf_current_ns(:Prefix, ?URI) is nondet.
 %

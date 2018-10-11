@@ -117,6 +117,7 @@
             rdf_current_prefix/2,       % :Alias, ?URI
             rdf_register_prefix/2,      % +Alias, +URI
             rdf_register_prefix/3,      % +Alias, +URI, +Options
+            rdf_unregister_prefix/1,    % +Alias
             rdf_current_ns/2,           % :Alias, ?URI
             rdf_register_ns/2,          % +Alias, +URI
             rdf_register_ns/3,          % +Alias, +URI, +Options
