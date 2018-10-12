@@ -53,7 +53,7 @@ fix_load_path.
 :- use_module(turtle).
 :- use_module(rdf_db).
 :- use_module(rdf_compare).
-:- use_module(library(rdf_ntriples)).
+:- use_module(library(w3c_ntdata)).             % From package RDF
 :- use_module(library(apply)).
 :- use_module(library(debug)).
 :- use_module(library(aggregate)).
