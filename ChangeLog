@@ -780,7 +780,7 @@ Aug 19, 2004
   * ADDED: rdf_estimate_complexity/4.
 
   * ADDED: rdf_predicate_property(+Predicate, triples(-Count)) to find
-    the number of triples on a predciate.
+    the number of triples on a predicate.
 
 Aug 11, 2004
 
