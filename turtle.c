@@ -2933,6 +2933,22 @@ statement(turtle_state *ts)
 	{ discardBuf(&pn_prefix);
 	  return sparql_prefix_directive(ts);
 	}
+	/* FIXME: merely skips "GRAPH", i.e., Does not enforce next
+	 * token to be a graph label.
+	 */
+	if ( wcscasecmp(baseBuf(&pn_prefix), L"GRAPH") == 0 )
+	{ discardBuf(&pn_prefix);
+	  if ( ts->format == D_TURTLE )
+	  { syntax_warning(ts, "Unexpected \"GRAPH\" in Turtle format "
+			 "(assuming TriG, ignoring graphs)");
+	    set_format(ts, D_TRIG_NO_GRAPH);
+	  } else if ( ts->format == D_AUTO )
+	  { set_format(ts, D_TRIG);
+	  }
+	  if ( !next(ts) )
+	    return FALSE;
+	  goto retry;
+	}
 
 	if ( ts->current_char == ':' )
 	{ if ( !next(ts) )
