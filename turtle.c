@@ -2761,12 +2761,22 @@ starts_graph(turtle_state *ts)
 }
 
 
+#define	NO_GRAPH \
+	if ( graph_keyword_seen ) \
+	  return syntax_error(ts, "graph IRI expected after GRAPH keyword") \
+
 static int
-graph_or_final_predicate_object_list(turtle_state *ts, resource *r)
+graph_or_final_predicate_object_list(turtle_state *ts, resource *r,
+				     int *must_be_graph)
 { int rc;
+  int graph_keyword_seen = *must_be_graph;
+
+  *must_be_graph = FALSE;
 
   if ( !skip_ws(ts) )
+  { NO_GRAPH;
     return FALSE;
+  }
 
   if ( (rc = starts_graph(ts)) == TRUE )
   { switch ( ts->format )
@@ -2797,6 +2807,7 @@ graph_or_final_predicate_object_list(turtle_state *ts, resource *r)
   } else if ( rc == FALSE )
   { set_subject(ts, r, NULL);
 
+    NO_GRAPH;
     return final_predicate_object_list(ts);
   } else
     return FALSE;			/* error from starts_graph() */
@@ -2805,17 +2816,20 @@ graph_or_final_predicate_object_list(turtle_state *ts, resource *r)
 
 static int
 statement(turtle_state *ts)
-{ retry:
+{ int graph_keyword_seen = FALSE;
 
+retry:
   if ( !skip_ws(ts) )
     return FALSE;
 
   switch ( ts->current_char )
   { case '@':				/* directive */
-    { return next(ts) && directive(ts);
+    { NO_GRAPH;
+      return next(ts) && directive(ts);
     }
     case '}':
-    { if ( ts->format == D_TRIG )
+    { NO_GRAPH;
+      if ( ts->format == D_TRIG )
       { set_graph(ts, NULL, NULL);
 	return next(ts);			/* return } as empty triple set */
       } else if ( ts->format == D_TRIG_NO_GRAPH )
@@ -2824,7 +2838,8 @@ statement(turtle_state *ts)
 	return syntax_error(ts, "Unexpected \"}\" in Turtle format");
     }
     case '{':
-    { switch( ts->format )
+    { NO_GRAPH;
+      switch( ts->format )
       { case D_AUTO:
 	  set_format(ts, D_TRIG);
 	  /*FALLTHROUGH*/
@@ -2854,12 +2869,13 @@ statement(turtle_state *ts)
     { resource *r;
 
       if ( (r=read_iri_ref(ts)) )
-	return graph_or_final_predicate_object_list(ts, r);
+	return graph_or_final_predicate_object_list(ts, r, &graph_keyword_seen);
       return FALSE;
     }
     case '[':
     { resource *r;
 
+      NO_GRAPH;
       if ( !next(ts) || !skip_ws(ts) )
 	return FALSE;
       if ( ts->current_char == ']' )
@@ -2879,6 +2895,7 @@ statement(turtle_state *ts)
     case '(':
     { resource *r;
 
+      NO_GRAPH;
       if ( (r=read_collection(ts)) )
       { set_subject(ts, r, NULL);
 	return final_predicate_object_list(ts);
@@ -2888,6 +2905,7 @@ statement(turtle_state *ts)
     case '_':
     { resource *r;
 
+      NO_GRAPH;
       if ( (r=read_blank_node_label(ts)) )
       { set_subject(ts, r, NULL);
 	return final_predicate_object_list(ts);
@@ -2907,19 +2925,21 @@ statement(turtle_state *ts)
 	  r = resolve_iri(ts, NULL, baseBuf(&pn_local));
 	  discardBuf(&pn_local);
 	  if ( r )
-	    return graph_or_final_predicate_object_list(ts, r);
+	    return graph_or_final_predicate_object_list(ts, r,
+							&graph_keyword_seen);
 	}
       } else
       { resource *r;
 
 	if ( (r=resolve_iri(ts, NULL, NULL)) )
-	  return graph_or_final_predicate_object_list(ts, r);
+	  return graph_or_final_predicate_object_list(ts, r, &graph_keyword_seen);
       }
 
       return FALSE;
     }
     case -1:
-    { return TRUE;				/* End of file */
+    { NO_GRAPH;
+      return TRUE;				/* End of file */
     }
     default:
     { string_buffer pn_prefix;
@@ -2927,17 +2947,18 @@ statement(turtle_state *ts)
       if ( read_pn_prefix(ts, &pn_prefix) )
       { if ( wcscasecmp(baseBuf(&pn_prefix), L"BASE") == 0 )
 	{ discardBuf(&pn_prefix);
+	  NO_GRAPH;
 	  return sparql_base_directive(ts);
 	}
 	if ( wcscasecmp(baseBuf(&pn_prefix), L"PREFIX") == 0 )
 	{ discardBuf(&pn_prefix);
+	  NO_GRAPH;
 	  return sparql_prefix_directive(ts);
 	}
-	/* FIXME: merely skips "GRAPH", i.e., Does not enforce next
-	 * token to be a graph label.
-	 */
-	if ( wcscasecmp(baseBuf(&pn_prefix), L"GRAPH") == 0 )
+	if ( wcscasecmp(baseBuf(&pn_prefix), L"GRAPH") == 0 &&
+	     ts->current_char != ':' )
 	{ discardBuf(&pn_prefix);
+	  NO_GRAPH;
 	  if ( ts->format == D_TURTLE )
 	  { syntax_warning(ts, "Unexpected \"GRAPH\" in Turtle format "
 			 "(assuming TriG, ignoring graphs)");
@@ -2947,6 +2968,8 @@ statement(turtle_state *ts)
 	  }
 	  if ( !next(ts) )
 	    return FALSE;
+	  graph_keyword_seen = TRUE;
+
 	  goto retry;
 	}
 
@@ -2966,7 +2989,8 @@ statement(turtle_state *ts)
 	      discardBuf(&pn_local);
 	      if ( r )
 	      { discardBuf(&pn_prefix);
-		return graph_or_final_predicate_object_list(ts, r);
+		return graph_or_final_predicate_object_list(ts, r,
+							    &graph_keyword_seen);
 	      }
 	    }
 	  } else
@@ -2976,10 +3000,12 @@ statement(turtle_state *ts)
 	    discardBuf(&pn_prefix);
 
 	    if ( r )
-	      return graph_or_final_predicate_object_list(ts, r);
+	      return graph_or_final_predicate_object_list(ts, r,
+							  &graph_keyword_seen);
 	  }
 	} else
 	{ discardBuf(&pn_prefix);
+	  NO_GRAPH;
 	  return syntax_error(ts, "Expected \":\"");
 	}
       }
