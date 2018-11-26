@@ -4,3 +4,4 @@
 #cmakedefine PL_ARITY_AS_SIZE          @PL_ARITY_AS_SIZE@
 #cmakedefine SIZEOF_LONG               @SIZEOF_LONG@
 #cmakedefine SIZEOF_VOIDP              @SIZEOF_VOIDP@
+#cmakedefine WORDS_BIGENDIAN	       @WORDS_BIGENDIAN@
