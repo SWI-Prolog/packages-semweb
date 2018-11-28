@@ -24,7 +24,11 @@
           ]).
 :- include(local_test).
 
-:- use_module(rdf_db).
+:- prolog_load_context(directory, D),
+   asserta(user:file_search_path(library, D)),
+   atom_concat(D, '/..', DD),
+   asserta(user:file_search_path(library, DD)).
+:- use_module(library(semweb/rdf_db)).
 :- use_module(library(aggregate)).
 
 /** <module> RDF test language

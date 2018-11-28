@@ -48,13 +48,17 @@ run_zlib_tests :-
 run_network_tests :-
     \+ getenv('USE_PUBLIC_NETWORK_TESTS', false).
 
+:- prolog_load_context(directory, D),
+   asserta(user:file_search_path(library, D)),
+   atom_concat(D, '/..', DD),
+   asserta(user:file_search_path(library, DD)).
 :- use_module(library(plunit)).
 :- use_module(library(uri)).
 :- use_module(library(semweb/rdf_db)).
 :- if(run_zlib_tests).
-:- use_module(rdf_zlib_plugin).
+:- use_module(library(semweb/rdf_zlib_plugin)).
 :- endif.
-:- use_module(rdf_http_plugin).
+:- use_module(library(semweb/rdf_http_plugin)).
 
 test_load :-
     run_tests([load]).
