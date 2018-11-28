@@ -55,7 +55,9 @@ add_dependencies(semweb rdf_db turtle ntriples pkg_semweb_data)
 test_libs(con litmap load ntriples rdf11 rdf_db
 	  subprop turtle2 turtle
 	  PACKAGES sgml clib zlib http plunit RDF
-	  PARENT_LIB)
+     PARENT_LIB
+     TEST_FILES_REGEX 
+     "local_test.pl$|random_graph.pl$|search.pl$|dc.rdfs$|pce_graph.pl$")
 
 pkg_doc(semweb
 	LIBSUBDIR
