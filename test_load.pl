@@ -52,9 +52,9 @@ run_network_tests :-
 :- use_module(library(uri)).
 :- use_module(library(semweb/rdf_db)).
 :- if(run_zlib_tests).
-:- use_module(rdf_zlib_plugin).
+:- use_module(library(semweb/rdf_zlib_plugin)).
 :- endif.
-:- use_module(rdf_http_plugin).
+:- use_module(library(semweb/rdf_http_plugin)).
 
 test_load :-
     run_tests([load]).

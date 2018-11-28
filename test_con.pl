@@ -24,7 +24,7 @@
           ]).
 :- include(local_test).
 
-:- use_module(rdf_db).
+:- use_module(library(semweb/rdf_db)).
 :- use_module(library(aggregate)).
 
 /** <module> RDF test language

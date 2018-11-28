@@ -50,9 +50,9 @@ fix_load_path.
 
 :- fix_load_path.
 
-:- use_module(turtle).
-:- use_module(rdf_db).
-:- use_module(rdf_compare).
+:- use_module(library(semweb/turtle)).
+:- use_module(library(semweb/rdf_db)).
+:- use_module(library(semweb/rdf_compare)).
 :- use_module(library(w3c_ntdata)).             % From package RDF
 :- use_module(library(apply)).
 :- use_module(library(debug)).

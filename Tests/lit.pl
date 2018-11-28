@@ -1,7 +1,9 @@
 :- module(lit,
           [ lit/0
           ]).
-:- use_module('../rdf_db').
+:- include('../local_test').
+
+:- use_module(library(semweb/rdf_db)).
 
 data(string, '').
 data(string, 'This is a nice string').
