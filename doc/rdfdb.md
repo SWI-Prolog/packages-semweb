@@ -5,7 +5,7 @@ The extra _Graph_ and _Line_ elements provide information about the
 origin of the triple.
 
 The actual storage is provided by the _|foreign language (C)|_ module.
-Using a dedicated C-based implementation we can reduced memory usage and
+Using a dedicated C-based implementation we can reduce memory usage and
 improve indexing capabilities, for example by providing a dedicated
 index to support entailment over =|rdfs:subPropertyOf|=. Currently the
 following indexes are provided (S=subject, P=predicate, O=object,
@@ -13,11 +13,11 @@ G=graph):
 
   * S, P, O, SP, PO, SPO, G, SG, PG
 
-  * Predicates connect by *|rdfs:subPropertyOf|* are combined
+  * Predicates connected by *|rdfs:subPropertyOf|* are combined
     in a _|predicate cloud|_.  The system causes multiple
     predicates in the cloud to share the same hash.  The cloud
     maintains a 2-dimensional array that expresses the
-    closure of all rdfs:subPropertyOf relations.  This
+    closure of all =|rdfs:subPropertyOf|= relations.  This
     index supports rdf_has/3 to query a property and all its
     children efficiently.
 
@@ -149,7 +149,7 @@ track origin, changes and modified state.
 
 ## Literal matching and indexing {#semweb-literals}
 
-Literal values are ordered and indexed using a _|skip list|_ The aim of
+Literal values are ordered and indexed using a _|skip list|_. The aim of
 this index is threefold.
 
   * Unlike hash-tables, binary trees allow for efficient
@@ -175,7 +175,7 @@ please check the source-code of the mapping-table generator
 Currently the total order of literals is first based on the type of
 literal using the ordering _|numeric < string < term|_ Numeric values
 (integer and float) are ordered by value, integers preceed floats if
-they represent the same value. strings are sorted alphabetically after
+they represent the same value. Strings are sorted alphabetically after
 case-mapping and diacritic removal as described above. If they match
 equal, uppercase preceeds lowercase and diacritics are ordered on their
 unicode value. If they still compare equal literals without any
@@ -193,7 +193,7 @@ use the tree index are returned in alphabetical order.
 The predicates below form an experimental interface to provide more
 reasoning inside the kernel of the rdb_db engine. Note that =symetric=,
 =inverse_of= and =transitive= are not yet supported by the rest of the
-engine. Alo note that there is no relation to defined RDF properties.
+engine. Also note that there is no relation to defined RDF properties.
 Properties that have no triples are not reported by this predicate,
 while predicates that are involved in triples do not need to be defined
 as an instance of rdf:Property.

@@ -36,14 +36,14 @@ writing RDF/XML and Turtle data, caching loaded RDF documents and
 persistent storage. This package is the core of a ready-to-run platform
 for developing Semantic Web applications named
 \href{http://cliopatria.swi-prolog.org}{ClioPatria}, which is distributed
-seperately. The SWI-Prolog RDF store is amoung the most memory efficient
+seperately. The SWI-Prolog RDF store is among the most memory efficient
 main-memory stores for
 RDF\footnote{\url{http://cliopatria.swi-prolog.org/help/source/doc/home/vnc/prolog/src/ClioPatria/web/help/memusage.txt}}
 
 Version~3 of the RDF library enhances concurrent use of the library by
 allowing for lock-free reading and writing using short-held locks.  It
 provides Prolog compatible \jargon{logical update view} on the triple
-store and isolation using \jargon{transactions} and jargon{snapshots}.
+store and isolation using \jargon{transactions} and \jargon{snapshots}.
 This version of the library provides near real-time modification and
 querying of RDF graphs, making it particularly interesting for handling
 streaming RDF and graph manipulation tasks.

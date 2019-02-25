@@ -424,7 +424,7 @@ rdf_update_(S, P, O, G1, graph(G2)) :-
 %
 %   If both S and O are given,   these predicates are `semidet`. The
 %   number of steps D is  minimal   because  the implementation uses
-%   _breath first_ search.
+%   _breadth first_ search.
 
 rdf_reachable(S,P,O) :-
     pre_object(O,O0),
@@ -1485,7 +1485,7 @@ out_date_time(Type, Prolog, Lexical) :-
 
 %!  rdf_term(?Term) is nondet.
 %
-%   True if Term appears in the RDF database. Term is either an iri,
+%   True if Term appears in the RDF database. Term is either an IRI,
 %   literal or blank node and may  appear   in  any  position of any
 %   triple. If Term is ground,  it   is  pre-processed as the object
 %   argument of rdf_assert/3 and the predicate is _semidet_.
@@ -1597,7 +1597,7 @@ rdf_predicate(P) :-
 
 %!  rdf_object(?O) is nondet.
 %
-%   True when O is a currently known  object, i.e. it appeasr in the
+%   True when O is a currently known  object, i.e. it appears in the
 %   object position of some visible triple. If Term is ground, it is
 %   pre-processed as the object  argument   of  rdf_assert/3 and the
 %   predicate is _semidet_.
@@ -1755,7 +1755,7 @@ literal_form(_^^_).
 %
 %   Success of this goal does not imply that the name is
 %   well-formed or that it is present in the database (see
-%   rdf_name/1) for that).
+%   rdf_name/1 for that).
 
 rdf_is_name(T) :- rdf_is_iri(T), !.
 rdf_is_name(T) :- rdf_is_literal(T).
@@ -1767,7 +1767,7 @@ rdf_is_name(T) :- rdf_is_literal(T).
 %
 %   Success of this goal does not imply that the object term in
 %   well-formed or that it is present in the database (see
-%   rdf_object/1) for that).
+%   rdf_object/1 for that).
 %
 %   Since any RDF term can appear in the object position, this is
 %   equaivalent to rdf_is_term/1.
@@ -1781,7 +1781,7 @@ rdf_is_object(T) :- rdf_is_literal(T).
 %   True if Term can appear in the   predicate position of a triple.
 %
 %   Success of this goal does not imply that the predicate term is
-%   present in the database (see rdf_predicate/1) for that).
+%   present in the database (see rdf_predicate/1 for that).
 %
 %   Since only IRIs can appear in the predicate position, this is
 %   equivalent to rdf_is_iri/1.
@@ -1796,7 +1796,7 @@ rdf_is_predicate(T) :- rdf_is_iri(T).
 %   Only blank nodes and IRIs can appear in the subject position.
 %
 %   Success of this goal does not imply that the subject term is
-%   present in the database (see rdf_subject/1) for that).
+%   present in the database (see rdf_subject/1 for that).
 %
 %   Since blank nodes are represented by atoms that start with
 %   `_:` and an IRIs are atoms as well, this is equivalent to
@@ -1810,7 +1810,7 @@ rdf_is_subject(T) :- atom(T).
 %   either an IRI, a blank node or an RDF literal.
 %
 %   Success of this goal does not imply that the RDF term is
-%   present in the database (see rdf_term/1) for that).
+%   present in the database (see rdf_term/1 for that).
 
 rdf_is_term(N) :- rdf_is_subject(N), !.
 rdf_is_term(N) :- rdf_is_literal(N).
