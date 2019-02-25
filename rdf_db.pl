@@ -287,7 +287,7 @@ rdf_prefixes:rdf_empty_prefix_cache(_Prefix, _IRI) :-
 
 %!  rdf_equal(?Resource1, ?Resource2)
 %
-%   Simple equality test to exploit goal-expansion
+%   Simple equality test to exploit goal-expansion.
 
 rdf_equal(Resource, Resource).
 
@@ -307,7 +307,7 @@ lang_equal(Lang1, Lang2) :-
 %   True if Lang  matches  Pattern.   This  implements  XML language
 %   matching  conform  RFC  4647.   Both    Lang   and  Pattern  are
 %   dash-separated strings of  identifiers  or   (for  Pattern)  the
-%   wildcart *. Identifiers are  matched   case-insensitive  and a *
+%   wildcard *. Identifiers are  matched   case-insensitive  and a *
 %   matches any number of identifiers. A   short pattern is the same
 %   as *.
 
@@ -376,11 +376,11 @@ lang_equal(Lang1, Lang2) :-
 %     literals.
 %
 %     * ge(+Literal)
-%     Match any literal that is equal or larger then Literal in the
+%     Match any literal that is equal or larger than Literal in the
 %     ordered set of literals.
 %
 %     * gt(+Literal)
-%     Match any literal that is larger then Literal in the ordered set
+%     Match any literal that is larger than Literal in the ordered set
 %     of literals.
 %
 %     * eq(+Literal)
@@ -388,11 +388,11 @@ lang_equal(Lang1, Lang2) :-
 %     of literals.
 %
 %     * le(+Literal)
-%     Match any literal that is equal or smaller then Literal in the
+%     Match any literal that is equal or smaller than Literal in the
 %     ordered set of literals.
 %
 %     * lt(+Literal)
-%     Match any literal that is smaller then Literal in the ordered set
+%     Match any literal that is smaller than Literal in the ordered set
 %     of literals.
 %
 %     * between(+Literal1, +Literal2)
@@ -443,7 +443,7 @@ lang_equal(Lang1, Lang2) :-
 %   repecting the symetric(true) or inverse_of(P2) properties.
 %
 %   If used with either Subject or  Object unbound, it first returns
-%   the origin, followed by  the   reachable  nodes  in breath-first
+%   the origin, followed by  the  reachable  nodes  in breadth-first
 %   search-order. The implementation internally   looks one solution
 %   ahead and succeeds deterministically on  the last solution. This
 %   predicate never generates the same  node   twice  and  is robust
@@ -836,7 +836,7 @@ consider_gc(_CPU) :-
 %   Obtain statistics on the RDF database.  Defined statistics are:
 %
 %     * graphs(-Count)
-%     Number of named graphs
+%     Number of named graphs.
 %
 %     * triples(-Count)
 %     Total number of triples in the database.  This is the number
@@ -987,7 +987,7 @@ rdf_current_predicate(P, DB) :-
 %     * rdf_object_branch_factor(-Float)
 %     Unify Float with the average number of triples associated with
 %     each unique value for the object-side of this relation. In
-%     addition to the comments with the subject_branch_factor
+%     addition to the comments with the =rdf_subject_branch_factor=
 %     property, uniqueness of the object value is computed from the
 %     hash key rather than the actual values.
 %
@@ -1361,7 +1361,7 @@ rdf_load_db(File) :-
 %       Named graph in which to load the data.  It is *not* allowed
 %       to load two sources into the same named graph.  If Graph is
 %       unbound, it is unified to the graph into which the data is
-%       loaded.  The default graph is a =file://= URL when loading
+%       loaded.  The default graph is a =|file://|= URL when loading
 %       a file or, if the specification is a URL, its normalized
 %       version without the optional _|#fragment|_.
 %
@@ -1998,7 +1998,7 @@ modified_graph(SourceURL, Graph) :-
 %       The graph is loaded from the Source (a URL)
 %       * source_last_modified(?Time)
 %       Time is the last-modified timestamp of Source at the moment
-%       that the graph was loaded from Source.
+%       the graph was loaded from Source.
 %       * triples(Count)
 %       True when Count is the number of triples in Graph.
 %
@@ -2104,13 +2104,13 @@ rdf_reset_db :-
 %           Save only triples associated to the given named Graph.
 %
 %           * anon(Bool)
-%           If false (default true) do not save blank nodes that do
+%           If =false= (default =true=) do not save blank nodes that do
 %           not appear (indirectly) as object of a named resource.
 %
 %           * base_uri(URI)
 %           BaseURI used. If present, all URIs that can be
 %           represented relative to this base are written using
-%           their shorthand.  See also =write_xml_base= option
+%           their shorthand.  See also =write_xml_base= option.
 %
 %           * convert_typed_literal(:Convertor)
 %           Call Convertor(-Type, -Content, +RDFObject), providing
@@ -2118,10 +2118,10 @@ rdf_reset_db :-
 %           the RDF parser.
 %
 %           * document_language(+Lang)
-%           Initial xml:lang saved with rdf:RDF element
+%           Initial =|xml:lang|= saved with rdf:RDF element.
 %
 %           * encoding(Encoding)
-%           Encoding for the output.  Either utf8 or iso_latin_1
+%           Encoding for the output.  Either utf8 or iso_latin_1.
 %
 %           * inline(+Bool)
 %           If =true= (default =false=), inline resources when
@@ -2129,7 +2129,7 @@ rdf_reset_db :-
 %           are handled this way.
 %
 %           * namespaces(+List)
-%           Explicitely specify saved namespace declarations. See
+%           Explicitly specify saved namespace declarations. See
 %           rdf_save_header/2 option namespaces for details.
 %
 %           * sorted(+Boolean)

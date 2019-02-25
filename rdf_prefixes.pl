@@ -180,7 +180,7 @@ rdf_db:ns(xsd,     'http://www.w3.org/2001/XMLSchema#').
 %   Register Prefix as an abbreviation for URI. Options:
 %
 %           * force(Boolean)
-%           If =true=, Replace existing namespace alias. Please note
+%           If =true=, replace existing namespace alias. Please note
 %           that replacing a namespace is dangerous as namespaces
 %           affect preprocessing. Make sure all code that depends on
 %           a namespace is compiled after changing the registration.
@@ -267,7 +267,7 @@ rdf_unregister_prefix(Alias) :-
 
 %!  rdf_current_ns(:Prefix, ?URI) is nondet.
 %
-%   @deprecated.  Use rdf_current_prefix/2.
+%   @deprecated  Use rdf_current_prefix/2.
 
 rdf_current_ns(Prefix, URI) :-
     rdf_current_prefix(Prefix, URI).
@@ -277,7 +277,7 @@ rdf_current_ns(Prefix, URI) :-
 %
 %   Register an RDF prefix.
 %
-%   @deprecated. Use rdf_register_prefix/2 or rdf_register_prefix/3.
+%   @deprecated  Use rdf_register_prefix/2 or rdf_register_prefix/3.
 
 rdf_register_ns(Prefix, URI) :-
     rdf_register_prefix(Prefix, URI).
