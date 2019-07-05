@@ -191,6 +191,7 @@
                        db(atom),
                        format(oneof([xml,triples,turtle,trig,nquads,ntriples])),
                        graph(atom),
+                       multifile(boolean),
                        if(oneof([true,changed,not_loaded])),
                        modified(-float),
                        prefixes(-list),
@@ -1390,6 +1391,12 @@ rdf_load_db(File) :-
 %       Returns the prefixes defined in the source   data file as a list
 %       of pairs.
 %
+%       * multifile(+Boolean)
+%       Indicate that the addressed graph may be populated with
+%       triples from multiple sources. This disables caching and
+%       avoids that an rdf_load/2 call affecting the specified
+%       graph cleans the graph.
+%
 %   Other  options  are  forwarded  to  process_rdf/3.  By  default,
 %   rdf_load/2 only loads RDF/XML from files.  It can be extended to
 %   load data from other formats and   locations  using plugins. The
@@ -1531,7 +1538,10 @@ rdf_load_file(_Ref, _Spec, SourceURL, Protocol, Graph, M, Options) :-
                         format(Format)
                       | Extra
                       ], Options, RDFOptions),
-        do_unload(Graph),
+        (   option(multifile(true), Options)
+        ->  true
+        ;   do_unload(Graph)
+        ),
         graph_modified(Modified, ModifiedStamp),
         rdf_set_graph_source(Graph, SourceURL, ModifiedStamp),
         call_cleanup(rdf_load_stream(Format, In, M:RDFOptions),
@@ -1619,15 +1629,18 @@ use If-modified-since to verify that we need not reloading this file.
 
 rdf_open_input(SourceURL, Protocol, Graph,
                Stream, Cleanup, Modified, Format, Options) :-
-    option(if(If), Options, changed),
-    (   If == true
+    (   option(multifile(true), Options)
     ->  true
-    ;   rdf_graph_source_(Graph, SourceURL, HaveModified)
-    ->  true
-    ;   option(cache(true), Options, true),
-        rdf_cache_file(SourceURL, read, CacheFile)
-    ->  time_file(CacheFile, HaveModified)
-    ;   true
+    ;   option(if(If), Options, changed),
+        (   If == true
+        ->  true
+        ;   rdf_graph_source_(Graph, SourceURL, HaveModified)
+        ->  true
+        ;   option(cache(true), Options, true),
+            rdf_cache_file(SourceURL, read, CacheFile)
+        ->  time_file(CacheFile, HaveModified)
+        ;   true
+        )
     ),
     option(format(Format), Options, _),
     open_input_if_modified(Protocol, SourceURL, HaveModified,
@@ -1703,6 +1716,18 @@ storage_extension(File, '', File).
 %     3. The base_uri(BaseURI) option
 %     4. The source URL
 
+load_graph(_Source, Graph, Options) :-
+    option(multifile(true), Options),
+    !,
+    (   (   option(graph(Graph), Options)
+        ->  true
+        ;   option(db(Graph), Options)
+        ),
+        ground(Graph)
+    ->  true
+    ;   throw(error(existence_error(option, graph),
+                    context(_, "rdf_load/2: using multifile requires graph")))
+    ).
 load_graph(Source, Graph, Options) :-
     (   option(graph(Graph), Options)
     ;   option(db(Graph), Options)
