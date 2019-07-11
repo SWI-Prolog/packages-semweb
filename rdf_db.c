@@ -2144,8 +2144,9 @@ cloud_of(predicate *p, int *labelp)
 
   for(i=0; i<pc->size; i++)
   { if ( pc->members[i] == p )
-      *labelp = i;
-    return pc;
+    { *labelp = i;
+      return pc;
+    }
   }
 
   assert(0);
