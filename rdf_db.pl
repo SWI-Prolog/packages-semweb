@@ -186,6 +186,7 @@
                      [expand(callable), filter(callable), min_count(nonneg)]).
 :- predicate_options(rdf_load/2, 2,
                      [ base_uri(atom),
+                       blank_nodes(oneof([share,noshare])),
                        cache(boolean),
                        concurrent(positive_integer),
                        db(atom),
