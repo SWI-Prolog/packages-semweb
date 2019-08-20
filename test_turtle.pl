@@ -53,7 +53,7 @@ fix_load_path.
 :- use_module(library(semweb/turtle)).
 :- use_module(library(semweb/rdf_db)).
 :- use_module(library(semweb/rdf_compare)).
-:- use_module(library(w3c_ntdata)).             % From package RDF
+:- use_module('../RDF/w3c_ntdata').             % From package RDF
 :- use_module(library(apply)).
 :- use_module(library(debug)).
 :- use_module(library(aggregate)).
@@ -95,8 +95,8 @@ test_turtle(File) :-
 :- dynamic
     blocked/1.
 
-%blocked('test-28.ttl').
-
+% test-18.ttl uses Unicode characters > 2**16.
+blocked('test-18.ttl') :- \+ catch(char_code(_, 100 000), _, fail).
 
 %:- debug(test_turtle).
 

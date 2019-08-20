@@ -99,6 +99,16 @@ test_turtle2 :-
 blocked_test('turtle-eval-bad-01').
 blocked_test('turtle-eval-bad-02').
 blocked_test('turtle-eval-bad-03').
+% These require full Unicode range
+blocked_test('localName_with_assigned_nfc_PN_CHARS_BASE_character_boundaries') :-
+    \+ catch(char_code(_, 100 000), _, fail).
+blocked_test('localName_with_nfc_PN_CHARS_BASE_character_boundaries') :-
+    \+ catch(char_code(_, 100 000), _, fail).
+blocked_test('localName_with_PN_CHARS_BASE_character_boundaries') :-
+    \+ catch(char_code(_, 100 000), _, fail).
+% Fails due to CR stripping on input.
+blocked_test('literal_with_CARRIAGE_RETURN') :-
+    current_prolog_flag(windows, true).
 
 %!  syntax_tests
 %
@@ -156,6 +166,7 @@ negative_eval_tests :-
 negative_eval_test(T) :-
     rdf(T, mf:name, literal(Name)),
     blocked_test(Name),
+    !,
     print_message(informational, test_turtle(blocked, Name)).
 negative_eval_test(T) :-
     rdf(T, mf:action, FileURI),
@@ -178,6 +189,11 @@ eval_tests :-
     forall(rdf(T, rdf:type, rdft:'TestTurtleEval'),
            eval_test(T)).
 
+eval_test(T) :-
+    rdf(T, mf:name, literal(Name)),
+    blocked_test(Name),
+    !,
+    print_message(informational, test_turtle(blocked, Name)).
 eval_test(T) :-
     rdf(T, mf:action, ActionURI),
     rdf(T, mf:result, ResultURI),
