@@ -2966,7 +2966,9 @@ save_body_literal(DOM,
                       NameText, BaseURI, Out, Indent, Options).
 
 save_attribute_value(Value, Out, _) :-  % strings
-    atom(Value),
+    (	atom(Value)
+	;	string(Value)
+	),
     !,
     stream_property(Out, encoding(Encoding)),
     xml_quote_cdata(Value, QVal, Encoding),
