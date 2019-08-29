@@ -2218,11 +2218,16 @@ rdf_save2(File, Options) :-
                               OSavedTriples,
                               Close)).
 
-open_output(stream(Out), Encoding, Out,
-            set_stream(Out, encoding(Old))) :-
+open_output(stream(Out), Encoding, Out, Cleanup) :-
     !,
     stream_property(Out, encoding(Old)),
-    set_stream(Out, encoding(Encoding)).
+    (   (   Old == Encoding
+        ;   Old == wchar_t          % Internal encoding
+        )
+    ->  Cleanup = true
+    ;   set_stream(Out, encoding(Encoding)),
+        Cleanup = set_stream(Out, encoding(Old))
+    ).
 open_output(File, Encoding, Out,
             close(Out)) :-
     open(File, write, Out, [encoding(Encoding)]).
@@ -2334,7 +2339,7 @@ rdf_save_header(Out, Options) :-
 rdf_save_header(Out, Options, OptionsOut) :-
     is_list(Options),
     !,
-    stream_property(Out, encoding(Enc)),
+    option(encoding(Enc), Options, utf8),
     xml_encoding(Enc, Encoding),
     format(Out, '<?xml version=\'1.0\' encoding=\'~w\'?>~n', [Encoding]),
     format(Out, '<!DOCTYPE rdf:RDF [', []),
@@ -2721,11 +2726,11 @@ rdf_save_subject(Out, Subject, BaseURI, Atts, Indent, Options) :-
     !,
     format(Out, '~*|<', [Indent]),
     rdf_write_id(Out, TypeId),
-    save_about(Out, BaseURI, Subject),
+    save_about(Out, BaseURI, Subject, Options),
     save_attributes(Atts1, BaseURI, Out, TypeId, Indent, Options).
 rdf_save_subject(Out, Subject, BaseURI, Atts, Indent, Options) :-
     format(Out, '~*|<rdf:Description', [Indent]),
-    save_about(Out, BaseURI, Subject),
+    save_about(Out, BaseURI, Subject, Options),
     save_attributes(Atts, BaseURI, Out, rdf:'Description', Indent, Options).
 
 xml_is_name(_NS:Atom) :-
@@ -2734,20 +2739,20 @@ xml_is_name(_NS:Atom) :-
 xml_is_name(Atom) :-
     xml_name(Atom).
 
-%!  save_about(+Out, +BaseURI, +Subject) is det.
+%!  save_about(+Out, +BaseURI, +Subject, +Options) is det.
 %
 %   Save the rdf:about. If Subject is a  blank node, save the nodeID
 %   if any.
 
-save_about(Out, _, Subject) :-
+save_about(Out, _BaseURI, Subject, _Options) :-
     rdf_is_bnode(Subject),
     !,
     (   named_anon(Subject, NodeID)
     ->  format(Out, ' rdf:nodeID="~w"', [NodeID])
     ;   true
     ).
-save_about(Out, BaseURI, Subject) :-
-    stream_property(Out, encoding(Encoding)),
+save_about(Out, BaseURI, Subject, Options) :-
+    option(encoding(Encoding), Options, utf8),
     rdf_value(Subject, BaseURI, QSubject, Encoding),
     format(Out, ' rdf:about="~w"', [QSubject]).
 
@@ -2827,7 +2832,7 @@ in_tag_attribute(_=literal(Text)) :-
     atom_length(Text, Len),
     Len < 60.
 
-%!  save_attributes(+List, +BaseURI, +TagOrBody, +Stream)
+%!  save_attributes2(+List, +BaseURI, +TagOrBody, +Stream, +Indent, +Options)
 %
 %   Save a list of attributes.
 
@@ -2836,10 +2841,10 @@ save_attributes2([H|T], BaseURI, Where, Out, Indent, Options) :-
     save_attribute(Where, H, BaseURI, Out, Indent, Options),
     save_attributes2(T, BaseURI, Where, Out, Indent, Options).
 
-save_attribute(tag, Name=literal(Value), BaseURI, Out, Indent, _DB) :-
+save_attribute(tag, Name=literal(Value), BaseURI, Out, Indent, Options) :-
     AttIndent is Indent + 2,
     rdf_id(Name, BaseURI, NameText),
-    stream_property(Out, encoding(Encoding)),
+    option(encoding(Encoding), Options, utf8),
     xml_quote_attribute(Value, QVal, Encoding),
     format(Out, '~N~*|', [AttIndent]),
     rdf_write_id(Out, NameText),
@@ -2871,7 +2876,7 @@ save_attribute(body, Name=Value, BaseURI, Out, Indent, Options) :-
         ),
         SubIndent is Indent + 2,
         (   rdf_collection(Value)
-        ->  save_about(Out, BaseURI, Value),
+        ->  save_about(Out, BaseURI, Value, Options),
             format(Out, ' rdf:parseType="Collection">~n', []),
             rdf_save_list(Out, Value, BaseURI, SubIndent, Options)
         ;   format(Out, '>~n', []),
@@ -2892,7 +2897,7 @@ save_attribute(body, Name=Value, BaseURI, Out, Indent, Options) :-
     rdf_write_id(Out, NameText),
     SubIndent is Indent + 2,
     (   rdf_collection(Value)
-    ->  save_about(Out, BaseURI, Value),
+    ->  save_about(Out, BaseURI, Value, Options),
         format(Out, ' rdf:parseType="Collection">~n', []),
         rdf_save_list(Out, Value, BaseURI, SubIndent, Options)
     ;   format(Out, '>~n', []),
@@ -2901,8 +2906,8 @@ save_attribute(body, Name=Value, BaseURI, Out, Indent, Options) :-
     format(Out, '~N~*|</', [Indent]),
     rdf_write_id(Out, NameText),
     format(Out, '>~n', []).
-save_attribute(body, Name=Value, BaseURI, Out, Indent, _DB) :-
-    stream_property(Out, encoding(Encoding)),
+save_attribute(body, Name=Value, BaseURI, Out, Indent, Options) :-
+    option(encoding(Encoding), Options, utf8),
     rdf_value(Value, BaseURI, QVal, Encoding),
     rdf_id(Name, BaseURI, NameText),
     format(Out, '~N~*|<', [Indent]),
@@ -2927,7 +2932,7 @@ save_body_literal(lang(Lang, Value),
     ;   rdf_id(Lang, BaseURI, LangText),
         format(Out, ' xml:lang="~w">', [LangText])
     ),
-    save_attribute_value(Value, Out, Indent),
+    save_attribute_value(Value, Out, Options),
     write(Out, '</'), rdf_write_id(Out, NameText), write(Out, '>').
 save_body_literal(type(Type, DOM),
                   NameText, _BaseURI, Out, Indent, Options) :-
@@ -2941,23 +2946,23 @@ save_body_literal(type(Type, DOM),
     ;   save_xml_literal(DOM, NameText, Out, Indent, Options)
     ).
 save_body_literal(type(Type, Value),
-                  NameText, BaseURI, Out, Indent, _) :-
+                  NameText, BaseURI, Out, Indent, Options) :-
     !,
     format(Out, '~N~*|<', [Indent]),
     rdf_write_id(Out, NameText),
-    stream_property(Out, encoding(Encoding)),
+    option(encoding(Encoding), Options, utf8),
     rdf_value(Type, BaseURI, QVal, Encoding),
     format(Out, ' rdf:datatype="~w">', [QVal]),
-    save_attribute_value(Value, Out, Indent),
+    save_attribute_value(Value, Out, Options),
     write(Out, '</'), rdf_write_id(Out, NameText), write(Out, '>').
 save_body_literal(Literal,
-                  NameText, _, Out, Indent, _) :-
+                  NameText, _, Out, Indent, Options) :-
     atomic(Literal),
     !,
     format(Out, '~N~*|<', [Indent]),
     rdf_write_id(Out, NameText),
     write(Out, '>'),
-    save_attribute_value(Literal, Out, Indent),
+    save_attribute_value(Literal, Out, Options),
     write(Out, '</'), rdf_write_id(Out, NameText), write(Out, '>').
 save_body_literal(DOM,
                   NameText, BaseURI, Out, Indent, Options) :-
@@ -2965,19 +2970,19 @@ save_body_literal(DOM,
     save_body_literal(type(Type, DOM),
                       NameText, BaseURI, Out, Indent, Options).
 
-save_attribute_value(Value, Out, _) :-  % strings
+save_attribute_value(Value, Out, Options) :-  % strings
     (	atom(Value)
     ;	string(Value)
     ),
     !,
-    stream_property(Out, encoding(Encoding)),
+    option(encoding(Encoding), Options, utf8),
     xml_quote_cdata(Value, QVal, Encoding),
     write(Out, QVal).
-save_attribute_value(Value, Out, _) :-  % numbers
+save_attribute_value(Value, Out, _Options) :-  % numbers
     number(Value),
     !,
     writeq(Out, Value).             % quoted: preserve floats
-save_attribute_value(Value, _Out, _) :-
+save_attribute_value(Value, _Out, _Options) :-
     throw(error(save_attribute_value(Value), _)).
 
 %!  save_xml_literal(+DOM, +Attr, +Out, +Indent, +Options) is det.
@@ -3047,7 +3052,7 @@ rdf_save_list(Out, List, BaseURI, Indent, Options) :-
     (   rdf_is_bnode(First)
     ->  nl(Out),
         rdf_save_subject(Out, First, BaseURI, Indent, Options)
-    ;   stream_property(Out, encoding(Encoding)),
+    ;   option(encoding(Encoding), Options, utf8),
         rdf_value(First, BaseURI, QVal, Encoding),
         format(Out, '~N~*|<rdf:Description rdf:about="~w"/>',
                [Indent, QVal])
