@@ -155,7 +155,7 @@ sparql_query(Query, Row, Options) :-
               [ header(content_type, ContentType),
                 status_code(Status)
               | HTTPOptions
-              ]),
+              ]), !,
     plain_content_type(ContentType, CleanType),
     read_reply(Status, CleanType, In, VarNames, Row).
 
