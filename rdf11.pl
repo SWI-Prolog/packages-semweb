@@ -1840,6 +1840,9 @@ rdf_list(L) :-
     rdf_list_g(L),
     !.
 
+:- rdf_meta
+    rdf_list_g(r).
+
 rdf_list_g(rdf:nil) :- !.
 rdf_list_g(L) :-
     once(rdf_has(L, rdf:first, _)),
