@@ -112,7 +112,7 @@ try_lang(_).
 
 user:portray(URL) :-
     atom(URL),
-    sub_atom(URL, 0, _, _, 'http://'),
+    http_url(URL),
     !,
     (   style(Style)
     ->  true
@@ -127,6 +127,9 @@ user:portray(URL) :-
     sub_atom(URL2, 0, S, _, Path),
     file_base_name(Path, Base),
     format('_:~w#~w', [Base, Local]).
+
+http_url(URL) :- sub_atom(URL, 0, _, _, 'http://'), !.
+http_url(URL) :- sub_atom(URL, 0, _, _, 'https://'), !.
 
 portray_url(writeq, URL) :-
     writeq(URL).
