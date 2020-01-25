@@ -275,7 +275,9 @@ process_turtle(Parser, Stream, OnObject, Graph, Options) :-
 open_input(stream(Stream), Stream, Close) :-
     !,
     stream_property(Stream, encoding(Old)),
-    (   unicode_encoding(Old)
+    (   (   unicode_encoding(Old)
+        ;   stream_property(Stream, type(text))
+        )
     ->  Close = true
     ;   set_stream(Stream, encoding(utf8)),
         Close = set_stream(Stream, encoding(Old))
