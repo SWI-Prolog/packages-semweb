@@ -39,13 +39,20 @@
             sparql_read_xml_result/2,   % +Stream, -Result
             sparql_read_json_result/2   % +Input, -Result
           ]).
-:- use_module(library(http/http_open)).
-:- use_module(library(http/json)).
-:- use_module(library(lists)).
-:- use_module(library(rdf)).
-:- use_module(library(semweb/turtle)).
-:- use_module(library(option)).
-:- use_module(library(uri)).
+:- autoload(library(apply),[maplist/3,maplist/4]).
+:- autoload(library(gensym),[gensym/2]).
+:- autoload(library(lists),[member/2]).
+:- autoload(library(option),[select_option/3,select_option/4]).
+:- autoload(library(rdf),[load_rdf/2]).
+:- autoload(library(readutil),[read_stream_to_codes/2]).
+:- autoload(library(sgml),[load_structure/3]).
+:- autoload(library(uri),
+	    [ uri_components/2, uri_data/3, uri_authority_components/2,
+	      uri_authority_data/3
+	    ]).
+:- autoload(library(http/http_open),[http_open/3]).
+:- autoload(library(http/json),[json_read/2]).
+:- autoload(library(semweb/turtle),[rdf_read_turtle/3]).
 
 /** <module> SPARQL client library
 

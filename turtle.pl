@@ -44,12 +44,18 @@
             rdf_save_canonical_trig/2,          % +File, +Options
             rdf_save_ntriples/2                 % +File, +Options
           ]).
-:- use_module(library(option)).
-:- use_module(library(semweb/rdf_db)).
 :- use_module(library(semweb/rdf_turtle_write)). % re-exports
-:- use_module(library(uri)).
-:- use_module(library(http/http_open)).
+:- use_module(library(semweb/rdf_db),
+              [rdf_transaction/2,rdf_set_graph/2,rdf_assert/4]).
 
+:- autoload(library(memfile),
+	    [atom_to_memory_file/2,open_memory_file/4]).
+:- autoload(library(option),[option/3,option/2]).
+:- autoload(library(uri),
+	    [uri_file_name/2,uri_is_global/1,uri_normalized/2]).
+:- autoload(library(http/http_open),[http_open/3]).
+
+% re-exports
 :- meta_predicate
     rdf_process_turtle(+,2,+).
 

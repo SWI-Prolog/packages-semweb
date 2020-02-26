@@ -51,9 +51,16 @@
 
             rdfs_find/5                 % +String, +Dom, +Props, +Method, -Subj
           ]).
-:- use_module(library(lists)).
-:- use_module(rdf_db).
+:- use_module(library(semweb/rdf_prefixes),
+              [ (rdf_meta)/1, op(_,_,rdf_meta)
+              ]).
+:- use_module(rdf_db,
+              [ rdf_reachable/3, rdf_equal/2, rdf_has/3, rdf_subject/1,
+                rdf_global_id/2, rdf/3, rdf_has/4, rdf_member_property/2,
+                rdf_bnode/1, rdf_assert/4, rdf_match_label/3
+              ]).
 
+:- autoload(library(lists),[member/2]).
 
 /** <module> RDFS handling
 

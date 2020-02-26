@@ -75,11 +75,23 @@
 
             rdfe_snapshot_file/1        % -File
           ]).
-:- use_module(rdf_db).
-:- use_module(library(broadcast)).
-:- use_module(library(lists)).
-:- use_module(library(debug)).
-:- use_module(library(uri)).
+:- use_module(library(semweb/rdf_prefixes),
+              [ (rdf_meta)/1,
+                op(_,_,rdf_meta)
+              ]).
+
+:- autoload(rdf_db,
+	    [ rdf_assert/4, rdf/4, rdf_retractall/4, rdf_update/4,
+	      rdf_update/5, rdf_load/2, rdf_statistics/1, rdf_md5/2,
+	      rdf_unload/1, rdf_save_db/2, rdf_load_db/1, rdf_register_ns/2,
+	      rdf_source/2, rdf_graph_property/2, rdf_graph/1, rdf_set_graph/2,
+	      rdf_reset_db/0, rdf_load/1
+	    ]).
+:- autoload(library(broadcast),[broadcast/1]).
+:- autoload(library(debug),[debug/3,debugging/1]).
+:- autoload(library(gui_tracer),[gtrace/0]).
+:- autoload(library(lists),[append/3]).
+:- autoload(library(uri),[uri_file_name/2,uri_components/2,uri_data/3]).
 
 :- meta_predicate
     rdfe_transaction(0),

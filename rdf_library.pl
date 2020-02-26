@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2010-2014, University of Amsterdam
+    Copyright (c)  2010-2020, University of Amsterdam
                               VU University Amsterdam
     All rights reserved.
 
@@ -44,20 +44,34 @@
             rdf_library_index/2,        % ?Id, ?Facet
             rdf_current_manifest/1      % -Manifest
           ]).
-:- use_module(library(semweb/rdf_db)).
-:- use_module(library(semweb/turtle)).
-:- use_module(library(rdf)).
-:- use_module(library(lists)).
-:- use_module(library(option)).
-:- use_module(library(debug)).
-:- use_module(library(error)).
-:- use_module(library(pairs)).
-:- use_module(library(date)).
-:- use_module(library(uri)).
-:- use_module(library(http/http_open)).
-:- use_module(library(thread)).
-:- use_module(library(apply)).
-:- use_module(library(solution_sequences)).
+:- use_module(library(semweb/rdf_prefixes),
+              [ (rdf_meta)/1, op(_,_,rdf_meta)
+              ]).
+:- use_module(library(semweb/rdf_db),
+              [ rdf_register_ns/2, rdf_equal/2, rdf_register_ns/3, rdf_load/2
+              ]).
+
+:- autoload(library(apply),[exclude/3,maplist/2]).
+:- autoload(library(date),[parse_time/2]).
+:- autoload(library(debug),[debug/3]).
+:- autoload(library(dif),[dif/2]).
+:- autoload(library(error),[must_be/2,existence_error/2]).
+:- autoload(library(lists),[member/2,list_to_set/2]).
+:- autoload(library(option),[option/2,option/3]).
+:- autoload(library(pairs),
+	    [pairs_values/2,map_list_to_pairs/3,group_pairs_by_key/2]).
+:- autoload(library(rdf),[load_rdf/2]).
+:- autoload(library(solution_sequences),[distinct/2]).
+:- autoload(library(thread),[concurrent/3]).
+:- autoload(library(uri),
+	    [ uri_file_name/2,
+	      uri_components/2,
+	      uri_data/3,
+	      uri_is_global/1,
+	      uri_normalized/2
+	    ]).
+:- autoload(library(http/http_open),[http_open/3]).
+:- autoload(library(semweb/turtle),[rdf_load_turtle/3]).
 
 :- predicate_options(rdf_list_library/2, 2,
                      [ indent(atom),

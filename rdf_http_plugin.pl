@@ -34,13 +34,14 @@
 */
 
 :- module(rdf_http_plugin, []).
-:- use_module(library(http/http_open)).
-:- use_module(library(http/http_header)).
 :- use_module(library(semweb/rdf_db), []). % we define hooks for this
-:- use_module(library(date)).
-:- use_module(library(error)).
-:- use_module(library(lists)).
-:- use_module(library(option)).
+
+:- autoload(library(date),[parse_time/2]).
+:- autoload(library(error),[domain_error/2]).
+:- autoload(library(lists),[append/2]).
+:- autoload(library(option),[option/3]).
+:- autoload(library(http/http_header),[http_timestamp/2]).
+:- autoload(library(http/http_open),[http_open/3]).
 
 /** <module> RDF HTTP Plugin
 

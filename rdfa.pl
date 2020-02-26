@@ -36,17 +36,38 @@
           [ read_rdfa/3,                % +Input, -RDF, +Options
             xml_rdfa/3                  % +XMLDom, -RDF, +Options
           ]).
-:- use_module(library(semweb/rdf_db)).
-:- use_module(library(http/http_open)).
-:- use_module(library(dcg/basics)).
-:- use_module(library(xpath)).
-:- use_module(library(apply)).
-:- use_module(library(sgml)).
-:- use_module(library(lists)).
-:- use_module(library(option)).
-:- use_module(library(debug)).
-:- use_module(library(uri)).
-:- use_module(library(error)).
+:- use_module(library(semweb/rdf_db),
+	    [ rdf_register_prefix/2,
+	      rdf_meta/1,
+	      rdf_global_id/2,
+	      rdf_equal/2,
+	      rdf_is_bnode/1,
+	      rdf_global_term/2,
+	      rdf_transaction/2,
+	      rdf_assert/4,
+	      rdf_set_graph/2,
+              op(_,_,_)
+	    ]).
+:- use_module(library(xpath),[xpath/3, op(_,_,_)]).
+
+:- autoload(library(apply),[maplist/3,maplist/2,exclude/3,include/3]).
+:- autoload(library(debug),[debugging/1,debug/3]).
+:- autoload(library(error),[instantiation_error/1,type_error/2]).
+:- autoload(library(gui_tracer),[gtrace/0]).
+:- autoload(library(lists),[append/2,reverse/2,member/2,append/3]).
+:- autoload(library(option),[merge_options/3,option/2,option/3]).
+:- autoload(library(prolog_stack),[backtrace/1]).
+:- autoload(library(sgml),
+	    [ load_xml/3, load_html/3, xml_basechar/1, xml_ideographic/1,
+	      xml_digit/1, xml_combining_char/1, xml_extender/1
+	    ]).
+:- autoload(library(sgml_write),[xml_write/2]).
+:- autoload(library(uri),
+	    [ uri_file_name/2, uri_components/2, uri_data/3, uri_data/4,
+	      iri_normalized/3, iri_normalized/2, uri_normalized/3
+	    ]).
+:- autoload(library(dcg/basics),[blanks/2,blank/2,alpha_to_lower/3]).
+:- autoload(library(http/http_open),[http_open/3]).
 
 /** <module> Extract RDF from an HTML or XML DOM
 

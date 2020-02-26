@@ -51,10 +51,10 @@
             (rdf_meta)/1,               % +Heads
             op(1150, fx, (rdf_meta))
           ]).
-:- use_module(library(error)).
-:- use_module(library(lists)).
-:- use_module(library(option)).
-:- use_module(library(pairs)).
+:- autoload(library(error),[must_be/2,existence_error/2]).
+:- autoload(library(lists),[member/2]).
+:- autoload(library(option),[option/3]).
+:- autoload(library(pairs),[map_list_to_pairs/3,pairs_values/2]).
 
 :- meta_predicate
     rdf_current_prefix(:, -),

@@ -37,7 +37,11 @@
             rdf_read_turtle/3,          % +Input, -Triples, +Options
             rdf_process_turtle/3        % +Input, :OnObject, +Options
           ]).
-:- use_module(library(semweb/turtle)).  % re-export
+:- use_module(library(semweb/turtle),
+              [ rdf_load_turtle/3,
+                rdf_read_turtle/3,
+                rdf_process_turtle/3
+              ]).  % re-export
 
 /** <module> Turtle reader
 

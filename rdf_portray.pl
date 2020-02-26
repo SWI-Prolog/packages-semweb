@@ -3,8 +3,9 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2009-2012, University of Amsterdam
+    Copyright (c)  2009-2020, University of Amsterdam
                               VU University Amsterdam
+                              CWI, Amsterdam
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -37,9 +38,11 @@
           [ rdf_portray_as/1,           % +Style
             rdf_portray_lang/1          % +Lang
           ]).
-:- use_module(library(semweb/rdf_db)).
-:- use_module(library(semweb/rdfs)).
-:- use_module(library(error)).
+:- use_module(library(semweb/rdf_db),[rdf_global_id/2,rdf_has/3]).
+:- use_module(library(semweb/rdfs),[rdfs_ns_label/2]).
+
+:- autoload(library(error),[must_be/2]).
+:- autoload(library(lists),[member/2]).
 
 /** <module> Portray RDF resources
 

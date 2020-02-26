@@ -44,16 +44,26 @@
             rdf_snapshot_file/2,        % ?Graph, ?SnapshotFile
             rdf_db_to_file/2            % ?Graph, ?FileBase
           ]).
-:- use_module(library(semweb/rdf_db)).
-:- use_module(library(filesex)).
-:- use_module(library(lists)).
-:- use_module(library(uri)).
-:- use_module(library(debug)).
-:- use_module(library(option)).
-:- use_module(library(error)).
-:- use_module(library(thread)).
-:- use_module(library(apply)).
+:- use_module(library(semweb/rdf_db),
+              [ rdf_graph/1, rdf_unload_graph/1, rdf_statistics/1,
+                rdf_load_db/1, rdf_retractall/4, rdf_create_graph/1,
+                rdf_assert/4, rdf_update/5, rdf_monitor/2, rdf/4,
+                rdf_save_db/2, rdf_atom_md5/3, rdf_current_ns/2,
+                rdf_register_ns/3
+              ]).
 
+:- autoload(library(apply),[maplist/2,maplist/3,partition/4,exclude/3]).
+:- autoload(library(debug),[debug/3]).
+:- autoload(library(error),
+	    [permission_error/3,must_be/2,domain_error/2]).
+:- autoload(library(filesex),
+	    [directory_file_path/3,make_directory_path/1]).
+:- autoload(library(lists),[select/3,append/3]).
+:- autoload(library(option),[option/2,option/3]).
+:- autoload(library(readutil),[read_file_to_terms/3]).
+:- autoload(library(socket),[gethostname/1]).
+:- autoload(library(thread),[concurrent/3]).
+:- autoload(library(uri),[uri_encoded/3]).
 
 /** <module> RDF persistency plugin
 

@@ -48,10 +48,18 @@
             rdfs_member/2,                        % ?Elem, ?Container
             rdfs_nth0/3                           % ?N, ?Container, ?Elem
           ]).
-:- use_module(library(apply)).
-:- use_module(library(pairs)).
-:- use_module(library(error)).
-:- use_module(rdf11).
+:- use_module(library(semweb/rdf_prefixes),
+              [ (rdf_meta)/1, op(_,_,rdf_meta)
+              ]).
+:- use_module(rdf11,
+              [ rdf_default_graph/1, rdf_transaction/1, rdf_create_bnode/1,
+                rdf_assert/4, rdf_equal/2, rdf_is_subject/1, rdf_has/3
+              ]).
+
+:- autoload(library(apply),[maplist/3]).
+:- autoload(library(error),[must_be/2,type_error/2]).
+:- autoload(library(lists),[member/2]).
+:- autoload(library(pairs),[group_pairs_by_key/2,pairs_values/2]).
 
 /** <module> RDF 1.1 Containers
 

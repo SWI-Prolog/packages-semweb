@@ -99,11 +99,42 @@
             op(650, xfx, ^^),           % must be above :
             op(1150, fx, rdf_meta)
           ]).
-:- use_module(library(c14n2)).
-:- use_module(library(debug)).
-:- use_module(library(error)).
-:- use_module(library(lists)).
-:- use_module(library(memfile)).
+:- use_module(library(semweb/rdf_prefixes),
+              [ (rdf_meta)/1, op(_,_,rdf_meta)
+              ]).
+:- use_module(library(semweb/rdf_db),
+              [ rdf_transaction/2,
+                rdf_match_label/3,
+                rdf_equal/2,
+                rdf_is_bnode/1,
+                rdf_transaction/1
+              ]).
+
+:- autoload(library(apply),[partition/4]).
+:- autoload(library(c14n2),[xml_write_canonical/3]).
+:- autoload(library(debug),[assertion/1,debug/3]).
+:- autoload(library(error),
+	    [ must_be/2,
+	      domain_error/2,
+	      instantiation_error/1,
+	      existence_error/2,
+	      type_error/2,
+	      is_of_type/2,
+	      uninstantiation_error/1
+	    ]).
+:- autoload(library(lists),[select/3,append/3]).
+:- autoload(library(memfile),
+	    [new_memory_file/1,open_memory_file/3,free_memory_file/1]).
+:- autoload(library(sgml),
+	    [ xsd_number_string/2,
+	      xsd_time_string/3,
+	      xml_is_dom/1,
+	      load_xml/3,
+	      load_html/3
+	    ]).
+:- autoload(library(sgml_write),[html_write/3,xml_write/2]).
+:- autoload(library(solution_sequences),[distinct/2]).
+
 :- reexport(library(semweb/rdf_db),
             except([ rdf/3,
                      rdf/4,
@@ -128,9 +159,6 @@
                      rdf_estimate_complexity/4
                    ])
            ).
-:- use_module(library(sgml)).
-:- use_module(library(solution_sequences)).
-
 /** <module> RDF 1.1 API
 
 This library provides a new API   on  top of library(semweb/rdf_db). The

@@ -3,7 +3,8 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2009-2013, University of Amsterdam
+    Copyright (c)  2009-2020, University of Amsterdam
+                              CWI, Amsterdam
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -35,10 +36,10 @@
 :- module(rdf_compare,
           [ rdf_equal_graphs/3          % +Graph1, +Graph2, -Substitutions
           ]).
-:- use_module(library(semweb/rdf_db)).
-:- use_module(library(apply)).
-:- use_module(library(debug)).
-
+:- use_module(library(semweb/rdf_db),[lang_equal/2,rdf_is_bnode/1]).
+:- autoload(library(apply),[partition/4,maplist/3]).
+:- autoload(library(debug),[debug/3]).
+:- autoload(library(lists),[select/3]).
 
 /** <module> Compare RDF graphs
 

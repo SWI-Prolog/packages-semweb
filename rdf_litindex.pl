@@ -3,8 +3,9 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2006-2015, University of Amsterdam
+    Copyright (c)  2006-2020, University of Amsterdam
                               VU University Amsterdam
+                              CWI, Amsterdam
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -44,17 +45,28 @@
             rdf_literal_index/2,                % +Type, -Index
             rdf_delete_literal_index/1          % +Type
           ]).
-:- use_module(rdf_db).
-:- use_module(library(debug)).
-:- use_module(library(lists)).
-:- use_module(library(error)).
-:- use_module(library(apply)).
-:- if(exists_source(library(snowball))).
-:- use_module(library(snowball)).
-:- else.
-:- use_module(library(porter_stem)).
-:- endif.
-:- use_module(library(double_metaphone)).
+:- autoload(rdf_db,
+	    [ rdf_keys_in_literal_map/3,
+	      rdf_find_literal_map/3,
+	      rdf_new_literal_map/1,
+	      rdf_monitor/2,
+	      rdf_current_literal/1,
+	      rdf_reset_literal_map/1,
+	      rdf_insert_literal_map/4,
+	      rdf_delete_literal_map/2,
+	      rdf/3,
+	      rdf_delete_literal_map/3,
+	      rdf_insert_literal_map/3,
+	      rdf_statistics_literal_map/2
+	    ]).
+:- autoload(library(apply),[maplist/3]).
+:- autoload(library(debug),[debug/3]).
+:- autoload(library(double_metaphone),[double_metaphone/2]).
+:- autoload(library(error),
+	    [instantiation_error/1,must_be/2,domain_error/2]).
+:- autoload(library(lists),[member/2,flatten/2,append/3]).
+:- autoload(library(porter_stem),[tokenize_atom/2]).
+:- autoload(library(snowball),[snowball/3]).
 
 /** <module> Search literals
 
@@ -905,16 +917,10 @@ add_stem(Token, Lang, Map) :-
     stem(Lang, Token, Stem),
     rdf_insert_literal_map(Map, Stem, Token, _).
 
-:- if(current_predicate(snowball/3)).
 stem(Token, LangSpec, Stem) :-
     main_lang(LangSpec, Lang),
     downcase_atom(Token, Lower),
     catch(snowball(Lang, Lower, Stem), _, fail).
-:- else.
-stem(Token, _Lang, Stem) :-
-    downcase_atom(Token, Lower),
-    porter_stem(Lower, Stem).
-:- endif.
 
 main_lang(LangSpec, Lang) :-
     sub_atom(LangSpec, Before, _, _, -),

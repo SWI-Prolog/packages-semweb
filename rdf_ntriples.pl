@@ -41,11 +41,18 @@
             read_nquad/2,               % +Stream, -Quad
             read_ntuple/2               % +Stream, -TripleOrQuad
           ]).
-:- use_module(library(record)).
-:- use_module(library(uri)).
-:- use_module(library(option)).
-:- use_module(library(http/http_open)).
-:- use_module(library(semweb/rdf_db)).
+:- use_module(library(semweb/rdf_db),
+              [rdf_transaction/2,rdf_set_graph/2,rdf_assert/4]).
+:- use_module(library(record),[(record)/1, op(_,_,record)]).
+
+:- autoload(library(error),[domain_error/2]).
+:- autoload(library(memfile),
+	    [atom_to_memory_file/2,open_memory_file/4]).
+:- autoload(library(option),[option/3,option/2]).
+:- autoload(library(uri),
+	    [uri_file_name/2,uri_is_global/1,uri_normalized/2]).
+:- autoload(library(http/http_open),[http_open/3]).
+
 :- use_foreign_library(foreign(ntriples)).
 
 /** <module> Process files in the RDF N-Triples format

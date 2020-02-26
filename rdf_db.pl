@@ -3,8 +3,9 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2003-2017, University of Amsterdam
+    Copyright (c)  2003-2020, University of Amsterdam
                               VU University Amsterdam
+                              CWI, Amsterdam
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -153,23 +154,58 @@
             (rdf_meta)/1,               % +Heads
             op(1150, fx, (rdf_meta))
           ]).
-:- use_module(library(rdf)).
-:- use_module(library(lists)).
-:- use_module(library(shlib)).
-:- use_module(library(gensym)).
-:- use_module(library(sgml)).
-:- use_module(library(sgml_write)).
-:- use_module(library(option)).
-:- use_module(library(error)).
-:- use_module(library(uri)).
-:- use_module(library(debug)).
-:- use_module(library(apply)).
-:- use_module(library(xsdp_types)).
+:- use_module(library(semweb/rdf_prefixes),
+              [ (rdf_meta)/1,
+                register_file_prefixes/1,
+                rdf_global_id/2,
+                rdf_register_ns/2,
+                                        % re-exported predicates
+                rdf_global_object/2,
+                rdf_current_ns/2,
+                rdf_prefix/2,
+                rdf_global_term/2,
+                rdf_register_ns/3,
+                rdf_register_prefix/3,
+                rdf_register_prefix/2,
+                rdf_current_prefix/2,
+                rdf_unregister_prefix/1
+              ]).
+
+:- autoload(library(apply),[maplist/2,maplist/3]).
+:- autoload(library(debug),[debug/3,assertion/1]).
+:- autoload(library(error),[must_be/2,existence_error/2]).
+:- autoload(library(gensym),[gensym/2,reset_gensym/1]).
+:- autoload(library(lists),
+	    [member/2,flatten/2,list_to_set/2,append/3,select/3]).
+:- autoload(library(memfile),
+	    [atom_to_memory_file/2,open_memory_file/4]).
+:- autoload(library(option),
+	    [option/2,option/3,merge_options/3,meta_options/3]).
+:- autoload(library(rdf),[process_rdf/3]).
+:- autoload(library(sgml),
+	    [ load_structure/3,
+	      xml_quote_attribute/3,
+	      xml_name/1,
+	      xml_quote_cdata/3,
+	      xml_is_dom/1,
+	      iri_xml_namespace/3,
+	      iri_xml_namespace/2
+	    ]).
+:- autoload(library(sgml_write),[xml_write/3]).
+:- autoload(library(uri),
+	    [ uri_file_name/2,
+	      uri_is_global/1,
+	      uri_normalized/2,
+	      uri_components/2,
+	      uri_data/3,
+	      uri_data/4
+	    ]).
+:- autoload(library(xsdp_types),[xsdp_numeric_uri/2]).
+:- autoload(library(semweb/rdf_cache),[rdf_cache_file/3]).
+
 :- if(exists_source(library(thread))).
-:- use_module(library(thread)).
+:- autoload(library(thread), [concurrent/3]).
 :- endif.
-:- use_module(library(semweb/rdf_cache)).
-:- use_module(library(semweb/rdf_prefixes)).
 
 :- use_foreign_library(foreign(rdf_db)).
 :- public rdf_print_predicate_cloud/2.  % print matrix of reachable predicates

@@ -3,8 +3,9 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2009-2017, University of Amsterdam
+    Copyright (c)  2009-2020, University of Amsterdam
                               VU University Amsterdam
+                              CWI, Amsterdam
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -40,19 +41,38 @@
             rdf_save_canonical_trig/2,          % +File, +Options
             rdf_save_ntriples/2                 % +File, +Options
           ]).
-:- use_module(library(semweb/rdf_db)).
+:- use_module(library(record),[(record)/1, op(_,_,record)]).
 :- use_module(library(semweb/turtle), []). % we make calls to public preds here
-:- use_module(library(option)).
-:- use_module(library(record)).
-:- use_module(library(error)).
-:- use_module(library(lists)).
-:- use_module(library(rbtrees)).
-:- use_module(library(apply)).
-:- use_module(library(url)).
-:- use_module(library(pairs)).
-:- use_module(library(debug)).
-:- use_module(library(sgml_write)).
-:- use_module(library(sgml)).
+:- use_module(library(semweb/rdf_db),
+              [ rdf_graph/1, rdf_graph_prefixes/3, rdf_current_prefix/2,
+                rdf_is_bnode/1, rdf_equal/2, rdf_graph_property/2,
+                rdf_statistics/1, rdf/4, rdf_resource/1, rdf_subject/1,
+                rdf/3, rdf_global_id/2
+              ]).
+
+:- autoload(library(apply),[maplist/3,include/3,partition/4]).
+:- autoload(library(debug),[assertion/1]).
+:- autoload(library(error),[must_be/2,existence_error/2,type_error/2]).
+:- autoload(library(lists),
+	    [append/2,reverse/2,delete/3,append/3,select/3,member/2]).
+:- autoload(library(option),[meta_options/3]).
+:- autoload(library(pairs),
+	    [ transpose_pairs/2,
+	      map_list_to_pairs/3,
+	      pairs_values/2,
+	      group_pairs_by_key/2
+	    ]).
+:- autoload(library(rbtrees),
+	    [ ord_list_to_rbtree/2,
+	      rb_lookup/3,
+	      rb_insert/4,
+	      rb_empty/1,
+	      rb_update/5
+	    ]).
+:- autoload(library(sgml),
+	    [xml_name/1,xml_is_dom/1,xsd_number_string/2]).
+:- autoload(library(sgml_write),[xml_write/2]).
+:- autoload(library(url),[file_name_to_url/2,parse_url/2]).
 
 :- predicate_options(rdf_save_turtle/2, 2,
                      [ graph(atom),
