@@ -1403,9 +1403,17 @@ to_dot_dot([_|T0], ['..'|T], Tail) :-
 %
 %   Write a literal value to the stream Out.
 
+tw_literal(^^(Value, Type), State, Out) :-
+    !,
+    tw_typed_literal(Type, Value, State, Out).
 tw_literal(literal(type(Type, Value)), State, Out) :-
     !,
     tw_typed_literal(Type, Value, State, Out).
+tw_literal(@(Value, Lang), State, Out) :-
+    !,
+    tw_quoted_string(Value, State, Out),
+    downcase_atom(Lang, TurtleLang),        % Turtle lang = [a-z]+('-'[a-z0-9]+)*
+    format(Out, '@~w', [TurtleLang]).
 tw_literal(literal(lang(Lang, Value)), State, Out) :-
     !,
     tw_quoted_string(Value, State, Out),
