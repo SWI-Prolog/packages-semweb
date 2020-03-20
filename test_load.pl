@@ -92,6 +92,7 @@ test(gzip_file, [condition(run_zlib_tests), true(N == 1), cleanup(rdf_reset_db)]
     rdf_load(URI, [silent(true)]),
     rdf_statistics(triples(N)).
 
+:- if(exists_source(library(ssl))).
 test(http, [condition(run_network_tests), true(N == 1), cleanup(rdf_reset_db)]) :-
     rdf_load('http://www.swi-prolog.org/Tests/semweb/test-001.rdf', [silent(true)]),
     rdf_statistics(triples(N)).
@@ -99,6 +100,7 @@ test(http, [condition(run_network_tests), true(N == 1), cleanup(rdf_reset_db)]) 
 test(gzip_http, [condition((run_network_tests, run_zlib_tests)), true(N == 1), cleanup(rdf_reset_db)]) :-
     rdf_load('http://www.swi-prolog.org/Tests/semweb/test-002.rdf.gz', [silent(true)]),
     rdf_statistics(triples(N)).
+:- endif.
 
 :- end_tests(load).
 
