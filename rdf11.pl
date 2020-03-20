@@ -1085,7 +1085,8 @@ pre_ground_object(true, literal(type(xsd:boolean, true))) :- !.
 pre_ground_object(Term, literal(type(Type, Atom))) :-
     xsd_date_time_term(Term),
     !,
-    xsd_time_string(Term, Type, Atom).
+    xsd_time_string(Term, Type, String),
+    atom_string(Atom, String).
 pre_ground_object(Val@Lang,  literal(lang(Lang0, Val0))) :-
     !,
     downcase_atom(Lang, Lang0),
