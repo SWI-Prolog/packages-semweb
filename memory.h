@@ -3,7 +3,8 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2011-2013, VU University Amsterdam
+    Copyright (c)  2011-2020, VU University Amsterdam
+			      CWI, Amsterdam
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -81,13 +82,30 @@ MSB(unsigned int i)
 #elif defined(__GNUC__)			/* GCC version */
 
 #define MSB(i)			((i) ? (32 - __builtin_clz(i)) : 0)
-#define MEMORY_BARRIER()	__sync_synchronize()
+#define MEMORY_BARRIER()	__atomic_thread_fence(__ATOMIC_SEQ_CST)
 #define PREFETCH_FOR_WRITE(p)	__builtin_prefetch(p, 1, 0)
 #define PREFETCH_FOR_READ(p)	__builtin_prefetch(p, 0, 0)
-#define ATOMIC_ADD(ptr, v)	__sync_add_and_fetch(ptr, v)
-#define ATOMIC_SUB(ptr, v)	__sync_sub_and_fetch(ptr, v)
+#define ATOMIC_ADD(ptr, v)	__atomic_add_fetch(ptr, v, __ATOMIC_SEQ_CST)
+#define ATOMIC_SUB(ptr, v)	__atomic_sub_fetch(ptr, v, __ATOMIC_SEQ_CST)
 #define ATOMIC_INC(ptr)		ATOMIC_ADD(ptr, 1) /* ++(*ptr) */
 #define ATOMIC_DEC(ptr)		ATOMIC_SUB(ptr, 1) /* --(*ptr) */
+
+#define __COMPARE_AND_SWAP(at, from, to) \
+	__atomic_compare_exchange_n(at, &(from), to, FALSE, \
+				    __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
+
+static inline int
+COMPARE_AND_SWAP_PTR(void *at, void *from, void *to)
+{ void **ptr = at;
+
+  return __COMPARE_AND_SWAP(ptr, from, to);
+}
+
+static inline int
+COMPARE_AND_SWAP_UINT(unsigned int *at, unsigned int from, unsigned int to)
+{ return __COMPARE_AND_SWAP(at, from, to);
+}
+
 
 #endif /*_MSC_VER|__GNUC__*/
 

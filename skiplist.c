@@ -39,6 +39,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "skiplist.h"
+#include "memory.h"
 
 static int debuglevel;
 
@@ -87,7 +88,7 @@ my_rand(void)
   { n0 = next;
 
     n = n0 * 1103515245 + 12345;
-  } while(n != n0 && !__sync_bool_compare_and_swap(&next, n0, n));
+  } while(n != n0 && !COMPARE_AND_SWAP_UINT(&next, n0, n));
 
   return((unsigned int)(n/65536) % 32768);
 }

@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2011-2013, VU University Amsterdam
+    Copyright (c)  2011-2020, VU University Amsterdam
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -33,6 +33,7 @@
 */
 
 #include "rdf_db.h"
+#include "memory.h"
 
 
 		 /*******************************
@@ -78,11 +79,11 @@ is_literal(term_t t)
 
 
 typedef struct prefix_cache
-{ atom_t local;
-  atom_t alias;
-  atom_t uri;
-  int    generation;
-  int	 locked;
+{ atom_t	local;
+  atom_t	alias;
+  atom_t	uri;
+  int		generation;
+  unsigned int	locked;
 } prefix_cache;
 
 #define PREFIX_EXPAND_ENTRIES 4
@@ -114,7 +115,7 @@ cache_expansion(atom_t alias, atom_t local, atom_t uri)
   for(i=(++cache_ptr%PREFIX_EXPAND_ENTRIES); ; i = (i+1)%PREFIX_EXPAND_ENTRIES)
   { prefix_cache *c = &cache[i];
 
-    if ( __sync_bool_compare_and_swap(&c->locked, 0, 1) )
+    if ( COMPARE_AND_SWAP_UINT(&c->locked, 0, 1) )
     { atom_t olocal = c->local;
       atom_t ouri   = c->uri;
 
@@ -146,8 +147,8 @@ flush_prefix_cache(void)
   for( i=0; i<PREFIX_EXPAND_ENTRIES; i++)
   { prefix_cache *c = &cache[i];
 
-    while( !__sync_bool_compare_and_swap(&c->locked, 0, 1) )
-      ;
+    while( !COMPARE_AND_SWAP_UINT(&c->locked, 0, 1) )
+      ;					/* spin lock */
 
     { atom_t olocal = c->local;
       atom_t ouri   = c->uri;

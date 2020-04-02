@@ -15,12 +15,18 @@ set(SWIPL_SEMWEB_DATA
     rdfs.rdfs dc.rdfs eor.rdfs owl.owl rdf_library.ttl)
 prepend(SWIPL_SEMWEB_DATA ${CMAKE_CURRENT_SOURCE_DIR} ${SWIPL_SEMWEB_DATA})
 
+if(HAVE_LIBATOMIC)
+  set(RDFDB_CLIBS atomic)
+else()
+  set(RDFDB_CLIBS)
+endif()
+
 swipl_plugin(
     rdf_db
     C_SOURCES rdf_db.c atom.c md5.c atom_map.c debug.c
 	      hash.c murmur.c query.c resource.c error.c skiplist.c
 	      snapshot.c xsd.c
-    C_LIBS
+    C_LIBS ${RDFDB_CLIBS}
     PL_LIB_SUBDIR semweb
     PL_LIBS rdf_db.pl rdfs.pl rdf_edit.pl rdf_litindex.pl
 	    rdf_persistency.pl rdf_turtle.pl rdf_cache.pl

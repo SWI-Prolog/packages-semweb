@@ -34,6 +34,7 @@
 
 #ifndef PL_DEFER_FREE_H_INCLUDED
 #define PL_DEFER_FREE_H_INCLUDED
+#include "memory.h"
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 This header supports freeing data in   datastructures  that are designed
@@ -128,7 +129,7 @@ free_defer_list(defer_free *df, defer_cell *list, defer_cell *last)
   do
   { o = df->free_cells;
     last->next = o;
-  } while ( !__sync_bool_compare_and_swap(&df->free_cells, o, list) );
+  } while ( !COMPARE_AND_SWAP_PTR(&df->free_cells, o, list) );
 }
 
 
@@ -148,7 +149,7 @@ alloc_defer_cell(defer_free *df)
       } else
 	return NULL;
     }
-  } while ( !__sync_bool_compare_and_swap(&df->free_cells, c, c->next) );
+  } while ( !COMPARE_AND_SWAP_PTR(&df->free_cells, c, c->next) );
 
   return c;
 }
@@ -168,7 +169,7 @@ deferred_free(defer_free *df, void *data)
   do
   { o = df->freed;
     c->next = o;
-  } while ( !__sync_bool_compare_and_swap(&df->freed, o, c) );
+  } while ( !COMPARE_AND_SWAP_PTR(&df->freed, o, c) );
 }
 
 
@@ -186,14 +187,14 @@ deferred_finalize(defer_free *df, void *data,
   do
   { o = df->freed;
     c->next = o;
-  } while ( !__sync_bool_compare_and_swap(&df->freed, o, c) );
+  } while ( !COMPARE_AND_SWAP_PTR(&df->freed, o, c) );
 }
 
 
 
 static inline void
 enter_scan(defer_free *df)
-{ __sync_add_and_fetch(&df->active, 1);
+{ ATOMIC_INC(&df->active);
 }
 
 
@@ -201,8 +202,8 @@ static inline void
 exit_scan(defer_free *df)
 { defer_cell *o = df->freed;
 
-  if ( __sync_sub_and_fetch(&df->active, 1) == 0 )
-  { if ( o && __sync_bool_compare_and_swap(&df->freed, o, NULL) )
+  if ( ATOMIC_DEC(&df->active) == 0 )
+  { if ( o && COMPARE_AND_SWAP_PTR(&df->freed, o, NULL) )
     { defer_cell *fl = o;
 
       for(;;)

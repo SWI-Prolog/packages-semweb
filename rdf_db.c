@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2003-2016, University of Amsterdam
+    Copyright (c)  2003-2020, University of Amsterdam
                               VU University Amsterdam
     All rights reserved.
 
@@ -1089,7 +1089,7 @@ free_array_slice(triple_array *a, triple_element *list, triple_element *last)
   do
   { o = a->freelist;
     last->fnext = o;
-  } while ( !__sync_bool_compare_and_swap(&a->freelist, o, list) );
+  } while ( !COMPARE_AND_SWAP_PTR(&a->freelist, o, list) );
 }
 
 static int
@@ -1165,7 +1165,7 @@ register_triple(rdf_db *db, triple *t)
 	resize_triple_array(db);
       simpleMutexUnlock(&db->locks.misc);
     }
-  } while ( !__sync_bool_compare_and_swap(&a->freelist, e, e->fnext) );
+  } while ( !COMPARE_AND_SWAP_PTR(&a->freelist, e, e->fnext) );
 
   e->triple = t;
 
