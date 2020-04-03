@@ -94,7 +94,7 @@ catch_failure(Reason, Goal) :-
 %   modifications on g2 (in a snapshot).
 
 test(N) :-
-    test(g1, N).
+    test(-, N).
 
 test(G, N*M) :-
     !,
@@ -263,6 +263,8 @@ subPropertyOf(Graph, Sub, Super, Gen) :-
 :- dynamic
     record_stream/2.                        % Graph, Out
 
+record_in(-, -) :-
+    !.
 record_in(Graph, Out) :-
     file_name_extension(Graph, rec, File),
     open(File, write, Out),
