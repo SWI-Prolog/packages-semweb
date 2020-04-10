@@ -580,11 +580,23 @@ system:goal_expansion(G, Expanded) :-
     rdf_meta_specification(G, IM, Spec),
     rdf_expand(G, Spec, Expanded, LM).
 
+system:term_expansion(Module:Fact, Expanded) :-
+    atom(Module),
+    rdf_meta_specification(Fact, Module, Spec),
+    rdf_expand(Fact, Spec, ExpandedFact, Module),
+    Fact \== ExpandedFact,
+    Expanded = (Module:ExpandedFact).
 system:term_expansion(Fact, Expanded) :-
     prolog_load_context(module, Module),
     rdf_meta_specification(Fact, Module, Spec),
     rdf_expand(Fact, Spec, Expanded, Module),
     Fact \== Expanded.
+system:term_expansion((Module:Head :- Body), (Expanded :- Body)) :-
+    atom(Module),
+    rdf_meta_specification(Head, Module, Spec),
+    rdf_expand(Head, Spec, ExpandedHead, Module),
+    Head \== ExpandedHead,
+    Expanded = (Module:ExpandedHead).
 system:term_expansion((Head :- Body), (Expanded :- Body)) :-
     prolog_load_context(module, Module),
     rdf_meta_specification(Head, Module, Spec),
