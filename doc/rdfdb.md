@@ -70,7 +70,6 @@ rdf_transaction/3.
   * [[rdf_retractall/3]]
   * [[rdf_retractall/4]]
   * [[rdf_update/4]]
-  * [[rdf_update/5]]
 
 ## Update view, transactions and snapshots {#semweb-update-view}
 

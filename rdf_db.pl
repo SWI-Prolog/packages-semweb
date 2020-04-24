@@ -567,9 +567,10 @@ rdf_subject(Resource) :-
 %   useful to remove all triples coming from a loaded file. See also
 %   rdf_unload/1.
 
-%!  rdf_update(+Subject, +Predicate, +Object, +Action) is det.
+%!  rdf_update(+Subject, +Predicate, +Object, ++Action) is det.
+%!  rdf_update(+Subject, +Predicate, +Object, +Graph, ++Action) is det
 %
-%   Replaces one of  the  three  fields   on  the  matching  triples
+%   Replaces one of the three  (four)   fields  on  the matching triples
 %   depending on Action:
 %
 %     * subject(Resource)
@@ -581,10 +582,8 @@ rdf_subject(Resource) :-
 %     literal(Value).
 %     * graph(Graph)
 %     Moves the triple from its current named graph to Graph.
-
-%!  rdf_update(+Subject, +Predicate, +Object, +Graph, +Action) is det
-%
-%   As rdf_update/4 but allows for specifying the graph.
+%     This only works with rdf_update/5 and throws an error when
+%     used with rdf_update/4.
 
 
                  /*******************************

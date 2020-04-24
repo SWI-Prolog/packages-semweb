@@ -364,7 +364,7 @@ rdf_has(S,P,O,RealP) :-
 %!  rdf_update(+S, +P, +O, ++Action) is det.
 %!  rdf_update(+S, +P, +O, +G, ++Action) is det.
 %
-%   Replaces one of  the  three  fields   on  the  matching  triples
+%   Replaces one of the three  (four)   fields  on  the matching triples
 %   depending on Action:
 %
 %     * subject(Resource)
@@ -376,14 +376,14 @@ rdf_has(S,P,O,RealP) :-
 %     literal(Value).
 %     * graph(Graph)
 %     Moves the triple from its current named graph to Graph.
-%     This only works with rdf_update/4 and will throw an error when
-%     used with rdf_update/3.
+%     This only works with rdf_update/5 and throws an error when
+%     used with rdf_update/4.
 %
-%   The argument matching  the  action  must   be  ground.  If  this
-%   argument is equivalent to  the  current   value,  no  action  is
-%   performed. Otherwise, the requested action   is performed on all
-%   matching triples.  For example, all resources typed `rdfs:Class`
-%   can be changed to `owl:Class` using
+%   The argument matching Action must  be   ground.  If this argument is
+%   equivalent to the current value, no  action is performed. Otherwise,
+%   the requested action is  performed  on   all  matching  triples. For
+%   example,  all  resources  typed  `rdfs:Class`   can  be  changed  to
+%   `owl:Class` using
 %
 %     ```
 %     ?- rdf_update(_, rdf:type, rdfs:'Class',
