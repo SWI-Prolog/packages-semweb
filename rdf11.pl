@@ -959,6 +959,11 @@ post_graph(G, G0:_) :-
 post_graph(G, G).
 
 
+pre_object(Atom, URI, _, _) :-
+    atom(Atom),
+    \+ boolean(Atom),
+    !,
+    URI = Atom.
 pre_object(Var, Var1, Subj, Pred) :-
     var(Var),
     !,
@@ -977,11 +982,6 @@ pre_object(Var, Var1, Subj, Pred) :-
       ; true
       )
     ).
-pre_object(Atom, URI, _, _) :-
-    atom(Atom),
-    \+ boolean(Atom),
-    !,
-    URI = Atom.
 pre_object(Val@Lang, Var1, _, _) :-
     !,
     ( literal_condition(Val, Cond)
