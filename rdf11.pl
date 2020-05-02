@@ -760,20 +760,9 @@ lang_condition(lang_matches(Pattern), Lang) :-
 %   Translated constraints are removed from object.
 
 literal_condition(Object, Cond) :-
-    var(Object),
-    !,
     get_attr(Object, rdf11, Cond0),
     best_literal_cond(Cond0, Cond, Rest),
     put_cond(Object, Rest).
-literal_condition(Text@_Lang, Cond) :-
-    get_attr(Text, rdf11, Cond0),
-    !,
-    best_literal_cond(Cond0, Cond, Rest),
-    put_cond(Text, Rest).
-literal_condition(Text^^_Type, Cond) :-
-    get_attr(Text, rdf11, Cond0),
-    best_literal_cond(Cond0, Cond, Rest),
-    put_cond(Text, Rest).
 
 %!  best_literal_cond(+Conditions, -Best, -Rest) is semidet.
 %
@@ -970,40 +959,47 @@ post_graph(G, G0:_) :-
 post_graph(G, G).
 
 
-pre_object(Literal, literal(Cond, Value), _, _) :-
-    literal_condition(Literal, Cond),
-    !,
-    debug(literal_index, 'Search literal using ~p', [literal(Cond, Value)]),
-    literal_value0(Literal, Value).
-pre_object(Literal, literal(Value), _, _) :-
-    literal_class(Literal, Value),
-    !,
-    debug(literal_index, 'Search literal using ~p', [literal(Value)]).
 pre_object(Var, Var1, Subj, Pred) :-
     var(Var),
     !,
-    ( Var == Subj
-    -> Var1 = Subj
-    ; true
-    ),
-    ( Var == Pred
-    -> Var1 = Pred
-    ; true
+    ( literal_condition(Var, Cond)
+    -> Var1 = literal(Cond, _),
+       debug(literal_index, 'Search literal using ~p', [Var1])
+    ; literal_class(Var, Value)
+    -> Var1 = literal(Value),
+       debug(literal_index, 'Search literal using ~p', [Var1])
+    ; ( Var == Subj
+      -> Var1 = Subj
+      ; true
+      ),
+      ( Var == Pred
+      -> Var1 = Pred
+      ; true
+      )
     ).
 pre_object(Atom, URI, _, _) :-
     atom(Atom),
     \+ boolean(Atom),
     !,
     URI = Atom.
-pre_object(Val@Lang, literal(lang(Lang, Val0)), _, _) :-
+pre_object(Val@Lang, Var1, _, _) :-
     !,
-    in_lang_string(Val, Val0).
-pre_object(Val^^Type, literal(Literal), _, _) :-
+    ( literal_condition(Val, Cond)
+    -> Var1 = literal(Cond, lang(Lang, _))
+    ; literal_class(Val@Lang, Class)
+    -> Var1 = literal(Class)
+    ; in_lang_string(Val, Val0),
+      Var1 = literal(lang(Lang, Val0))
+    ).
+pre_object(Val^^Type, Var1, _, _) :-
     !,
-    in_type(Type, Val, Type0, Val0),
-    (   var(Type0), var(Val0)
-    ->  true
-    ;   Literal = type(Type0, Val0)
+    ( literal_condition(Val, Cond)
+    -> Var1 = literal(Cond, type(Type, _))
+    ; in_type(Type, Val, Type0, Val0),
+      (   var(Type0), var(Val0)
+      ->  Var1 = literal(_)
+      ;   Var1 = literal(type(Type0, Val0))
+      )
     ).
 pre_object(Obj, Val0, _, _) :-
     ground(Obj),
@@ -1011,12 +1007,6 @@ pre_object(Obj, Val0, _, _) :-
     pre_ground_object(Obj, Val0).
 pre_object(Obj, _, _, _) :-
     type_error(rdf_object, Obj).
-
-literal_value0(Var, _) :-
-    var(Var),
-    !.
-literal_value0(_ @Lang, lang(Lang, _)).
-literal_value0(_^^Type, type(Type, _)).
 
 
 %!  pre_ground_object(+Object, -RDF) is det.
