@@ -331,12 +331,12 @@ In a nutshell, the following issues are addressed:
 %        convert between lexical representations and Prolog terms.
 
 rdf(S,P,O) :-
-    pre_object(O,O0),
+    pre_object(O,O0,S,P),
     rdf_db:rdf(S,P,O0),
     post_object(O,O0).
 
 rdf(S,P,O,G) :-
-    pre_object(O,O0),
+    pre_object(O,O0,S,P),
     pre_graph(G,G0),
     rdf_db:rdf(S,P,O0,G0),
     post_graph(G, G0),
@@ -351,12 +351,12 @@ rdf(S,P,O,G) :-
 %   `symmetric`. See rdf_set_predicate/2.
 
 rdf_has(S,P,O) :-
-    pre_object(O,O0),
+    pre_object(O,O0,S,P),
     rdf_db:rdf_has(S,P,O0),
     post_object(O,O0).
 
 rdf_has(S,P,O,RealP) :-
-    pre_object(O,O0),
+    pre_object(O,O0,S,P),
     rdf_db:rdf_has(S,P,O0,RealP),
     post_object(O,O0).
 
@@ -455,12 +455,12 @@ rdf_update_(S, P, O, G1, graph(G2)) :-
 %   _breadth first_ search.
 
 rdf_reachable(S,P,O) :-
-    pre_object(O,O0),
+    pre_object(O,O0,S,P),
     rdf_db:rdf_reachable(S,P,O0),
     post_object(O,O0).
 
 rdf_reachable(S,P,O,MaxD,D) :-
-    pre_object(O,O0),
+    pre_object(O,O0,S,P),
     rdf_db:rdf_reachable(S,P,O0,MaxD,D),
     post_object(O,O0).
 
@@ -494,11 +494,11 @@ rdf_assert(S,P,O,G) :-
 %   instantiate any of its arguments.
 
 rdf_retractall(S,P,O) :-
-    pre_object(O,O0),
+    pre_object(O,O0,S,P),
     rdf_db:rdf_retractall(S,P,O0).
 
 rdf_retractall(S,P,O,G) :-
-    pre_object(O,O0),
+    pre_object(O,O0,S,P),
     pre_graph(G,G0),
     rdf_db:rdf_retractall(S,P,O0,G0).
 
@@ -970,38 +970,46 @@ post_graph(G, G0:_) :-
 post_graph(G, G).
 
 
-pre_object(Literal, literal(Cond, Value)) :-
+pre_object(Literal, literal(Cond, Value), _, _) :-
     literal_condition(Literal, Cond),
     !,
     debug(literal_index, 'Search literal using ~p', [literal(Cond, Value)]),
     literal_value0(Literal, Value).
-pre_object(Literal, literal(Value)) :-
+pre_object(Literal, literal(Value), _, _) :-
     literal_class(Literal, Value),
     !,
     debug(literal_index, 'Search literal using ~p', [literal(Value)]).
-pre_object(Var, _Var) :-
+pre_object(Var, Var1, Subj, Pred) :-
     var(Var),
-    !.
-pre_object(Atom, URI) :-
+    !,
+    ( Var == Subj
+    -> Var1 = Subj
+    ; true
+    ),
+    ( Var == Pred
+    -> Var1 = Pred
+    ; true
+    ).
+pre_object(Atom, URI, _, _) :-
     atom(Atom),
     \+ boolean(Atom),
     !,
     URI = Atom.
-pre_object(Val@Lang, literal(lang(Lang, Val0))) :-
+pre_object(Val@Lang, literal(lang(Lang, Val0)), _, _) :-
     !,
     in_lang_string(Val, Val0).
-pre_object(Val^^Type, literal(Literal)) :-
+pre_object(Val^^Type, literal(Literal), _, _) :-
     !,
     in_type(Type, Val, Type0, Val0),
     (   var(Type0), var(Val0)
     ->  true
     ;   Literal = type(Type0, Val0)
     ).
-pre_object(Obj, Val0) :-
+pre_object(Obj, Val0, _, _) :-
     ground(Obj),
     !,
     pre_ground_object(Obj, Val0).
-pre_object(Obj, _) :-
+pre_object(Obj, _, _, _) :-
     type_error(rdf_object, Obj).
 
 literal_value0(Var, _) :-
@@ -1522,7 +1530,7 @@ out_date_time(Type, Prolog, Lexical) :-
 rdf_term(N) :-
     ground(N),
     !,
-    pre_object(N, N0),
+    pre_object(N, N0, _, _),
     visible_term(N0).
 rdf_term(N) :-
     gen_term(N).
@@ -1546,7 +1554,7 @@ rdf_literal(Term) :-
     pre_ground_object(Term, Object),
     (rdf_db:rdf(_,_,Object)->true).
 rdf_literal(Term) :-
-    pre_object(Term,literal(Lit0)),
+    pre_object(Term,literal(Lit0), _, _),
     rdf_db:rdf_current_literal(Lit0),
     (rdf_db:rdf(_,_,literal(Lit0))->true),
     post_object(Term, literal(Lit0)).
@@ -2031,7 +2039,7 @@ rdf_last(L, _) :-
 %!  rdf_estimate_complexity(?S, ?P, ?O, -Estimate) is det.
 
 rdf_estimate_complexity(S, P, O, Estimate) :-
-    pre_object(O,O0),
+    pre_object(O,O0,S,P),
     rdf_db:rdf_estimate_complexity(S,P,O0,Estimate).
 
 
