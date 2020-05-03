@@ -959,6 +959,13 @@ post_graph(G, G0:_) :-
 post_graph(G, G).
 
 
+%   left for code calling this directly
+
+pre_object(Atom, URI) :-
+    pre_object(Atom, URI, _, _).
+
+%!  pre_object(+APIObject, -DBObject, +APISubject, +APIPredicate)
+
 pre_object(Atom, URI, _, _) :-
     atom(Atom),
     \+ boolean(Atom),
@@ -967,39 +974,37 @@ pre_object(Atom, URI, _, _) :-
 pre_object(Var, Var1, Subj, Pred) :-
     var(Var),
     !,
-    ( literal_condition(Var, Cond)
-    -> Var1 = literal(Cond, _),
-       debug(literal_index, 'Search literal using ~p', [Var1])
-    ; literal_class(Var, Value)
-    -> Var1 = literal(Value),
-       debug(literal_index, 'Search literal using ~p', [Var1])
-    ; ( Var == Subj
-      -> Var1 = Subj
-      ; true
-      ),
-      ( Var == Pred
-      -> Var1 = Pred
-      ; true
-      )
+    (   literal_condition(Var, Cond)
+    ->  Var1 = literal(Cond, _)
+    ;   literal_class(Var, Value)
+    ->  Var1 = literal(Value)
+    ;   (   Var == Subj
+        ->  Var1 = Subj
+        ;   true
+        ),
+        (   Var == Pred
+        ->  Var1 = Pred
+        ;   true
+        )
     ).
 pre_object(Val@Lang, Var1, _, _) :-
     !,
-    ( literal_condition(Val, Cond)
-    -> Var1 = literal(Cond, lang(Lang, _))
-    ; literal_class(Val@Lang, Class)
-    -> Var1 = literal(Class)
-    ; in_lang_string(Val, Val0),
-      Var1 = literal(lang(Lang, Val0))
+    (   literal_condition(Val, Cond)
+    ->  Var1 = literal(Cond, lang(Lang, _))
+    ;   literal_class(Val@Lang, Class)
+    ->  Var1 = literal(Class)
+    ;   in_lang_string(Val, Val0),
+        Var1 = literal(lang(Lang, Val0))
     ).
 pre_object(Val^^Type, Var1, _, _) :-
     !,
-    ( literal_condition(Val, Cond)
-    -> Var1 = literal(Cond, type(Type, _))
-    ; in_type(Type, Val, Type0, Val0),
-      (   var(Type0), var(Val0)
-      ->  Var1 = literal(_)
-      ;   Var1 = literal(type(Type0, Val0))
-      )
+    (   literal_condition(Val, Cond)
+    ->  Var1 = literal(Cond, type(Type, _))
+    ;   in_type(Type, Val, Type0, Val0),
+        (   var(Type0), var(Val0)
+        ->  Var1 = literal(_)
+        ;   Var1 = literal(type(Type0, Val0))
+        )
     ).
 pre_object(Obj, Val0, _, _) :-
     ground(Obj),
@@ -1096,9 +1101,6 @@ pre_ground_object(Atom, URI) :-
     atom(Atom),
     !,
     URI = Atom.
-%pre_ground_object(NS:Local, URI) :-            % still leaves S and P.
-%       atom(NS), atom(Local), !,
-%       rdf_global_id(NS:Local, URI).
 pre_ground_object(literal(Lit0), literal(Lit)) :-
     old_literal(Lit0, Lit),
     !.
