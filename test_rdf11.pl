@@ -101,6 +101,9 @@ test(untyped_int, true) :-
 test(untyped_int2, Type == xsd:integer) :-
     rdf_assert(untyped_int2, p1, "010"^^xsd:integer),
     rdf(untyped_int2, p1, 10^^Type).
+test(shared_so, fail) :-
+    rdf_assert(s,p,o),
+    rdf(X,_,X).
 
 :- end_tests(literal).
 
