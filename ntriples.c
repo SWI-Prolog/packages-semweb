@@ -188,7 +188,7 @@ syntax_error(IOSTREAM *in, const char *msg)
     { c = Sgetcode(in);
     } while(c != '\n' && c != -1);
 
-    return PL_raise_exception(ex);
+    return PL_raise_exception(ex),FALSE;
   }
 
   return FALSE;
@@ -417,7 +417,7 @@ get_iri_code(IOSTREAM *in, int *cp)
 
 static int
 read_uniref(IOSTREAM *in, term_t subject, int *cp)
-{ int c;
+{ int c = -1;
   string_buffer buf;
 
   initBuf(&buf);
@@ -642,7 +642,7 @@ get_string_code(IOSTREAM *in, int *cp)
 
 static int
 read_literal(IOSTREAM *in, term_t literal, int *cp)
-{ int c;
+{ int c = -1;
   string_buffer buf;
 
   initBuf(&buf);
