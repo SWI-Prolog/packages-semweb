@@ -337,7 +337,7 @@ slightly more than half these amounts.
     be reused, but many reindexed triples may result in a significant
     memory fragmentation.
 
-  - Resources are maintained in a seperate table to support
+  - Resources are maintained in a separate table to support
     rdf_resource/1.  A resources requires approximately 32 bytes.
 
   - Identical literals are shared (see rdf_current_literal/1) and

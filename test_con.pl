@@ -196,7 +196,7 @@ snap(X) :-
 %!  @@(:Goal, +Context)
 %
 %   Run Goal (as once/1) in Context. Context is either a snapshot or
-%   a seperate thread.  If  Context  is   a  thread,  wait  for  its
+%   a separate thread.  If  Context  is   a  thread,  wait  for  its
 %   completion (synchronous execution). The construct
 %
 %           {G} @@ {T}

@@ -1072,7 +1072,7 @@ replay_actions([H|T]) :-
 %   appears changed, but this isn't really   easy  as copying and OS
 %   differences makes it hard to decide on changes by length as well
 %   as modification time. Alternatively we could   save the state in
-%   seperate quick-load states.
+%   separate quick-load states.
 
 replay_action(retract(_, Subject, Predicate, Object, PayLoad)) :-
     rdf_retractall(Subject, Predicate, Object, PayLoad).

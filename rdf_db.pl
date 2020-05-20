@@ -814,7 +814,7 @@ rdf_gc(CPU) :-
 %!  rdf_gc is det.
 %
 %   Run the RDF-DB garbage collector until no   garbage  is left and all
-%   tables are fully optimized. Under normal operation a seperate thread
+%   tables are fully optimized. Under normal operation a separate thread
 %   with identifier =|__rdf_GC|= performs garbage  collection as long as
 %   it is considered `useful'.
 %
