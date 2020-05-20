@@ -2189,7 +2189,7 @@ rdfs:subPropertyOf tree at query q. We cache this information.
 
 FIXME: Note that this code is subject to  race conditions. If we want to
 avoid that without using locks, we must  put the validity information in
-a seperate object that is not modified.
+a separate object that is not modified.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static int
@@ -4308,7 +4308,7 @@ resume_gc(rdf_db *db)
 /** rdf_gc_(-Done) is semidet.
 
 Run the RDF-DB garbage collector. The collector   is  typically ran in a
-seperate thread. Its execution does not  interfere with readers and only
+separate thread. Its execution does not  interfere with readers and only
 synchronizes with writers using short-held locks.
 
 Fails without any action if there is already a GC in progress.
@@ -9407,7 +9407,7 @@ erase_predicates(rdf_db *db)
 
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Reset the DB. It might be wiser to create  a new one and have a seperate
+Reset the DB. It might be wiser to create  a new one and have a separate
 thread deleting the old one (e.g. do this in GC).
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 

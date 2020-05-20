@@ -36,7 +36,7 @@ writing RDF/XML and Turtle data, caching loaded RDF documents and
 persistent storage. This package is the core of a ready-to-run platform
 for developing Semantic Web applications named
 \href{http://cliopatria.swi-prolog.org}{ClioPatria}, which is distributed
-seperately. The SWI-Prolog RDF store is among the most memory efficient
+separately. The SWI-Prolog RDF store is among the most memory efficient
 main-memory stores for
 RDF\footnote{\url{http://cliopatria.swi-prolog.org/help/source/doc/home/vnc/prolog/src/ClioPatria/web/help/memusage.txt}}
 
