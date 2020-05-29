@@ -46,7 +46,7 @@ run_zlib_tests :-
                        ]).
 
 run_network_tests :-
-    \+ getenv('USE_PUBLIC_NETWORK_TESTS', false).
+    getenv('SWIPL_PUBLIC_NETWORK_TESTS', true).
 
 :- use_module(library(plunit)).
 :- use_module(library(uri)).
