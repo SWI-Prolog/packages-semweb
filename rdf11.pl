@@ -342,8 +342,8 @@ rdf(S,P,O,G) :-
     post_graph(G, G0),
     post_object(O,O0).
 
-%!  rdf_has(?S, ?P, ?O) is nondet.
-%!  rdf_has(?S, ?P, ?O, -RealP) is nondet.
+%!  rdf_has(?S, +P, ?O) is nondet.
+%!  rdf_has(?S, +P, ?O, -RealP) is nondet.
 %
 %   Similar to rdf/3 and rdf/4, but   P  matches all predicates that
 %   are defined as an rdfs:subPropertyOf of   P. This predicate also
