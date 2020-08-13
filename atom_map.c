@@ -918,7 +918,8 @@ find_atom_map_protected(atom_map  *map, term_t keys, term_t literals)
   if ( ns==0 || as[0].neg )
     return PL_domain_error("keywords", keys);
 
-  PL_put_term(tail, literals);
+  if ( !PL_put_term(tail, literals) )
+    return FALSE;
   ah=as[0].set->entries;
 
   for(ca=0; ca<ah->allocated; ca++)
