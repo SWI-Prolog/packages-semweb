@@ -158,6 +158,7 @@ static atom_t	ATOM_reset;
 static atom_t	ATOM_lt;		/* < */
 static atom_t	ATOM_eq;		/* = */
 static atom_t	ATOM_gt;		/* > */
+static atom_t	ATOM_XSDString;
 
 static atom_t	ATOM_subPropertyOf;
 static atom_t	ATOM_xsdString;
@@ -3259,13 +3260,27 @@ compare_literals() sorts literals.  Ordering is defined as:
 
 static int
 cmp_qualifier(const literal *l1, const literal *l2)
-{ if ( l1->qualifier != Q_NONE && l1->qualifier == l2->qualifier )
-  { if ( l1->type_or_lang )
-      return cmp_atoms(ID_ATOM(l1->type_or_lang), ID_ATOM(l2->type_or_lang));
+{ int q1 = l1->qualifier;
+  int q2 = l2->qualifier;
+  atom_t tl1 = ID_ATOM(l1->type_or_lang);
+  atom_t tl2 = ID_ATOM(l2->type_or_lang);
+
+  if ( q1 == Q_NONE )
+  { q1 = Q_TYPE;
+    tl1 = ATOM_XSDString;
+  }
+  if ( q2 == Q_NONE )
+  { q2 = Q_TYPE;
+    tl2 = ATOM_XSDString;
+  }
+
+  if ( q1 == q2 )
+  { if ( tl1 )
+      return cmp_atoms(tl1, tl2);
     return -1;
   }
 
-  return l1->qualifier - l2->qualifier;
+  return q1 - q2;
 }
 
 static xsd_primary
@@ -3275,6 +3290,19 @@ is_numerical_string(const literal *lit)
     return is_numeric_type(ID_ATOM(lit->type_or_lang));
 
   return XSD_NONNUMERIC;
+}
+
+
+static int
+same_type(atom_id id1, atom_id id2)
+{ if ( id1 == id2 )
+    return TRUE;
+  if ( id2 == 0 && ID_ATOM(id1) == ATOM_XSDString )
+    return TRUE;
+  if ( id1 == 0 && ID_ATOM(id2) == ATOM_XSDString )
+    return TRUE;
+
+  return FALSE;
 }
 
 
@@ -3304,7 +3332,7 @@ compare_literals(literal_ex *lex, literal *l2)
       }
       case OBJ_STRING:
       { if ( lex->atom.handle == l2->value.string &&
-	     l1->type_or_lang == l2->type_or_lang )
+	     same_type(l1->type_or_lang, l2->type_or_lang) )
 	{ rc = 0;
 	} else
 	{ xsd_primary nt1 = is_numerical_string(l1);
@@ -9758,6 +9786,7 @@ install_rdf_db(void)
   ATOM_lt		  = PL_new_atom("<");
   ATOM_eq		  = PL_new_atom("=");
   ATOM_gt		  = PL_new_atom(">");
+  ATOM_XSDString	  = PL_new_atom("http://www.w3.org/2001/XMLSchema#string");
 
   PRED_call1         = PL_predicate("call", 1, "user");
 
