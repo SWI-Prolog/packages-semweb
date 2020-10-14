@@ -393,8 +393,7 @@ term_expansion(T0, T) :-
 
 sparql_read_xml_result(Input, Result) :-
     load_structure(Input, DOM,
-                   [ dialect(xmlns),
-                     space(remove)
+                   [ dialect(xmlns)
                    ]),
     call_cleanup(dom_to_result(DOM, Result),
                  retractall(bnode_map(_,_))).
@@ -426,13 +425,22 @@ variables([element(sparql:variable, Att, [])|T0], [Name|T]) :-
     memberchk(name=Name, Att),
     variables(T0, T).
 variables([element(sparql:link, _, _)|T0], T) :-
+    !,
+    variables(T0, T).
+variables([CDATA|T0], T) :-
+    atomic(CDATA),
     variables(T0, T).
 
 
 rows([], _, []).
 rows([R|T0], Vars, [Row|T]) :-
+    R = element(sparql:result, _, _),
+    !,
     row_values(Vars, R, Values),
     Row =.. [row|Values],
+    rows(T0, Vars, T).
+rows([CDATA|T0], Vars, T) :-
+    atomic(CDATA),
     rows(T0, Vars, T).
 
 row_values([], _, []).
