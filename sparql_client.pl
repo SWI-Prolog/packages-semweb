@@ -3,8 +3,9 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2010-2017, University of Amsterdam
+    Copyright (c)  2010-2020, University of Amsterdam
                               VU University Amsterdam
+                              SWI-Prolog Solutions b.v.
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -58,74 +59,88 @@
 
 This module provides a SPARQL client.  For example:
 
-    ==
-    ?- sparql_query('select * where { ?x rdfs:label "Amsterdam" }', Row,
-                    [ host('dbpedia.org'), path('/sparql/')]).
+```
+?- sparql_query('select * where { ?x rdfs:label "Amsterdam" }', Row,
+                [ host('dbpedia.org'), path('/sparql/')]).
 
-    Row = row('http://www.ontologyportal.org/WordNet#WN30-108949737') ;
-    false.
-    ==
+Row = row('http://www.ontologyportal.org/WordNet#WN30-108949737') ;
+false.
+```
 
 Or, querying a local server using an =ASK= query:
 
-    ==
-    ?- sparql_query('ask { owl:Class rdfs:label "Class" }', Row,
-                    [ host('localhost'), port(3020), path('/sparql/')]).
-    Row = true.
-    ==
+```
+?- sparql_query('ask { owl:Class rdfs:label "Class" }', Row,
+                [ host('localhost'), port(3020), path('/sparql/')]).
+Row = true.
+```
 
 HTTPS servers are supported using the scheme(https) option:
 
-    ==
-    ?- sparql_query('select * where { ?x rdfs:label "Amsterdam"@nl }',
-		    Row,
-                    [ scheme(https),
-                      host('query.wikidata.org'),
-                      path('/sparql')
-                    ]).
-    ==
+```
+?- sparql_query('select * where { ?x rdfs:label "Amsterdam"@nl }',
+                Row,
+                [ scheme(https),
+                  host('query.wikidata.org'),
+                  path('/sparql')
+                ]).
+```
 */
 
 
 %!  sparql_query(+Query, -Result, +Options) is nondet.
 %
-%   Execute a SPARQL query on an HTTP   SPARQL endpoint. Query is an
-%   atom that denotes  the  query.  Result   is  unified  to  a term
-%   rdf(S,P,O) for =CONSTRUCT= and =DESCRIBE=  queries, row(...) for
-%   =SELECT= queries and  =true=  or   =false=  for  =ASK=  queries.
-%   Options are
+%   Execute a SPARQL query on an HTTP  SPARQL endpoint. Query is an atom
+%   that denotes the query. Result is unified   to a term rdf(S,P,O) for
+%   ``CONSTRUCT`` and ``DESCRIBE``  queries,   row(...)  for  ``SELECT``
+%   queries and `true` or `false` for ``ASK`` queries. Options are
 %
-%   Variables that are unbound in SPARQL (e.g., due to SPARQL optional
+%   Variables that are unbound in SPARQL   (e.g., due to SPARQL optional
 %   clauses), are bound in Prolog to the atom `'$null$'`.
 %
-%	* endpoint(+URL)
+%	- endpoint(+URL)
 %	  May be used as alternative to Scheme, Host, Port and Path
 %	  to specify the endpoint in a single option.
-%       * host(+Host)
-%       * port(+Port)
-%       * path(+Path)
-%       * scheme(+Scheme)
-%       The above four options set the location of the server.
-%       * search(+ListOfParams)
-%       Provide additional query parameters, such as the graph.
-%       * variable_names(-ListOfNames)
-%       Unifies ListOfNames with a list of atoms that describe the
-%       names of the variables in a =SELECT= query.
+%       - host(+Host)
+%       - port(+Port)
+%       - path(+Path)
+%       - scheme(+Scheme)
+%         The above four options set the location of the server.
+%       - search(+ListOfParams)
+%         Provide additional query parameters, such as the graph.
+%       - variable_names(-ListOfNames)
+%         Unifies ListOfNames with a list of atoms that describe the
+%         names of the variables in a =SELECT= query.
 %
-%   Remaining options are passed to   http_open/3.  The defaults for
-%   Host, Port and Path can be   set  using sparql_set_server/1. The
-%   initial default for port is 80 and path is =|/sparql/|=.
+%   Remaining options are passed to http_open/3.  The defaults for Host,
+%   Port and Path can be  set   using  sparql_set_server/1.  The initial
+%   default for port is 80 and path is `/sparql/`.
 %
-%   For example, the ClioPatria  server   understands  the parameter
-%   =entailment=. The code  below  queries   for  all  triples using
+%   For  example,  the  ClioPatria  server   understands  the  parameter
+%   `entailment`.  The  code  below  queries    for  all  triples  using
 %   _rdfs_entailment.
 %
-%     ==
-%     ?- sparql_query('select * where { ?s ?p ?o }',
-%                     Row,
-%                     [ search([entailment=rdfs])
-%                     ]).
-%     ==
+%   ```
+%   ?- sparql_query('select * where { ?s ?p ?o }',
+%                   Row,
+%                   [ search([entailment=rdfs])
+%                   ]).
+%   ```
+%
+%   Another useful option is the   `request_header`  which, for example,
+%   may be used to trick force  a   server  to  reply using a particular
+%   document format:
+%
+%   ```
+%   ?- sparql_query(
+%          'select * where { ?s ?p ?o }',
+%           Row,
+%           [ host('integbio.jp'),
+%             path('/rdf/sparql'),
+%             request_header('Accept' =
+%                            'application/sparql-results+xml')
+%           ]).
+%   ```
 
 sparql_query(Query, Row, Options) :-
     (   select_option(endpoint(URL), Options, Options5)
