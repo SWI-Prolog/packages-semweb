@@ -218,19 +218,8 @@ sparql_extra_headers(
                                      application/sparql-results+json, \c
                                      application/rdf+xml, \c
                                      text/rdf+xml; q=0.8, \c
-                                     */*; q=0.1'),
-          cert_verify_hook(ssl_verify)
+                                     */*; q=0.1')
         ]).
-
-:- public ssl_verify/5.
-
-%!  ssl_verify(+SSL, +ProblemCert, +AllCerts, +FirstCert, +Error)
-%
-%   Currently we accept  all  certificates.
-
-ssl_verify(_SSL,
-           _ProblemCertificate, _AllCertificates, _FirstCertificate,
-           _Error).
 
 %!  read_reply(+Status, +ContentType, +In, -Close, -Row)
 
