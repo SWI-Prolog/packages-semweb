@@ -40,20 +40,22 @@
             sparql_read_xml_result/2,   % +Stream, -Result
             sparql_read_json_result/2   % +Input, -Result
           ]).
-:- autoload(library(apply),[maplist/3,maplist/4]).
-:- autoload(library(gensym),[gensym/2]).
-:- autoload(library(lists),[member/2]).
-:- autoload(library(option),[select_option/3,select_option/4]).
-:- autoload(library(rdf),[load_rdf/2]).
-:- autoload(library(readutil),[read_stream_to_codes/2]).
-:- autoload(library(sgml),[load_structure/3]).
+:- autoload(library(apply), [maplist/3, maplist/4, partition/4]).
+:- autoload(library(gensym), [gensym/2]).
+:- autoload(library(lists), [member/2]).
+:- autoload(library(option), [select_option/3, select_option/4, merge_options/3]).
+:- autoload(library(rdf), [load_rdf/2]).
+:- autoload(library(readutil), [read_stream_to_codes/2]).
+:- autoload(library(sgml), [load_structure/3]).
 :- autoload(library(uri),
-	    [ uri_components/2, uri_data/3, uri_authority_components/2,
-	      uri_authority_data/3
-	    ]).
-:- autoload(library(http/http_open),[http_open/3]).
-:- autoload(library(http/json),[json_read/2]).
-:- autoload(library(semweb/turtle),[rdf_read_turtle/3]).
+            [ uri_components/2,
+              uri_data/3,
+              uri_authority_components/2,
+              uri_authority_data/3
+            ]).
+:- autoload(library(http/http_open), [http_open/3]).
+:- autoload(library(http/json), [json_read/2]).
+:- autoload(library(semweb/turtle), [rdf_read_turtle/3]).
 
 /** <module> SPARQL client library
 
@@ -67,7 +69,7 @@ Row = row('http://www.ontologyportal.org/WordNet#WN30-108949737') ;
 false.
 ```
 
-Or, querying a local server using an =ASK= query:
+Or, querying a local server using an ``ASK`` query:
 
 ```
 ?- sparql_query('ask { owl:Class rdfs:label "Class" }', Row,
