@@ -149,7 +149,9 @@ sparql_query(Query, Row, Options) :-
         select_option(search(Extra), Options4, Options5, [])
     ),
     select_option(variable_names(VarNames), Options5, Options6, _),
-    sparql_extra_headers(HTTPOptions),
+    partition(is_url_option, Options6, UrlOptions, HTTPOptions),
+    sparql_extra_headers(HTTPOptions0),
+    merge_options(HTTPOptions, HTTPOptions0, HTTPOptions1),
     http_open([ scheme(Scheme),
                 host(Host),
                 port(Port),
@@ -157,14 +159,31 @@ sparql_query(Query, Row, Options) :-
                 search([ query = Query
                        | Extra
                        ])
-              | Options6
+              | UrlOptions
               ], In,
               [ header(content_type, ContentType),
                 status_code(Status)
-              | HTTPOptions
+              | HTTPOptions1
               ]),
     plain_content_type(ContentType, CleanType),
     read_reply(Status, CleanType, In, VarNames, Row).
+
+url_option(scheme).
+url_option(user).
+url_option(password).
+url_option(host).
+url_option(port).
+url_option(path).
+url_option(query_string).
+url_option(search).
+
+is_url_option(Name = _Value) :-
+    url_option(Name),
+    !.
+is_url_option(Opt) :-
+    compound(Opt),
+    functor(Opt, Name, 1),
+    url_option(Name).
 
 %!  sparql_extra_headers(-List)
 %
