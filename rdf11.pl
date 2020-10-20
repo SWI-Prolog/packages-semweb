@@ -1259,6 +1259,19 @@ in_number(double, _Domain, _, Val, Val0) :-
     !,
     xsd_number_string(ValF, ValS),
     atom_string(Val0, ValS).
+in_number(decimal, _Domain, _, Val, Val0) :-
+    number(Val),
+    !,
+    ValF is float(Val),
+    number_string(ValF, ValS),
+    atom_string(Val0, ValS).
+in_number(decimal, _Domain, _, Val, Val0) :-
+    atomic(Val),
+    xsd_number_string(Num, Val),
+    ValF is float(Num),
+    !,
+    number_string(ValF, ValS),
+    atom_string(Val0, ValS).
 in_number(PrologType, _, _, Val, _) :-
     type_error(PrologType, Val).
 
@@ -1286,7 +1299,7 @@ error:has_type(nonpos, T):-
 
 xsd_numerical(xsd:byte,               between(-128,127),               integer).
 xsd_numerical(xsd:double,             float,                           double).
-xsd_numerical(xsd:decimal,            float,                           double).
+xsd_numerical(xsd:decimal,            float,                           decimal).
 xsd_numerical(xsd:float,              float,                           double).
 xsd_numerical(xsd:int,                between(-2147483648,2147483647), integer).
 xsd_numerical(xsd:integer,            integer,                         integer).
