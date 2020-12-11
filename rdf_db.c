@@ -4400,7 +4400,8 @@ rdf_gc_info(term_t info)
 
   if ( keep_gen == db->gc.last_gen )
   { garbage -= db->gc.uncollectable;
-    assert((int64_t)garbage >= 0);
+    if ( (int64_t)garbage < 0 )
+      garbage = 0;
   }
 
   return PL_unify_term(info,
