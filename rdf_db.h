@@ -276,7 +276,7 @@ typedef struct literal
     int64_t	integer;
     double	real;
     struct
-    { record_t  record;
+    { char *    record;
       size_t	len;
     } term;				/* external record */
   } value;
