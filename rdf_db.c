@@ -1103,7 +1103,6 @@ init_triple_array(rdf_db *db)
     a->blocks[i] = slice;
 
   a->freelist = slice->fnext;		/* simply ignore the first for id>0 */
-  a->preinit  = TRIPLE_ARRAY_PREINIT;
   a->size     = TRIPLE_ARRAY_PREINIT;
 
   return TRUE;
@@ -1115,11 +1114,12 @@ destroy_triple_array(rdf_db *db)
   int i;
 
   free(a->blocks[0]);
-  for(i=MSB(a->preinit); i<MSB(a->size); i++)
+  for(i=MSB(TRIPLE_ARRAY_PREINIT); i<MSB(a->size); i++)
   { triple_element *e = a->blocks[i];
 
+    assert(e);
     e += 1<<(i-1);
-    free(e);
+    aliasedFree(e);			/* trick GCC-11 */
   }
   memset(a, 0, sizeof(*a));
 }

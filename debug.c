@@ -36,6 +36,7 @@
 #include <config.h>
 #include "SWI-Prolog.h"
 #include "debug.h"
+#include "stdlib.h"
 
 #ifdef O_DEBUG
 
@@ -56,3 +57,8 @@ rdf_debug(term_t level)
 }
 
 #endif
+
+void
+aliasedFree(void *mem)
+{ free(mem);
+}

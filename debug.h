@@ -53,4 +53,6 @@ foreign_t	rdf_debug(term_t level);
 #define SECURE(g) (void)0
 #endif
 
+void		aliasedFree(void*);
+
 #endif /*DEBUG_H_INCLUDED*/

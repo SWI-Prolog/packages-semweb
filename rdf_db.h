@@ -397,7 +397,6 @@ typedef union triple_element
 typedef struct triple_array
 { triple_element *blocks[MAX_TBLOCKS];	/* Dynamic array starts */
   triple_element *freelist;		/* free buckets */
-  size_t	preinit;		/* Preinitialized size */
   size_t	size;			/* current (allocated) size */
 } triple_array;
 #endif /*COMPACT*/
