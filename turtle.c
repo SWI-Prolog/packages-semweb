@@ -1089,7 +1089,7 @@ make_absolute_resource(turtle_state *ts, const wchar_t *uri)
   resource *r;
 
   if ( !uri[0] )			/* <> */
-    return new_resource(ts, ts->base_uri);
+    return new_resource(ts, ts->base_uri ? ts->base_uri : L"");
 
   if ( is_scheme_char(uri[0]) )		/* absolute uri */
   { for(s=&uri[1]; *s && is_scheme_char(*s); s++)
