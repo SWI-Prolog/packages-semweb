@@ -558,9 +558,6 @@ read_subject(IOSTREAM *in, term_t subject, int *cp)
       return syntax_error(in, "subject expected");
   }
 
-  if ( rc && !is_ws(*cp) )
-    return syntax_error(in, "subject not followed by whitespace");
-
   return rc;
 }
 
@@ -577,9 +574,6 @@ read_predicate(IOSTREAM *in, term_t predicate, int *cp)
     default:
       return syntax_error(in, "predicate expected");
   }
-
-  if ( rc && !is_ws(*cp) )
-    return syntax_error(in, "predicate not followed by whitespace");
 
   return rc;
 }

@@ -110,10 +110,6 @@ test(eof, error(syntax_error('EOF in string'))) :-
     atom_triple('<a> <b> "', _).
 test(newline, error(syntax_error('newline in string'))) :-
     atom_triple('<a> <b> "\n', _).
-test(nospace, error(syntax_error('subject not followed by whitespace'))) :-
-    atom_triple('<a><b> <c> .', _).
-test(nospace, error(syntax_error('predicate not followed by whitespace'))) :-
-    atom_triple('<a> <b><c> .', _).
 test(escape, error(syntax_error('illegal unicode escape'))) :-
     atom_triple('<a> <b> "\\u123" .', _).
 test(escape, error(syntax_error('illegal escape'))) :-
