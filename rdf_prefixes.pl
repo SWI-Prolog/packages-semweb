@@ -428,9 +428,9 @@ rdf_global_term([H0|T0], [H|T], M) :-
 rdf_global_term(Term0, Term, M) :-
     compound(Term0),
     !,
-    Term0 =.. [H|L0],
+    compound_name_arguments(Term0, Name, L0),
     rdf_global_term(L0, L, M),
-    Term =.. [H|L].
+    compound_name_arguments(Term, Name, L).
 rdf_global_term(Term, Term, _).
 
 %!  rdf_global_graph(+TermIn, -GlobalTerm, +Module) is det.
