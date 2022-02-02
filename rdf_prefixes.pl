@@ -3,8 +3,9 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2018, VU University Amsterdam
-			 CWI, Amsterdam
+    Copyright (c)  2018-2022, VU University Amsterdam
+			      CWI, Amsterdam
+                              SWI-Prolog Solutions b.v.
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -573,6 +574,30 @@ rdf_meta_specification(Unbounded, Module, Spec) :-
     '$flushed_predicate'(Module:'rdf meta specification'(_,_)),
     call(Module:'rdf meta specification'(Unbounded, Spec)).
 
+split_rule((Module:Head :- Body), (Module:Expanded :- Body),
+           Module, Head, Expanded) :-
+    atom(Module).
+split_rule((Head :- Body), (Expanded :- Body),
+           Module, Head, Expanded) :-
+    callable(Head),
+    prolog_load_context(module, Module).
+split_rule((Module:Head,Guard => Body), (Module:Expanded,Guard => Body),
+           Module, Head, Expanded) :-
+    callable(Head),
+    atom(Module).
+split_rule((Module:Head => Body), (Module:Expanded => Body),
+           Module, Head, Expanded) :-
+    callable(Head),
+    atom(Module).
+split_rule((Head,Guard => Body), (Expanded,Guard => Body),
+           Module, Head, Expanded) :-
+    callable(Head),
+    prolog_load_context(module, Module).
+split_rule((Head => Body), (Expanded => Body),
+           Module, Head, Expanded) :-
+    callable(Head),
+    prolog_load_context(module, Module).
+
 system:goal_expansion(G, Expanded) :-
     \+ predicate_property(G, iso),
     prolog_load_context(module, LM),
@@ -591,14 +616,9 @@ system:term_expansion(Fact, Expanded) :-
     rdf_meta_specification(Fact, Module, Spec),
     rdf_expand(Fact, Spec, Expanded, Module),
     Fact \== Expanded.
-system:term_expansion((Module:Head :- Body), (Expanded :- Body)) :-
-    atom(Module),
-    rdf_meta_specification(Head, Module, Spec),
-    rdf_expand(Head, Spec, ExpandedHead, Module),
-    Head \== ExpandedHead,
-    Expanded = (Module:ExpandedHead).
-system:term_expansion((Head :- Body), (Expanded :- Body)) :-
-    prolog_load_context(module, Module),
+system:term_expansion(Clause0, Clause) :-
+    split_rule(Clause0, Clause, Module, Head, Expanded),
+    !,
     rdf_meta_specification(Head, Module, Spec),
     rdf_expand(Head, Spec, Expanded, Module),
     Head \== Expanded.
