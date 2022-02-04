@@ -576,23 +576,28 @@ rdf_meta_specification(Unbounded, Module, Spec) :-
 
 split_rule((Module:Head :- Body), (Module:Expanded :- Body),
            Module, Head, Expanded) :-
-    atom(Module).
+    atom(Module),
+    !.
 split_rule((Head :- Body), (Expanded :- Body),
            Module, Head, Expanded) :-
     callable(Head),
-    prolog_load_context(module, Module).
+    prolog_load_context(module, Module),
+    !.
 split_rule((Module:Head,Guard => Body), (Module:Expanded,Guard => Body),
            Module, Head, Expanded) :-
     callable(Head),
-    atom(Module).
+    atom(Module),
+    !.
 split_rule((Module:Head => Body), (Module:Expanded => Body),
            Module, Head, Expanded) :-
     callable(Head),
-    atom(Module).
+    atom(Module),
+    !.
 split_rule((Head,Guard => Body), (Expanded,Guard => Body),
            Module, Head, Expanded) :-
     callable(Head),
-    prolog_load_context(module, Module).
+    prolog_load_context(module, Module),
+    !.
 split_rule((Head => Body), (Expanded => Body),
            Module, Head, Expanded) :-
     callable(Head),
@@ -618,7 +623,6 @@ system:term_expansion(Fact, Expanded) :-
     Fact \== Expanded.
 system:term_expansion(Clause0, Clause) :-
     split_rule(Clause0, Clause, Module, Head, Expanded),
-    !,
     rdf_meta_specification(Head, Module, Spec),
     rdf_expand(Head, Spec, Expanded, Module),
     Head \== Expanded.
