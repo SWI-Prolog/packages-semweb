@@ -371,15 +371,15 @@ skiplist_check(skiplist *sl, int print)
 					 SIZEOF_SKIP_CELL_NOPLAYLOAD(i-1));
 	    skipcell *next1 = subPointer(sc->next[i],
 					 SIZEOF_SKIP_CELL_NOPLAYLOAD(i));
-	    void *p0, *p1;
 	    assert(next0->magic == SKIPCELL_MAGIC);
 	    assert(next1->magic == SKIPCELL_MAGIC);
-	    (void)next0;
-	    (void)next1;
+	   
+	    void *p0, *p1;
 	    p0 = subPointer(next0, sl->payload_size);
 	    p1 = subPointer(next1, sl->payload_size);
-
 	    assert((*sl->compare)(p0, p1, sl->client_data) <= 0);
+	    (void)p0;
+	    (void)p1;
 	  }
 	}
       }
