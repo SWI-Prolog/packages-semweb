@@ -374,6 +374,8 @@ skiplist_check(skiplist *sl, int print)
 	    void *p0, *p1;
 	    assert(next0->magic == SKIPCELL_MAGIC);
 	    assert(next1->magic == SKIPCELL_MAGIC);
+	    (void)next0;
+	    (void)next1;
 	    p0 = subPointer(next0, sl->payload_size);
 	    p1 = subPointer(next1, sl->payload_size);
 
@@ -390,6 +392,8 @@ skiplist_check(skiplist *sl, int print)
 	pl1 = subPointer(prev, sl->payload_size);
 	pl2 = subPointer(sc,   sl->payload_size);
 	assert((*sl->compare)(pl1, pl2, sl->client_data) < 0);
+	(void)pl1;
+	(void)pl2;
       }
 
       scpp = scp;
