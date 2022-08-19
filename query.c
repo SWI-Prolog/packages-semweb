@@ -652,6 +652,7 @@ update_triples(query *q,
     }
   }
 
+  (void)updated;
   setWriteGen(q, gen);
   simpleMutexUnlock(&db->queries.write.lock);
   simpleMutexUnlock(&db->queries.write.generation_lock);
