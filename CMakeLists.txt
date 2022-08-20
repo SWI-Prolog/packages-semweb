@@ -29,6 +29,8 @@ add_custom_target(semweb)
 add_dependencies(semweb turtle ntriples)
 
 if(MULTI_THREADED)
+# As is, the RDF database depends on threads. Making it available in the
+# single threaded version requires some redesign.
 set(SWIPL_SEMWEB_DATA
     rdfs.rdfs dc.rdfs eor.rdfs owl.owl rdf_library.ttl)
 prepend(SWIPL_SEMWEB_DATA ${CMAKE_CURRENT_SOURCE_DIR} ${SWIPL_SEMWEB_DATA})
@@ -56,7 +58,7 @@ install_src(pkg_semweb_data
 	    FILES ${SWIPL_SEMWEB_DATA}
 	    DESTINATION ${SWIPL_INSTALL_LIBRARY}/semweb)
 
-add_dependencies(semweb turtle ntriples)
+add_dependencies(semweb rdf_db)
 endif(MULTI_THREADED)
 
 
