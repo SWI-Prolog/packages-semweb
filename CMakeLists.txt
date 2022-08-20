@@ -26,7 +26,7 @@ swipl_plugin(
     PL_LIBS rdf_ntriples.pl)
 
 add_custom_target(semweb)
-add_dependencies(semweb turtle ntriples)
+add_dependencies(semweb turtle ntriples rdf_db)
 
 if(MULTI_THREADED)
 set(SWIPL_SEMWEB_DATA
@@ -56,7 +56,7 @@ install_src(pkg_semweb_data
 	    FILES ${SWIPL_SEMWEB_DATA}
 	    DESTINATION ${SWIPL_INSTALL_LIBRARY}/semweb)
 
-add_dependencies(semweb turtle ntriples)
+add_dependencies(semweb turtle ntriples rdf_db)
 endif(MULTI_THREADED)
 
 
