@@ -11,6 +11,24 @@ check_type_size("void *" SIZEOF_VOIDP)
 
 configure_file(config.h.cmake config.h)
 
+swipl_plugin(
+    turtle
+    C_SOURCES turtle.c murmur.c
+    C_LIBS
+    PL_LIB_SUBDIR semweb
+    PL_LIBS turtle.pl rdf_turtle_write.pl)
+
+swipl_plugin(
+    ntriples
+    C_SOURCES ntriples.c
+    C_LIBS
+    PL_LIB_SUBDIR semweb
+    PL_LIBS rdf_ntriples.pl)
+
+add_custom_target(semweb)
+add_dependencies(semweb turtle ntriples)
+
+if(MULTI_THREADED)
 set(SWIPL_SEMWEB_DATA
     rdfs.rdfs dc.rdfs eor.rdfs owl.owl rdf_library.ttl)
 prepend(SWIPL_SEMWEB_DATA ${CMAKE_CURRENT_SOURCE_DIR} ${SWIPL_SEMWEB_DATA})
@@ -35,26 +53,13 @@ swipl_plugin(
             rdfa.pl rdf11.pl rdf11_containers.pl rdf_sandbox.pl
 	    rdf_prefixes.pl)
 
-swipl_plugin(
-    turtle
-    C_SOURCES turtle.c murmur.c
-    C_LIBS
-    PL_LIB_SUBDIR semweb
-    PL_LIBS turtle.pl rdf_turtle_write.pl)
-
-swipl_plugin(
-    ntriples
-    C_SOURCES ntriples.c
-    C_LIBS
-    PL_LIB_SUBDIR semweb
-    PL_LIBS rdf_ntriples.pl)
-
 install_src(pkg_semweb_data
 	    FILES ${SWIPL_SEMWEB_DATA}
 	    DESTINATION ${SWIPL_INSTALL_LIBRARY}/semweb)
 
-add_custom_target(semweb)
-add_dependencies(semweb rdf_db turtle ntriples pkg_semweb_data)
+add_dependencies(semweb turtle ntriples)
+endif(MULTI_THREADED)
+
 
 # FIXME: test_rdfa.pl is not used.  Was also the case in the
 # autoconf version
