@@ -16,7 +16,7 @@ swipl_plugin(
     C_SOURCES turtle.c murmur.c
     C_LIBS
     PL_LIB_SUBDIR semweb
-    PL_LIBS turtle.pl rdf_turtle_write.pl)
+    PL_LIBS turtle.pl rdf_turtle_write.pl rdf_prefixes.pl)
 
 swipl_plugin(
     ntriples
@@ -50,8 +50,7 @@ swipl_plugin(
 	    rdf_persistency.pl rdf_turtle.pl rdf_cache.pl
             rdf_http_plugin.pl rdf_zlib_plugin.pl rdf_portray.pl
             rdf_compare.pl rdf_library.pl sparql_client.pl
-            rdfa.pl rdf11.pl rdf11_containers.pl rdf_sandbox.pl
-	    rdf_prefixes.pl)
+            rdfa.pl rdf11.pl rdf11_containers.pl rdf_sandbox.pl)
 
 install_src(pkg_semweb_data
 	    FILES ${SWIPL_SEMWEB_DATA}
