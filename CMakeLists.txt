@@ -69,6 +69,7 @@ test_libs(con litmap load ntriples rdf11 rdf_db
      TEST_FILES local_test.pl random_graph.pl search.pl dc.rdfs pce_graph.pl
      TEST_DIRS Tests)
 
+if(MULTI_THREADED)
 pkg_doc(semweb
 	LIBSUBDIR
 	    semweb
@@ -81,3 +82,10 @@ pkg_doc(semweb
 	    rdf_cache.pl rdf11_containers.pl
 	    SOURCE doc/rdfdb.md rdfdb.tex --rdfdb
 	    SOURCE doc/rdf11.md rdf11.tex --rdf11)
+else()
+pkg_doc(semweb
+	LIBSUBDIR
+	    semweb
+	SECTION
+	    turtle.pl rdf_ntriples.pl)
+endif()
