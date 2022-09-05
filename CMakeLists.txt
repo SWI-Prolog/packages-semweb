@@ -16,7 +16,7 @@ swipl_plugin(
     C_SOURCES turtle.c murmur.c
     C_LIBS
     PL_LIB_SUBDIR semweb
-    PL_LIBS turtle.pl rdf_turtle_write.pl rdf_prefixes.pl)
+    PL_LIBS turtle.pl rdf_turtle_write.pl rdf_prefixes.pl rdf_compare.pl)
 
 swipl_plugin(
     ntriples
@@ -24,6 +24,8 @@ swipl_plugin(
     C_LIBS
     PL_LIB_SUBDIR semweb
     PL_LIBS rdf_ntriples.pl)
+
+test_libs(turtle ntriples TEST_DIRS Tests)
 
 add_custom_target(semweb)
 add_dependencies(semweb turtle ntriples)
@@ -51,8 +53,14 @@ swipl_plugin(
     PL_LIBS rdf_db.pl rdfs.pl rdf_edit.pl rdf_litindex.pl
 	    rdf_persistency.pl rdf_turtle.pl rdf_cache.pl
             rdf_http_plugin.pl rdf_zlib_plugin.pl rdf_portray.pl
-            rdf_compare.pl rdf_library.pl sparql_client.pl
+            rdf_library.pl sparql_client.pl
             rdfa.pl rdf11.pl rdf11_containers.pl rdf_sandbox.pl)
+
+test_libs(turtle2 con litmap load rdf11 rdf_db subprop
+	  PACKAGES sgml clib zlib http plunit RDF
+     PARENT_LIB
+     TEST_FILES local_test.pl random_graph.pl search.pl dc.rdfs pce_graph.pl
+     TEST_DIRS Tests)
 
 install_src(pkg_semweb_data
 	    FILES ${SWIPL_SEMWEB_DATA}
@@ -60,16 +68,6 @@ install_src(pkg_semweb_data
 
 add_dependencies(semweb rdf_db)
 endif(MULTI_THREADED)
-
-
-# FIXME: test_rdfa.pl is not used.  Was also the case in the
-# autoconf version
-test_libs(con litmap load ntriples rdf11 rdf_db
-	  subprop turtle2 turtle
-	  PACKAGES sgml clib zlib http plunit RDF
-     PARENT_LIB
-     TEST_FILES local_test.pl random_graph.pl search.pl dc.rdfs pce_graph.pl
-     TEST_DIRS Tests)
 
 if(MULTI_THREADED)
 pkg_doc(semweb
