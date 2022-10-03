@@ -165,8 +165,8 @@ of the old API, so both APIs can be mixed in a single application.
 \subsection{library(semweb/rdf11): The RDF database}
 \label{sec:semweb-rdf11}
 
-\InputIfFileExists{rdf11}
-\InputIfFileExists{rdf11containers}
+\InputIfFileExists{rdf11}{}{}
+\InputIfFileExists{rdf11containers}{}{}
 
 
 		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -177,7 +177,7 @@ of the old API, so both APIs can be mixed in a single application.
 \subsection{library(semweb/rdf_db): The RDF database}
 \label{sec:semweb-rdf-db}
 
-\InputIfFileExists{rdfdb}
+\InputIfFileExists{rdfdb}{}{}
 
 
 \subsection{Monitoring the database}		\label{sec:rdfmonitor}
@@ -382,7 +382,7 @@ mime-type is not one of the above.  In addition, it recognises
 \const{text/html} and \const{application/xhtml+xml}, scanning
 the XML content for embedded RDF.
 
-\InputIfFileExists{rdfcache.tex}
+\InputIfFileExists{rdfcache.tex}{}{}
 
 
 
@@ -816,7 +816,7 @@ in the directory described by rdf_current_db/1 and has the extension
 
 \input{turtle.tex}
 \input{rdfntriples.tex}
-\InputIfFileExists{rdfa.tex}
+\InputIfFileExists{rdfa.tex}{}{}
 
 
 		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -920,15 +920,15 @@ database \arg{DB}.
 		 %	     LIBRARY		%
 		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\InputIfFileExists{rdflib.tex}
+\InputIfFileExists{rdflib.tex}{}{}
 
 		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		 %	  PLDOC LIBRARIES	%
 		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\InputIfFileExists{sparqlclient.tex}
-\InputIfFileExists{rdfcompare.tex}
-\InputIfFileExists{rdfportray.tex}
+\InputIfFileExists{sparqlclient.tex}{}{}
+\InputIfFileExists{rdfcompare.tex}{}{}
+\InputIfFileExists{rdfportray.tex}{}{}
 
 
 \section{Related packages}
