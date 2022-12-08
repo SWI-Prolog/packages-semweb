@@ -284,7 +284,7 @@ static resource resource_constants[] =
 #define RECOVER_END()         ts->recover = __or; \
 			    }
 #define RECOVER(mode, code) \
-        RECOVER_BEGIN(mode); \
+	RECOVER_BEGIN(mode); \
 	code; \
 	RECOVER_END();
 
@@ -366,9 +366,8 @@ discardBuf(string_buffer *b)
     free(b->buf);
 }
 
-
 static inline int
-addBuf(string_buffer *b, int c)
+addBuf_wchar(string_buffer *b, int c)
 { if ( b->in < b->end )
   { *b->in++ = c;
     return TRUE;
@@ -377,6 +376,26 @@ addBuf(string_buffer *b, int c)
   return growBuffer(b, c);
 }
 
+static inline void
+utf16_encode(int c, int *lp, int *tp)
+{ c -= 0x10000;
+  *lp = (c>>10)+0xD800;
+  *tp = (c&0X3FF)+0xDC00;
+}
+
+static inline int
+addBuf(string_buffer *b, int c)
+{
+#if SIZEOF_WCHAR_T == 2
+  if ( c > 0xffff )
+  { int l, t ;
+    utf16_encode(c, &l, &t);
+    return ( addBuf_wchar(b, l) &&
+	     addBuf_wchar(b, t) );
+  } else
+#endif
+  return addBuf_wchar(b, c);
+}
 
 static inline int
 bufSize(string_buffer *b)
@@ -688,7 +707,7 @@ syntax_message(turtle_state *ts, const char *msg, int is_error)
 
   if ( !(ex1=PL_new_term_ref()) ||
        !PL_unify_term(ex1, PL_FUNCTOR, FUNCTOR_syntax_error1,
-		              PL_CHARS, msg) )
+			      PL_CHARS, msg) )
     return FALSE;
 
   return print_message(ts, ex1, is_error);
@@ -1254,7 +1273,7 @@ set_format(turtle_state *ts, format fmt)
   { switch(fmt)
     { case D_TRIG:
 	ts->default_graph = ts->current_graph;
-        ts->current_graph = NULL;
+	ts->current_graph = NULL;
 	/*FALLTHROUGH*/
       case D_TRIG_NO_GRAPH:
       case D_TURTLE:
@@ -1262,7 +1281,7 @@ set_format(turtle_state *ts, format fmt)
 	return TRUE;
       default:
 	assert(0);
-        return FALSE;
+	return FALSE;
     }
   }
 
@@ -1485,8 +1504,8 @@ put_graph(turtle_state *ts, term_t g)
     if ( (pos=ts->input->position) )
     { PL_put_variable(g);
       return PL_unify_term(g, PL_FUNCTOR, FUNCTOR_colon2,
-			        PL_ATOM, cg->v.r.handle,
-			        PL_INT,  (int)pos->lineno);
+				PL_ATOM, cg->v.r.handle,
+				PL_INT,  (int)pos->lineno);
     } else
     { return PL_put_atom(g, cg->v.r.handle);
     }
@@ -2368,8 +2387,8 @@ read_number(turtle_state *ts, string_buffer *num, number_type *numtype)
 	{ *numtype = NUM_DOUBLE;
 	  return read_exponent(ts, num);
 	}
-        default:
-        done:
+	default:
+	done:
 	  addBuf(num, EOS);
 	  return TRUE;
       }
@@ -2795,14 +2814,14 @@ graph_or_final_predicate_object_list(turtle_state *ts, resource *r,
       case D_TURTLE:
 	syntax_warning(ts, "Unexpected \"<graph> {\" in Turtle format "
 		       "(assuming TriG, ignoring graphs)");
-        set_format(ts, D_TRIG_NO_GRAPH);
+	set_format(ts, D_TRIG_NO_GRAPH);
 	/*FALLTHROUGH*/
       case D_TRIG_NO_GRAPH:
 	free_resource(ts, r);		/* discard graph name */
 	return next(ts) && statement(ts);
       default:
 	assert(0);
-        return FALSE;
+	return FALSE;
     }
   } else if ( rc == FALSE )
   { set_subject(ts, r, NULL);
@@ -2843,7 +2862,7 @@ retry:
       { case D_AUTO:
 	  set_format(ts, D_TRIG);
 	  /*FALLTHROUGH*/
-        case D_TRIG:
+	case D_TRIG:
 	  if ( !ts->current_graph )
 	  { if ( !next(ts) )
 	      return FALSE;
@@ -2859,7 +2878,7 @@ retry:
 			 "(assuming TriG, ignoring graphs)");
 	  set_format(ts, D_TRIG_NO_GRAPH);
 	  /*FALLTHROUGH*/
-        case D_TRIG_NO_GRAPH:
+	case D_TRIG_NO_GRAPH:
 	  if ( !next(ts) )
 	    return FALSE;
 	  goto retry;
@@ -3439,7 +3458,7 @@ turtle_format(term_t parser, term_t format)
       case D_TRIG_NO_GRAPH: a = ATOM_trig;   break;
       default:
 	assert(0);
-        return FALSE;
+	return FALSE;
     }
 
     return PL_unify_atom(format, a);

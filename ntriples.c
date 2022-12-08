@@ -3,7 +3,8 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2013-2015, VU University Amsterdam
+    Copyright (c)  2013-2022, VU University Amsterdam
+			      SWI-Prolog Solutions b.v.
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -164,7 +165,7 @@ syntax_error(IOSTREAM *in, const char *msg)
   IOPOS *pos;
 
   if ( !PL_unify_term(ex+0, PL_FUNCTOR, FUNCTOR_syntax_error1,
-		              PL_CHARS, msg) )
+			      PL_CHARS, msg) )
     return FALSE;
 
   if ( (pos=in->position) )
@@ -275,13 +276,34 @@ discardBuf(string_buffer *b)
 
 
 static inline int
-addBuf(string_buffer *b, int c)
+addBuf_wchar(string_buffer *b, int c)
 { if ( b->in < b->end )
   { *b->in++ = c;
     return TRUE;
   }
 
   return growBuffer(b, c);
+}
+
+static inline void
+utf16_encode(int c, int *lp, int *tp)
+{ c -= 0x10000;
+  *lp = (c>>10)+0xD800;
+  *tp = (c&0X3FF)+0xDC00;
+}
+
+static inline int
+addBuf(string_buffer *b, int c)
+{
+#if SIZEOF_WCHAR_T == 2
+  if ( c > 0xffff )
+  { int l, t ;
+    utf16_encode(c, &l, &t);
+    return ( addBuf_wchar(b, l) &&
+	     addBuf_wchar(b, t) );
+  } else
+#endif
+  return addBuf_wchar(b, c);
 }
 
 
