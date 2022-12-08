@@ -38,6 +38,7 @@
 #include <string.h>
 #include <assert.h>
 #include "turtle_chars.c"
+#include "pl-utf8.h"
 
 static atom_t ATOM_end_of_file;
 
@@ -275,13 +276,24 @@ discardBuf(string_buffer *b)
 
 
 static inline int
-addBuf(string_buffer *b, int c)
+addBuf_wchar(string_buffer *b, int c)
 { if ( b->in < b->end )
   { *b->in++ = c;
     return TRUE;
   }
 
   return growBuffer(b, c);
+}
+
+
+static inline int
+addBuf(string_buffer *b, int c)
+{ if ( c <= 0xffff )
+    return addBuf_wchar(b, c) ;
+
+  int l, t ;
+  utf16_encode(c, &l, &t);
+  return addBuf_wchar(b, l) && addBuf_wchar(b, t) ;
 }
 
 
