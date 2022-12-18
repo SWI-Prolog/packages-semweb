@@ -285,12 +285,14 @@ addBuf_wchar(string_buffer *b, int c)
   return growBuffer(b, c);
 }
 
+#if SIZEOF_WCHAR_T == 2
 static inline void
 utf16_encode(int c, int *lp, int *tp)
 { c -= 0x10000;
   *lp = (c>>10)+0xD800;
   *tp = (c&0X3FF)+0xDC00;
 }
+#endif
 
 static inline int
 addBuf(string_buffer *b, int c)
