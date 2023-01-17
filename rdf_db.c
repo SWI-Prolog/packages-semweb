@@ -257,7 +257,7 @@ print_literal(literal *lit)
 	  { if ( strlen(s) == len )
 	      Sdprintf("\"%s\"", s);
 	    else
-	      Sdprintf("\"%s\" (len=%d)", s, len);
+	      Sdprintf("\"%s\" (len=%zd)", s, len);
 	  } else if ( (w = PL_atom_wchars(lit->value.string, &len)) )
 	  { unsigned int i;
 	    Sputc('L', Serror);
@@ -312,7 +312,7 @@ print_src(triple *t)
   { if ( t->line == NO_LINE )
       Sdprintf(" [%s]", PL_atom_chars(ID_ATOM(t->graph_id)));
     else
-      Sdprintf(" [%s:%ld]", PL_atom_chars(ID_ATOM(t->graph_id)), t->line);
+      Sdprintf(" [%s:%" PRIu32 "]", PL_atom_chars(ID_ATOM(t->graph_id)), t->line);
   } else
   { Sdprintf(" ?g");
   }
@@ -1477,7 +1477,7 @@ lookup_predicate(rdf_db *db, atom_t name)
   p->next = *pp;
   *pp = p;
   db->predicates.count++;
-  DEBUG(5, Sdprintf("Pred %s (count = %d)\n",
+  DEBUG(5, Sdprintf("Pred %s (count = %zd)\n",
 		    PL_atom_chars(name), db->predicates.count));
   UNLOCK_MISC(db);
 
@@ -1720,7 +1720,7 @@ append_clouds(rdf_db *db,
     else
       newc++;
 
-    DEBUG(1, Sdprintf("Cloud %p: %d alt-hashes\n", c1, newc));
+    DEBUG(1, Sdprintf("Cloud %p: %zd alt-hashes\n", c1, newc));
 
     if ( c1->alt_hashes )
     { unsigned int *new_hashes;
@@ -2334,7 +2334,7 @@ print_reachability_cloud(rdf_db *db, predicate *p, int all)
   sub_p_matrix *rm;
   query *q;
 
-  Sdprintf("Cloud has %d members, hash = 0x%x\n", cloud->size, cloud->hash);
+  Sdprintf("Cloud has %zd members, hash = 0x%x\n", cloud->size, cloud->hash);
   check_predicate_cloud(cloud);
 
   if ( !(q = open_query(db)) )
@@ -2369,7 +2369,7 @@ print_reachability_cloud(rdf_db *db, predicate *p, int all)
       if ( predicate_hash(yp) == cloud->hash )
 	Sdprintf(" %2d %s\n  ", y, pname(yp));
       else
-	Sdprintf(" %2d %s (hash=0x%x)\n  ", y, pname(yp), predicate_hash(yp));
+	Sdprintf(" %2d %s (hash=0x%zx)\n  ", y, pname(yp), predicate_hash(yp));
       assert(cloud->members[y]->label == y);
     }
   }
@@ -4202,7 +4202,7 @@ gc_hash_chain(rdf_db *db, size_t bucket_no, int icol,
   if ( icol == 0 )
   { char buf[64];
 
-    DEBUG(4, Sdprintf("At %s: %lld uncollectable\n",
+    DEBUG(4, Sdprintf("At %s: %zd uncollectable\n",
 		      gen_name(gen, buf),
 		      uncollectable));
     db->gc.uncollectable = uncollectable;
@@ -7439,7 +7439,7 @@ next_sub_property(search_state *state)
       if ( p->predicate.r->cloud->alt_hash_count )
       { pc = state->p_cloud = p->predicate.r->cloud;
 
-	DEBUG(1, Sdprintf("%d alt hashes; first was 0x%x\n",
+	DEBUG(1, Sdprintf("%zd alt hashes; first was 0x%zx\n",
 			  p->predicate.r->cloud->alt_hash_count,
 			  predicate_hash(p->predicate.r)));
 	tw->unbounded_hash ^= predicate_hash(p->predicate.r);
@@ -8326,7 +8326,7 @@ rdf_monitor(term_t goal, term_t mask)
       joined_mask = 0L;
       for(cb2=callback_list; cb2; cb2 = cb2->next)
 	joined_mask |= cb2->mask;
-      DEBUG(2, Sdprintf("Set mask to 0x%x\n", joined_mask));
+      DEBUG(2, Sdprintf("Set mask to 0x%zx\n", joined_mask));
 
       return TRUE;
     }
