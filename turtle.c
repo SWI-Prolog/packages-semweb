@@ -1397,7 +1397,7 @@ set_prefix(turtle_state *ts, const wchar_t *prefix, resource *r)
 static char *
 r_name(resource *r, char *buf, size_t size)
 { if ( r->type == R_RESOURCE )
-    Ssnprintf(buf, size, "<%Ws>", r->v.r.name);
+    SsnprintfX(buf, size, "<%Ws>", r->v.r.name);
   else if ( r->type == R_BNODE )
     Ssnprintf(buf, size, "bnode(%ld)", (long)r->v.bnode_id);
   else
@@ -1413,12 +1413,12 @@ o_name(object *o, char *buf, size_t size)
     return r_name(o->value.r, buf, size);
   if ( o->type == O_LITERAL )
   { if ( o->value.l.lang )
-      Ssnprintf(buf, size, "\"%Ws\"@%Ws", o->value.l.string, o->value.l.lang);
+      SsnprintfX(buf, size, "\"%Ws\"@%Ws", o->value.l.string, o->value.l.lang);
     else if ( o->value.l.type )
-      Ssnprintf(buf, size, "\"%Ws\"^^<%Ws>", o->value.l.string,
-	       o->value.l.type->v.r);
+      SsnprintfX(buf, size, "\"%Ws\"^^<%Ws>", o->value.l.string,
+		 o->value.l.type->v.r);
     else
-      Ssnprintf(buf, size, "\"%Ws\"", o->value.l.string);
+      SsnprintfX(buf, size, "\"%Ws\"", o->value.l.string);
 
     return buf;
   }

@@ -388,10 +388,10 @@ gen_name(gen_t gen, char *buf)
     if ( r == GEN_TNEST-1 )
       Ssprintf(buf, "T%d+GEN_TNEST", tid);
     else
-      Ssprintf(buf, "T%d+%lld", tid, (int64_t)r);
+      Ssprintf(buf, "T%d+%" PRId64, tid, (int64_t)r);
     return buf;
   }
-  Ssprintf(buf, "%lld", (int64_t)gen);
+  Ssprintf(buf, "%" PRId64, (int64_t)gen);
   return buf;
 }
 

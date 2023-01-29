@@ -360,7 +360,7 @@ format_datum(datum d, char *buf)
 
   if ( !buf )
     buf = tmp;
-  Ssprintf(buf, "%lld", (int64_t)integer_from_datum(d));
+  Ssprintf(buf, "%" PRId64, (int64_t)integer_from_datum(d));
 
   return buf;
 }
@@ -905,7 +905,7 @@ find_atom_map_protected(atom_map  *map, term_t keys, term_t literals)
 
       as[ns].set = &data->values;
       as[ns].neg = neg;
-      DEBUG(2, Sdprintf("Found atom-set of size %d\n", as[ns].set->size));
+      DEBUG(2, Sdprintf("Found atom-set of size %zd\n", as[ns].set->size));
       ns++;
     } else if ( !neg )
     { return PL_unify_nil(literals);
