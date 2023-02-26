@@ -1197,6 +1197,7 @@ clear_turtle_parser(turtle_state *ts)
 
   if ( ts->base_uri )	     free(ts->base_uri);
   if ( ts->empty_prefix )    free(ts->empty_prefix);
+  if ( ts->bnode.prefix )    free(ts->bnode.prefix);
   if ( ts->bnode.buffer )    free(ts->bnode.buffer);
 
   if ( ts->input )
