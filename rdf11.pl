@@ -1554,6 +1554,10 @@ gen_term(O) :-                          % performs double conversion!
 rdf_literal(Term) :-
     ground(Term),
     !,
+    (   boolean(Term)
+    ;   \+ atom(Term)
+    ),
+    !,
     pre_ground_object(Term, Object),
     (rdf_db:rdf(_,_,Object)->true).
 rdf_literal(Term) :-

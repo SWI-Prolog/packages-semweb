@@ -159,6 +159,8 @@ test(type, set(Literal == [ 42^^xsd:integer,
                             true^^xsd:boolean,
                             "hello"^^xsd:string])) :-
     rdf_literal(Literal).
+test(type, fail) :-
+    rdf_literal(c).
 % deterministic tests
 test(enum_det) :- rdf_name(true).
 test(enum_det) :- rdf_name(a).
