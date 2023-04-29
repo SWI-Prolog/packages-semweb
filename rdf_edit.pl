@@ -226,7 +226,7 @@ rdfe_load(File, Options) :-
     rdfe_current_transaction(TID),
     absolute_file_name(File,
                        [ access(read),
-                         extensions([rdf,rdfs,owl,''])
+                         extensions([rdf,rdfs,owl,ttl,nt,''])
                        ], Path),
     rdf_load(Path,
              [ graph(Graph),
