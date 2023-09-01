@@ -523,7 +523,7 @@ insert_atom_set(atom_map *map, atom_set *as, datum a)
 static int
 delete_atom_set(atom_map *map, atom_set *as, datum a)
 { unsigned int i;
-  int j, r;
+  unsigned int j, r;
 
   if ( as->size < as->entries->allocated/4 &&
        as->entries->allocated > AS_INITIAL_SIZE )
@@ -751,14 +751,14 @@ insert_atom_map4(term_t handle, term_t from, term_t to, term_t keys)
     data = skiplist_insert(&map->list, &search, &is_new);
     SECURE(data->magic = ND_MAGIC);
     if ( is_new )
-    { map->new = map->new*0.99+1.0;
+    { map->new = (float)(map->new*0.99+1.0);
       map->value_count++;
       lock_datum(search.data.key);
     } else
     { int rc;
 
     found:
-      map->existing = map->existing*0.99+1.0;
+      map->existing = (float)(map->existing*0.99+1.0);
       if ( (rc = insert_atom_set(map, &data->values, a2)) > 0 )
       { map->value_count++;
 	lock_datum(a2);
@@ -952,7 +952,7 @@ next:;
 static foreign_t
 find_atom_map(term_t handle, term_t keys, term_t literals)
 { atom_map *map;
-  int rc;
+  foreign_t rc;
 
   if ( !get_atom_map(handle, &map) )
     return FALSE;
@@ -1128,7 +1128,7 @@ rdf_keys_in_literal_map_proteced(atom_map *map, term_t spec, term_t keys)
 static foreign_t
 rdf_keys_in_literal_map(term_t handle, term_t spec, term_t keys)
 { atom_map *map;
-  int rc;
+  foreign_t rc;
 
   if ( !get_atom_map(handle, &map) )
     return FALSE;

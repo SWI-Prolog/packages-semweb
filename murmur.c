@@ -23,7 +23,7 @@ NOTE: This file is a copy of src/pl-hash.c from SWI-Prolog.
 #if WORDS_BIGENDIAN
 
 unsigned int
-rdf_murmer_hash(const void * key, int len, unsigned int seed)
+rdf_murmer_hash(const void * key, size_t len, unsigned int seed)
 { const unsigned int m = 0x5bd1e995;
   const int r = 24;
   unsigned int h = seed ^ len;

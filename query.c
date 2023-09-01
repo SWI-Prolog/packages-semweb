@@ -382,7 +382,7 @@ gen_name(gen_t gen, char *buf)
   if ( gen == GEN_MAX     ) return "GEN_MAX";
   if ( gen == GEN_PREHIST ) return "GEN_PREHIST";
   if ( gen >= GEN_TBASE )
-  { int tid = (gen-GEN_TBASE)/GEN_TNEST;
+  { int tid = (int)((gen-GEN_TBASE)/GEN_TNEST);
     gen_t r = (gen-GEN_TBASE)%GEN_TNEST;
 
     if ( r == GEN_TNEST-1 )

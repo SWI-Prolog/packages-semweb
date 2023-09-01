@@ -32,6 +32,7 @@
     POSSIBILITY OF SUCH DAMAGE.
 */
 
+#define _CRT_SECURE_NO_WARNINGS 1
 #include <config.h>
 #if defined(__sun) || __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 1070
 #undef HAVE_WCSDUP			/* there is no prototype */
@@ -399,7 +400,7 @@ addBuf(string_buffer *b, int c)
   return addBuf_wchar(b, c);
 }
 
-static inline int
+static inline size_t
 bufSize(string_buffer *b)
 { return b->in - b->buf;
 }
@@ -3400,8 +3401,8 @@ turtle_prefixes(term_t parser, term_t prefixmap)
   if ( get_turtle_parser(parser, &ts) )
   { term_t tail = PL_copy_term_ref(prefixmap);
     term_t head = PL_new_term_ref();
-    int e = ts->prefix_map.size;
-    int i;
+    size_t e = ts->prefix_map.size;
+    size_t i;
 
     for(i=0; i<e; i++)
     { hash_cell *c = ts->prefix_map.entries[i];

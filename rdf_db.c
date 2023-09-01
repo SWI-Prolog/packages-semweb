@@ -45,6 +45,9 @@
 #ifndef SIZEOF_LONG
 #define SIZEOF_LONG 4
 #endif
+#ifdef _MSC_VER
+#define strdup _strdup
+#endif
 #endif
 
 #include "rdf_db.h"
@@ -1118,7 +1121,7 @@ destroy_triple_array(rdf_db *db)
   { triple_element *e = a->blocks[i];
 
     assert(e);
-    e += 1<<(i-1);
+    e += (size_t)1<<(i-1);
     aliasedFree(e);			/* trick GCC-11 */
   }
   memset(a, 0, sizeof(*a));
@@ -1173,7 +1176,7 @@ register_triple(rdf_db *db, triple *t)
   for(i=1,slice_size=1; i<MAX_TBLOCKS; i++,slice_size*=2)
   { if ( e >= a->blocks[i]+slice_size &&
 	 e <  a->blocks[i]+slice_size*2 )
-    { t->id = e - a->blocks[i];
+    { t->id = (triple_id)(e - a->blocks[i]);
 
       assert(fetch_triple(db, t->id) == t);
       return t->id;
@@ -1290,7 +1293,7 @@ next_hash_triple(triple_walker *tw)
 
   if ( tw->bcount <= hash->bucket_count )
   { do
-    { int entry = tw->unbounded_hash % tw->bcount;
+    { size_t entry = tw->unbounded_hash % tw->bcount;
       triple_bucket *bucket = &hash->blocks[MSB(entry)][entry];
 
       rc = fetch_triple(tw->db, bucket->head);
@@ -1420,7 +1423,7 @@ next_predicate(pred_walker *pw)
     pw->current = p->next;
   } else if ( pw->bcount <= pw->db->predicates.bucket_count )
   { do
-    { int entry = pw->unbounded_hash % pw->bcount;
+    { size_t entry = pw->unbounded_hash % pw->bcount;
       p = pw->db->predicates.blocks[MSB(entry)][entry];
       pw->bcount *= 2;
     } while(!p && pw->bcount <= pw->db->predicates.bucket_count );
@@ -1686,7 +1689,7 @@ static predicate_cloud *
 append_clouds(rdf_db *db,
 	      predicate_cloud *c1, predicate_cloud *c2,
 	      int update_hash)
-{ int i;
+{ size_t i;
   predicate **new_members;
   predicate **old_members = c1->members;
 
@@ -1701,7 +1704,7 @@ append_clouds(rdf_db *db,
   { predicate *p = c1->members[i];
 
     p->cloud = c1;
-    p->label = i;
+    p->label = (unsigned int)i;
     if ( update_hash )
       p->hash = c1->hash;
   }
@@ -2594,7 +2597,7 @@ next_graph(graph_walker *gw)
     gw->current = g->next;
   } else if ( gw->bcount <= gw->db->graphs.bucket_count )
   { do
-    { int entry = gw->unbounded_hash % gw->bcount;
+    { size_t entry = gw->unbounded_hash % gw->bcount;
       g = gw->db->graphs.blocks[MSB(entry)][entry];
       gw->bcount *= 2;
     } while(!g && gw->bcount <= gw->db->graphs.bucket_count );
@@ -3482,7 +3485,7 @@ share_literal(rdf_db *db, literal *from)
   if ( existing*2 > new &&
       (data = skiplist_find(&db->literals, &lex)) )
   { simpleMutexLock(&db->locks.literal);
-    existing = existing*0.99+1.0;
+    existing = existing*0.99f+1.0f;
     if ( !skiplist_erased_payload(&db->literals, data) )
     { shared = *data;
       shared->references++;
@@ -3501,13 +3504,13 @@ share_literal(rdf_db *db, literal *from)
   data = skiplist_insert(&db->literals, &lex, &is_new);
   sl_check(db, FALSE);
   if ( is_new )
-  { new = new*0.99+1.0;
+  { new = new*0.99f+1.0f;
     from->shared = TRUE;
     shared = from;
     assert(from->references==1);
     assert(from->atoms_locked==1);
   } else
-  { existing = existing*0.99+1.0;
+  { existing = existing*0.99f+1.0f;
     shared = *data;
     shared->references++;
     assert(shared->references != 0);
@@ -3644,7 +3647,7 @@ reset_triple_hash(rdf_db *db, triple_hash *hash)
     { triple_bucket *t = hash->blocks[i];
 
       hash->blocks[i] = NULL;
-      t += 1<<(i-1);
+      t += (size_t)1<<(i-1);
       PL_free(t);
     } else
       break;
@@ -3665,7 +3668,7 @@ reset_triple_hash(rdf_db *db, triple_hash *hash)
 #define COUNT_DIFF_NOHASH 5
 
 static int
-count_different(rdf_db *db, triple_bucket *tb, int index, int *count)
+count_different(rdf_db *db, triple_bucket *tb, int index, size_t *count)
 { triple *t;
   int rc;
 
@@ -3673,7 +3676,7 @@ count_different(rdf_db *db, triple_bucket *tb, int index, int *count)
   { if ( tb->count <= 1 )
     { *count = tb->count;
 
-      return tb->count;
+      return (int)tb->count;
     } else
     { size_t hashes[COUNT_DIFF_NOHASH];
       int different = 0;
@@ -3708,7 +3711,7 @@ count_different(rdf_db *db, triple_bucket *tb, int index, int *count)
     { c++;
       add_atomset(&hash_set, (atom_t)triple_hash_key(t, index));
     }
-    rc = hash_set.count;
+    rc = (int)hash_set.count;
     destroy_atomset(&hash_set);
 
     *count = c;
@@ -3736,14 +3739,14 @@ triple_hash_quality(rdf_db *db, int index, int sample)
     return 1.0;
 
   if ( sample > 0 )
-    step = (hash->bucket_count+sample)/sample;	/* step >= 1 */
+    step = (int)((hash->bucket_count+sample)/sample);	/* step >= 1 */
   else
     step = 1;
 
   for(i=0; i<hash->bucket_count; i += step)
   { int entry = MSB(i);
     triple_bucket *tb = &hash->blocks[entry][i];
-    int count;
+    size_t count;
     int different = count_different(db, tb, col_index[index], &count);
 
     DEBUG(1,			/* inconsistency is normal due to concurrency */
@@ -3757,7 +3760,7 @@ triple_hash_quality(rdf_db *db, int index, int sample)
     }
   }
 
-  return total == 0 ? 1.0 : q/(float)total;
+  return total == 0 ? 1.0f : q/(float)total;
 }
 
 
@@ -3768,14 +3771,14 @@ print_triple_hash(rdf_db *db, int index, int sample)
   int i, step;
 
   if ( sample > 0 )
-    step = (hash->bucket_count+sample)/sample;	/* step >= 1 */
+    step = (int)((hash->bucket_count+sample)/sample);	/* step >= 1 */
   else
     step = 1;
 
   for(i=0; i<hash->bucket_count; i += step)
   { int entry = MSB(i);
     triple_bucket *tb = &hash->blocks[entry][i];
-    int count;
+    size_t count;
     int different = count_different(db, tb, col_index[index], &count);
 
     if ( count != 0 )
@@ -3806,7 +3809,7 @@ consider_triple_rehash(rdf_db *db, size_t extra)
   if ( (extra + triples)/spo->avg_chain_len > spo->bucket_count )
   { int i;
     int resized = 0;
-    int factor = ((extra+triples+100000)*16)/(triples+100000);
+    int factor = (int)(((extra+triples+100000)*16)/(triples+100000));
 
 #define SCALE(n) (((n)*factor)/(16*db->hash[i].avg_chain_len))
 #define SCALEF(n) (((n)*(float)factor)/(16.0*(float)db->hash[i].avg_chain_len))
@@ -4669,7 +4672,7 @@ create_triple_hashes(rdf_db *db, int count, int *ic)
       { for(i=0; i<mx; i++)
 	{ triple_hash *hash = hashes[i];
 	  int i = col_index[hash->icol];
-	  int key = triple_hash_key(t, i) % hash->bucket_count;
+	  size_t key = triple_hash_key(t, i) % hash->bucket_count;
 	  triple_bucket *bucket = &hash->blocks[MSB(key)][key];
 
 	  append_triple_bucket(db, bucket, hash->icol, t);
@@ -4701,7 +4704,7 @@ link_triple_hash(rdf_db *db, triple *t)
 
     if ( hash->created )
     { int i = col_index[ic];
-      int key = triple_hash_key(t, i) % hash->bucket_count;
+      size_t key = triple_hash_key(t, i) % hash->bucket_count;
       triple_bucket *bucket = &hash->blocks[MSB(key)][key];
 
       append_triple_bucket(db, bucket, ic, t);
@@ -7229,7 +7232,8 @@ init_cursor_from_literal(search_state *state, literal *cursor)
   if ( p->indexed&BY_S ) iv ^= subject_hash(p);
   if ( p->indexed&BY_P ) iv ^= predicate_hash(p->predicate.r);
 
-  init_triple_literal_walker(&state->cursor, state->db, p, p->indexed, iv);
+  init_triple_literal_walker(&state->cursor, state->db, p, p->indexed,
+			     (unsigned int)iv);
   state->has_literal_state = TRUE;
   state->literal_cursor = cursor;
 
@@ -7781,7 +7785,7 @@ rdf_estimate_complexity(term_t subject, term_t predicate, term_t object,
 
     c = 0;
     for(count=hash->bucket_count_epoch; count <= hash->bucket_count; count *= 2)
-    { int entry = key%count;
+    { size_t entry = key%count;
       triple_bucket *bucket = &hash->blocks[MSB(entry)][entry];
 
       c += bucket->count;		/* TBD: compensate for resize */
@@ -9093,7 +9097,7 @@ unify_statistics(rdf_db *db, term_t key, functor_t f)
     { if ( db->hash[i].created )
       { if ( !PL_unify_list(tail, head, tail) ||
 	     !PL_put_integer(av+0, col_index[i]) ||
-	     !PL_put_integer(av+1, db->hash[i].bucket_count) ||
+	     !PL_put_int64(av+1, db->hash[i].bucket_count) ||
 	     !PL_put_float(av+2, triple_hash_quality(db, i, 1024)) ||
 	     !PL_put_integer(av+3, MSB(db->hash[i].bucket_count)-
 				   MSB(db->hash[i].bucket_count_epoch)) ||

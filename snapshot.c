@@ -239,7 +239,7 @@ int
 snapshot_thread(snapshot *ss)
 { if ( ss->tr_gen > GEN_TBASE &&
        ((ss->tr_gen-GEN_TBASE)%GEN_TNEST) != 0 )
-    return (ss->tr_gen-GEN_TBASE)/GEN_TNEST;
+    return (int)((ss->tr_gen-GEN_TBASE)/GEN_TNEST);
 
   return 0;
 }

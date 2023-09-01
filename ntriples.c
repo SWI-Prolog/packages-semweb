@@ -309,7 +309,7 @@ addBuf(string_buffer *b, int c)
 }
 
 
-static inline int
+static inline size_t
 bufSize(string_buffer *b)
 { return b->in - b->buf;
 }

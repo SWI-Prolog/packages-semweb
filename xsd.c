@@ -32,6 +32,7 @@
     POSSIBILITY OF SUCH DAMAGE.
 */
 
+#define _CRT_SECURE_NO_WARNINGS 1
 #include "xsd.h"
 #include <string.h>
 #include <stdlib.h>
@@ -42,7 +43,7 @@ static xsd_type xsd_types[] =
   { URL_xsd "byte",		  0, XSD_INTEGER, -128,        127 },
   { URL_xsd "double",		  0, XSD_DOUBLE,   0,	       0 },
   { URL_xsd "decimal",		  0, XSD_DECIMAL,  0,	       0 },
-  { URL_xsd "int",		  0, XSD_INTEGER, -2147483648, 2147483647 },
+  { URL_xsd "int",		  0, XSD_INTEGER, -2147483648LL, 2147483647 },
   { URL_xsd "integer",		  0, XSD_INTEGER,  0,	       0 },
   { URL_xsd "long",		  0, XSD_INTEGER,  0,	       0 },
   { URL_xsd "negativeInteger",	  0, XSD_INTEGER,  0, -1 },

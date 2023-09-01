@@ -16,7 +16,7 @@
 #define   OBJ_MURMUR_SEED	(0x14e86b12)
 #define	GRAPH_MURMUR_SEED	(0x78a64d55)
 
-COMMON(unsigned int) rdf_murmer_hash(const void *key, int len, unsigned int seed);
+COMMON(unsigned int) rdf_murmer_hash(const void *key, size_t len, unsigned int seed);
 
 static inline unsigned int
 atom_hash(atom_t a, unsigned int seed)

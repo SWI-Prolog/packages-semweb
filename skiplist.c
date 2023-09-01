@@ -363,7 +363,7 @@ skiplist_check(skiplist *sl, int print)
       count++;
 
       if ( h == 0 )
-      { int i;
+      { unsigned int i;
 
 	for(i=1; i<sc->height; i++)
 	{ if ( sc->next[i] )
@@ -373,7 +373,7 @@ skiplist_check(skiplist *sl, int print)
 					 SIZEOF_SKIP_CELL_NOPLAYLOAD(i));
 	    assert(next0->magic == SKIPCELL_MAGIC);
 	    assert(next1->magic == SKIPCELL_MAGIC);
-	   
+
 	    void *p0, *p1;
 	    p0 = subPointer(next0, sl->payload_size);
 	    p1 = subPointer(next1, sl->payload_size);
@@ -417,7 +417,7 @@ skiplist_insert(skiplist *sl, void *payload, int *is_new)
     int h;
     void **scp, **scpp;
 
-    if ( new->height > sl->height )
+    if ( new->height > (unsigned int)sl->height )
       sl->height = new->height;
 
     h    = sl->height-1;
@@ -438,7 +438,7 @@ skiplist_insert(skiplist *sl, void *payload, int *is_new)
 	assert(diff != 0);
 
 	if ( diff < 0 )			/* cell payload > target */
-	{ if ( h < new->height )
+	{ if ( h < (int)new->height )
 	  { DEBUG(3, Sdprintf("Between %p and %p at height = %d\n",
 			      scpp, scp, h));
 	    new->next[h] = scp;
@@ -456,7 +456,7 @@ skiplist_insert(skiplist *sl, void *payload, int *is_new)
       }
 
       if ( *scp == NULL )
-      { if ( new->height > h )
+      { if ( (int)new->height > h )
 	  *scp = &new->next[h];
 	if ( scpp )
 	  scpp--;

@@ -68,19 +68,38 @@ Stuff for lock-free primitives
 
 #ifdef _MSC_VER				/* Windows MSVC version */
 
+#define HAVE_MSB 1
 static inline int
-MSB(unsigned int i)
-{ unsigned long mask = i;
-  unsigned long index;
+MSB(size_t i)
+{ unsigned long index;
+#if SIZEOF_VOIDP == 8
+  unsigned __int64 mask = i;
+  _BitScanReverse64(&index, mask);
+#else
+  unsigned long mask = i;
+  _BitScanReverse(&index, mask);
+#endif
 
-  assert(0);				/* TBD */
-
-  _BitScanReverse(&index, mask);	/* 0 if mask is 0 */
   return index;
 }
 
-#elif defined(__GNUC__)			/* GCC version */
+#define ATOMIC_ADD(ptr, v)	_InterlockedExchangeAdd64(ptr, v)
+#define ATOMIC_SUB(ptr, v)	ATOMIC_ADD(ptr, -((int64_t)v))
+#define ATOMIC_INC(ptr)		_Generic((*ptr), \
+					 int: _InterlockedIncrement((long*)ptr), \
+					 unsigned int: _InterlockedIncrement((long*)ptr), \
+					 size_t: _InterlockedIncrement64((__int64*)ptr), \
+					 __int64: _InterlockedIncrement64((__int64*)ptr))
+#define ATOMIC_DEC(ptr)		_Generic((*ptr), \
+					 int: _InterlockedDecrement((long*)ptr), \
+					 unsigned int: _InterlockedDecrement((long*)ptr), \
+					 size_t:  _InterlockedDecrement64((__int64*)ptr), \
+					 __int64: _InterlockedDecrement64((__int64*)ptr))
 
+
+#else /* GCC or Clang */
+
+#define HAVE_MSB 1
 #define MSB(i)			((i) ? (32 - __builtin_clz(i)) : 0)
 #define MEMORY_BARRIER()	__atomic_thread_fence(__ATOMIC_SEQ_CST)
 #define PREFETCH_FOR_WRITE(p)	__builtin_prefetch(p, 1, 0)
@@ -94,22 +113,10 @@ MSB(unsigned int i)
 	__atomic_compare_exchange_n(at, &(from), to, FALSE, \
 				    __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
 
-static inline int
-COMPARE_AND_SWAP_PTR(void *at, void *from, void *to)
-{ void **ptr = at;
+#endif /*_MSC_VER or GCC/Clang */
 
-  return __COMPARE_AND_SWAP(ptr, from, to);
-}
-
-static inline int
-COMPARE_AND_SWAP_UINT(unsigned int *at, unsigned int from, unsigned int to)
-{ return __COMPARE_AND_SWAP(at, from, to);
-}
-
-
-#endif /*_MSC_VER|__GNUC__*/
-
-#ifndef MSB
+#ifndef HAVE_MSB
+#define HAVE_MSB
 static inline int
 MSB(unsigned int i)
 { int j = 0;
@@ -124,6 +131,31 @@ MSB(unsigned int i)
   return j;
 }
 #endif
+
+static inline int
+COMPARE_AND_SWAP_PTR(void *at, void *from, void *to)
+{
+#ifdef _MSC_VER
+# if SIZEOF_VOIDP == 4
+  return _InterlockedCompareExchange(at, (long)to, (long)from) == (long)from;
+# else
+  return _InterlockedCompareExchange64(at, (int64_t)to, (int64_t)from) == (int64_t)from;
+#endif
+#else
+  void **ptr = at;
+  return __COMPARE_AND_SWAP(ptr, from, to);
+#endif
+}
+
+static inline int
+COMPARE_AND_SWAP_UINT(unsigned int *at, unsigned int from, unsigned int to)
+{
+#ifdef _MSC_VER
+  return _InterlockedCompareExchange64((int64_t *)at, (int64_t)to, (int64_t)from) == from;
+#else
+  return __COMPARE_AND_SWAP(at, from, to);
+#endif
+}
 
 #ifndef MEMORY_BARRIER
 #define MEMORY_BARRIER() (void)0

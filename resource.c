@@ -159,7 +159,7 @@ next_resource(res_walker *rw)
     rw->current = r->next;
   } else if ( rw->bcount <= rw->rdb->hash.bucket_count )
   { do
-    { int entry = rw->unbounded_hash % rw->bcount;
+    { size_t entry = rw->unbounded_hash % rw->bcount;
       r = rw->rdb->hash.blocks[MSB(entry)][entry];
       rw->bcount *= 2;
     } while(!r && rw->bcount <= rw->rdb->hash.bucket_count );

@@ -251,7 +251,7 @@ typedef struct graph
   atom_t	name;			/* name of the graph */
   atom_t	source;			/* URL graph was loaded from */
   double	modified;		/* Modified time of source URL */
-  int		triple_count;		/* # triples associated to it */
+  size_t	triple_count;		/* # triples associated to it */
   unsigned	erased;			/* Graph is destroyed */
 #ifdef WITH_MD5
   unsigned	md5 : 1;		/* do/don't record MD5 */
@@ -380,7 +380,7 @@ typedef struct triple_bucket
   triple       *head;			/* head of triple-list */
   triple       *tail;			/* Tail of triple-list */
 #endif
-  unsigned int	count;			/* #Triples in bucket */
+  size_t	count;			/* #Triples in bucket */
 } triple_bucket;
 
 
