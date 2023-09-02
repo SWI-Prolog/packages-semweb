@@ -3,8 +3,9 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2011-2020, VU University Amsterdam
+    Copyright (c)  2011-2023, VU University Amsterdam
 			      CWI, Amsterdam
+			      SWI-Prolog Solutions b.v.
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -55,6 +56,10 @@ Stuff for lock-free primitives
 
      size of array at i is i=0 ? 1 : 1<<(i-1)
 
+  __NOTE__: This version is different from   the  one in pl-inline.h for
+  which MSB(0) = undefined, MSB(1) = 0, etc. Would be less confusing to
+  sync this.
+
   * MemoryBarrier()
   Realises a (full) memory barrier.  This means that memory operations
   before the barrier are all executed before those after the barrier.
@@ -67,21 +72,30 @@ Stuff for lock-free primitives
 #define BLOCKLEN(i) ((i) ? 1<<(i-1) : 1)
 
 #ifdef _MSC_VER				/* Windows MSVC version */
+#include <intrin.h>
+#if SIZEOF_VOIDP == 8
+  #pragma intrinsic(_BitScanReverse64)
+#else
+  #pragma intrinsic(_BitScanReverse)
+#endif
 
 #define HAVE_MSB 1
 static inline int
 MSB(size_t i)
 { unsigned long index;
+  unsigned char rc;
 #if SIZEOF_VOIDP == 8
   unsigned __int64 mask = i;
-  _BitScanReverse64(&index, mask);
+  rc = _BitScanReverse64(&index, mask);
 #else
   unsigned long mask = i;
-  _BitScanReverse(&index, mask);
+  rc = _BitScanReverse(&index, mask);
 #endif
 
-  return index;
+  return rc ? index+1 : 0;
 }
+
+#define MEMORY_BARRIER()	MemoryBarrier()
 
 #define ATOMIC_ADD(ptr, v)	_InterlockedExchangeAdd64(ptr, v)
 #define ATOMIC_SUB(ptr, v)	ATOMIC_ADD(ptr, -((int64_t)v))
@@ -137,8 +151,10 @@ COMPARE_AND_SWAP_PTR(void *at, void *from, void *to)
 {
 #ifdef _MSC_VER
 # if SIZEOF_VOIDP == 4
+  static_assert(sizeof(void*) == sizeof(long));
   return _InterlockedCompareExchange(at, (long)to, (long)from) == (long)from;
 # else
+  static_assert(sizeof(void*) == sizeof(int64_t));
   return _InterlockedCompareExchange64(at, (int64_t)to, (int64_t)from) == (int64_t)from;
 #endif
 #else
@@ -151,7 +167,8 @@ static inline int
 COMPARE_AND_SWAP_UINT(unsigned int *at, unsigned int from, unsigned int to)
 {
 #ifdef _MSC_VER
-  return _InterlockedCompareExchange64((int64_t *)at, (int64_t)to, (int64_t)from) == from;
+  static_assert(sizeof(*at) == sizeof(long));
+  return _InterlockedCompareExchange((long*)at, (long)to, (long)from) == (long)from;
 #else
   return __COMPARE_AND_SWAP(at, from, to);
 #endif

@@ -4465,7 +4465,7 @@ new_db(void)
 }
 
 
-static rdf_db *RDF_DB;
+static rdf_db *RDF_DB = NULL;
 
 rdf_db *
 rdf_current_db(void)
