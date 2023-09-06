@@ -3,9 +3,10 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2003-2020, University of Amsterdam
+    Copyright (c)  2003-2023, University of Amsterdam
                               VU University Amsterdam
                               CWI, Amsterdam
+                              SWI-Prolog Solutions b.v.
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -219,7 +220,11 @@
     rdf_load(+, :).
 
 :- predicate_options(rdf_graph_prefixes/3, 3,
-                     [expand(callable), filter(callable), min_count(nonneg)]).
+                     [ expand(callable+4),
+                       filter(callable+3),
+                       get_prefix(callable+2),
+                       min_count(nonneg)
+                     ]).
 :- predicate_options(rdf_load/2, 2,
                      [ base_uri(atom),
                        blank_nodes(oneof([share,noshare])),

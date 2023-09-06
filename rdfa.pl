@@ -100,8 +100,8 @@ load_xml/3.
 		       markup(atom)
 		     ]).
 :- predicate_options(read_dom/3, 3,
-		     [ pass_to(load_html/3, 3),
-		       pass_to(load_xml/3, 3)
+		     [ pass_to(sgml:load_html/3, 3),
+		       pass_to(sgml:load_xml/3, 3)
 		     ]).
 :- predicate_options(read_rdfa/3, 3,
 		     [ pass_to(read_dom/3, 3),
