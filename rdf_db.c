@@ -3751,7 +3751,7 @@ triple_hash_quality(rdf_db *db, int index, int sample)
 
     DEBUG(1,			/* inconsistency is normal due to concurrency */
 	  if ( count != tb->count )
-	    Sdprintf("Inconsistent count in index=%d, bucket=%d, %d != %d\n",
+	    Sdprintf("Inconsistent count in index=%d, bucket=%d, %dz != %d\n",
 		     index, i, count, tb->count));
 
     if ( count )
