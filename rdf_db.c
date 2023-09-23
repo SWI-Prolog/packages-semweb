@@ -3751,7 +3751,7 @@ triple_hash_quality(rdf_db *db, int index, int sample)
 
     DEBUG(1,			/* inconsistency is normal due to concurrency */
 	  if ( count != tb->count )
-	    Sdprintf("Inconsistent count in index=%d, bucket=%d, %dz != %d\n",
+	    Sdprintf("Inconsistent count in index=%d, bucket=%d, %zd != %zd\n",
 		     index, i, count, tb->count));
 
     if ( count )
@@ -3784,7 +3784,7 @@ print_triple_hash(rdf_db *db, int index, int sample)
     if ( count != 0 )
     { triple *t;
 
-      Sdprintf("%d: c=%d; d=%d", i, count, different);
+      Sdprintf("%d: c=%zd; d=%d", i, count, different);
       for(t=fetch_triple(db, tb->head); t; t=triple_follow_hash(db, t, index))
       { Sdprintf("\n\t");
 	print_triple(t, 0);
