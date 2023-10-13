@@ -88,7 +88,7 @@
 	      rdf_reset_db/0, rdf_load/1
 	    ]).
 :- autoload(library(broadcast),[broadcast/1]).
-:- autoload(library(debug),[debug/3,debugging/1]).
+:- use_module(library(debug),[debug/3,debugging/1]).
 :- autoload(library(gui_tracer),[gtrace/0]).
 :- autoload(library(lists),[append/3]).
 :- autoload(library(uri),[uri_file_name/2,uri_components/2,uri_data/3]).

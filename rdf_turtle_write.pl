@@ -61,7 +61,7 @@ have_rdf_db :- fail.
 :- endif.
 
 :- autoload(library(apply),[maplist/3,include/3,partition/4]).
-:- autoload(library(debug),[assertion/1]).
+:- use_module(library(debug),[assertion/1]).
 :- autoload(library(error),[must_be/2,existence_error/2,type_error/2]).
 :- autoload(library(lists),
 	    [append/2,reverse/2,delete/3,append/3,select/3,member/2]).

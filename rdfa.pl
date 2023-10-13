@@ -51,7 +51,7 @@
 :- use_module(library(xpath),[xpath/3, op(_,_,_)]).
 
 :- autoload(library(apply),[maplist/3,maplist/2,exclude/3,include/3]).
-:- autoload(library(debug),[debugging/1,debug/3]).
+:- use_module(library(debug),[debugging/1,debug/3]).
 :- autoload(library(error),[instantiation_error/1,type_error/2]).
 :- if(exists_source(library(guitracer))).
 :- autoload(library(gui_tracer),[gtrace/0]).

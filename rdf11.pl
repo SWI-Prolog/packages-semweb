@@ -112,7 +112,7 @@
 
 :- autoload(library(apply),[partition/4]).
 :- autoload(library(c14n2),[xml_write_canonical/3]).
-:- autoload(library(debug),[assertion/1,debug/3]).
+:- use_module(library(debug),[assertion/1,debug/3]).
 :- autoload(library(error),
 	    [ must_be/2,
 	      domain_error/2,

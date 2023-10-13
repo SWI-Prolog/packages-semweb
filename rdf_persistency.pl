@@ -53,7 +53,7 @@
               ]).
 
 :- autoload(library(apply),[maplist/2,maplist/3,partition/4,exclude/3]).
-:- autoload(library(debug),[debug/3]).
+:- use_module(library(debug),[debug/3]).
 :- autoload(library(error),
 	    [permission_error/3,must_be/2,domain_error/2]).
 :- autoload(library(filesex),

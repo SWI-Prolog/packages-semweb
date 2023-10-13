@@ -41,7 +41,7 @@
 :- use_module(library(semweb/rdf_db),[lang_equal/2,rdf_is_bnode/1]).
 :- endif.
 :- autoload(library(apply),[partition/4,maplist/3]).
-:- autoload(library(debug),[debug/3]).
+:- use_module(library(debug),[debug/3]).
 :- autoload(library(lists),[select/3]).
 
 /** <module> Compare RDF graphs

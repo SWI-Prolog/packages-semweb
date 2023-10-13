@@ -60,7 +60,7 @@
 	      rdf_statistics_literal_map/2
 	    ]).
 :- autoload(library(apply),[maplist/3]).
-:- autoload(library(debug),[debug/3]).
+:- use_module(library(debug),[debug/3]).
 :- autoload(library(double_metaphone),[double_metaphone/2]).
 :- autoload(library(error),
 	    [instantiation_error/1,must_be/2,domain_error/2]).

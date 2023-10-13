@@ -53,7 +53,7 @@
 
 :- autoload(library(apply),[exclude/3,maplist/2]).
 :- autoload(library(date),[parse_time/2]).
-:- autoload(library(debug),[debug/3]).
+:- use_module(library(debug),[debug/3]).
 :- autoload(library(dif),[dif/2]).
 :- autoload(library(error),[must_be/2,existence_error/2]).
 :- autoload(library(lists),[member/2,list_to_set/2]).

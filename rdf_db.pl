@@ -173,7 +173,7 @@
               ]).
 
 :- autoload(library(apply),[maplist/2,maplist/3]).
-:- autoload(library(debug),[debug/3,assertion/1]).
+:- use_module(library(debug),[debug/3,assertion/1]).
 :- autoload(library(error),[must_be/2,existence_error/2]).
 :- autoload(library(gensym),[gensym/2,reset_gensym/1]).
 :- autoload(library(lists),
