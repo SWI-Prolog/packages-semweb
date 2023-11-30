@@ -193,6 +193,20 @@ url_option(port).
 url_option(path).
 url_option(query_string).
 url_option(search).
+url_option(cert_verify_hook).
+url_option(certificate_file).
+url_option(key_file).
+url_option(certificate_key_pairs).
+url_option(pem_password_hook).
+url_option(crl).
+url_option(cacert_file).
+url_option(cacerts).
+url_option(cipher_list).
+url_option(ecdh_curve).
+url_option(min_protocol_version).
+url_option(max_protocol_version).
+url_option(disable_ssl_methods).
+url_option(ssl_method).
 
 is_url_option(Name = _Value) :-
     url_option(Name),
