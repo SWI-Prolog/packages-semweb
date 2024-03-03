@@ -1501,18 +1501,23 @@ put_graph(turtle_state *ts, term_t g)
   if ( (cg=ts->current_graph) )
   { IOPOS *pos;
 
-    if ( !cg->v.r.handle )
-    { cg->v.r.handle = PL_new_atom_wchars(wcslen(cg->v.r.name), cg->v.r.name);
-    }
+    if ( !put_resource(ts, g, cg) )
+      return FALSE;
 
     if ( (pos=ts->input->position) )
-    { PL_put_variable(g);
-      return PL_unify_term(g, PL_FUNCTOR, FUNCTOR_colon2,
-				PL_ATOM, cg->v.r.handle,
-				PL_INT,  (int)pos->lineno);
+    { term_t line;
+      int rc;
+
+      rc = ( (line = PL_new_term_ref()) &&
+	     PL_put_int64(line, pos->lineno) &&
+	     PL_cons_functor(g, FUNCTOR_colon2, g, line) );
+
+      if ( rc )
+	PL_reset_term_refs(line);
+
+      return rc;
     } else
-    { return PL_put_atom(g, cg->v.r.handle);
-    }
+      return TRUE;
   } else
   { return TRUE;
   }
@@ -2930,9 +2935,8 @@ retry:
 
       NO_GRAPH;
       if ( (r=read_blank_node_label(ts)) )
-      { set_subject(ts, r, NULL);
-	return final_predicate_object_list(ts);
-      }
+	return graph_or_final_predicate_object_list(ts, r,
+						    &graph_keyword_seen);
       return FALSE;
     }
     case ':':
