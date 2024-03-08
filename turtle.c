@@ -3,7 +3,8 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2009-2017, VU University Amsterdam
+    Copyright (c)  2009-2024, VU University Amsterdam
+				 SWI-Prolog solutions b.v.
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -1965,7 +1966,7 @@ read_collection(turtle_state *ts)
 
 static resource *
 read_blank_node_property_list(turtle_state *ts)
-{ resource *olds, *bnode, *oldp = NULL;
+{ resource *olds = NULL, *bnode, *oldp = NULL;
   int rc;
 
   rc = ( set_anon_subject(ts, &olds) &&
