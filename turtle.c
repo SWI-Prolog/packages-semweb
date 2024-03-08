@@ -1965,14 +1965,14 @@ read_collection(turtle_state *ts)
 
 static resource *
 read_blank_node_property_list(turtle_state *ts)
-{ resource *olds, *bnode, *oldp = NULL;
+{ resource *olds = NULL, *bnode, *oldp = NULL;     // initialize olds
   int rc;
 
   rc = ( set_anon_subject(ts, &olds) &&
 	 set_predicate(ts, NULL, &oldp) &&
 	 read_predicate_object_list(ts, "]")
        );
-  set_subject(ts, olds, &bnode);
+  set_subject(ts, olds, &bnode);                   // alternatively: if(rc) set_subject(...);
   set_predicate(ts, oldp, NULL);
 
   if ( rc && ts->current_char == ']' && next(ts) )
