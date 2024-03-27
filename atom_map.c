@@ -206,7 +206,7 @@ get_atom_map(term_t t, atom_map **map)
 static int
 unify_atom_map(term_t t, atom_map *map)
 { return PL_unify_term(t, PL_FUNCTOR, FUNCTOR_atom_map1,
-		            PL_POINTER, map);
+			    PL_POINTER, map);
 }
 
 
@@ -1168,7 +1168,7 @@ rdf_reset_literal_map(term_t handle)
 		 *******************************/
 
 
-term_t
+static foreign_t
 rdf_statistics_literal_map(term_t map, term_t key)
 { atom_map *m;
 
