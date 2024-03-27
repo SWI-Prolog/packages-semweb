@@ -6087,7 +6087,11 @@ rdf_load_db(term_t stream, term_t id, term_t graphs)
   }
 
 error:
-  rdf_broadcast(EV_LOAD, (void*)id, (void*)ATOM_error);
+  term_t err = PL_new_term_ref();
+  if ( err )
+  { PL_put_atom(err, ATOM_error);
+    rdf_broadcast(EV_LOAD, (void*)id, (void*)err);
+  }
   destroy_load_context(db, &ctx, TRUE);
   return FALSE;
 }
