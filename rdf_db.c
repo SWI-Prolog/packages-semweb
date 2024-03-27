@@ -4409,14 +4409,14 @@ rdf_gc_info(term_t info)
 
   return PL_unify_term(info,
 		       PL_FUNCTOR_CHARS, "gc_info", 8,
-		         INT_ARG(life),
-		         INT_ARG(garbage),
-		         INT_ARG(reindex),
-		         INT_ARG(optimizable_hashes(db)),
-		         INT_ARG(keep_gen),
-		         INT_ARG(db->gc.last_gen),
-		         INT_ARG(keep_reindex),
-		         INT_ARG(db->gc.last_reindex_gen));
+			 INT_ARG(life),
+			 INT_ARG(garbage),
+			 INT_ARG(reindex),
+			 INT_ARG(optimizable_hashes(db)),
+			 INT_ARG(keep_gen),
+			 INT_ARG(db->gc.last_gen),
+			 INT_ARG(keep_reindex),
+			 INT_ARG(db->gc.last_reindex_gen));
 }
 
 
@@ -5038,7 +5038,7 @@ Quick Load Format (implemented in pl-wic.c).
 			    <version>
 			    ['S' <graph-name>]
 			    ['F' <graph-source>]
-		            ['t' <modified>]
+			    ['t' <modified>]
 			    ['M' <md5>]
 			    {<triple>}
 			    'E'
@@ -5049,7 +5049,7 @@ Quick Load Format (implemented in pl-wic.c).
 	<md5>		::= <byte>*		(16 bytes digest)
 
 	<triple>	::= 'T'
-	                    <subject>
+			    <subject>
 			    <predicate>
 			    <object>
 			    <graph>
@@ -5213,12 +5213,12 @@ destroy_saved(rdf_db *db, save_context *ctx)
 
 static saved *
 lookup_saved_atom(save_context *ctx, atom_t a)
-{ return lookup_saved(&ctx->atoms, (void*)a);
+{ return lookup_saved(&ctx->atoms, (void*)PL_atom_index(a));
 }
 
 static saved *
 add_saved_atom(rdf_db *db, save_context *ctx, atom_t a)
-{ return add_saved(db, &ctx->atoms, (void*)a);
+{ return add_saved(db, &ctx->atoms, (void*)PL_atom_index(a));
 }
 
 static saved *
@@ -5649,13 +5649,13 @@ add_object(rdf_db *db, void *obj, ld_array *ar)
 
 static int
 add_atom(rdf_db *db, atom_t a, ld_context *ctx)
-{ return add_object(db, (void*)a, &ctx->atoms);
+{ return add_object(db, (void*)PL_atom_index(a), &ctx->atoms);
 }
 
 static atom_t
 fetch_atom(ld_context *ctx, size_t idx)
 { if ( idx < ctx->atoms.loaded_id )
-    return (atom_t)ctx->atoms.loaded_objects[idx];
+    return PL_atom_from_index((size_t)ctx->atoms.loaded_objects[idx]);
 
   return (atom_t)0;
 }
@@ -5993,12 +5993,13 @@ destroy_load_context(rdf_db *db, ld_context *ctx, int delete_triples)
   free_triple_buffer(&ctx->triples);
 
   if ( ctx->atoms.loaded_objects )
-  { atom_t *ap, *ep;
+  { void **ap, **ep;
 
-    for( ap=(atom_t*)ctx->atoms.loaded_objects, ep=ap+ctx->atoms.loaded_id;
+    for( ap=ctx->atoms.loaded_objects, ep=ap+ctx->atoms.loaded_id;
 	 ap<ep;
 	 ap++)
-    { PL_unregister_atom(*ap);
+    { void *x = *ap;
+      PL_unregister_atom(PL_atom_from_index((size_t)x));
     }
 
     free(ctx->atoms.loaded_objects);
@@ -7758,7 +7759,7 @@ rdf_estimate_complexity(+S,+P,+O,-C)
 
 static foreign_t
 rdf_estimate_complexity(term_t subject, term_t predicate, term_t object,
-		        term_t complexity)
+			term_t complexity)
 { triple t;
   size_t c;
   rdf_db *db = rdf_current_db();
@@ -9208,8 +9209,8 @@ rdf_generation(term_t t)
   { assert(q->tr_gen < q->stack->tr_gen_max);
 
     rc = PL_unify_term(t, PL_FUNCTOR, FUNCTOR_plus2,
-		            PL_INT64, q->rd_gen,
-		            PL_INT64, q->tr_gen - q->stack->tr_gen_base);
+			    PL_INT64, q->rd_gen,
+			    PL_INT64, q->tr_gen - q->stack->tr_gen_base);
   } else
   { rc = PL_unify_int64(t, q->rd_gen);
   }
@@ -9875,7 +9876,7 @@ install_rdf_db(void)
   PL_register_foreign("rdf_md5",	2, rdf_md5,	    0);
   PL_register_foreign("rdf_graph_modified_", 3, rdf_graph_modified_, 0);
   PL_register_foreign("rdf_graph_clear_modified_",
-				        1, rdf_graph_clear_modified_, 0);
+					1, rdf_graph_clear_modified_, 0);
   PL_register_foreign("rdf_atom_md5",	3, rdf_atom_md5,    0);
 #endif
 
