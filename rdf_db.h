@@ -183,7 +183,7 @@ typedef struct list
 typedef struct bitmatrix
 { size_t width;
   size_t heigth;
-  int bits[1];
+  unsigned int bits[1];
 } bitmatrix;
 
 

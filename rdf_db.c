@@ -1864,7 +1864,7 @@ delSubPropertyOf(rdf_db *db, triple *t, query *q)
 Reachability matrix.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-#define WBITSIZE (sizeof(int)*8)
+#define WBITSIZE (sizeof(unsigned int)*8)
 
 static size_t
 byte_size_bitmatrix(size_t w, size_t h)
@@ -1901,9 +1901,9 @@ static void
 setbit(bitmatrix *m, int i, int j)
 { size_t ij = m->width*i+j;
   size_t word = ij/WBITSIZE;
-  int bit  = ij%WBITSIZE;
+  unsigned int bit  = ij%WBITSIZE;
 
-  m->bits[word] |= 1<<bit;
+  m->bits[word] |= 1U<<bit;
 }
 
 
@@ -1911,9 +1911,9 @@ static int
 testbit(bitmatrix *m, int i, int j)
 { size_t ij = m->width*i+j;
   size_t word = ij/WBITSIZE;
-  int bit  = ij%WBITSIZE;
+  unsigned int bit  = ij%WBITSIZE;
 
-  return ((m->bits[word] & (1<<bit)) != 0);
+  return ((m->bits[word] & (1U<<bit)) != 0);
 }
 
 
