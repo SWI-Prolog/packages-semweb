@@ -4966,6 +4966,8 @@ match_object(triple *t, triple *p, unsigned flags)
 	  if ( plit->value.term.record &&
 	       plit->value.term.len != tlit->value.term.len )
 	    return FALSE;
+	  if ( plit->value.term.len == 0 )
+	    return TRUE;
 	  return memcmp(tlit->value.term.record, plit->value.term.record,
 			plit->value.term.len) == 0;
 	default:
