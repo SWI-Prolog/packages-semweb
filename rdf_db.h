@@ -155,7 +155,7 @@ typedef struct lifespan
 #define BY_SPOG	(BY_S|BY_P|BY_O|BY_G)	/* 15 */
 
 /* (*) INDEX_TABLES must be consistent with index_col[] in rdf_db.c */
-#define INDEX_TABLES		        10	/* (*)  */
+#define INDEX_TABLES			10	/* (*)  */
 #define INITIAL_TABLE_SIZE		1024
 #define INITIAL_RESOURCE_TABLE_SIZE	8192
 #define INITIAL_PREDICATE_TABLE_SIZE	64
@@ -200,8 +200,8 @@ typedef struct predicate
 { atom_t	    name;		/* name of the predicate */
   struct predicate *next;		/* next in hash-table */
 					/* hierarchy */
-  list	            subPropertyOf;	/* the one I'm subPropertyOf */
-  list	            siblings;		/* reverse of subPropertyOf */
+  list		    subPropertyOf;	/* the one I'm subPropertyOf */
+  list		    siblings;		/* reverse of subPropertyOf */
   struct predicate_cloud *cloud;	/* cloud I belong to */
   is_leaf	   *is_leaf;		/* cached is-leaf information */
   struct predicate *inverse_of;		/* my inverse predicate */

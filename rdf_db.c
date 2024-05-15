@@ -4409,14 +4409,14 @@ rdf_gc_info(term_t info)
 
   return PL_unify_term(info,
 		       PL_FUNCTOR_CHARS, "gc_info", 8,
-		         INT_ARG(life),
-		         INT_ARG(garbage),
-		         INT_ARG(reindex),
-		         INT_ARG(optimizable_hashes(db)),
-		         INT_ARG(keep_gen),
-		         INT_ARG(db->gc.last_gen),
-		         INT_ARG(keep_reindex),
-		         INT_ARG(db->gc.last_reindex_gen));
+			 INT_ARG(life),
+			 INT_ARG(garbage),
+			 INT_ARG(reindex),
+			 INT_ARG(optimizable_hashes(db)),
+			 INT_ARG(keep_gen),
+			 INT_ARG(db->gc.last_gen),
+			 INT_ARG(keep_reindex),
+			 INT_ARG(db->gc.last_reindex_gen));
 }
 
 
@@ -5038,7 +5038,7 @@ Quick Load Format (implemented in pl-wic.c).
 			    <version>
 			    ['S' <graph-name>]
 			    ['F' <graph-source>]
-		            ['t' <modified>]
+			    ['t' <modified>]
 			    ['M' <md5>]
 			    {<triple>}
 			    'E'
@@ -5049,7 +5049,7 @@ Quick Load Format (implemented in pl-wic.c).
 	<md5>		::= <byte>*		(16 bytes digest)
 
 	<triple>	::= 'T'
-	                    <subject>
+			    <subject>
 			    <predicate>
 			    <object>
 			    <graph>
@@ -7758,7 +7758,7 @@ rdf_estimate_complexity(+S,+P,+O,-C)
 
 static foreign_t
 rdf_estimate_complexity(term_t subject, term_t predicate, term_t object,
-		        term_t complexity)
+			term_t complexity)
 { triple t;
   size_t c;
   rdf_db *db = rdf_current_db();
@@ -9208,8 +9208,8 @@ rdf_generation(term_t t)
   { assert(q->tr_gen < q->stack->tr_gen_max);
 
     rc = PL_unify_term(t, PL_FUNCTOR, FUNCTOR_plus2,
-		            PL_INT64, q->rd_gen,
-		            PL_INT64, q->tr_gen - q->stack->tr_gen_base);
+			    PL_INT64, q->rd_gen,
+			    PL_INT64, q->tr_gen - q->stack->tr_gen_base);
   } else
   { rc = PL_unify_int64(t, q->rd_gen);
   }
@@ -9875,7 +9875,7 @@ install_rdf_db(void)
   PL_register_foreign("rdf_md5",	2, rdf_md5,	    0);
   PL_register_foreign("rdf_graph_modified_", 3, rdf_graph_modified_, 0);
   PL_register_foreign("rdf_graph_clear_modified_",
-				        1, rdf_graph_clear_modified_, 0);
+					1, rdf_graph_clear_modified_, 0);
   PL_register_foreign("rdf_atom_md5",	3, rdf_atom_md5,    0);
 #endif
 
