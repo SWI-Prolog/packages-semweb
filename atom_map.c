@@ -272,7 +272,7 @@ atom_to_datum(atom_t a)
 
 static inline datum
 integer_to_datum(intptr_t v)
-{ return (datum)(v<<1);
+{ return (datum)((uintptr_t)v<<1);
 }
 
 
