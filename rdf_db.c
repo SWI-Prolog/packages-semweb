@@ -5576,7 +5576,7 @@ load_int(IOSTREAM *fd)
     shift = (sizeof(first)-bytes)*8;
   }
 
-  first <<= shift;
+  first = (int64_t)((uint64_t)first << shift);
   first >>= shift;
 
   return first;
