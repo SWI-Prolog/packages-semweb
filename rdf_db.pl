@@ -564,7 +564,8 @@ rdf_subject(Resource) :-
 %!  rdf_retractall(?Subject, ?Predicate, ?Object) is det.
 %
 %   Remove   all   matching   triples   from    the   database.   As
-%   rdf_retractall/4 using an unbound graph.
+%   rdf_retractall/4 using an unbound graph. See also
+%   rdf_retractall/4 and rdf_unload/1.
 
 %!  rdf_retractall(?Subject, ?Predicate, ?Object, ?Graph) is det.
 %
@@ -1371,7 +1372,11 @@ rdf_load_db(File) :-
 
 %!  rdf_load(+FileOrList, :Options) is det.
 %
-%   Load RDF data. Options provides   additional processing options.
+%   Load RDF data. If this predicate is called a second time
+%   for the same file, it is by default treated as a no-op.
+%   See option =if(changed)=.
+%
+%   Options provides   additional processing options.
 %   Defined options are:
 %
 %       * blank_nodes(+ShareMode)
