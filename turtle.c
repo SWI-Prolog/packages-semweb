@@ -2934,7 +2934,6 @@ retry:
     case '_':
     { resource *r;
 
-      NO_GRAPH;
       if ( (r=read_blank_node_label(ts)) )
 	return graph_or_final_predicate_object_list(ts, r,
 						    &graph_keyword_seen);
