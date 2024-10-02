@@ -789,6 +789,10 @@ recover_gc('$aborted') :-
     !,
     thread_self(Me),
     thread_detach(Me).
+recover_gc(unwind(abort)) :-
+    !,
+    thread_self(Me),
+    thread_detach(Me).
 recover_gc(Error) :-
     print_message(error, Error),
     rdf_gc_loop.
