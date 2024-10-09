@@ -783,19 +783,19 @@ rdf_create_gc_thread :-
 %   is called from a thread started by creating the RDF DB.
 
 rdf_gc_loop :-
-    catch(rdf_gc_loop(0), E, recover_gc(E)).
+    catch(rdf_gc_loop(0), E, recover_gc(E, Cont)),
+    (   Cont == true
+    ->  rdf_gc_loop
+    ;   thread_self(Me),
+        thread_detach(Me)
+    ).
 
-recover_gc('$aborted') :-
-    !,
-    thread_self(Me),
-    thread_detach(Me).
-recover_gc(unwind(abort)) :-
-    !,
-    thread_self(Me),
-    thread_detach(Me).
-recover_gc(Error) :-
-    print_message(error, Error),
-    rdf_gc_loop.
+recover_gc('$aborted', false) :-
+    !.
+recover_gc(unwind(_), false) :-
+    !.
+recover_gc(Error, true) :-
+    print_message(error, Error).
 
 rdf_gc_loop(CPU) :-
     repeat,
