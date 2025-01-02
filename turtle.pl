@@ -372,11 +372,11 @@ name_uri(Name, BaseURI) :-
 %!  turtle_write_quoted_string(+Out, +Value, ?WriteLong) is det.
 %
 %   Write Value (an atom)  as  a   valid  Turtle  string.  WriteLong
-%   determines wether the string is written   as a _short_ or _long_
+%   determines whether the string is written   as a _short_ or _long_
 %   string.  It takes the following values:
 %
 %     * true
-%     Use Turtle's long string syntax. Embeded newlines and
+%     Use Turtle's long string syntax. Embedded newlines and
 %     single or double quotes are are emitted verbatim.
 %     * false
 %     Use Turtle's short string syntax.

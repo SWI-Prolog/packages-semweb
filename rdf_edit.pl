@@ -371,13 +371,13 @@ rdfe_unregister_ns(Id, URI) :-
 
 %       rdfe_register_ns/0
 %
-%       Reset namespaces to the state they where before usage of the
+%       Reset namespaces to the state they were before usage of the
 %       rdf_edit layer.
 
 rdfe_reset_ns :-
     (   system_ns(_, _)
     ->  retractall(rdf_db:ns(Id, URI)),
-        forall(system_ns(Id, URI), assert(rdb_db:ns(Id, URI)))
+        forall(system_ns(Id, URI), assert(rdf_db:ns(Id, URI)))
     ;   true
     ).
 

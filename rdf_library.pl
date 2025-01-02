@@ -132,7 +132,7 @@ The typical usage scenario is
 %
 %           * import(Bool)
 %           If =true= (default), also load ontologies that are
-%           explicitely imported.
+%           explicitly imported.
 %
 %           * base_uri(URI)
 %           BaseURI used for loading RDF.  Local definitions in

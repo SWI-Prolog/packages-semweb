@@ -5,7 +5,7 @@
 The semweb library provides a Prolog   library based on foreign-language
 extensions for storing and manipulating RDF triples. It can handle quite
 large sets of triples only  limited   by  available  memory. One million
-triples requires about 80MB memory, so   a  fully equiped 32-bit machine
+triples requires about 80MB memory, so  a  fully equipped 32-bit machine
 can handle about 25 million triples. A   64-bit machine with 32Gb memory
 (just a few thousand euros in june 2009)   can  handle up to 150 million
 triples.

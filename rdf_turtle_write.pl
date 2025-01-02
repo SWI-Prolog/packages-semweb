@@ -380,7 +380,7 @@ rdf_save_trig(Spec, QOptions) :-
 %!  rdf_save_canonical_trig(+Spec, :Options) is det.
 %
 %   Save     triples     in     a      canonical     format.     See
-%   rdf_save_canonical_turtle/2 foir details.
+%   rdf_save_canonical_turtle/2 for details.
 
 
 rdf_save_canonical_trig(Spec, M:Options) :-
@@ -1146,7 +1146,7 @@ tw_collection([H|T], Indent, State, Out) :-
 
 %!  unshared_collection(+URI, +State, -Members) is semidet.
 %
-%   True if URI denodes an RDF list that  is made up from bnodes, is
+%   True if URI denotes an RDF list that  is made up from bnodes, is
 %   linked exactly once  to  its  context   and  contains  no  extra
 %   triples.
 
@@ -1327,7 +1327,7 @@ sort_bnode_pairs(Pairs, Sorted, _State) :-
 %   Generate a node-id for BNode.   When writing non-canonically, we
 %   simply number the bnodes.  Otherwise  we   want  a  more  stable
 %   numbering. Our numbering is a hash of  the content of the bnode.
-%   It is not unlikely that we find muliple copies, and therefore we
+%   It is not unlikely that we find multiple copies, and therefore we
 %   number the full id is bn_<hash>_<n>, <n> counting 0...
 
 next_bnode_id(State, _BNode, bnode(Ref)) :-

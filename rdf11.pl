@@ -1152,7 +1152,7 @@ in_type(_, _, _, _).
 %!  in_ground_type(+Type, +Input, -Lexical:atom) is det.
 %
 %   Translate the Prolog date Input according   to Type into its RDF
-%   lexical form. The lecical form  is   represented  as an atom. In
+%   lexical form. The lexical form  is   represented  as an atom. In
 %   future versions this is likely to become a string.
 
 in_ground_type(Type, Input, Lex) :-
@@ -1504,7 +1504,7 @@ out_type(_Unknown, Val, Val0) :-
 %!  out_date_time(+DateTimeType, -Val, +Val0) is det.
 %
 %   Translate an XSD lexical form for   a date/time related datatype
-%   into the cannical form as defined by xsd_time_string/3.
+%   into the canonical form as defined by xsd_time_string/3.
 
 out_date_time(Type, Prolog, Lexical) :-
     catch(xsd_time_string(Prolog, Type, Lexical),
@@ -1814,7 +1814,7 @@ rdf_is_name(T) :- rdf_is_literal(T).
 %   rdf_object/1 for that).
 %
 %   Since any RDF term can appear in the object position, this is
-%   equaivalent to rdf_is_term/1.
+%   equivalent to rdf_is_term/1.
 
 rdf_is_object(T) :- rdf_is_subject(T), !.
 rdf_is_object(T) :- rdf_is_literal(T).

@@ -99,7 +99,7 @@ declarations.  E.g.\
 The \href{http://www.w3.org/TR/void/}{VoID} aims at resolving the same
 problem as the Manifest files described here. In addition, the
 \href{http://vocab.org/vann/}{VANN} vocabulary provides the information
-about preferred namepaces prefixes.  The RDF library manager can deal
+about preferred namespace prefixes. The RDF library manager can deal
 with VoID files.  The following relations apply:
 
 \begin{itemize}
@@ -130,7 +130,7 @@ with VoID files.  The following relations apply:
 
 Currently, the RDF metadata is \emph{not} stored in the RDF database. It
 is processed by low-level primitives that do \emph{not} perform RDFS
-reasoning. In particular, this means that rdfs:supPropertyOf and
+reasoning. In particular, this means that rdfs:subPropertyOf and
 rdfs:subClassOf cannot be used to specialise the RDF meta vocabulary.
 
 

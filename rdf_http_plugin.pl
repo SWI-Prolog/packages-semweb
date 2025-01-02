@@ -77,7 +77,7 @@ error:has_type(rdf_format, Term):-
 %!  rdf_extra_headers(-RequestHeaders:list(compound), +Options:list) is det.
 %
 %   Send extra headers with the request. Note that, although we also
-%   process RDF embedded in HTML, we do  not explicitely ask for it.
+%   process RDF embedded in HTML, we do  not explicitly ask for it.
 %   Doing so causes some   (e.g., http://w3.org/2004/02/skos/core to
 %   reply with the HTML description rather than the RDF).
 %

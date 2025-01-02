@@ -112,7 +112,7 @@ Reasoning systems, not necessarily limited to entailment reasoning, can
 be prototyped efficiently on the Prolog based store. This includes
 `what-if' reasoning, which is supported by \jargon{snapshot} and
 \jargon{transaction} isolation. These features, together with the
-concurrent loading capabilities, make the platform well equiped to
+concurrent loading capabilities, make the platform well equipped to
 collect relevant data from large external stores for intensive
 reasoning. Finally, the
 \href{http://www.swi-prolog.org/pldoc/package/tipc.html}{TIPC} package
@@ -256,7 +256,7 @@ same thread that issued the database manipulation. To process all
 changes in one thread they should be send to a thread message queue. For
 all updating events, the monitor is called while the calling thread has
 a write lock on the RDF store. This implies that these events are
-processed strickly synchronous, even if modifications originate from
+processed strictly synchronous, even if modifications originate from
 multiple threads. In particular, the \const{transaction} \emph{begin},
 \ldots{} \emph{updates} \ldots{} \emph{end} sequence is never
 interleaved with other events. Same for \const{load} and \const{parse}.
@@ -268,7 +268,7 @@ interleaved with other events. Same for \const{load} and \const{parse}.
 This RDF low-level module has been created after two year experimenting
 with a plain Prolog based module and a brief evaluation of a second
 generation pure Prolog implementation. The aim was to be able to handle
-upto about 5 million triples on standard (notebook) hardware and deal
+up to about 5 million triples on standard (notebook) hardware and deal
 efficiently with \const{subPropertyOf} which was identified as a crucial
 feature of RDFS to realise fusion of different data-sets.
 
@@ -492,7 +492,7 @@ and task-dependent this predicate first calls the hook
 \term{rdf_litindex:tokenization}{Literal, -Tokens}. On failure it
 calls tokenize_atom/2 from the NLP package and deletes the following:
 atoms of length 1, floats, integers that are out of range and the
-english words \const{and}, \const{an}, \const{or}, \const{of},
+English words \const{and}, \const{an}, \const{or}, \const{of},
 \const{on}, \const{in}, \const{this} and \const{the}.  Deletion first
 calls the hook \term{rdf_litindex:exclude_from_index}{token, X}.  This
 hook is called as follows:
@@ -518,7 +518,7 @@ between threads, using a locking strategy that allows for multiple
 concurrent readers.
 
 Typically, this module is used together with rdf_monitor/2 on the
-channals \const{new_literal} and \const{old_literal} to maintain an
+channels \const{new_literal} and \const{old_literal} to maintain an
 index of words that appear in a literal. Further abstraction using
 Porter stemming or Metaphone can be used to create additional search
 indices. These can map either directly to the literal values, or
@@ -633,13 +633,13 @@ directory are loaded into the RDF database. Loading a source means
 loading the base state (if any) and replaying the journal (if any). The
 current implementation does not synchronise triples that are in the
 store before attaching a database. They are not removed from the
-database, nor added to the presistent store. Different merging options
+database, nor added to the persistent store. Different merging options
 may be supported through the \arg{Options} argument later.  Currently
 defined options are:
 
     \begin{description}
 	\termitem{concurrency}{+PosInt}
-Number of threads used to reload databased and journals from the
+Number of threads used to reload database and journals from the
 files in \arg{Directory}.  Default is the number of physical CPUs
 determined by the Prolog flag \const{cpu_count} or 1 (one) on
 systems where this number is unknown.  See also concurrent/3.
@@ -652,7 +652,7 @@ graphs. The value can be lowered for scenarios where write operations
 are very infrequent.
 
 	\termitem{silent}{Boolean}
-If \const{true}, supress loading messages from rdf_attach_db/2.
+If \const{true}, suppress loading messages from rdf_attach_db/2.
 
 	\termitem{log_nested_transactions}{Boolean}
 If \const{true}, nested \emph{log} transactions are added to the journal
@@ -681,8 +681,8 @@ Unify \arg{Directory} with the current database directory.  Fails if no
 persistent database is attached.
 
     \predicate{rdf_persistency}{2}{+DB, +Bool}
-Change presistency of named database (4th argument of rdf/4). By default
-all databases are presistent. Using \const{false}, the journal and
+Change persistency of named database (4th argument of rdf/4). By default
+all databases are persistent. Using \const{false}, the journal and
 snapshot for the database are deleted and further changes to triples
 associated with \arg{DB} are not recorded. If \arg{Bool} is \const{true}
 a snapshot is created for the current state and further modifications
@@ -714,7 +714,7 @@ such actions at quiet times or scheduled maintenance periods.
 
 The above predicates suffice for most applications. The predicates in
 this section provide access to the journal files and the base state
-files and are intented to provide additional services, such as reasoning
+files and are intended to provide additional services, such as reasoning
 about the journals, loaded files, etc.%
     \footnote{A library \pllib{rdf_history} is under development
 	      exploiting these features supporting wiki style editing
@@ -881,7 +881,7 @@ True if the domain of \arg{Property} includes \arg{Class}.  Used to
 generate all properties that apply to a class.
 
     \predicate{rdfs_individual_of}{2}{?Resource, ?Class}
-True if \arg{Resource} is an indivisual of \arg{Class}.  This implies
+True if \arg{Resource} is an individual of \arg{Class}.  This implies
 \arg{Resource} has an \const{rdf:type} property that refers to
 \arg{Class} or a sub-class thereof.  Can be used to test, generate
 classes \arg{Resource} belongs to or generate individuals described
@@ -958,7 +958,7 @@ external DL reasoner using DIG.
 \label{sec:semweb-version3}
 
 RDF-DB version 3 is a major redesign of the SWI-Prolog RDF
-infrastructure. Nevertheles, version~3 is almost perfectly upward
+infrastructure. Nevertheless, version~3 is almost perfectly upward
 compatible with version~2. Below are some issues to take into
 consideration when upgrading.
 
@@ -1000,7 +1000,7 @@ add_siblings_2 :-
 In \textbf{version~3}, we can write this in the natural Prolog style
 below. In itself, this may not seem a big advantage because wrapping
 such operations in a transaction is often a good style anyway. The story
-changes with more complicated constrol structures that combine
+changes with more complicated control structures that combine
 iterations with steps that depend on triples asserted in previous steps.
 Such scenarios can be programmed naturally in the current version.
 
@@ -1035,7 +1035,7 @@ Generations inside a transaction are represented as
 \arg{BaseGeneration} is the global generation where the transaction
 started and \arg{TransactionGeneration} expresses the generation within
 the transaction. Counting generation has changed as well. In particular,
-comitting a transaction steps the generation only by one.
+committing a transaction steps the generation only by one.
 
     \item [rdf_current_ns/1, rdf_register_ns/2, rdf_register_ns/3]
 These predicates are renamed into rdf_current_prefix/1,

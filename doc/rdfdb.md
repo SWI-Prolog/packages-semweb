@@ -167,18 +167,18 @@ character properties and independent from the current locale. Case
 conversion is based on the `simple uppercase mapping' defined by Unicode
 and diacritic removal on the `decomposition type'. The approach is
 lightweight, but somewhat simpleminded for some languages. The tables
-are generated for Unicode characters upto 0x7fff. For more information,
+are generated for Unicode characters up to 0x7fff. For more information,
 please check the source-code of the mapping-table generator
 =|unicode_map.pl|= available in the sources of this package.
 
 Currently the total order of literals is first based on the type of
 literal using the ordering _|numeric < string < term|_ Numeric values
-(integer and float) are ordered by value, integers preceed floats if
+(integer and float) are ordered by value, integers precede floats if
 they represent the same value. Strings are sorted alphabetically after
 case-mapping and diacritic removal as described above. If they match
-equal, uppercase preceeds lowercase and diacritics are ordered on their
+equal, uppercase precedes lowercase and diacritics are ordered on their
 unicode value. If they still compare equal literals without any
-qualifier preceeds literals with a type qualifier which preceeds
+qualifier precedes literals with a type qualifier which precedes
 literals with a language qualifier. Same qualifiers (both type or both
 language) are sorted alphabetically.
 
@@ -190,7 +190,7 @@ use the tree index are returned in alphabetical order.
 ## Predicate properties {#semweb-predicates}
 
 The predicates below form an experimental interface to provide more
-reasoning inside the kernel of the rdb_db engine. Note that =symetric=,
+reasoning inside the kernel of the rdf_db engine. Note that =symmetric=,
 =inverse_of= and =transitive= are not yet supported by the rest of the
 engine. Also note that there is no relation to defined RDF properties.
 Properties that have no triples are not reported by this predicate,
@@ -205,7 +205,7 @@ as an instance of rdf:Property.
 Prolog code often contains references to constant resources with a known
 _prefix_ (also known as XML _namespaces_). For example,
 =|http://www.w3.org/2000/01/rdf-schema#Class|= refers to the most
-general notion of an RDFS class. Readability and maintability concerns
+general notion of an RDFS class. Readability and maintainability concerns
 require for abstraction here. The RDF database maintains a table of
 known _prefixes_. This table can be queried using rdf_current_ns/2 and
 can be extended using rdf_register_ns/3. The prefix database is used to
@@ -240,7 +240,7 @@ number of distinct objects for a certain property on a certain object.
         ).
   ==
 
-Now assume we want to write labels/2 that returns the number of distict
+Now assume we want to write labels/2 that returns the number of distinct
 labels of a resource:
 
   ==
@@ -417,9 +417,9 @@ For maximum performance, perform the following steps:
 	ignore(rdf(_, p, _, g)).
     ==
 
-  - Duplicate adminstration is initialized in the background after the
+  - Duplicate administration is initialized in the background after the
     first call that returns a significant amount of duplicates. Creating
-    the adminstration can be forced by calling rdf_update_duplicates/0.
+    the administration can be forced by calling rdf_update_duplicates/0.
 
 Predicates:
 

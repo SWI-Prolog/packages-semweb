@@ -154,7 +154,7 @@ support the format =ntriples= and =nquads=.
 %     * graph(+Graph)
 %     For rdf_read_nquads/3, this defines the graph associated
 %     to _triples_ loaded from the input.  For rdf_read_ntriples/3
-%     this opion is ignored.
+%     this option is ignored.
 %
 %   @arg Triples is a list of rdf(Subject, Predicate, Object)
 %   @arg Quads is a list of rdf(Subject, Predicate, Object, Graph)
