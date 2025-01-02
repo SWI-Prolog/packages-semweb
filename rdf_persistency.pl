@@ -146,7 +146,7 @@ delete the journals.
 %           * concurrency(+Jobs)
 %           Number of threads to use for loading the initial
 %           database.  If not provided it is the number of CPUs
-%           as optained from the flag =cpu_count=.
+%           as obtained from the flag =cpu_count=.
 %
 %           * max_open_journals(+Count)
 %           Maximum number of journals kept open.  If not provided,
@@ -863,8 +863,8 @@ check_nested(_) :-
 %
 %   Add a begin(Id, Level, Time,  Message)   term  if  a transaction
 %   involves DB. Id is an incremental   integer, where each database
-%   has its own counter. Level is the nesting level, Time a floating
-%   point timestamp and Message te message   provided as argument to
+%   has its own counter. Level is the nesting level, Time is a floating
+%   point timestamp and Message is the message provided as argument to
 %   the log message.
 
 open_transaction(DB, Fd) :-

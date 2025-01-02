@@ -51,7 +51,7 @@ strategies that are controlled by rdf_set_cache_options/1.
 cached in a sub-directory of  the   directory  holding  the source. This
 directory is called =|.cache|= (=|_cache|=  on   Windows).  If the cache
 option =create_local_directory= is =true=, a  cache directory is created
-if posible.
+if possible.
 
 *|Global caching|* This approach applies  to   all  sources,  except for
 unnamed streams. Triples are cached in   directory  defined by the cache
@@ -185,8 +185,8 @@ ensure_global_cache(Dir) :-
 %   Return the name of the cache file   for FileURL. The name is the
 %   plain filename with the .trp extension.  As   the  URL is a file
 %   URL, it is guaranteed  to  be   a  valid  filename.  Assumes the
-%   hosting OS can handle  multiple   exensions  (=|.x.y|=)  though.
-%   These days thats even true on Windows.
+%   hosting OS can handle  multiple  extensions  (=|.x.y|=)  though.
+%   These days that's even true on Windows.
 
 local_cache_file(URL, File) :-
     file_base_name(URL, Name),

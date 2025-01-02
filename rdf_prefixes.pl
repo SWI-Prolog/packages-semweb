@@ -288,7 +288,7 @@ rdf_register_ns(Prefix, URI, Options) :-
 
 %!  register_file_prefixes(+Map:list(pair)) is det.
 %
-%   Register a namespace as encounted in   the  namespace list of an
+%   Register a namespace as encountered in the  namespace list of an
 %   RDF document. We only register if  both the abbreviation and URL
 %   are not already known. Is there a   better  way? This code could
 %   also do checks on the consistency   of  RDF and other well-known
@@ -401,7 +401,7 @@ global(Prefix, Local, Global, Module) :-
 
 %!  rdf_global_term(+TermIn, :GlobalTerm) is det.
 %
-%   Performs rdf_global_id/2 on predixed IRIs and rdf_global_object/2 on
+%   Performs rdf_global_id/2 on prefixed IRIs and rdf_global_object/2 on
 %   RDF literals, by recursively  analysing  the   term.  Note  that the
 %   predicate is a meta-predicate  on  the   output  argument.  This  is
 %   necessary to get the module context while  the first argument may be
@@ -540,7 +540,7 @@ valid_arg(A) :-
 %
 %     $ t :
 %     The argument is a term that must be translated. Expansion will
-%     translate all occurences of _prefix_:_local_ appearing
+%     translate all occurrences of _prefix_:_local_ appearing
 %     anywhere in the term. See rdf_global_term/2.
 %
 %   As it is subject to term_expansion/2, the rdf_meta/1 declaration
@@ -548,7 +548,7 @@ valid_arg(A) :-
 %   before the definition of  the  predicates   as  well  as  before
 %   compiling code that  uses  the   rdf  meta-predicates.  The atom
 %   =rdf_meta=  is  declared   as   an    operator   exported   from
-%   library(semweb/rdf_db). Files using rdf_meta/1  must explicitely
+%   library(semweb/rdf_db). Files using rdf_meta/1  must explicitly
 %   load this library.
 %
 %   Beginning with SWI-Prolog 7.3.17, the   low-level  RDF interface

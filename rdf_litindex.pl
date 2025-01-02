@@ -642,7 +642,7 @@ thread_monitor_literal(Action) :-
 %!  check_index_workers(+Queue, +Keys)
 %
 %   Increase the number of workers indexing   literals sent to Queue
-%   if the queue gets overful.
+%   if the queue gets overfull.
 
 check_index_workers(Alias, Keys) :-
     max_extra_workers(Max),
@@ -818,10 +818,10 @@ rdf_stopgap_token2(Token) :-
 
 %!  default_stopgap(?Token)
 %
-%   Tokens we do not wish to index,   as  they creat huge amounts of
+%   Tokens we do not wish to index,  as  they create huge amounts of
 %   data with little or no value.  Is   there  a more general way to
 %   describe this? Experience shows that simply  word count is not a
-%   good criterium as it often rules out popular domain terms.
+%   good criterion as it often rules out popular domain terms.
 
 default_stopgap(and).
 default_stopgap(an).

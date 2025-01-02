@@ -356,7 +356,7 @@ rdfs_collection_member(Element, Set) :-
 
 %!  rdfs_list_to_prolog_list(+RDFSList, -PrologList)
 %
-%   Convert ann RDFS list (result from parseType=Collection) into a
+%   Convert an RDFS list (result from parseType=Collection) into a
 %   Prolog list of elements.
 
 rdfs_list_to_prolog_list(Set, []) :-

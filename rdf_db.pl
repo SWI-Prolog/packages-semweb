@@ -461,7 +461,7 @@ lang_equal(Lang1, Lang2) :-
 %   belongs. Unlike rdf/3, this predicate does not remove duplicates
 %   from the result set.
 %
-%   @param Source is a term Graph:Line.  If Source is instatiated,
+%   @param Source is a term Graph:Line.  If Source is instantiated,
 %   passing an atom is the same as passing Atom:_.
 
 
@@ -483,7 +483,7 @@ lang_equal(Lang1, Lang2) :-
 %
 %   Is true if Object can  be   reached  from  Subject following the
 %   transitive predicate Predicate or a  sub-property thereof, while
-%   repecting the symetric(true) or inverse_of(P2) properties.
+%   respecting the symmetric(true) or inverse_of(P2) properties.
 %
 %   If used with either Subject or  Object unbound, it first returns
 %   the origin, followed by  the  reachable  nodes  in breadth-first
@@ -569,7 +569,7 @@ rdf_subject(Resource) :-
 
 %!  rdf_retractall(?Subject, ?Predicate, ?Object, ?Graph) is det.
 %
-%   As rdf_retractall/3, also matching Graph.   This  is particulary
+%   As rdf_retractall/3, also matching Graph.  This  is particularly
 %   useful to remove all triples coming from a loaded file. See also
 %   rdf_unload/1.
 
@@ -1003,7 +1003,7 @@ rdf_current_predicate(P, DB) :-
 %   properties are given below.
 %
 %     * symmetric(Bool)
-%     True if the predicate is defined to be symetric. I.e., {A} P
+%     True if the predicate is defined to be symmetric. I.e., {A} P
 %     {B} implies {B} P {A}. Setting symmetric is equivalent to
 %     inverse_of(Self).
 %
@@ -1028,7 +1028,7 @@ rdf_current_predicate(P, DB) :-
 %     there are no triples the value 0.0 is returned. This value is
 %     cached with the predicate and recomputed only after
 %     substantial changes to the triple set associated to this
-%     relation. This property is intended for path optimalisation
+%     relation. This property is intended for path optimisation
 %     when solving conjunctions of rdf/3 goals.
 %
 %     * rdf_object_branch_factor(-Float)
@@ -1128,11 +1128,11 @@ rdf_current_snapshot(Term) :-
 %     1. Modifications inside the transactions become all atomically
 %        visible to the outside world if Goal succeeds or remain
 %        invisible if Goal fails or throws an exception.  I.e.,
-%        the _atomicy_ property is fully supported.
+%        the _atomicity_ property is fully supported.
 %     2. _Consistency_ is not guaranteed. Later versions may
 %        implement consistency constraints that will be checked
 %        serialized just before the actual commit of a transaction.
-%     3. Concurrently executing transactions do not infuence each
+%     3. Concurrently executing transactions do not influence each
 %        other.  I.e., the _isolation_ property is fully supported.
 %     4. _Durability_ can be activated by loading
 %        library(semweb/rdf_persistency).
@@ -1255,7 +1255,7 @@ rdf_index(pg).
 %!  rdf_update_duplicates is det.
 %
 %   Update the duplicate administration of the RDF store. This marks
-%   every triple that is potentionally  a   duplicate  of another as
+%   every triple that  is  potentially  a   duplicate  of another as
 %   duplicate. Being potentially a  duplicate   means  that subject,
 %   predicate and object are equivalent and   the  life-times of the
 %   two triples overlap.
@@ -1280,7 +1280,7 @@ rdf_update_duplicates_thread :-
 
 %!  rdf_update_duplicates is det.
 %
-%   Update the duplicate administration. If   this  adminstration is
+%   Update the duplicate administration. If  this  administration is
 %   up-to-date, each triples that _may_ have a duplicate is flagged.
 %   The predicate rdf/3 uses this administration to speedup checking
 %   for duplicate answers.
@@ -1394,7 +1394,7 @@ rdf_load_db(File) :-
 %
 %       * concurrent(+Jobs)
 %       If FileOrList is a list of files, process the input files
-%       using Jobs threads concurrently.  Default is the mininum
+%       using Jobs threads concurrently.  Default is the minimum
 %       of the number of cores and the number of inputs.  Higher
 %       values can be useful when loading inputs from (slow)
 %       network connections.  Using 1 (one) does not use
@@ -2129,7 +2129,7 @@ save_cache(DB, Cache) :-
 
 %!  assert_triples(+Triples, +Source)
 %
-%   Assert a list of triples into the database. Foir security
+%   Assert a list of triples into the database. For security
 %   reasons we check we aren't inserting anything but nice RDF
 %   triples.
 
@@ -2380,7 +2380,7 @@ graph(Options0, DB) :-
 %     option, the expensive search for all namespaces that may be
 %     used by your data is omitted. The namespaces =rdf= and =rdfs=
 %     are added to the provided List. If a namespace is not
-%     declared, the resource is emitted in non-abreviated form.
+%     declared, the resource is emitted in non-abbreviated form.
 
 rdf_save_header(Out, Options) :-
     rdf_save_header(Out, Options, _).
@@ -2491,7 +2491,7 @@ header_namespaces(Options, List) :-
 %
 %       The Where argument gives the location of the prefix ans is
 %       one of =subject=, =predicate=, =object= or =type=. The
-%       Prefix argument is the potentionally new prefix and URI is
+%       Prefix argument is the potentially new prefix and URI is
 %       the full URI that is being processed.
 %
 %       * expand(:Goal)
@@ -2840,8 +2840,8 @@ split_attributes(Atts, HeadAttr, BodyAttr, _) :-
 
 %!  duplicate_attributes(+Attrs, -Duplicates, -Singles)
 %
-%   Extract attributes that appear more than onces as we cannot
-%   dublicate an attribute in the head according to the XML rules.
+%   Extract attributes that appear more than once as we cannot
+%   duplicate an attribute in the head according to the XML rules.
 
 duplicate_attributes([], [], []).
 duplicate_attributes([H|T], Dupls, Singles) :-
@@ -3186,7 +3186,7 @@ rdf_value(V, _, Q, Encoding) :-
 %     - Numeric literals are compared by value and then by type,
 %       where Integer < Decimal < Double
 %     - Other literals are compare lexically, case insensitive.
-%       If equal, uppercase preceeds lowercase.  If still equal,
+%       If equal, uppercase precedes lowercase.  If still equal,
 %       the types are compared lexically.
 
 %!  rdf_match_label(+How, +Pattern, +Label) is semidet.
