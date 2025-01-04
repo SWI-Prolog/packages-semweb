@@ -3,7 +3,8 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2012, VU University Amsterdam
+    Copyright (c)  2012-2025, VU University Amsterdam
+			      SWI-Prolog Solutions b.v.
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -51,7 +52,7 @@ typedef struct skipcell
 { unsigned	height : 6;		/* Max 63 height should do */
   unsigned	erased : 1;		/* Cell is erased */
   unsigned	magic : 25;		/* SKIPCELL_MAGIC */
-  void	       *next[1];
+  void	       *next[];
 } skipcell;
 
 

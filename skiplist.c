@@ -53,10 +53,6 @@ skiplist_debug(int new)
 }
 
 
-#ifndef offsetof
-#define offsetof(structure, field) ((size_t) &(((structure *)NULL)->field))
-#endif
-
 #define subPointer(p,n) (void*)((char*)(p)-(n))
 #define addPointer(p,n) (void*)((char*)(p)+(n))
 

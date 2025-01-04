@@ -107,7 +107,7 @@ typedef void *datum;
 
 typedef struct atom_chash
 { size_t allocated;
-  datum  atoms[1];
+  datum  atoms[];
 } atom_chash;
 
 #define SIZEOF_ATOM_HASH(n)	offsetof(atom_chash, atoms[n])

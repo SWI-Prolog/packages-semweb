@@ -3,8 +3,9 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2003-2020, University of Amsterdam
+    Copyright (c)  2003-2025, University of Amsterdam
                               VU University Amsterdam
+			      SWI-Prolog Solutions b.v.
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -1870,7 +1871,7 @@ static size_t
 byte_size_bitmatrix(size_t w, size_t h)
 { size_t wsize = ((w*h)+WBITSIZE-1)/WBITSIZE;
 
-  return (size_t)(intptr_t)&((bitmatrix*)NULL)->bits[wsize];
+  return offsetof(struct bitmatrix, bits[wsize]);
 }
 
 

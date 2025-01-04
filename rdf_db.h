@@ -3,8 +3,9 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2003-2016, University of Amsterdam
+    Copyright (c)  2003-2025, University of Amsterdam
                               VU University Amsterdam
+			      SWI-Prolog Solutions b.v.
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -183,7 +184,7 @@ typedef struct list
 typedef struct bitmatrix
 { size_t width;
   size_t heigth;
-  unsigned int bits[1];
+  unsigned int bits[];
 } bitmatrix;
 
 

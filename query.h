@@ -80,7 +80,7 @@ typedef struct chunk
 { struct chunk *next;
   int	 used;				/* # used elements */
   int	 size;				/* size of the chunk */
-  struct visited nodes[1];		/* nodes in the chunk */
+  struct visited nodes[];		/* nodes in the chunk */
 } chunk;
 
 

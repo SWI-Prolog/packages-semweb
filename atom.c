@@ -230,13 +230,12 @@ string_hashA(const char *s, size_t len)
 
   while( len>0 )
   { unsigned char buf[256];
-    unsigned char *o = buf-1;
+    unsigned char *o = buf;
     int cp = len > 256 ? 256 : (int)len;
     const unsigned char *e = t+cp;
 
-    t--;
-    while(++t<e)
-      *++o = sort_pointA(*t)>>8;
+    for( ; t < e; t++ )
+      *o++ = sort_pointA(*t)>>8;
     hash ^= rdf_murmer_hash(buf, cp, MURMUR_SEED);
 
     len -= cp;
