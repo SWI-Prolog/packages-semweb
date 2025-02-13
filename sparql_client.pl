@@ -156,7 +156,7 @@ sparql_query(Query, Row, Options) :-
         uri_authority_data(host, AComp, Host),
         uri_authority_data(port, AComp, Port),
         (   var(Port)
-        ->  sparql_port(Scheme, Port, _, _)
+        ->  sparql_port(Scheme, Port, Options, _)
         ;   true
         )
     ;   sparql_param(scheme(Scheme), Options,  Options1),
