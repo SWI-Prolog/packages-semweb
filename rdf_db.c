@@ -4502,19 +4502,27 @@ either case, this is typically called unlocked.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 static void
-free_triple(rdf_db *db, triple *t, int linger)
+free_unallocated_triple(rdf_db *db, triple *t)
 { if ( t->match == STR_MATCH_BETWEEN )
     free_literal_value(db, &t->tp.end);
 
-  if ( !t->allocated )
-  { unlock_atoms(db, t);
-    if ( t->object_is_literal && t->object.literal )
-    { free_literal(db, t->object.literal);
-      t->object_is_literal = FALSE;
-    }
-  } else
-  { unalloc_triple(db, t, linger);
+  unlock_atoms(db, t);
+  if ( t->object_is_literal && t->object.literal )
+  { free_literal(db, t->object.literal);
+    t->object_is_literal = FALSE;
   }
+}
+
+static void
+free_triple(rdf_db *db, triple *t, int linger)
+{ if ( !t->allocated )
+  { free_unallocated_triple(db, t);
+    return;
+  }
+
+  if ( t->match == STR_MATCH_BETWEEN )
+    free_literal_value(db, &t->tp.end);
+  unalloc_triple(db, t, linger);
 }
 
 
@@ -7346,7 +7354,7 @@ free_search_state(search_state *state)
 { if ( state->query )
     close_query(state->query);
 
-  free_triple(state->db, &state->pattern, FALSE);
+  free_unallocated_triple(state->db, &state->pattern);
   destroy_triple_walker(state->db, &state->cursor);
   if ( !state->db->maintain_duplicates &&
        state->dup_answers.count > state->db->duplicate_admin_threshold )
@@ -9642,6 +9650,7 @@ rdf_compare(term_t dif, term_t a, term_t b)
 
   memset(&ta, 0, sizeof(ta));
   memset(&tb, 0, sizeof(tb));
+
   if ( get_object(db, a, &ta) &&
        get_object(db, b, &tb) )
   { int d;
@@ -9666,8 +9675,8 @@ rdf_compare(term_t dif, term_t a, term_t b)
   { rc = FALSE;
   }
 
-  free_triple(db, &ta, FALSE);
-  free_triple(db, &tb, FALSE);
+  free_unallocated_triple(db, &ta);
+  free_unallocated_triple(db, &tb);
 
   return rc;
 }

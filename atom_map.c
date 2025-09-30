@@ -3,8 +3,9 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2006-2015, University of Amsterdam
+    Copyright (c)  2006-2025, University of Amsterdam
                               VU University Amsterdam
+			      SWI-Prolog Solutions b.v.
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -47,6 +48,7 @@
 #include "debug.h"
 #include <string.h>
 #include <assert.h>
+#include <stdbool.h>
 #ifdef __WINDOWS__
 #define inline __inline
 #endif
@@ -182,7 +184,7 @@ init_functors()
 }
 
 
-static int
+static bool
 get_atom_map(term_t t, atom_map **map)
 { if ( PL_is_functor(t, FUNCTOR_atom_map1) )
   { term_t a = PL_new_term_ref();
@@ -194,12 +196,12 @@ get_atom_map(term_t t, atom_map **map)
 
       if ( am->magic == AM_MAGIC )
       { *map = am;
-        return TRUE;
+        return true;
       }
     }
   }
 
-  return PL_type_error("atom_map", t);
+  return PL_type_error("atom_map", t),false;
 }
 
 
