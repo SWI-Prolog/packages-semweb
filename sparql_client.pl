@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2010-2020, University of Amsterdam
+    Copyright (c)  2010-2025, University of Amsterdam
                               VU University Amsterdam
                               SWI-Prolog Solutions b.v.
     All rights reserved.
@@ -54,7 +54,7 @@
               uri_authority_data/3
             ]).
 :- autoload(library(http/http_open), [http_open/3]).
-:- autoload(library(http/json), [json_read/2]).
+:- autoload(library(json), [json_read/2]).
 :- autoload(library(semweb/turtle), [rdf_read_turtle/3]).
 
 /** <module> SPARQL client library
