@@ -1135,8 +1135,7 @@ make_path(File, PWD, Path) :-
                  *******************************/
 
 :- multifile
-    prolog:message/3,
-    user:message_hook/3.
+    prolog:message/3.
 
 %       Catch messages.
 
