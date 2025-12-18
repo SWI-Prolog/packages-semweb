@@ -99,8 +99,8 @@ decimal_dot(void)
   if ( ddot )
     return ddot;
 
-  char buf[10];
-  sprintf(buf, "%f", 1.0);
+  char buf[32];
+  snprintf(buf, sizeof(buf), "%f", 1.0);
   ddot = buf[1];
 
   return ddot;
