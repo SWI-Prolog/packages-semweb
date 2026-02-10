@@ -26,7 +26,7 @@ unsigned int
 rdf_murmer_hash(const void * key, size_t len, unsigned int seed)
 { const unsigned int m = 0x5bd1e995;
   const int r = 24;
-  unsigned int h = seed ^ len;
+  unsigned int h = seed ^ (unsigned int)len;
   const unsigned char * data = (const unsigned char *)key;
 
   while( len >= 4 )
@@ -71,7 +71,7 @@ rdf_murmer_hash(const void *key, size_t len, unsigned int seed)
 { const unsigned int m = 0x5bd1e995;
   const int r = 24;
   const unsigned char * data = (const unsigned char *)key;
-  unsigned int h = seed ^ len;
+  unsigned int h = seed ^ (unsigned int)len;
   int align = (int)(uintptr_t)data & 3;
 
   if ( align && (len >= 4) )
