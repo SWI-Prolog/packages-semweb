@@ -7,17 +7,14 @@
             replay/1                    % +File
           ]).
 :- include(local_test).
-:- prolog_load_context(directory, D),
-   atom_concat(D, '/..', DD),
-   asserta(user:file_search_path(library, DD)).
 
 :- use_module(library(semweb/rdf_db)).
 :- use_module(library(record)).
 :- use_module(library(debug)).
 :- use_module(library(broadcast)).
 :- use_module(library(settings)).
-:- use_module(library(semweb/random_graph)).
-:- use_module(library(semweb/search)).
+:- use_module(random_graph).
+:- use_module(search).
 
 /** <module> Test RDF subproperty handling
 

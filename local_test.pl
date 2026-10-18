@@ -32,22 +32,6 @@
     POSSIBILITY OF SUCH DAMAGE.
 */
 
-assert_search_paths :-
-    current_prolog_flag(xref, true),
-    !.
-assert_search_paths :-
-    asserta(user:file_search_path(foreign, '../sgml')),
-    asserta(user:file_search_path(foreign, '../clib')),
-    asserta(user:file_search_path(foreign, '../zlib')),
-    asserta(user:file_search_path(foreign, '../http')),
-    asserta(user:file_search_path(library, '../sgml')),
-    asserta(user:file_search_path(library, '../clib')),
-    asserta(user:file_search_path(library, '../zlib')),
-    asserta(user:file_search_path(library, '../RDF')),
-    asserta(user:file_search_path(library, '../plunit')),
-    asserta(user:file_search_path(library, '..')),
-    asserta(user:file_search_path(foreign, '.')).
-
 fix_load_path :-
     current_prolog_flag(xref, true),
     !.
@@ -62,5 +46,4 @@ fix_load_path :-
                                   (:- use_module(library(LocalDir/X), Opts)))).
 fix_load_path.
 
-:- assert_search_paths.
 :- fix_load_path.

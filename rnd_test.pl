@@ -39,7 +39,6 @@
             record/1,                   % +Actions
             replay/1                    % +Actions
           ]).
-:- asserta(user:file_search_path(foreign, '.')).
 :- use_module(rdf_db).
 :- use_module(library(thread)).
 :- use_module(library(debug)).
