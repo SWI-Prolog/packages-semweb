@@ -40,7 +40,6 @@
 		 *	       ERRORS		*
 		 *******************************/
 
-static functor_t FUNCTOR_error2;
 static functor_t FUNCTOR_literal1;
 static functor_t FUNCTOR_colon2;
 
@@ -202,8 +201,7 @@ get_prefixed_iri(rdf_db *db, term_t t, atom_t *ap)
 
 int
 init_errors(void)
-{ MKFUNCTOR(error, 2);
-  MKFUNCTOR(literal, 1);
+{ MKFUNCTOR(literal, 1);
   FUNCTOR_colon2 = PL_new_functor(PL_new_atom(":"), 2);
 
   return TRUE;
