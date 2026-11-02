@@ -64,10 +64,6 @@ typedef ptr_hash_table atom_hash_table;
 #define for_atom_hash for_ptr_hash
 
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-SWI-Prolog note: Atoms are integers shifted by LMASK_BITS (7)
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
 #define POINTER_HASH_SHIFT 3
 
 #endif /*HASH_H_INCLUDED*/

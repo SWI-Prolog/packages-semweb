@@ -217,11 +217,11 @@ unify_atom_map(term_t t, atom_map *map)
 		 *******************************/
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Datum is either an atom or a 31-bit  signed integer. Atoms are shifted 7
-bits
+Datum is either an atom or a signed integer.  An atom is its index (see
+PL_atom_index()) shifted left by one with the lowest bit set, an integer
+is shifted left by one.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-#define ATOM_TAG_BITS 7
 #define ATOM_TAG 0x1
 #define EMPTY ((datum)ATOM_TAG)
 
@@ -232,13 +232,9 @@ bits
 #define MAP_MIN_INT	(-(intptr_t)((intptr_t)1<<(sizeof(intptr_t)*8 - 1 - 1)))
 #define MAP_MAX_INT	(-MAP_MIN_INT - 1)
 
-static intptr_t atom_mask;
-
 static void
 init_datum_store(void)
-{ atom_t a = PL_new_atom("[]");
-
-  atom_mask = a & ((1<<(ATOM_TAG_BITS-1))-1);
+{
 }
 
 
@@ -247,7 +243,7 @@ atom_from_datum(datum d)
 { uintptr_t v = (uintptr_t)d;
   atom_t a;
 
-  a  = ((v&~0x1)<<(ATOM_TAG_BITS-1))|atom_mask;
+  a  = PL_atom_from_index(v>>1);
   DEBUG(9, Sdprintf("0x%lx --> %s\n", v, PL_atom_chars(a)));
   return a;
 }
@@ -263,7 +259,7 @@ integer_from_datum(datum d)
 
 static inline datum
 atom_to_datum(atom_t a)
-{ uintptr_t v = (a>>(ATOM_TAG_BITS-1))|ATOM_TAG;
+{ uintptr_t v = ((uintptr_t)PL_atom_index(a)<<1)|ATOM_TAG;
 
   SECURE(assert(atom_from_datum((datum)v) == a));
   DEBUG(9, Sdprintf("Atom %s --> 0x%lx\n", PL_atom_chars(a), v));
