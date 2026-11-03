@@ -7800,7 +7800,7 @@ rdf_estimate_complexity(term_t subject, term_t predicate, term_t object,
   }
 
   rc = PL_unify_int64(complexity, c);
-  free_triple(db, &t, FALSE);
+  free_unallocated_triple(db, &t);
 
   return rc;
 }
@@ -7931,11 +7931,11 @@ update_triple(rdf_db *db, term_t action, triple *t, triple **updated, query *q)
     memset(&t2, 0, sizeof(t2));
 
     if ( !get_object(db, a, &t2) )
-    { free_triple(db, &t2, FALSE);
+    { free_unallocated_triple(db, &t2);
       return FALSE;
     }
     if ( match_object(&t2, &tmp, MATCH_QUAL) )
-    { free_triple(db, &t2, FALSE);
+    { free_unallocated_triple(db, &t2);
       return TRUE;
     }
 
@@ -8046,7 +8046,7 @@ rdf_update5(term_t subject, term_t predicate, term_t object, term_t src,
 out:
   close_query(q);
   free_triple_buffer(&matches);
-  free_triple(db, &t, FALSE);
+  free_unallocated_triple(db, &t);
 
   return (rc && count > 0) ? TRUE : FALSE;
 }
@@ -8101,7 +8101,7 @@ rdf_retractall4(term_t subject, term_t predicate, term_t object, term_t src)
       buffer_triple(&buf, p);
     }
   }
-  free_triple(db, &t, FALSE);
+  free_unallocated_triple(db, &t);
   del_triples(q, buf.base, buf.top-buf.base);
   close_query(q);
   free_triple_buffer(&buf);
